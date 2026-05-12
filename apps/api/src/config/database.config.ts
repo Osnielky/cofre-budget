@@ -1,5 +1,6 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { User } from '../users/user.entity';
 
 export default registerAs('database', (): TypeOrmModuleOptions => ({
   type: 'postgres',
@@ -8,7 +9,7 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   username: process.env.DB_USER ?? 'postgres',
   password: process.env.DB_PASS ?? 'postgres',
   database: process.env.DB_NAME ?? 'cofre_budget',
-  entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+  entities: [User],
   synchronize: true,
   logging: false,
 }));
