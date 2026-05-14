@@ -1,0 +1,59 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#B388FF"/>
+      <stop offset="100%" stop-color="#6B21E8"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F5C842"/>
+      <stop offset="100%" stop-color="#F07A3E"/>
+    </linearGradient>
+    <linearGradient id="handle" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFE08A"/>
+      <stop offset="100%" stop-color="#F07A3E"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Outer rounded-square body -->
+  <rect x="4" y="4" width="92" height="92" rx="24" fill="url(#body)"/>
+
+  <!-- Subtle inner bevel -->
+  <rect x="10" y="10" width="80" height="80" rx="19" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
+
+  <!-- Vault door outer ring -->
+  <circle cx="50" cy="50" r="28" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
+
+  <!-- Vault door inner ring -->
+  <circle cx="50" cy="50" r="20" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+
+  <!-- 4 locking bolts (cardinal positions) -->
+  <!-- Top -->
+  <rect x="44" y="10" width="12" height="9" rx="3.5" fill="url(#bolt)" filter="url(#glow)"/>
+  <!-- Bottom -->
+  <rect x="44" y="81" width="12" height="9" rx="3.5" fill="url(#bolt)" filter="url(#glow)"/>
+  <!-- Left -->
+  <rect x="10" y="44" width="9" height="12" rx="3.5" fill="url(#bolt)" filter="url(#glow)"/>
+  <!-- Right -->
+  <rect x="81" y="44" width="9" height="12" rx="3.5" fill="url(#bolt)" filter="url(#glow)"/>
+
+  <!-- Dial tick marks -->
+  <line x1="50" y1="25" x2="50" y2="29" stroke="rgba(255,255,255,0.35)" stroke-width="2" stroke-linecap="round"/>
+  <line x1="50" y1="71" x2="50" y2="75" stroke="rgba(255,255,255,0.35)" stroke-width="2" stroke-linecap="round"/>
+  <line x1="25" y1="50" x2="29" y2="50" stroke="rgba(255,255,255,0.35)" stroke-width="2" stroke-linecap="round"/>
+  <line x1="71" y1="50" x2="75" y2="50" stroke="rgba(255,255,255,0.35)" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Center handle disc -->
+  <circle cx="50" cy="50" r="12" fill="url(#handle)" filter="url(#glow)"/>
+  <circle cx="50" cy="50" r="12" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+
+  <!-- Handle grip dot -->
+  <circle cx="50" cy="50" r="4.5" fill="rgba(255,255,255,0.30)"/>
+  <circle cx="50" cy="50" r="2" fill="rgba(255,255,255,0.55)"/>
+
+  <!-- Tiny indicator line on dial -->
+  <line x1="50" y1="41" x2="50" y2="45" stroke="rgba(80,30,0,0.4)" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

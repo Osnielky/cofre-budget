@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Logo from '@/components/Logo';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -32,12 +33,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-dvh" style={{ background: 'var(--color-base)' }}>
-      <div className="w-full max-w-sm p-10 flex flex-col gap-8" style={{ background: 'var(--color-surface)', borderRadius: 'var(--radius-card)' }}>
-
-        <div className="text-center flex flex-col gap-1">
-          <h1 className="text-3xl font-extrabold tracking-tight">Cofre</h1>
-          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Budget tracker</p>
+    <div className="flex items-center justify-center min-h-dvh px-4">
+      <div
+        className="w-full max-w-sm p-10 flex flex-col gap-8"
+        style={{
+          background: 'rgba(35, 35, 47, 0.55)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          border: '1px solid rgba(255,255,255,0.09)',
+          boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
+          borderRadius: 'var(--radius-card)',
+        }}
+      >
+        <div className="text-center flex flex-col items-center gap-3">
+          <Logo size={64} />
+          <div className="flex flex-col gap-0.5">
+            <h1 className="text-3xl font-extrabold tracking-tight">Cofre</h1>
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Budget tracker</p>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -48,8 +61,8 @@ export default function LoginPage() {
               placeholder="you@example.com"
               className="px-4 py-3 text-sm outline-none transition-colors"
               style={{
-                background: 'var(--color-elevated)',
-                border: '1px solid var(--color-border)',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.10)',
                 borderRadius: 'var(--radius-input)',
                 color: 'var(--color-text-primary)',
               }}
@@ -63,8 +76,8 @@ export default function LoginPage() {
               placeholder="••••••••"
               className="px-4 py-3 text-sm outline-none transition-colors"
               style={{
-                background: 'var(--color-elevated)',
-                border: '1px solid var(--color-border)',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.10)',
                 borderRadius: 'var(--radius-input)',
                 color: 'var(--color-text-primary)',
               }}
