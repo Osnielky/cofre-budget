@@ -62,6 +62,8 @@ body {
   box-shadow: var(--glass-shadow);
 }
 
+@keyframes spin { to { transform: rotate(360deg); } }
+
 ::-webkit-scrollbar        { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track  { background: transparent; }
 ::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.12); border-radius: 3px; }
