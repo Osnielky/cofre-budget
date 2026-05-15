@@ -85,7 +85,8 @@ export default function BudgetsPage() {
 
   const usedCategoryIds = new Set(budgets.map((b) => b.categoryId));
   const availableCategories = categories.filter(
-    (c) => !usedCategoryIds.has(c.id) || c.id === form.categoryId,
+    (c) => c.type !== 'transfer' && c.type !== 'income' &&
+           (!usedCategoryIds.has(c.id) || c.id === form.categoryId),
   );
 
   async function handleSubmit(e: React.FormEvent) {
@@ -213,7 +214,7 @@ export default function BudgetsPage() {
                   disabled={!!editingId}
                   className="px-3 py-2.5 text-sm outline-none appearance-none" style={inputStyle}>
                   <option value="">Select a category</option>
-                  {availableCategories.filter((c) => c.type !== 'income').map((c) => (
+                  {availableCategories.map((c) => (
                     <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
                   ))}
                 </select>

@@ -3,4 +3,5 @@ export class UpsertCategoryDto {
   icon: string;
   color: string;
   type?: string;
+  description?: string | null;
 }

@@ -20,6 +20,9 @@ export class Category {
   @Column()
   name: string;
 
+  @Column({ type: 'varchar', nullable: true, default: null })
+  description: string | null;
+
   @Column()
   icon: string;
 

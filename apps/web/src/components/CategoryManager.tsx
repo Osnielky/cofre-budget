@@ -1,32 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import CategoryFormModal, { Category as CatType } from './CategoryFormModal';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  type: string;
-  isDefault: boolean;
-}
+type Category = CatType;
 
-const PRESET_COLORS = ['#9B6DFF','#4FBF7F','#F07A3E','#F5C842','#4BA8D8','#E879A0','#5C5C78','#FF6B6B'];
+const TRANSFER_TIP = "Transfer categories are for transactions that move money between your own accounts — like paying a credit card bill or moving funds to savings. They are excluded from budget calculations and income/expense totals so your reports stay accurate.";
 
-const EMOJI_OPTIONS = [
-  '🍔','🍕','🍣','🥗','☕','🍺','🛒','🥦',
-  '🚗','🚕','✈️','🚂','🚲','⛽','🛵','🚌',
-  '🛍️','👗','👟','💍','📦','🛋️','🔧','🏠',
-  '💊','🏥','🏃','🧘','🦷','❤️','🧠','🩺',
-  '🎬','🎮','🎵','🎭','📚','🎨','🎲','🏆',
-  '💡','🔌','📡','🌊','🔥','❄️','☀️','🌙',
-  '💼','💰','📈','💳','🏦','💎','🪙','💵',
-  '📱','💻','⌨️','📷','🎓','✏️','📋','🗓️',
-  '✈️','🏖️','🗺️','🏕️','🎡','🎢','🚢','🎠',
-  '🐾','🌿','🎁','✨','🔑','🧺','🪴','🧹',
-];
+const TYPE_META: Record<string, { label: string; color: string }> = {
+  expense:  { label: 'Expense',  color: '#F07A3E' },
+  income:   { label: 'Income',   color: '#4FBF7F' },
+  both:     { label: 'Both',     color: '#9B6DFF' },
+  transfer: { label: 'Transfer', color: '#6B6B8A' },
+};
 
 const glass: React.CSSProperties = {
   background: 'rgba(35, 35, 47, 0.50)',
@@ -36,243 +25,345 @@ const glass: React.CSSProperties = {
   boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
 };
 
-const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.10)',
-  borderRadius: 'var(--radius-input)',
-  color: 'var(--color-text-primary)',
-};
-
-const TYPE_COLORS: Record<string, string> = {
-  expense: '#F07A3E',
-  income:  '#4FBF7F',
-  both:    '#9B6DFF',
-};
-
 export default function CategoryManager() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Category | null>(null);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-
-  const [form, setForm] = useState({ name: '', icon: '📦', color: PRESET_COLORS[0], type: 'expense' });
+  const [deletingId, setDeletingId]         = useState<string | null>(null);
+  const [confirmCat, setConfirmCat]         = useState<Category | null>(null);
+  const [usageCount, setUsageCount]         = useState<number | null>(null);
+  const [usageLoading, setUsageLoading]     = useState(false);
+  const [deleteAction, setDeleteAction]     = useState<'uncat' | 'reassign'>('uncat');
+  const [reassignTarget, setReassignTarget] = useState('');
 
   useEffect(() => {
     fetch(`${API}/categories`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then(setCategories)
-      .finally(() => setLoading(false));
+      .then((r) => r.json()).then(setCategories).finally(() => setLoading(false));
   }, []);
 
-  function startCreate() {
-    setEditing(null);
-    setForm({ name: '', icon: '📦', color: PRESET_COLORS[0], type: 'expense' });
-    setShowForm(true);
-  }
+  function startCreate() { setEditing(null); setShowForm(true); }
+  function startEdit(cat: Category) { setEditing(cat); setShowForm(true); }
+  function closeForm() { setShowForm(false); setEditing(null); }
 
-  function startEdit(cat: Category) {
-    setEditing(cat);
-    setForm({ name: cat.name, icon: cat.icon, color: cat.color, type: cat.type });
-    setShowForm(true);
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const url = editing ? `${API}/categories/${editing.id}` : `${API}/categories`;
-    const method = editing ? 'PATCH' : 'POST';
-    const res = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(form),
-    });
-    const saved: Category = await res.json();
+  function handleSaved(saved: Category) {
     setCategories((prev) =>
       editing ? prev.map((c) => (c.id === saved.id ? saved : c)) : [...prev, saved],
     );
-    setShowForm(false);
-    setEditing(null);
+    closeForm();
   }
 
-  async function handleDelete(id: string) {
-    setDeletingId(id);
+  async function openDeleteConfirm(cat: Category) {
+    setConfirmCat(cat);
+    setDeleteAction('uncat');
+    setReassignTarget('');
+    setUsageCount(null);
+    setUsageLoading(true);
+    const res = await fetch(`${API}/categories/${cat.id}/usage`, { credentials: 'include' });
+    const data = await res.json();
+    setUsageCount(data.count ?? 0);
+    setUsageLoading(false);
+  }
+
+  async function confirmDelete() {
+    if (!confirmCat) return;
+    setDeletingId(confirmCat.id);
     try {
-      await fetch(`${API}/categories/${id}`, { method: 'DELETE', credentials: 'include' });
-      setCategories((prev) => prev.filter((c) => c.id !== id));
-    } finally {
-      setDeletingId(null);
-    }
+      const qs = deleteAction === 'reassign' && reassignTarget ? `?reassignTo=${reassignTarget}` : '';
+      await fetch(`${API}/categories/${confirmCat.id}${qs}`, { method: 'DELETE', credentials: 'include' });
+      setCategories((prev) => prev.filter((c) => c.id !== confirmCat.id));
+      setConfirmCat(null);
+    } finally { setDeletingId(null); }
   }
 
-  const expenses  = categories.filter((c) => c.type === 'expense');
-  const incomes   = categories.filter((c) => c.type === 'income');
-  const both      = categories.filter((c) => c.type === 'both');
+  const expenseCats  = categories.filter((c) => c.type === 'expense');
+  const bothCats     = categories.filter((c) => c.type === 'both');
+  const incomeCats   = categories.filter((c) => c.type === 'income');
+  const transferCats = categories.filter((c) => c.type === 'transfer');
 
   return (
-    <section className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
+
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="font-semibold text-base">Categories</h2>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-            Organize your transactions with custom categories.
-          </p>
-        </div>
-        {!showForm && (
-          <button onClick={startCreate}
-            className="px-4 py-2 text-sm font-semibold text-white rounded-xl transition-all hover:brightness-110"
-            style={{ background: 'var(--color-card-violet)' }}>
-            + Add Category
-          </button>
-        )}
+        <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+          Organize your transactions with custom categories.
+        </p>
+        <button onClick={startCreate}
+          className="px-4 py-2 text-sm font-semibold text-white rounded-xl transition-all hover:brightness-110"
+          style={{ background: 'var(--color-card-violet)' }}>
+          + Add Category
+        </button>
       </div>
 
-      {/* Form */}
+      {/* Add / Edit modal */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
-          <p className="font-semibold text-sm">{editing ? 'Edit Category' : 'New Category'}</p>
-
-          <div className="grid grid-cols-2 gap-3">
-            {/* Icon picker */}
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Icon</span>
-              <div className="relative">
-                <button type="button" onClick={() => setShowEmojiPicker((v) => !v)}
-                  className="w-full px-3 py-2.5 text-left flex items-center gap-3 text-sm"
-                  style={inputStyle}>
-                  <span className="text-xl">{form.icon}</span>
-                  <span style={{ color: 'var(--color-text-muted)' }}>Choose icon</span>
-                </button>
-                {showEmojiPicker && (
-                  <div className="absolute z-10 top-full mt-1 left-0 p-3 rounded-xl grid grid-cols-8 gap-1"
-                    style={{ ...glass, width: '280px' }}>
-                    {EMOJI_OPTIONS.map((e) => (
-                      <button key={e} type="button"
-                        onClick={() => { setForm((f) => ({ ...f, icon: e })); setShowEmojiPicker(false); }}
-                        className="w-8 h-8 rounded-lg text-lg flex items-center justify-center transition-colors hover:bg-white/10"
-                        style={{ background: form.icon === e ? 'rgba(155,109,255,0.25)' : 'transparent' }}>
-                        {e}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </label>
-
-            {/* Name */}
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Name</span>
-              <input required placeholder="e.g. Groceries" value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className="px-3 py-2.5 text-sm outline-none" style={inputStyle} />
-            </label>
-
-            {/* Type */}
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Type</span>
-              <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-                className="px-3 py-2.5 text-sm outline-none appearance-none" style={inputStyle}>
-                <option value="expense">Expense</option>
-                <option value="income">Income</option>
-                <option value="both">Both</option>
-              </select>
-            </label>
-
-            {/* Color */}
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Color</span>
-              <div className="flex items-center gap-2 px-3 py-2" style={{ ...inputStyle, borderRadius: 'var(--radius-input)' }}>
-                {PRESET_COLORS.map((c) => (
-                  <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
-                    className="w-6 h-6 rounded-full transition-transform hover:scale-110 shrink-0"
-                    style={{ background: c, outline: form.color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }} />
-                ))}
-              </div>
-            </label>
-          </div>
-
-          {/* Preview */}
-          <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-              style={{ background: `${form.color}22`, border: `1px solid ${form.color}44` }}>
-              {form.icon}
-            </div>
-            <div>
-              <p className="font-semibold text-sm">{form.name || 'Category name'}</p>
-              <p className="text-xs capitalize" style={{ color: TYPE_COLORS[form.type] }}>{form.type}</p>
-            </div>
-          </div>
-
-          <div className="flex gap-2 justify-end">
-            <button type="button" onClick={() => { setShowForm(false); setEditing(null); }}
-              className="px-4 py-2 text-sm font-medium rounded-xl"
-              style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              Cancel
-            </button>
-            <button type="submit"
-              className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110"
-              style={{ background: 'var(--color-card-violet)' }}>
-              {editing ? 'Save Changes' : 'Add Category'}
-            </button>
-          </div>
-        </form>
+        <CategoryFormModal
+          editing={editing}
+          onClose={closeForm}
+          onSaved={handleSaved}
+        />
       )}
 
-      {/* Grid */}
+
+      {/* 3-column category layout */}
       {loading ? (
         <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading categories…</p>
+      ) : categories.length === 0 ? (
+        <div className="py-10 flex flex-col items-center gap-2 text-center" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
+          <span className="text-3xl">🏷️</span>
+          <p className="text-sm font-medium">No categories yet</p>
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Add your first category to start organizing.</p>
+        </div>
       ) : (
-        <div className="flex flex-col gap-5">
-          {[
-            { label: 'Expense', items: expenses, color: '#F07A3E' },
-            { label: 'Income',  items: incomes,  color: '#4FBF7F' },
-            { label: 'Both',    items: both,     color: '#9B6DFF' },
-          ].filter((g) => g.items.length > 0).map((group) => (
-            <div key={group.label}>
-              <p className="text-xs font-bold tracking-widest uppercase mb-2 px-1"
-                style={{ color: group.color }}>{group.label}</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2">
-                {group.items.map((cat) => (
-                  <div key={cat.id} className="p-3 flex items-center gap-3 group relative"
-                    style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
-                      style={{ background: `${cat.color}22`, border: `1px solid ${cat.color}44` }}>
-                      {cat.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold truncate">{cat.name}</p>
-                      {cat.isDefault && (
-                        <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Default</p>
-                      )}
-                    </div>
-                    {/* Actions — visible on hover */}
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex gap-1">
-                      <button onClick={() => startEdit(cat)}
-                        className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-white/15"
-                        title="Edit">
-                        <PencilIcon />
-                      </button>
-                      <button onClick={() => handleDelete(cat.id)} disabled={deletingId === cat.id}
-                        className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-red-500/20 disabled:opacity-40"
-                        title="Delete">
-                        {deletingId === cat.id ? <span className="text-[10px]">…</span> : <TrashIcon />}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+
+          {/* ── Expenses column ── */}
+          <CategoryColumn
+            title="Expenses" color="#F07A3E" icon="💸"
+            cats={[...expenseCats, ...bothCats]}
+
+            onEdit={startEdit} onDelete={openDeleteConfirm} deletingId={deletingId}
+          />
+
+          {/* ── Income column ── */}
+          <CategoryColumn
+            title="Income" color="#4FBF7F" icon="💰"
+            cats={incomeCats}
+
+            onEdit={startEdit} onDelete={openDeleteConfirm} deletingId={deletingId}
+          />
+
+          {/* ── Transfers column ── */}
+          <div className="flex flex-col gap-3">
+            <CategoryColumn
+              title="Transfers" color="#6B6B8A" icon="🔄"
+              cats={transferCats}
+  
+              onEdit={startEdit} onDelete={openDeleteConfirm} deletingId={deletingId}
+            />
+            {/* Transfer info tip */}
+            {transferCats.length > 0 && (
+              <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
+                style={{ background: 'rgba(107,107,138,0.10)', border: '1px solid rgba(107,107,138,0.25)' }}>
+                <span className="text-base shrink-0">ℹ️</span>
+                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+                  {TRANSFER_TIP}
+                </p>
               </div>
-            </div>
-          ))}
+            )}
+          </div>
+
         </div>
       )}
-    </section>
+
+      {/* Delete confirmation modal */}
+      {confirmCat && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-md rounded-2xl flex flex-col gap-5 p-6"
+            style={{ background: 'rgba(25,25,40,0.97)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+
+            {/* Header */}
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                style={{ background: `${confirmCat.color}20` }}>
+                {confirmCat.icon}
+              </div>
+              <div>
+                <p className="font-bold text-base">Delete "{confirmCat.name}"?</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            {/* Usage count */}
+            <div className="rounded-xl px-4 py-3 flex items-center gap-3"
+              style={{ background: 'rgba(245,200,66,0.07)', border: '1px solid rgba(245,200,66,0.18)' }}>
+              <span className="text-lg shrink-0">🏷️</span>
+              {usageLoading ? (
+                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Checking transactions…</p>
+              ) : usageCount === 0 ? (
+                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                  No transactions use this category. Safe to delete.
+                </p>
+              ) : (
+                <p className="text-sm">
+                  <span className="font-bold" style={{ color: '#F5C842' }}>{usageCount} transaction{usageCount !== 1 ? 's' : ''}</span>
+                  <span style={{ color: 'var(--color-text-muted)' }}> are currently using this category.</span>
+                </p>
+              )}
+            </div>
+
+            {/* What to do with transactions */}
+            {!usageLoading && (usageCount ?? 0) > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                  What should happen to those transactions?
+                </p>
+
+                {/* Option 1: leave uncategorized */}
+                <label className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-white/5"
+                  style={{ border: `1px solid ${deleteAction === 'uncat' ? 'rgba(155,109,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                           background: deleteAction === 'uncat' ? 'rgba(155,109,255,0.07)' : 'transparent' }}>
+                  <input type="radio" name="deleteAction" value="uncat" checked={deleteAction === 'uncat'}
+                    onChange={() => setDeleteAction('uncat')} className="mt-0.5 accent-violet-500" />
+                  <div>
+                    <p className="text-sm font-semibold">Leave uncategorized</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                      Transactions will appear in the "Uncategorized" filter until you reassign them manually.
+                    </p>
+                  </div>
+                </label>
+
+                {/* Option 2: reassign */}
+                <label className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-white/5"
+                  style={{ border: `1px solid ${deleteAction === 'reassign' ? 'rgba(155,109,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
+                           background: deleteAction === 'reassign' ? 'rgba(155,109,255,0.07)' : 'transparent' }}>
+                  <input type="radio" name="deleteAction" value="reassign" checked={deleteAction === 'reassign'}
+                    onChange={() => setDeleteAction('reassign')} className="mt-0.5 accent-violet-500" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold">Reassign to another category</p>
+                    <p className="text-xs mt-0.5 mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                      All transactions will be moved to the selected category automatically.
+                    </p>
+                    {deleteAction === 'reassign' && (
+                      <select value={reassignTarget} onChange={(e) => setReassignTarget(e.target.value)}
+                        className="w-full px-3 py-2 text-sm rounded-lg outline-none appearance-none"
+                        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--color-text-primary)' }}>
+                        <option value="">Select category…</option>
+                        {categories.filter((c) => c.id !== confirmCat.id).map((c) => (
+                          <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2 justify-end pt-1">
+              <button onClick={() => setConfirmCat(null)}
+                className="px-4 py-2 text-sm font-medium rounded-xl transition-colors hover:bg-white/10"
+                style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deletingId === confirmCat.id || usageLoading || (deleteAction === 'reassign' && !reassignTarget)}
+                className="px-4 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110 disabled:opacity-40"
+                style={{ background: 'rgba(255,107,107,0.18)', border: '1px solid rgba(255,107,107,0.35)', color: '#FF6B6B' }}>
+                {deletingId === confirmCat.id ? 'Deleting…' : 'Delete Category'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+    </div>
   );
+}
+
+/* ── CategoryColumn ─────────────────────────────────────────────── */
+interface ColProps {
+  title: string; color: string; icon: string;
+  cats: Category[];
+  onEdit: (c: Category) => void;
+  onDelete: (c: Category) => void;
+  deletingId: string | null;
+}
+function CategoryColumn({ title, color, icon, cats, onEdit, onDelete, deletingId }: ColProps) {
+  const glass: React.CSSProperties = {
+    background: 'rgba(35,35,47,0.50)', backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+  };
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Column header */}
+      <div className="flex items-center gap-2 px-1 pb-1">
+        <span className="text-sm">{icon}</span>
+        <span className="text-xs font-bold uppercase tracking-wider" style={{ color }}>{title}</span>
+        <span className="text-xs font-semibold rounded-md px-1.5 py-0.5 ml-auto"
+          style={{ background: `${color}18`, color }}>{cats.length}</span>
+      </div>
+
+      {cats.length === 0 ? (
+        <div className="py-6 flex items-center justify-center rounded-xl"
+          style={{ border: '1px dashed rgba(255,255,255,0.07)' }}>
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }}>None yet</p>
+        </div>
+      ) : (
+        <div className="flex flex-col overflow-hidden" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
+          {cats.map((cat, i) => {
+            const isBoth = cat.type === 'both';
+            return (
+              <div key={cat.id}
+                className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.025] group"
+                style={i > 0 ? { borderTop: '1px solid rgba(255,255,255,0.05)' } : {}}>
+
+                {/* Color bar */}
+                <div className="w-1 self-stretch rounded-full shrink-0 my-0.5" style={{ background: cat.color }} />
+
+                {/* Icon */}
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
+                  style={{ background: `${cat.color}18`, border: `1px solid ${cat.color}28` }}>
+                  {cat.icon}
+                </div>
+
+                {/* Name + description */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className="text-sm font-semibold truncate">{cat.name}</p>
+                    {isBoth && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                        style={{ background: 'rgba(155,109,255,0.15)', color: '#9B6DFF' }}>Both</span>
+                    )}
+                    {cat.isDefault && (
+                      <span className="text-[9px] rounded shrink-0" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>Default</span>
+                    )}
+                  </div>
+                  {cat.description && (
+                    <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                      {cat.description}
+                    </p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                  <button onClick={() => onEdit(cat)}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
+                    title="Edit" style={{ color: 'var(--color-text-secondary)' }}>
+                    <PencilIcon />
+                  </button>
+                  <button onClick={() => onDelete(cat)} disabled={deletingId === cat.id}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 disabled:opacity-40"
+                    title="Delete">
+                    {deletingId === cat.id
+                      ? <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>…</span>
+                      : <TrashIcon />}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CloseIcon() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 }
 
 function PencilIcon() {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-text-secondary)' }}>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
     </svg>
@@ -281,7 +372,8 @@ function PencilIcon() {
 
 function TrashIcon() {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--color-text-muted)' }}>
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+      style={{ color: '#FF6B6B' }}>
       <polyline points="3 6 5 6 21 6"/>
       <path d="M19 6l-1 14H6L5 6"/>
       <path d="M10 11v6M14 11v6"/>

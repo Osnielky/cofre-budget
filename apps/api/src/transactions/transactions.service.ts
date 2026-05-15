@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Transaction } from './transaction.entity';
@@ -18,14 +18,24 @@ export class TransactionsService {
     @InjectRepository(BankAccount) private accountRepo: Repository<BankAccount>,
   ) {}
 
-  findByUser(userId: string, bankAccountId?: string, limit = 50): Promise<Transaction[]> {
+  findByUser(
+    userId: string,
+    bankAccountId?: string,
+    from?: string,
+    to?: string,
+    limit = 500,
+  ): Promise<Transaction[]> {
     const qb = this.repo.createQueryBuilder('tx')
+      .leftJoinAndSelect('tx.categoryRef', 'categoryRef')
+      .leftJoinAndSelect('tx.bankAccount', 'bankAccount')
       .where('tx.userId = :userId', { userId })
       .orderBy('tx.date', 'DESC')
       .addOrderBy('tx.createdAt', 'DESC')
       .limit(limit);
 
     if (bankAccountId) qb.andWhere('tx.bankAccountId = :bankAccountId', { bankAccountId });
+    if (from) qb.andWhere('tx.date >= :from', { from });
+    if (to)   qb.andWhere('tx.date <= :to', { to });
     return qb.getMany();
   }
 
@@ -62,10 +72,39 @@ export class TransactionsService {
     return { imported, skipped };
   }
 
-  async updateCategory(id: string, userId: string, category: string): Promise<Transaction> {
+  async createManual(userId: string, dto: {
+    name: string; amount: number; date: string;
+    bankAccountId: string; categoryId?: string | null;
+  }): Promise<Transaction> {
+    const account = await this.accountRepo.findOneBy({ id: dto.bankAccountId });
+    if (!account || account.userId !== userId) throw new ForbiddenException();
+    const saved = await this.repo.save(
+      this.repo.create({
+        userId,
+        bankAccountId: dto.bankAccountId,
+        source: 'manual',
+        amount: dto.amount,
+        name: dto.name,
+        date: dto.date,
+        pending: false,
+        categoryId: dto.categoryId ?? undefined,
+      }),
+    );
+    return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'bankAccount'] });
+  }
+
+  async deleteManual(id: string, userId: string): Promise<void> {
+    const tx = await this.repo.findOneBy({ id, userId });
+    if (!tx) throw new NotFoundException();
+    if (tx.source !== 'manual') throw new BadRequestException('Only manual transactions can be deleted');
+    await this.repo.remove(tx);
+  }
+
+  async updateCategory(id: string, userId: string, categoryId: string | null): Promise<Transaction> {
     const tx = await this.repo.findOneByOrFail({ id, userId });
-    tx.category = category;
-    return this.repo.save(tx);
+    tx.categoryId = categoryId ?? undefined;
+    const saved = await this.repo.save(tx);
+    return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef'] });
   }
 }
 
