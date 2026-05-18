@@ -12,10 +12,14 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null }
 interface Budget { id: string; categoryId: string; category: Category; amount: string | number; spent: number }
+interface ProjectCategory { id: string; name: string; icon: string; color: string }
+interface Project { id: string; name: string; icon: string; color: string; status: string; categories?: ProjectCategory[] }
 interface Transaction {
   id: string; name: string; amount: number; date: string; source: string; pending: boolean;
   categoryId: string | null; categoryRef: Category | null;
   bankAccountId: string; bankAccount: BankAccount | null;
+  projectId: string | null;
+  projectCategoryId: string | null;
 }
 
 type Filter    = 'all' | 'uncategorized' | 'expense' | 'income';
@@ -67,6 +71,7 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories]     = useState<Category[]>([]);
   const [accounts, setAccounts]         = useState<BankAccount[]>([]);
+  const [projects, setProjects]         = useState<Project[]>([]);
   const [loading, setLoading]           = useState(true);
   const [syncing, setSyncing]           = useState(false);
   const [filter, setFilter]             = useState<Filter>('all');
@@ -82,6 +87,11 @@ export default function TransactionsPage() {
   const [newAcc, setNewAcc] = useState({ bankName: '', accountName: '', accountType: 'checking', color: '#9B6DFF', currency: 'USD' });
   const pickerRef     = useRef<HTMLDivElement>(null);
   const importBtnRef  = useRef<HTMLDivElement>(null);
+
+  const [pickerProjectDrill, setPickerProjectDrill]   = useState<string | null>(null);
+  const [linkingProj, setLinkingProj]                 = useState(false);
+  const [markAsSaleConfirm, setMarkAsSaleConfirm]     = useState<string | null>(null); // projectId
+  const [markAsSaleSaving, setMarkAsSaleSaving]       = useState(false);
 
   const [showNewCatModal, setShowNewCatModal] = useState(false);
   const [newCatForTxId, setNewCatForTxId]     = useState<string | null>(null);
@@ -157,7 +167,8 @@ export default function TransactionsPage() {
     Promise.all([
       fetch(`${API}/categories`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/bank-accounts`, { credentials: 'include' }).then((r) => r.json()),
-    ]).then(([cats, accs]) => { setCategories(cats); setAccounts(accs); });
+      fetch(`${API}/projects`, { credentials: 'include' }).then((r) => r.json()),
+    ]).then(([cats, accs, projs]) => { setCategories(cats); setAccounts(accs); setProjects(Array.isArray(projs) ? projs : []); });
   }, []);
 
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
@@ -166,9 +177,16 @@ export default function TransactionsPage() {
   /* close pickers on outside click */
   useEffect(() => {
     function onDown(e: MouseEvent) {
-      if (openPickerId && pickerRef.current && !pickerRef.current.contains(e.target as Node))
+      if (openPickerId && pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
         setOpenPickerId(null);
+        setPickerProjectDrill(null);
+        setMarkAsSaleConfirm(null);
+      }
       if (showImportPicker && importBtnRef.current && !importBtnRef.current.contains(e.target as Node)) {
+        // When the add-account sub-form is open, BankSelect's portal dropdown is outside importBtnRef —
+        // ignore clicks on any element that has data-bank-select on it or its ancestors.
+        const isInsideBankSelectPortal = !!(e.target as Element)?.closest?.('[data-bank-select]');
+        if (isInsideBankSelectPortal) return;
         setShowImportPicker(false);
         setShowAddAccForm(false);
         setAddAccError('');
@@ -224,6 +242,55 @@ export default function TransactionsPage() {
   async function deleteManualTx(id: string) {
     await fetch(`${API}/transactions/${id}`, { method: 'DELETE', credentials: 'include' });
     setTransactions((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  /* ── project link ── */
+  async function linkToProject(txId: string, projectId: string, projectCategoryId: string | null) {
+    setLinkingProj(true);
+    try {
+      await fetch(`${API}/projects/${projectId}/link/${txId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ projectCategoryId }),
+      });
+      setTransactions((prev) => prev.map((t) =>
+        t.id === txId ? { ...t, projectId, projectCategoryId } : t,
+      ));
+      setOpenPickerId(null); setPickerProjectDrill(null);
+    } finally { setLinkingProj(false); }
+  }
+
+  async function unlinkFromProject(txId: string, projectId: string) {
+    setLinkingProj(true);
+    try {
+      await fetch(`${API}/projects/${projectId}/unlink/${txId}`, { method: 'PATCH', credentials: 'include' });
+      setTransactions((prev) => prev.map((t) =>
+        t.id === txId ? { ...t, projectId: null, projectCategoryId: null } : t,
+      ));
+      setOpenPickerId(null); setPickerProjectDrill(null);
+    } finally { setLinkingProj(false); }
+  }
+
+  async function markProjectAsSold(txId: string, projectId: string) {
+    setMarkAsSaleSaving(true);
+    try {
+      const tx   = transactions.find((t) => t.id === txId);
+      const proj = projects.find((p) => p.id === projectId);
+      if (!tx || !proj) return;
+      const saleIncomeCat = proj.categories?.find((c) => c.name === 'Sale Income');
+      await fetch(`${API}/projects/${projectId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ status: 'sold', salePrice: Math.abs(Number(tx.amount)), saleDate: tx.date }),
+      });
+      await fetch(`${API}/projects/${projectId}/link/${txId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ projectCategoryId: saleIncomeCat?.id ?? null }),
+      });
+      setTransactions((prev) => prev.map((t) =>
+        t.id === txId ? { ...t, projectId, projectCategoryId: saleIncomeCat?.id ?? null } : t,
+      ));
+      setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, status: 'sold' } : p));
+      setOpenPickerId(null); setPickerProjectDrill(null); setMarkAsSaleConfirm(null);
+    } finally { setMarkAsSaleSaving(false); }
   }
 
   /* ── sync all Plaid accounts ── */
@@ -603,7 +670,12 @@ export default function TransactionsPage() {
                   <button
                     onClick={() => toggleCollapse(accountId)}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left transition-all hover:brightness-110"
-                    style={{ ...glass, borderLeft: `3px solid ${accColor}` }}>
+                    style={{
+                      background: `linear-gradient(135deg, ${accColor}14 0%, rgba(35,35,47,0.50) 100%)`,
+                      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                      border: `1px solid ${accColor}35`,
+                      boxShadow: `0 4px 24px rgba(0,0,0,0.3), inset 0 0 0 1px ${accColor}10`,
+                    }}>
 
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
                       style={{ background: `${accColor}20` }}>
@@ -703,7 +775,7 @@ export default function TransactionsPage() {
                               {/* Name + source */}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate leading-snug">{tx.name}</p>
-                                <div className="flex items-center gap-1.5 mt-0.5">
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase"
                                     style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)' }}>
                                     {tx.source}
@@ -714,6 +786,22 @@ export default function TransactionsPage() {
                                       Pending
                                     </span>
                                   )}
+                                  {tx.projectId ? (() => {
+                                    const proj = projects.find((p) => p.id === tx.projectId);
+                                    if (!proj) return null;
+                                    const c    = proj.color || '#9B6DFF';
+                                    const pCat = tx.projectCategoryId
+                                      ? proj.categories?.find((cat) => cat.id === tx.projectCategoryId)
+                                      : null;
+                                    return (
+                                      <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                        style={{ background: `${c}18`, border: `1px solid ${c}35`, color: c }}>
+                                        <span>{proj.icon}</span>
+                                        <span className="max-w-20 truncate">{proj.name}</span>
+                                        {pCat && <><span className="opacity-40">·</span><span>{pCat.icon}</span><span className="max-w-16 truncate" style={{ color: pCat.color }}>{pCat.name}</span></>}
+                                      </span>
+                                    );
+                                  })() : null}
                                 </div>
                               </div>
 
@@ -722,7 +810,7 @@ export default function TransactionsPage() {
                             <button
                               onMouseDown={(e) => { if (isOpen) e.stopPropagation(); }}
                               onClick={(e) => {
-                                if (isOpen) { setOpenPickerId(null); return; }
+                                if (isOpen) { setOpenPickerId(null); setPickerProjectDrill(null); return; }
                                 const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
                                 const w = 220;
                                 const left = Math.max(4, rect.right - w);
@@ -731,17 +819,31 @@ export default function TransactionsPage() {
                                 const openAbove = spaceBelow < 200 && spaceAbove > spaceBelow;
                                 setPickerPos({ top: openAbove ? rect.top - Math.min(300, spaceAbove) - 4 : rect.bottom + 4, left });
                                 setOpenPickerId(tx.id);
+                                setPickerProjectDrill(null);
                               }}
                               disabled={updatingId === tx.id}
                               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:brightness-110 disabled:opacity-40 max-w-40"
-                              style={cat
-                                ? { background: `${cat.color}18`, border: `1px solid ${cat.color}35`, color: cat.color }
-                                : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-muted)' }}>
+                              style={(() => {
+                                if (cat) return { background: `${cat.color}18`, border: `1px solid ${cat.color}35`, color: cat.color };
+                                if (tx.projectId) {
+                                  const _proj = projects.find((p) => p.id === tx.projectId);
+                                  const _pCat = tx.projectCategoryId ? _proj?.categories?.find((c) => c.id === tx.projectCategoryId) : null;
+                                  const _c = _pCat?.color || _proj?.color || '#9B6DFF';
+                                  return { background: `${_c}18`, border: `1px solid ${_c}35`, color: _c };
+                                }
+                                return { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-muted)' };
+                              })()}>
                               {updatingId === tx.id ? (
                                 <span>…</span>
                               ) : cat ? (
                                 <><span>{cat.icon}</span><span className="truncate">{cat.name}</span><ChevronIcon /></>
-                              ) : (
+                              ) : tx.projectId ? (() => {
+                                const _proj = projects.find((p) => p.id === tx.projectId);
+                                const _pCat = tx.projectCategoryId ? _proj?.categories?.find((c) => c.id === tx.projectCategoryId) : null;
+                                return _pCat
+                                  ? <><span>{_pCat.icon}</span><span className="truncate">{_pCat.name}</span><ChevronIcon /></>
+                                  : <><span>{_proj?.icon}</span><span className="truncate">{_proj?.name}</span><ChevronIcon /></>;
+                              })() : (
                                 <><TagIcon /><span>Categorize</span><ChevronIcon /></>
                               )}
                             </button>
@@ -759,28 +861,166 @@ export default function TransactionsPage() {
                                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }} />
                                   </>
                                 )}
-                                {pickerCats.map((c) => (
-                                  <button key={c.id} onClick={() => assignCategory(tx.id, c.id)}
-                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10"
-                                    style={tx.categoryId === c.id ? { background: `${c.color}15` } : {}}>
-                                    <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                      style={{ background: `${c.color}20` }}>{c.icon}</span>
-                                    <span className="font-medium flex-1 text-left"
-                                      style={{ color: tx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}>
-                                      {c.name}
-                                    </span>
-                                    {tx.categoryId === c.id && <span style={{ color: c.color }}>✓</span>}
-                                  </button>
-                                ))}
-                                <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
-                                <button
-                                  onClick={() => { setOpenPickerId(null); setNewCatForTxId(tx.id); setShowNewCatModal(true); }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-white/10"
-                                  style={{ color: '#9B6DFF' }}>
-                                  <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                    style={{ background: 'rgba(155,109,255,0.15)' }}>+</span>
-                                  New category
-                                </button>
+                                {!pickerProjectDrill ? (
+                                  /* ── Normal categories ── */
+                                  <>
+                                    {pickerCats.map((c) => (
+                                      <button key={c.id} onClick={() => { assignCategory(tx.id, c.id); setPickerProjectDrill(null); }}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10"
+                                        style={tx.categoryId === c.id ? { background: `${c.color}15` } : {}}>
+                                        <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                          style={{ background: `${c.color}20` }}>{c.icon}</span>
+                                        <span className="font-medium flex-1 text-left"
+                                          style={{ color: tx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}>
+                                          {c.name}
+                                        </span>
+                                        {tx.categoryId === c.id && <span style={{ color: c.color }}>✓</span>}
+                                      </button>
+                                    ))}
+
+                                    {/* Projects section */}
+                                    {projects.length > 0 && (
+                                      <>
+                                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
+                                        <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
+                                          style={{ color: 'var(--color-text-muted)' }}>Projects</p>
+                                        {projects.map((proj) => {
+                                          const c = proj.color || '#9B6DFF';
+                                          const linked = tx.projectId === proj.id;
+                                          return (
+                                            <button key={proj.id}
+                                              onClick={() => setPickerProjectDrill(proj.id)}
+                                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10"
+                                              style={linked ? { background: `${c}12` } : {}}>
+                                              <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                                style={{ background: `${c}20` }}>{proj.icon}</span>
+                                              <span className="flex-1 font-medium text-left truncate"
+                                                style={{ color: linked ? c : 'var(--color-text-primary)' }}>
+                                                {proj.name}
+                                              </span>
+                                              {linked && <span className="text-[10px] shrink-0" style={{ color: c }}>✓</span>}
+                                              <span className="text-[10px] shrink-0" style={{ color: 'var(--color-text-muted)' }}>▶</span>
+                                            </button>
+                                          );
+                                        })}
+                                      </>
+                                    )}
+
+                                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
+                                    <button
+                                      onClick={() => { setOpenPickerId(null); setPickerProjectDrill(null); setNewCatForTxId(tx.id); setShowNewCatModal(true); }}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-white/10"
+                                      style={{ color: '#9B6DFF' }}>
+                                      <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                        style={{ background: 'rgba(155,109,255,0.15)' }}>+</span>
+                                      New category
+                                    </button>
+                                  </>
+                                ) : (
+                                  /* ── Project category drill-down ── */
+                                  (() => {
+                                    const proj = projects.find((p) => p.id === pickerProjectDrill)!;
+                                    const c = proj?.color || '#9B6DFF';
+                                    return (
+                                      <>
+                                        {/* Header */}
+                                        <div className="flex items-center gap-2 px-3 py-2"
+                                          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                                          <button onClick={() => { setPickerProjectDrill(null); setMarkAsSaleConfirm(null); }}
+                                            className="text-sm hover:opacity-70 shrink-0"
+                                            style={{ color: 'var(--color-text-muted)' }}>←</button>
+                                          <span className="text-base shrink-0">{proj?.icon}</span>
+                                          <span className="text-xs font-bold flex-1 truncate" style={{ color: c }}>{proj?.name}</span>
+                                          {tx.projectId === pickerProjectDrill && (
+                                            <button
+                                              onClick={() => unlinkFromProject(tx.id, pickerProjectDrill!)}
+                                              disabled={linkingProj}
+                                              className="text-[10px] font-semibold px-1.5 py-0.5 rounded hover:brightness-110 disabled:opacity-50 shrink-0"
+                                              style={{ background: 'rgba(255,107,107,0.15)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.25)' }}>
+                                              Unlink
+                                            </button>
+                                          )}
+                                        </div>
+                                        {/* No category option */}
+                                        <button
+                                          onClick={() => linkToProject(tx.id, pickerProjectDrill!, null)}
+                                          disabled={linkingProj}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10 disabled:opacity-50"
+                                          style={tx.projectId === pickerProjectDrill && !tx.projectCategoryId ? { background: `${c}12` } : {}}>
+                                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                            style={{ background: 'rgba(255,255,255,0.06)' }}>🏷️</span>
+                                          <span className="flex-1 text-left" style={{ color: 'var(--color-text-secondary)' }}>
+                                            {linkingProj ? 'Linking…' : 'No specific category'}
+                                          </span>
+                                          {tx.projectId === pickerProjectDrill && !tx.projectCategoryId && (
+                                            <span className="text-xs" style={{ color: c }}>✓</span>
+                                          )}
+                                        </button>
+                                        {/* Project categories */}
+                                        {(proj?.categories ?? []).map((cat) => (
+                                          <button key={cat.id}
+                                            onClick={() => linkToProject(tx.id, pickerProjectDrill!, cat.id)}
+                                            disabled={linkingProj}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10 disabled:opacity-50"
+                                            style={tx.projectId === pickerProjectDrill && tx.projectCategoryId === cat.id ? { background: `${cat.color}15` } : {}}>
+                                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                              style={{ background: `${cat.color}20` }}>{cat.icon}</span>
+                                            <span className="flex-1 font-medium text-left"
+                                              style={{ color: tx.projectId === pickerProjectDrill && tx.projectCategoryId === cat.id ? cat.color : 'var(--color-text-primary)' }}>
+                                              {cat.name}
+                                            </span>
+                                            {tx.projectId === pickerProjectDrill && tx.projectCategoryId === cat.id && (
+                                              <span className="text-xs" style={{ color: cat.color }}>✓</span>
+                                            )}
+                                          </button>
+                                        ))}
+                                        {(!proj?.categories || proj.categories.length === 0) && (
+                                          <p className="text-xs px-3 py-2 text-center" style={{ color: 'var(--color-text-muted)' }}>
+                                            No categories — add them in Projects page.
+                                          </p>
+                                        )}
+
+                                        {/* Mark as SOLD — only for income txs on active projects */}
+                                        {Number(tx.amount) > 0 && proj?.status !== 'sold' && (
+                                          <>
+                                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
+                                            {markAsSaleConfirm === proj?.id ? (
+                                              <div className="px-3 py-2.5 flex flex-col gap-2">
+                                                <p className="text-xs font-semibold text-white">Mark {proj.name} as sold?</p>
+                                                <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                                                  Sale price: +${Math.abs(Number(tx.amount)).toFixed(2)} · {tx.date}
+                                                </p>
+                                                <div className="flex gap-1.5">
+                                                  <button type="button" onClick={() => setMarkAsSaleConfirm(null)}
+                                                    className="flex-1 py-1.5 text-xs rounded-lg hover:bg-white/10"
+                                                    style={{ color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                                    Cancel
+                                                  </button>
+                                                  <button type="button"
+                                                    onClick={() => markProjectAsSold(tx.id, proj.id)}
+                                                    disabled={markAsSaleSaving}
+                                                    className="flex-1 py-1.5 text-xs font-semibold rounded-lg hover:brightness-110 disabled:opacity-50"
+                                                    style={{ background: 'rgba(79,191,127,0.20)', color: '#4FBF7F', border: '1px solid rgba(79,191,127,0.35)' }}>
+                                                    {markAsSaleSaving ? '…' : '✓ Confirm'}
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            ) : (
+                                              <button type="button"
+                                                onClick={() => setMarkAsSaleConfirm(proj.id)}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-white/10 transition-colors"
+                                                style={{ color: '#4FBF7F' }}>
+                                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                                  style={{ background: 'rgba(79,191,127,0.15)' }}>🏷️</span>
+                                                Mark {proj.name} as SOLD
+                                              </button>
+                                            )}
+                                          </>
+                                        )}
+                                      </>
+                                    );
+                                  })()
+                                )}
                               </div>,
                               document.body
                             )}

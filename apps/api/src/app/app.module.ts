@@ -9,6 +9,7 @@ import { PlaidModule } from '../plaid/plaid.module';
 import { TransactionsModule } from '../transactions/transactions.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { BudgetsModule } from '../budgets/budgets.module';
+import { ProjectsModule } from '../projects/projects.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { BudgetsModule } from '../budgets/budgets.module';
     TransactionsModule,
     CategoriesModule,
     BudgetsModule,
+    ProjectsModule,
   ],
 })
 export class AppModule {}

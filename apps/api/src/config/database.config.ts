@@ -6,6 +6,8 @@ import { PlaidItem } from '../plaid/plaid-item.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { Category } from '../categories/category.entity';
 import { Budget } from '../budgets/budget.entity';
+import { Project } from '../projects/project.entity';
+import { ProjectCategory } from '../projects/project-category.entity';
 
 export default registerAs('database', (): TypeOrmModuleOptions => ({
   type: 'postgres',
@@ -14,7 +16,7 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   username: process.env.DB_USER ?? 'postgres',
   password: process.env.DB_PASS ?? 'postgres',
   database: process.env.DB_NAME ?? 'cofre_budget',
-  entities: [User, BankAccount, PlaidItem, Transaction, Category, Budget],
+  entities: [User, BankAccount, PlaidItem, Transaction, Category, Budget, Project, ProjectCategory],
   synchronize: true,
   logging: false,
 }));

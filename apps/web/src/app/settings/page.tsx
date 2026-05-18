@@ -6,12 +6,13 @@ import { usePlaidLink } from 'react-plaid-link';
 import Sidebar from '@/components/Sidebar';
 import CsvImportModal from '@/components/CsvImportModal';
 import CategoryManager from '@/components/CategoryManager';
+import ProjectCategoryManager from '@/components/ProjectCategoryManager';
 import BankSelect from '@/components/BankSelect';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
-type Tab = 'banks' | 'categories';
+type Tab = 'banks' | 'categories' | 'projects';
 
 interface BankAccount {
   id: string;
@@ -69,6 +70,15 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
+  {
+    id: 'projects',
+    label: 'Project Categories',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2 20h20M5 20V8l7-5 7 5v12"/><path d="M9 20v-5h6v5"/>
+      </svg>
+    ),
+  },
 ];
 
 export default function SettingsPage() {
@@ -76,6 +86,7 @@ export default function SettingsPage() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showManualForm, setShowManualForm] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -148,6 +159,39 @@ export default function SettingsPage() {
       setShowManualForm(false);
       setForm({ bankName: '', accountName: '', accountType: 'checking', balance: '', currency: 'USD', color: PRESET_COLORS[0] });
     } catch { setError('Could not add account. Please try again.'); }
+    finally { setSubmitting(false); }
+  }
+
+  function openEdit(account: BankAccount) {
+    setForm({
+      bankName: account.bankName,
+      accountName: account.accountName,
+      accountType: account.accountType as AccountType,
+      balance: String(account.balance),
+      currency: account.currency,
+      color: account.color || PRESET_COLORS[0],
+    });
+    setEditingAccount(account);
+    setShowManualForm(true);
+    setError('');
+  }
+
+  async function handleUpdate(e: FormEvent) {
+    e.preventDefault();
+    if (!editingAccount) return;
+    setSubmitting(true); setError('');
+    try {
+      const res = await fetch(`${API}/bank-accounts/${editingAccount.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ ...form, balance: parseFloat(form.balance) || 0 }),
+      });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      setAccounts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+      setShowManualForm(false);
+      setEditingAccount(null);
+      setForm({ bankName: '', accountName: '', accountType: 'checking', balance: '', currency: 'USD', color: PRESET_COLORS[0] });
+    } catch { setError('Could not update account. Please try again.'); }
     finally { setSubmitting(false); }
   }
 
@@ -231,16 +275,16 @@ export default function SettingsPage() {
               {showManualForm && createPortal(
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
                   style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
-                  onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowManualForm(false); setError(''); } }}>
+                  onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowManualForm(false); setEditingAccount(null); setError(''); } }}>
 
-                  <form onSubmit={handleAdd}
+                  <form onSubmit={editingAccount ? handleUpdate : handleAdd}
                     className="w-full max-w-lg flex flex-col gap-5 p-6 rounded-2xl"
                     style={{ background: 'rgba(22,22,36,0.98)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
 
                     {/* Header */}
                     <div className="flex items-center justify-between">
-                      <p className="font-bold text-base">Add Account</p>
-                      <button type="button" onClick={() => { setShowManualForm(false); setError(''); }}
+                      <p className="font-bold text-base">{editingAccount ? 'Edit Account' : 'Add Account'}</p>
+                      <button type="button" onClick={() => { setShowManualForm(false); setEditingAccount(null); setError(''); }}
                         className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
                         style={{ color: 'var(--color-text-muted)' }}>
                         <CloseIcon />
@@ -325,7 +369,7 @@ export default function SettingsPage() {
                     )}
 
                     <div className="flex gap-2 justify-end pt-1">
-                      <button type="button" onClick={() => { setShowManualForm(false); setError(''); }}
+                      <button type="button" onClick={() => { setShowManualForm(false); setEditingAccount(null); setError(''); }}
                         className="px-4 py-2 text-sm font-medium rounded-xl transition-colors hover:bg-white/10"
                         style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
                         Cancel
@@ -333,7 +377,7 @@ export default function SettingsPage() {
                       <button type="submit" disabled={submitting}
                         className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60"
                         style={{ background: 'var(--color-card-violet)' }}>
-                        {submitting ? 'Adding…' : 'Add Account'}
+                        {submitting ? 'Saving…' : editingAccount ? 'Save Changes' : 'Add Account'}
                       </button>
                     </div>
                   </form>
@@ -396,6 +440,11 @@ export default function SettingsPage() {
                         </div>
 
                         <div className="flex items-center gap-1 ml-1">
+                          <button onClick={() => openEdit(account)}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
+                            title="Edit account" style={{ color: 'var(--color-text-secondary)' }}>
+                            <EditIcon />
+                          </button>
                           <button onClick={() => setImportAccount(account)}
                             className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
                             title="Import CSV" style={{ color: 'var(--color-text-secondary)' }}>
@@ -426,6 +475,9 @@ export default function SettingsPage() {
           {/* ── CATEGORIES TAB ── */}
           {activeTab === 'categories' && <CategoryManager />}
 
+          {/* ── PROJECT CATEGORIES TAB ── */}
+          {activeTab === 'projects' && <ProjectCategoryManager />}
+
         </div>
       </main>
 
@@ -441,6 +493,9 @@ export default function SettingsPage() {
   );
 }
 
+function EditIcon() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+}
 function UploadIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

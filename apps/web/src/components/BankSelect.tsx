@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 export const BANKS = [
   { name: 'Chase',           domain: 'chase.com',           color: '#117ACA', abbr: 'CH' },
@@ -140,10 +141,11 @@ export default function BankSelect({ value, onChange, inputStyle, compact = fals
         <ChevronIcon open={open} />
       </button>
 
-      {/* Dropdown — fixed to escape stacking contexts */}
-      {open && dropPos && (
+      {/* Dropdown — portalled to body to escape backdrop-filter stacking context */}
+      {open && dropPos && createPortal(
         <div
           ref={dropRef}
+          data-bank-select
           className="py-1 rounded-xl overflow-y-auto"
           style={{
             ...glass,
@@ -177,7 +179,8 @@ export default function BankSelect({ value, onChange, inputStyle, compact = fals
               style={{ background: 'rgba(255,255,255,0.08)' }}>✏️</span>
             Other bank…
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

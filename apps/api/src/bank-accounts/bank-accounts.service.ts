@@ -20,6 +20,14 @@ export class BankAccountsService {
     return this.repo.save(account);
   }
 
+  async update(id: string, userId: string, dto: Partial<CreateBankAccountDto>): Promise<BankAccount> {
+    const account = await this.repo.findOneBy({ id });
+    if (!account) throw new NotFoundException();
+    if (account.userId !== userId) throw new ForbiddenException();
+    Object.assign(account, dto);
+    return this.repo.save(account);
+  }
+
   async remove(id: string, userId: string): Promise<void> {
     const account = await this.repo.findOneBy({ id });
     if (!account) throw new NotFoundException();

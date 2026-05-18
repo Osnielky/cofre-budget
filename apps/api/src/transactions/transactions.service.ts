@@ -74,14 +74,16 @@ export class TransactionsService {
 
   async createManual(userId: string, dto: {
     name: string; amount: number; date: string;
-    bankAccountId: string; categoryId?: string | null;
+    bankAccountId?: string | null; categoryId?: string | null;
   }): Promise<Transaction> {
-    const account = await this.accountRepo.findOneBy({ id: dto.bankAccountId });
-    if (!account || account.userId !== userId) throw new ForbiddenException();
+    if (dto.bankAccountId) {
+      const account = await this.accountRepo.findOneBy({ id: dto.bankAccountId });
+      if (!account || account.userId !== userId) throw new ForbiddenException();
+    }
     const saved = await this.repo.save(
       this.repo.create({
         userId,
-        bankAccountId: dto.bankAccountId,
+        bankAccountId: dto.bankAccountId ?? undefined,
         source: 'manual',
         amount: dto.amount,
         name: dto.name,

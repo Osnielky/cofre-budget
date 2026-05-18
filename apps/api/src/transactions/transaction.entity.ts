@@ -14,11 +14,11 @@ export class Transaction {
   @Column()
   userId: string;
 
-  @ManyToOne(() => BankAccount, { onDelete: 'CASCADE' })
+  @ManyToOne(() => BankAccount, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'bankAccountId' })
   bankAccount: BankAccount;
 
-  @Column()
+  @Column({ nullable: true })
   bankAccountId: string;
 
   /* External dedup key — Plaid transaction_id or CSV reference number */
@@ -49,6 +49,14 @@ export class Transaction {
 
   @Column({ nullable: true })
   categoryId: string;
+
+  /* Project this transaction is linked to */
+  @Column({ nullable: true })
+  projectId: string;
+
+  /* Project-level category (e.g. "Tires", "Mechanic") */
+  @Column({ nullable: true })
+  projectCategoryId: string;
 
   /* Plaid's category hierarchy, e.g. ["Food and Drink", "Restaurants"] */
   @Column({ type: 'simple-array', nullable: true })
