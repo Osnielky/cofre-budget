@@ -1002,6 +1002,14 @@ export default function ProjectsPage() {
                       <p className="text-xs text-center py-4" style={{ color: 'var(--color-text-muted)' }}>No transactions found</p>
                     )}
                   </div>
+
+                  <div className="shrink-0 pt-1">
+                    <button onClick={() => { setShowLinkPicker(null); setPendingLinkTx(null); }}
+                      className="w-full py-2.5 text-sm font-semibold rounded-xl hover:brightness-110"
+                      style={{ background: 'var(--color-card-violet)', color: 'white' }}>
+                      Done
+                    </button>
+                  </div>
                 </>
               ) : (
                 /* ── Step 2: pick project category ── */

@@ -1090,13 +1090,13 @@ export default function TransactionsPage() {
                   {/* Expense / Income toggle */}
                   <div className="flex rounded-xl overflow-hidden shrink-0"
                     style={{ border: '1px solid rgba(255,255,255,0.10)' }}>
-                    <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '-' }))}
+                    <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '-', categoryId: '' }))}
                       className="px-3 py-2.5 text-sm font-semibold transition-colors"
                       style={{ background: manualTx.sign === '-' ? 'rgba(240,122,62,0.2)' : 'transparent',
                                color: manualTx.sign === '-' ? '#F07A3E' : 'var(--color-text-muted)' }}>
                       − Expense
                     </button>
-                    <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '+' }))}
+                    <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '+', categoryId: '' }))}
                       className="px-3 py-2.5 text-sm font-semibold transition-colors"
                       style={{ background: manualTx.sign === '+' ? 'rgba(79,191,127,0.2)' : 'transparent',
                                color: manualTx.sign === '+' ? '#4FBF7F' : 'var(--color-text-muted)',
@@ -1145,9 +1145,11 @@ export default function TransactionsPage() {
                   className="px-3 py-2.5 text-sm outline-none appearance-none rounded-xl"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: manualTx.categoryId ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                   <option value="">Uncategorized</option>
-                  {categories.filter((c) => c.type !== 'transfer').map((c) => (
-                    <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-                  ))}
+                  {categories
+                    .filter((c) => c.type === (manualTx.sign === '+' ? 'income' : 'expense'))
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+                    ))}
                 </select>
               </div>
 

@@ -293,7 +293,7 @@ export class ProjectsService {
     const income   = txs.filter((t) => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
     const costBasis = Number(p.purchasePrice) + expenses;
     const netGain  = p.status === 'sold' && p.salePrice != null
-      ? Number(p.salePrice) - costBasis + income
+      ? Number(p.salePrice) - costBasis
       : null;
     const roi = netGain != null && costBasis > 0 ? (netGain / costBasis) * 100 : null;
     return { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length };
