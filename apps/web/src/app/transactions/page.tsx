@@ -358,9 +358,9 @@ export default function TransactionsPage() {
 
   /* ── derived data ── */
   const isTransfer = (t: Transaction) => t.categoryRef?.type === 'transfer';
-  const uncategorizedCount = transactions.filter((t) => !t.categoryId && !isTransfer(t)).length;
+  const uncategorizedCount = transactions.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
   const visible = transactions.filter((t) => {
-    if (filter === 'uncategorized' && (t.categoryId || isTransfer(t))) return false;
+    if (filter === 'uncategorized' && (t.categoryId || t.projectId || isTransfer(t))) return false;
     if (filter === 'expense'       && (Number(t.amount) >= 0 || isTransfer(t))) return false;
     if (filter === 'income'        && (Number(t.amount) < 0  || isTransfer(t))) return false;
     if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
@@ -682,7 +682,7 @@ export default function TransactionsPage() {
               const isCollapsed = collapsed.has(accountId);
               const accIncome       = txList.filter((t) => Number(t.amount) >= 0 && !isTransfer(t)).reduce((s, t) => s + Number(t.amount), 0);
               const accExpense      = txList.filter((t) => Number(t.amount) < 0  && !isTransfer(t)).reduce((s, t) => s + Number(t.amount), 0);
-              const accUncategorized = txList.filter((t) => !t.categoryId && !isTransfer(t)).length;
+              const accUncategorized = txList.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
               const accColor        = acc?.color || '#9B6DFF';
 
               const dateMap = txList.reduce<Record<string, Transaction[]>>((m, tx) => {
@@ -769,7 +769,7 @@ export default function TransactionsPage() {
                   {dates.map((date, dateIdx) => {
                     const dateKey       = `${accountId}::${date}`;
                     const dateCollapsed = collapsedDates.has(dateKey);
-                    const dayUncategorized = dateMap[date].filter((t) => !t.categoryId && !isTransfer(t)).length;
+                    const dayUncategorized = dateMap[date].filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
                     const isLast = dateIdx === dates.length - 1;
                     return (
                     <div key={date} className="relative">

@@ -1,366 +1,487 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Sidebar from '@/components/Sidebar';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-interface Category {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  type: string;
-}
-
+interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface BudgetWithSpent {
-  id: string;
-  categoryId: string;
-  category: Category;
-  amount: number;
-  spent: number;
-  percentage: number;
-  remaining: number;
+  id: string; categoryId: string; category: Category;
+  amount: number; spent: number; percentage: number; remaining: number;
 }
 
 const glass: React.CSSProperties = {
-  background: 'rgba(35, 35, 47, 0.50)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'rgba(35,35,47,0.50)', backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)',
   boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
 };
 
-const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.10)',
-  borderRadius: 'var(--radius-input)',
-  color: 'var(--color-text-primary)',
-};
-
-function progressColor(pct: number): string {
+function hexToRgb(hex: string) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+}
+function progressColor(pct: number) {
   if (pct >= 100) return '#FF4444';
   if (pct >= 80)  return '#F07A3E';
   if (pct >= 60)  return '#F5C842';
   return '#4FBF7F';
 }
-
-function monthLabel(m: string): string {
+function monthLabel(m: string) {
   const [y, mo] = m.split('-');
   return new Date(Number(y), Number(mo) - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
 }
-
-function prevMonth(m: string): string {
+function prevMonth(m: string) {
   const [y, mo] = m.split('-').map(Number);
   const d = new Date(y, mo - 2);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
-
-function nextMonth(m: string): string {
+function nextMonth(m: string) {
   const [y, mo] = m.split('-').map(Number);
   const d = new Date(y, mo);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 export default function BudgetsPage() {
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  const [budgets, setBudgets] = useState<BudgetWithSpent[]>([]);
+  const [month, setMonth]       = useState(() => new Date().toISOString().slice(0, 7));
+  const [budgets, setBudgets]   = useState<BudgetWithSpent[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ categoryId: '', amount: '' });
+  const [form, setForm]         = useState({ categoryId: '', amount: '' });
+  const [sort, setSort]         = useState<'pct' | 'spent' | 'name'>('pct');
 
   useEffect(() => {
     setLoading(true);
     Promise.all([
       fetch(`${API}/budgets?month=${month}`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/categories`, { credentials: 'include' }).then((r) => r.json()),
-    ]).then(([b, c]) => {
-      setBudgets(b);
-      setCategories(c);
-    }).finally(() => setLoading(false));
+    ]).then(([b, c]) => { setBudgets(Array.isArray(b) ? b : []); setCategories(Array.isArray(c) ? c : []); })
+      .finally(() => setLoading(false));
   }, [month]);
 
-  const usedCategoryIds = new Set(budgets.map((b) => b.categoryId));
-  const availableCategories = categories.filter(
+  const usedIds = new Set(budgets.map((b) => b.categoryId));
+  const available = categories.filter(
     (c) => c.type !== 'transfer' && c.type !== 'income' &&
-           (!usedCategoryIds.has(c.id) || c.id === form.categoryId),
+           (!usedIds.has(c.id) || c.id === form.categoryId),
   );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const amt = parseFloat(form.amount);
     if (editingId) {
-      const res = await fetch(`${API}/budgets/${editingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ amount: parseFloat(form.amount) }),
+      await fetch(`${API}/budgets/${editingId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ amount: amt }),
       });
-      const updated = await res.json();
-      const spent = budgets.find((b) => b.id === editingId);
-      setBudgets((prev) => prev.map((b) => b.id === editingId
-        ? { ...updated, spent: spent?.spent ?? 0, percentage: Math.round(((spent?.spent ?? 0) / parseFloat(form.amount)) * 100), remaining: parseFloat(form.amount) - (spent?.spent ?? 0) }
+      const prev = budgets.find((b) => b.id === editingId);
+      const spentAmt = prev?.spent ?? 0;
+      setBudgets((bs) => bs.map((b) => b.id === editingId
+        ? { ...b, amount: amt, percentage: amt > 0 ? Math.round((spentAmt / amt) * 100) : 0, remaining: amt - spentAmt }
         : b,
       ));
     } else {
       const res = await fetch(`${API}/budgets`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ categoryId: form.categoryId, amount: parseFloat(form.amount) }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ categoryId: form.categoryId, amount: amt }),
       });
       const created = await res.json();
-      setBudgets((prev) => [...prev, { ...created, spent: 0, percentage: 0, remaining: parseFloat(form.amount) }]);
+      const cat = categories.find((c) => c.id === form.categoryId);
+      setBudgets((bs) => [...bs, { ...created, category: cat ?? created.category, amount: amt, spent: 0, percentage: 0, remaining: amt }]);
     }
-    setShowForm(false);
-    setEditingId(null);
-    setForm({ categoryId: '', amount: '' });
+    setShowForm(false); setEditingId(null); setForm({ categoryId: '', amount: '' });
   }
 
   async function handleDelete(id: string) {
     setDeletingId(id);
     await fetch(`${API}/budgets/${id}`, { method: 'DELETE', credentials: 'include' });
-    setBudgets((prev) => prev.filter((b) => b.id !== id));
+    setBudgets((bs) => bs.filter((b) => b.id !== id));
     setDeletingId(null);
   }
 
   function startEdit(b: BudgetWithSpent) {
-    setEditingId(b.id);
-    setForm({ categoryId: b.categoryId, amount: String(b.amount) });
-    setShowForm(true);
+    setEditingId(b.id); setForm({ categoryId: b.categoryId, amount: String(b.amount) }); setShowForm(true);
   }
 
-  const totalBudget  = budgets.reduce((s, b) => s + Number(b.amount), 0);
-  const totalSpent   = budgets.reduce((s, b) => s + b.spent, 0);
-  const totalPct     = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
-  const overBudget   = budgets.filter((b) => b.percentage >= 100);
+  /* ── derived stats ── */
+  const totalBudget   = budgets.reduce((s, b) => s + Number(b.amount), 0);
+  const totalSpent    = budgets.reduce((s, b) => s + Number(b.spent), 0);
+  const totalRemaining = totalBudget - totalSpent;
+  const overBudget    = budgets.filter((b) => b.percentage >= 100);
+  const nearBudget    = budgets.filter((b) => b.percentage >= 80 && b.percentage < 100);
+  const onTrack       = budgets.filter((b) => b.percentage < 80);
+  const avgPct        = budgets.length > 0 ? Math.round(budgets.reduce((s, b) => s + b.percentage, 0) / budgets.length) : 0;
+  const biggestSpend  = [...budgets].sort((a, b) => Number(b.spent) - Number(a.spent))[0];
+  const overallPct    = totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0;
+
+  const sorted = [...budgets].sort((a, b) => {
+    if (sort === 'pct')   return b.percentage - a.percentage;
+    if (sort === 'spent') return Number(b.spent) - Number(a.spent);
+    return (a.category?.name ?? '').localeCompare(b.category?.name ?? '');
+  });
+
+  const isCurrentMonth = month === new Date().toISOString().slice(0, 7);
 
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
+      <main className="flex-1 overflow-y-auto">
 
-      <main className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-
-        {/* Header + month nav */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <h1 className="text-2xl font-bold tracking-tight">Budgets</h1>
+        {/* ── Sticky header ── */}
+        <div className="sticky top-0 z-20 px-6 pt-5 pb-4 flex items-center justify-between gap-4 flex-wrap"
+          style={{ background: 'rgba(15,15,26,0.88)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Budgets</h1>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              Spending limits by category
+            </p>
+          </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setMonth(prevMonth(month))}
-              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
-              style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-secondary)' }}>
-              ‹
+            {/* Month nav */}
+            <div className="flex items-center gap-1 p-1 rounded-xl"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <button onClick={() => setMonth(prevMonth(month))}
+                className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors text-sm"
+                style={{ color: 'var(--color-text-muted)' }}>‹</button>
+              <span className="text-sm font-semibold px-2 min-w-36 text-center">{monthLabel(month)}</span>
+              <button onClick={() => setMonth(nextMonth(month))} disabled={isCurrentMonth}
+                className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors text-sm disabled:opacity-30"
+                style={{ color: 'var(--color-text-muted)' }}>›</button>
+            </div>
+            <button onClick={() => { setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '' }); }}
+              className="px-4 py-2 text-sm font-semibold text-white rounded-xl transition-all hover:brightness-110"
+              style={{ background: 'var(--color-card-violet)' }}>
+              + Add Budget
             </button>
-            <span className="text-sm font-semibold px-3">{monthLabel(month)}</span>
-            <button onClick={() => setMonth(nextMonth(month))}
-              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
-              style={{ border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-secondary)' }}>
-              ›
-            </button>
-            {!showForm && (
-              <button onClick={() => { setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '' }); }}
-                className="ml-2 px-4 py-2 text-sm font-semibold text-white rounded-xl transition-all hover:brightness-110"
-                style={{ background: 'var(--color-card-violet)' }}>
-                + Add Budget
-              </button>
-            )}
           </div>
         </div>
 
-        {/* Monthly summary */}
-        {budgets.length > 0 && (
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: 'TOTAL BUDGET', value: `$${totalBudget.toFixed(2)}`,  accent: '#9B6DFF' },
-              { label: 'TOTAL SPENT',  value: `$${totalSpent.toFixed(2)}`,   accent: totalPct >= 100 ? '#FF4444' : '#F07A3E' },
-              { label: 'REMAINING',    value: `$${(totalBudget - totalSpent).toFixed(2)}`, accent: '#4FBF7F' },
-            ].map((s) => (
-              <div key={s.label} className="p-4 relative overflow-hidden"
-                style={{ ...glass, borderRadius: 'var(--radius-card)', border: `1px solid rgba(${hexToRgb(s.accent)},0.25)` }}>
-                <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full pointer-events-none"
-                  style={{ background: s.accent, opacity: 0.10, filter: 'blur(16px)' }} />
-                <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: s.accent }}>{s.label}</p>
-                <p className="text-2xl font-extrabold text-white mt-1">{s.value}</p>
-                {s.label === 'TOTAL SPENT' && (
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{totalPct}% of budget</p>
-                )}
+        <div className="p-6 flex flex-col gap-5">
+
+          {/* ── Stats ── */}
+          {!loading && budgets.length > 0 && (
+            <>
+              {/* Stat cards */}
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                {[
+                  { label: 'TOTAL BUDGET',   value: `$${totalBudget.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,    accent: '#9B6DFF', icon: '🎯', sub: `${budgets.length} categories` },
+                  { label: 'TOTAL SPENT',    value: `$${totalSpent.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,     accent: totalSpent > totalBudget ? '#FF4444' : '#F07A3E', icon: '💸', sub: `${Math.round(overallPct)}% of budget` },
+                  { label: 'REMAINING',      value: `$${Math.abs(totalRemaining).toLocaleString('en-US', { minimumFractionDigits: 2 })}${totalRemaining < 0 ? ' over' : ''}`, accent: totalRemaining < 0 ? '#FF4444' : '#4FBF7F', icon: '💰', sub: totalRemaining >= 0 ? 'available to spend' : 'exceeded budget' },
+                  { label: 'AVG USAGE',      value: `${avgPct}%`, accent: avgPct >= 100 ? '#FF4444' : avgPct >= 80 ? '#F07A3E' : '#F5C842', icon: '📊', sub: `${overBudget.length} over · ${nearBudget.length} near limit` },
+                ].map((s) => (
+                  <div key={s.label} className="p-5 flex flex-col gap-2 relative overflow-hidden rounded-2xl"
+                    style={{ background: `rgba(${hexToRgb(s.accent)},0.10)`, border: `1px solid rgba(${hexToRgb(s.accent)},0.22)`, boxShadow: `0 4px 24px rgba(${hexToRgb(s.accent)},0.08)` }}>
+                    <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full pointer-events-none"
+                      style={{ background: s.accent, opacity: 0.10, filter: 'blur(24px)' }} />
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: s.accent }}>{s.label}</span>
+                      <span className="text-xl">{s.icon}</span>
+                    </div>
+                    <span className="text-2xl font-extrabold text-white leading-none">{s.value}</span>
+                    <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{s.sub}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
 
-        {/* Over-budget alert */}
-        {overBudget.length > 0 && (
-          <div className="px-4 py-3 rounded-xl flex items-center gap-3"
-            style={{ background: 'rgba(255,68,68,0.08)', border: '1px solid rgba(255,68,68,0.25)' }}>
-            <span>⚠️</span>
-            <p className="text-sm" style={{ color: '#FF8080' }}>
-              <span className="font-semibold">{overBudget.length} {overBudget.length === 1 ? 'category' : 'categories'} over budget: </span>
-              {overBudget.map((b) => `${b.category.icon} ${b.category.name}`).join(', ')}
-            </p>
-          </div>
-        )}
+              {/* Overall progress bar + health summary */}
+              <div className="p-5 rounded-2xl flex flex-col gap-4" style={glass}>
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <p className="font-bold text-sm">Overall Budget Health</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{monthLabel(month)}</p>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs font-semibold flex-wrap">
+                    <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                      style={{ background: 'rgba(79,191,127,0.10)', color: '#4FBF7F' }}>
+                      ✓ {onTrack.length} on track
+                    </span>
+                    {nearBudget.length > 0 && (
+                      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                        style={{ background: 'rgba(240,122,62,0.10)', color: '#F07A3E' }}>
+                        ⚡ {nearBudget.length} near limit
+                      </span>
+                    )}
+                    {overBudget.length > 0 && (
+                      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg"
+                        style={{ background: 'rgba(255,68,68,0.10)', color: '#FF6B6B' }}>
+                        ⚠ {overBudget.length} over budget
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-        {/* Add/Edit form */}
-        {showForm && (
-          <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
-            <p className="font-semibold text-sm">{editingId ? 'Edit Budget' : 'New Budget'}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-1.5">
+                {/* Segmented bar */}
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                    <span>${totalSpent.toLocaleString('en-US', { minimumFractionDigits: 2 })} spent</span>
+                    <span>{Math.round(overallPct)}% · ${totalBudget.toLocaleString('en-US', { minimumFractionDigits: 2 })} budgeted</span>
+                  </div>
+                  <div className="w-full h-3 rounded-full overflow-hidden flex"
+                    style={{ background: 'rgba(255,255,255,0.07)' }}>
+                    {sorted.filter(b => Number(b.spent) > 0).map((b) => {
+                      const w = totalBudget > 0 ? (Number(b.spent) / totalBudget * 100) : 0;
+                      const c = b.category?.color ?? progressColor(b.percentage);
+                      return <div key={b.id} className="h-full transition-all" style={{ width: `${w}%`, background: c, minWidth: w > 0 ? '2px' : 0 }} />;
+                    })}
+                  </div>
+                  {/* Legend */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-2.5">
+                    {sorted.filter(b => Number(b.spent) > 0).slice(0, 8).map((b) => (
+                      <div key={b.id} className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: b.category?.color ?? '#9B6DFF' }} />
+                        <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                          {b.category?.name ?? 'Unknown'}
+                        </span>
+                        <span className="text-[10px] font-semibold" style={{ color: b.category?.color ?? '#9B6DFF' }}>
+                          ${Number(b.spent).toFixed(0)}
+                        </span>
+                      </div>
+                    ))}
+                    {biggestSpend && (
+                      <div className="ml-auto text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                        Top: <span className="font-semibold text-white">{biggestSpend.category?.name ?? '—'}</span> ${Number(biggestSpend.spent).toFixed(2)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── Over-budget alert ── */}
+          {overBudget.length > 0 && (
+            <div className="px-4 py-3 rounded-xl flex items-center gap-3"
+              style={{ background: 'rgba(255,68,68,0.08)', border: '1px solid rgba(255,68,68,0.25)' }}>
+              <span className="text-lg shrink-0">⚠️</span>
+              <p className="text-sm" style={{ color: '#FF8080' }}>
+                <span className="font-semibold">{overBudget.length} {overBudget.length === 1 ? 'category' : 'categories'} over budget: </span>
+                {overBudget.map((b) => `${b.category?.icon ?? ''} ${b.category?.name ?? '—'}`).join(', ')}
+              </p>
+            </div>
+          )}
+
+
+          {/* ── Budget list ── */}
+          {loading ? (
+            <p className="text-sm py-10 text-center" style={{ color: 'var(--color-text-muted)' }}>Loading budgets…</p>
+          ) : budgets.length === 0 && !showForm ? (
+            <div className="p-12 flex flex-col items-center gap-3 text-center rounded-2xl" style={glass}>
+              <span className="text-4xl">🎯</span>
+              <p className="font-semibold">No budgets for {monthLabel(month)}</p>
+              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                Set spending limits per category to track where your money goes.
+              </p>
+              <button onClick={() => setShowForm(true)}
+                className="mt-2 px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110"
+                style={{ background: 'var(--color-card-violet)' }}>
+                + Add Your First Budget
+              </button>
+            </div>
+          ) : budgets.length > 0 ? (
+            <div className="flex flex-col gap-3 rounded-2xl overflow-hidden" style={glass}>
+              {/* Table header */}
+              <div className="px-5 pt-4 pb-2 flex items-center justify-between gap-3 border-b"
+                style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                <p className="font-bold text-sm">Categories</p>
+                <div className="flex items-center gap-1 text-[10px] font-bold tracking-widest uppercase"
+                  style={{ color: 'var(--color-text-muted)' }}>
+                  Sort:
+                  {([['pct', 'Usage'], ['spent', 'Spent'], ['name', 'Name']] as const).map(([k, label]) => (
+                    <button key={k} onClick={() => setSort(k)}
+                      className="px-2.5 py-1 rounded-lg transition-colors"
+                      style={sort === k ? { background: 'rgba(155,109,255,0.18)', color: '#9B6DFF' } : { color: 'var(--color-text-muted)' }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {sorted.map((b, i) => {
+                const pct      = Math.min(b.percentage, 100);
+                const color    = progressColor(b.percentage);
+                const catColor = b.category?.color ?? '#9B6DFF';
+                const spent    = Number(b.spent);
+                const amount   = Number(b.amount);
+                const remaining = amount - spent;
+                const isOver   = b.percentage >= 100;
+                const isNear   = b.percentage >= 80 && b.percentage < 100;
+
+                return (
+                  <div key={b.id}
+                    className="px-5 py-4 flex flex-col gap-3 transition-colors hover:bg-white/[0.02]"
+                    style={i > 0 ? { borderTop: '1px solid rgba(255,255,255,0.05)' } : {}}>
+
+                    {/* Top row */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Icon */}
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+                        style={{ background: `${catColor}22`, border: `1px solid ${catColor}33` }}>
+                        {b.category?.icon ?? '📦'}
+                      </div>
+
+                      {/* Name + status */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="font-semibold text-sm">{b.category?.name ?? 'Unknown Category'}</p>
+                          {isOver && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                              style={{ background: 'rgba(255,68,68,0.15)', color: '#FF6B6B' }}>
+                              OVER BUDGET
+                            </span>
+                          )}
+                          {isNear && !isOver && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                              style={{ background: 'rgba(240,122,62,0.15)', color: '#F07A3E' }}>
+                              NEAR LIMIT
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] mt-0.5 capitalize" style={{ color: 'var(--color-text-muted)' }}>
+                          {b.category?.type ?? 'expense'} · Monthly budget
+                        </p>
+                      </div>
+
+                      {/* Numbers */}
+                      <div className="flex items-center gap-6 shrink-0">
+                        <div className="text-right hidden sm:block">
+                          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Spent</p>
+                          <p className="text-sm font-bold tabular-nums" style={{ color }}>
+                            ${spent.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="text-right hidden md:block">
+                          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Budget</p>
+                          <p className="text-sm font-bold tabular-nums text-white">
+                            ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="text-right hidden lg:block">
+                          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Remaining</p>
+                          <p className="text-sm font-bold tabular-nums"
+                            style={{ color: remaining < 0 ? '#FF4444' : '#4FBF7F' }}>
+                            {remaining < 0 ? '-' : '+'}${Math.abs(remaining).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </p>
+                        </div>
+                        <div className="text-right w-12">
+                          <p className="text-sm font-extrabold tabular-nums" style={{ color }}>{b.percentage}%</p>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={() => startEdit(b)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors text-xs"
+                            style={{ color: 'var(--color-text-muted)' }} title="Edit">
+                            ✏️
+                          </button>
+                          <button onClick={() => handleDelete(b.id)} disabled={deletingId === b.id}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-500/20 transition-colors text-xs disabled:opacity-40"
+                            style={{ color: 'var(--color-text-muted)' }} title="Delete">
+                            {deletingId === b.id ? '…' : '🗑️'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div>
+                      <div className="w-full h-2 rounded-full overflow-hidden"
+                        style={{ background: 'rgba(255,255,255,0.07)' }}>
+                        <div className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%`, background: color, boxShadow: `0 0 8px ${color}55` }} />
+                      </div>
+                      <div className="flex justify-between mt-1 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                        <span className="sm:hidden">
+                          ${spent.toFixed(2)} spent · ${amount.toFixed(2)} budget
+                        </span>
+                        <span className="hidden sm:block">
+                          ${spent.toFixed(2)} of ${amount.toFixed(2)}
+                        </span>
+                        <span style={{ color: remaining < 0 ? '#FF4444' : 'var(--color-text-muted)' }}>
+                          {remaining < 0
+                            ? `$${Math.abs(remaining).toFixed(2)} over`
+                            : `$${remaining.toFixed(2)} left`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+
+        {/* ── Add / Edit modal ── */}
+        {showForm && createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowForm(false); setEditingId(null); } }}>
+            <form onSubmit={handleSubmit}
+              className="w-full max-w-md flex flex-col gap-5 p-6 rounded-2xl"
+              style={{ background: 'rgba(22,22,36,0.98)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-base">{editingId ? 'Edit Budget' : 'New Budget'}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{monthLabel(month)}</p>
+                </div>
+                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 text-lg leading-none"
+                  style={{ color: 'var(--color-text-muted)' }}>
+                  ✕
+                </button>
+              </div>
+
+              {/* Category */}
+              <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Category</span>
                 <select required value={form.categoryId}
                   onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
                   disabled={!!editingId}
-                  className="px-3 py-2.5 text-sm outline-none appearance-none" style={inputStyle}>
-                  <option value="">Select a category</option>
-                  {availableCategories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-                  ))}
+                  className="px-3 py-2.5 text-sm outline-none appearance-none rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: form.categoryId ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                  <option value="">Select a category…</option>
+                  {available.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
                 </select>
-              </label>
+              </div>
 
-              <label className="flex flex-col gap-1.5">
+              {/* Amount */}
+              <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Monthly Limit</span>
                 <div className="flex">
-                  <span className="flex items-center px-3 text-sm rounded-l-[var(--radius-input)]"
-                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', borderRight: 'none', color: 'var(--color-text-muted)' }}>
+                  <span className="flex items-center px-3 text-sm"
+                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', borderRight: 'none', borderRadius: '12px 0 0 12px', color: 'var(--color-text-muted)' }}>
                     $
                   </span>
                   <input required type="number" step="0.01" min="1" placeholder="0.00"
                     value={form.amount}
                     onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
                     className="flex-1 px-3 py-2.5 text-sm outline-none"
-                    style={{ ...inputStyle, borderRadius: '0 var(--radius-input) var(--radius-input) 0', borderLeft: 'none' }} />
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderLeft: 'none', borderRadius: '0 12px 12px 0', color: 'var(--color-text-primary)' }} />
                 </div>
-              </label>
-            </div>
+              </div>
 
-            <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }}
-                className="px-4 py-2 text-sm font-medium rounded-xl"
-                style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                Cancel
-              </button>
-              <button type="submit"
-                className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110"
-                style={{ background: 'var(--color-card-violet)' }}>
-                {editingId ? 'Save Changes' : 'Create Budget'}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Budget cards */}
-        {loading ? (
-          <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading budgets…</p>
-        ) : budgets.length === 0 && !showForm ? (
-          <div className="p-10 flex flex-col items-center gap-3 text-center" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
-            <span className="text-4xl">🎯</span>
-            <p className="font-semibold">No budgets for {monthLabel(month)}</p>
-            <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-              Set spending limits per category to track where your money goes.
-            </p>
-            <button onClick={() => setShowForm(true)}
-              className="mt-2 px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110"
-              style={{ background: 'var(--color-card-violet)' }}>
-              + Add Your First Budget
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {budgets.map((b) => {
-              const pct    = Math.min(b.percentage, 100);
-              const color  = progressColor(b.percentage);
-              const catColor = b.category?.color ?? '#9B6DFF';
-
-              return (
-                <div key={b.id} className="p-5 flex flex-col gap-4" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
-                  {/* Top row */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-                        style={{ background: `${catColor}22`, border: `1px solid ${catColor}44` }}>
-                        {b.category?.icon ?? '📦'}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-sm">{b.category?.name ?? '—'}</p>
-                        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Monthly budget</p>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-1">
-                      <button onClick={() => startEdit(b)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"
-                        style={{ color: 'var(--color-text-muted)' }}>
-                        ✏️
-                      </button>
-                      <button onClick={() => handleDelete(b.id)} disabled={deletingId === b.id}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-500/20 transition-colors disabled:opacity-40"
-                        style={{ color: 'var(--color-text-muted)' }}>
-                        {deletingId === b.id ? '…' : '🗑️'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Amounts */}
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Spent</p>
-                      <p className="text-2xl font-extrabold" style={{ color }}>${b.spent.toFixed(2)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Budget</p>
-                      <p className="text-base font-bold text-white">${Number(b.amount).toFixed(2)}</p>
-                    </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div>
-                    <div className="w-full rounded-full overflow-hidden" style={{ height: '6px', background: 'rgba(255,255,255,0.08)' }}>
-                      <div className="h-full rounded-full transition-all duration-500"
-                        style={{ width: `${pct}%`, background: color, boxShadow: `0 0 8px ${color}66` }} />
-                    </div>
-                    <div className="flex justify-between mt-1.5">
-                      <p className="text-xs font-semibold" style={{ color }}>{b.percentage}%</p>
-                      <p className="text-xs" style={{ color: b.remaining < 0 ? '#FF4444' : 'var(--color-text-muted)' }}>
-                        {b.remaining < 0
-                          ? `$${Math.abs(b.remaining).toFixed(2)} over`
-                          : `$${b.remaining.toFixed(2)} left`}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Status badge */}
-                  {b.percentage >= 100 && (
-                    <div className="px-3 py-1.5 rounded-lg text-center text-xs font-semibold"
-                      style={{ background: 'rgba(255,68,68,0.12)', color: '#FF8080', border: '1px solid rgba(255,68,68,0.25)' }}>
-                      ⚠️ Over budget by ${Math.abs(b.remaining).toFixed(2)}
-                    </div>
-                  )}
-                  {b.percentage >= 80 && b.percentage < 100 && (
-                    <div className="px-3 py-1.5 rounded-lg text-center text-xs font-semibold"
-                      style={{ background: 'rgba(240,122,62,0.12)', color: '#F07A3E', border: '1px solid rgba(240,122,62,0.25)' }}>
-                      🔶 Almost at limit
-                    </div>
-                  )}
-                  {b.percentage < 60 && b.spent === 0 && (
-                    <div className="px-3 py-1.5 rounded-lg text-center text-xs font-semibold"
-                      style={{ background: 'rgba(79,191,127,0.08)', color: '#4FBF7F', border: '1px solid rgba(79,191,127,0.18)' }}>
-                      ✅ No spending yet
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+              {/* Actions */}
+              <div className="flex gap-2 justify-end pt-1">
+                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }}
+                  className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10"
+                  style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  Cancel
+                </button>
+                <button type="submit"
+                  className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110"
+                  style={{ background: 'var(--color-card-violet)' }}>
+                  {editingId ? 'Save Changes' : 'Create Budget'}
+                </button>
+              </div>
+            </form>
+          </div>,
+          document.body
         )}
       </main>
     </div>
   );
-}
-
-function hexToRgb(hex: string) {
-  const n = parseInt(hex.replace('#', ''), 16);
-  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
