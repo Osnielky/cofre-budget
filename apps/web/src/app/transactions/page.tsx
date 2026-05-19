@@ -885,26 +885,26 @@ export default function TransactionsPage() {
                               disabled={updatingId === tx.id}
                               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:brightness-110 disabled:opacity-40 max-w-40"
                               style={(() => {
-                                if (cat) return { background: `${cat.color}18`, border: `1px solid ${cat.color}35`, color: cat.color };
                                 if (tx.projectId) {
                                   const _proj = projects.find((p) => p.id === tx.projectId);
                                   const _pCat = tx.projectCategoryId ? _proj?.categories?.find((c) => c.id === tx.projectCategoryId) : null;
                                   const _c = _pCat?.color || _proj?.color || '#9B6DFF';
                                   return { background: `${_c}18`, border: `1px solid ${_c}35`, color: _c };
                                 }
+                                if (cat) return { background: `${cat.color}18`, border: `1px solid ${cat.color}35`, color: cat.color };
                                 return { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-muted)' };
                               })()}>
                               {updatingId === tx.id ? (
                                 <span>…</span>
-                              ) : cat ? (
-                                <><span>{cat.icon}</span><span className="truncate">{cat.name}</span><ChevronIcon /></>
                               ) : tx.projectId ? (() => {
                                 const _proj = projects.find((p) => p.id === tx.projectId);
                                 const _pCat = tx.projectCategoryId ? _proj?.categories?.find((c) => c.id === tx.projectCategoryId) : null;
                                 return _pCat
                                   ? <><span>{_pCat.icon}</span><span className="truncate">{_pCat.name}</span><ChevronIcon /></>
                                   : <><span>{_proj?.icon}</span><span className="truncate">{_proj?.name}</span><ChevronIcon /></>;
-                              })() : (
+                              })() : cat ? (
+                                <><span>{cat.icon}</span><span className="truncate">{cat.name}</span><ChevronIcon /></>
+                              ) : (
                                 <><TagIcon /><span>Categorize</span><ChevronIcon /></>
                               )}
                             </button>
