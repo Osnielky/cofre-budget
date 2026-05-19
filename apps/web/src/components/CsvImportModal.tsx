@@ -324,9 +324,20 @@ function validate(rows: CsvRow[], account: BankAccount, fileName: string): Warni
 
 /* ── Parser ─────────────────────────────────────────────────────── */
 
+const DATE_COL_NAMES = ['transaction date','trans date','trans. date','activity date','date','posting date','posted date','post date','value date','booking date'];
+
 function parseCsv(text: string): CsvRow[] {
-  const lines = text.trim().split('\n').map((l) => l.trim()).filter(Boolean);
-  if (lines.length < 2) throw new Error('CSV file is empty or has no data rows.');
+  const allLines = text.trim().split('\n').map((l) => l.trim()).filter(Boolean);
+  if (allLines.length < 2) throw new Error('CSV file is empty or has no data rows.');
+
+  /* Find the real header row — some banks (BofA) prepend a summary block */
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(allLines.length, 15); i++) {
+    const cols = parseRow(allLines[i]).map((h) => h.toLowerCase().trim());
+    if (cols.some((c) => DATE_COL_NAMES.includes(c))) { headerIdx = i; break; }
+  }
+  const lines = allLines.slice(headerIdx);
+  if (lines.length < 2) throw new Error('No transactions found in this file.');
 
   const rawHeaders = parseRow(lines[0]);
   const headers    = rawHeaders.map((h) => h.toLowerCase().trim());
@@ -334,7 +345,7 @@ function parseCsv(text: string): CsvRow[] {
   const col = (names: string[]) =>
     names.map((n) => headers.indexOf(n)).find((i) => i >= 0) ?? -1;
 
-  const dateIdx = col(['transaction date','trans date','trans. date','activity date','date','posting date','posted date','post date','value date','booking date']);
+  const dateIdx = col(DATE_COL_NAMES);
   const descIdx = col(['description','payee','memo','narrative','details','merchant','name','transaction details','particulars']);
   const amountIdx = col(['amount','transaction amount','net amount','trans amount']);
   const debitIdx  = col(['debit','debit amount','withdrawal','withdrawals','dr','debit(dr)','money out']);
@@ -348,12 +359,16 @@ function parseCsv(text: string): CsvRow[] {
   if (amountIdx < 0 && !splitMode) throw new Error('Could not find an Amount column.');
 
   const SKIP_TYPES = new Set(['payment', 'credit card payment', 'online payment', 'autopay']);
+  const SKIP_DESC  = /^(beginning balance|ending balance|opening balance|closing balance)/i;
 
   const rows: CsvRow[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = parseRow(lines[i]);
 
     if (typeIdx >= 0 && SKIP_TYPES.has(cols[typeIdx]?.trim().toLowerCase() ?? '')) continue;
+
+    const rawDesc = cols[descIdx]?.trim() ?? '';
+    if (SKIP_DESC.test(rawDesc)) continue;
 
     let amount: number;
     if (splitMode) {
@@ -366,8 +381,9 @@ function parseCsv(text: string): CsvRow[] {
       if (isNaN(amount)) continue;
     }
 
-    const date = cols[dateIdx]?.trim() ?? '';
-    const name = cols[descIdx]?.trim() ?? '';
+    const rawDate = cols[dateIdx]?.trim() ?? '';
+    const date    = normalizeDate(rawDate);
+    const name    = rawDesc;
     if (!date || !name) continue;
 
     const refRaw = refIdx >= 0 ? cols[refIdx]?.trim() : '';
@@ -376,6 +392,15 @@ function parseCsv(text: string): CsvRow[] {
     rows.push({ date, referenceNumber, name, amount });
   }
   return rows;
+}
+
+/* MM/DD/YYYY → YYYY-MM-DD; already ISO dates pass through unchanged */
+function normalizeDate(raw: string): string {
+  const mdyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdyMatch) return `${mdyMatch[3]}-${mdyMatch[1].padStart(2,'0')}-${mdyMatch[2].padStart(2,'0')}`;
+  const dmyMatch = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dmyMatch) return `${dmyMatch[3]}-${dmyMatch[2].padStart(2,'0')}-${dmyMatch[1].padStart(2,'0')}`;
+  return raw; // already YYYY-MM-DD or other ISO
 }
 
 function parseAmt(raw: string | undefined): number {

@@ -422,7 +422,7 @@ export default function TransactionsPage() {
                 <button onClick={() => { setShowImportPicker((v) => !v); setShowAddAccForm(false); setAddAccError(''); }}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
                   style={{ background: 'rgba(155,109,255,0.15)', border: '1px solid rgba(155,109,255,0.28)', color: '#9B6DFF' }}>
-                  <UploadIcon /> Import CSV
+                  <UploadIcon /> Import Transactions (CSV)
                 </button>
                 {showImportPicker && (
                   <div className="absolute right-0 top-full mt-2 z-30 rounded-xl min-w-64"
