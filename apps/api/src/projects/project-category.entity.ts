@@ -12,6 +12,10 @@ export class ProjectCategory {
   @Column({ nullable: true })
   projectType: string;
 
+  /* 'expense' | 'income' */
+  @Column({ default: 'expense' })
+  type: string;
+
   @Column()
   name: string;
 

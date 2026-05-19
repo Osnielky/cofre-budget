@@ -16,7 +16,7 @@ const PROJECT_TYPES: { value: string; label: string; icon: string }[] = [
 ];
 
 interface ProjectCategory {
-  id: string; name: string; icon: string; color: string; order: number;
+  id: string; name: string; icon: string; color: string; order: number; type: string;
 }
 
 interface CategoryBreakdown extends ProjectCategory {
@@ -757,7 +757,7 @@ export default function ProjectsPage() {
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>How did you receive payment?</span>
                 <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => { setSellMode('bank'); setSellLinkedTx(null); setSellCashAmount(''); setSellForm(f => ({ ...f, salePrice: '' })); }}
+                  <button type="button" onClick={() => { setSellMode('bank'); setSellLinkedTx(null); setSellForm(f => ({ ...f, salePrice: '' })); }}
                     className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium transition-all"
                     style={sellMode === 'bank'
                       ? { background: 'rgba(75,168,216,0.18)', color: '#4BA8D8', border: '1px solid rgba(75,168,216,0.40)' }
@@ -1041,18 +1041,12 @@ export default function ProjectsPage() {
                     Select a project category to tag this expense (optional):
                   </p>
 
-                  <div className="overflow-y-auto grid grid-cols-2 gap-2">
-                    {/* No category option */}
-                    <button
-                      onClick={() => setPendingCatId('')}
-                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5"
-                      style={pendingCatId === ''
-                        ? { background: 'rgba(155,109,255,0.12)', border: '1px solid rgba(155,109,255,0.30)' }
-                        : { border: '1px solid rgba(255,255,255,0.08)' }}>
-                      <span className="text-lg">🏷️</span>
-                      <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>No category</span>
-                    </button>
-                    {(projects.find((p) => p.id === showLinkPicker)?.categories ?? []).map((cat) => (
+                  {(() => {
+                    const isIncome = Number(pendingLinkTx?.amount ?? 0) >= 0;
+                    const allCats  = projects.find((p) => p.id === showLinkPicker)?.categories ?? [];
+                    const primary  = allCats.filter((c) => isIncome ? c.type === 'income' : c.type === 'expense');
+                    const refund   = allCats.filter((c) => isIncome ? c.type === 'expense' : c.type === 'income');
+                    const CatBtn = (cat: ProjectCategory) => (
                       <button key={cat.id}
                         onClick={() => setPendingCatId(cat.id)}
                         className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5"
@@ -1065,8 +1059,35 @@ export default function ProjectsPage() {
                         </span>
                         {pendingCatId === cat.id && <span className="ml-auto text-xs shrink-0" style={{ color: cat.color }}>✓</span>}
                       </button>
-                    ))}
-                  </div>
+                    );
+                    return (
+                      <div className="overflow-y-auto flex flex-col gap-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => setPendingCatId('')}
+                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5"
+                            style={pendingCatId === ''
+                              ? { background: 'rgba(155,109,255,0.12)', border: '1px solid rgba(155,109,255,0.30)' }
+                              : { border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <span className="text-lg">🏷️</span>
+                            <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>No category</span>
+                          </button>
+                          {primary.map(CatBtn)}
+                        </div>
+                        {refund.length > 0 && (
+                          <>
+                            <p className="text-[10px] font-bold tracking-widest uppercase px-1 pt-1"
+                              style={{ color: 'var(--color-text-muted)' }}>
+                              {isIncome ? '↩ Return / Refund' : '↩ Adjustment'}
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {refund.map(CatBtn)}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div className="flex gap-2 justify-end shrink-0 pt-1">
                     <button onClick={() => setPendingLinkTx(null)}
@@ -1173,16 +1194,35 @@ function ProjectCategoryPicker({
               <span>✕</span><span>Remove tag</span>
             </button>
           )}
-          {categories.map((cat) => (
-            <button key={cat.id}
-              onClick={() => { onAssign(cat.id); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 text-left"
-              style={tx.projectCategoryId === cat.id ? { background: `${cat.color}15` } : {}}>
-              <span>{cat.icon}</span>
-              <span style={{ color: tx.projectCategoryId === cat.id ? cat.color : 'var(--color-text-secondary)' }}>{cat.name}</span>
-              {tx.projectCategoryId === cat.id && <span className="ml-auto" style={{ color: cat.color }}>✓</span>}
-            </button>
-          ))}
+          {(() => {
+            const isIncome = Number(tx.amount) >= 0;
+            const primary  = categories.filter((c) => isIncome ? c.type === 'income' : c.type === 'expense');
+            const refund   = categories.filter((c) => isIncome ? c.type === 'expense' : c.type === 'income');
+            const CatBtn = (cat: ProjectCategory) => (
+              <button key={cat.id}
+                onClick={() => { onAssign(cat.id); setOpen(false); }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 text-left"
+                style={tx.projectCategoryId === cat.id ? { background: `${cat.color}15` } : {}}>
+                <span>{cat.icon}</span>
+                <span style={{ color: tx.projectCategoryId === cat.id ? cat.color : 'var(--color-text-secondary)' }}>{cat.name}</span>
+                {tx.projectCategoryId === cat.id && <span className="ml-auto" style={{ color: cat.color }}>✓</span>}
+              </button>
+            );
+            return (
+              <>
+                {primary.map(CatBtn)}
+                {refund.length > 0 && (
+                  <>
+                    <div className="px-3 pt-1 pb-0.5 text-[9px] font-bold tracking-widest uppercase"
+                      style={{ color: 'var(--color-text-muted)', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                      {isIncome ? '↩ Return / Refund' : '↩ Adjustment'}
+                    </div>
+                    {refund.map(CatBtn)}
+                  </>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

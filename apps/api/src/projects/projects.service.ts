@@ -45,40 +45,40 @@ export interface ProjectWithStats extends Project {
 }
 
 /* Default category seeds per project type */
-const DEFAULT_CATEGORIES: Record<string, { name: string; icon: string; color: string }[]> = {
+const DEFAULT_CATEGORIES: Record<string, { name: string; icon: string; color: string; type: string }[]> = {
   vehicle: [
-    { name: 'Mechanic',     icon: '🔧', color: '#F07A3E' },
-    { name: 'Tires',        icon: '🛞', color: '#F5C842' },
-    { name: 'Maintenance',  icon: '🔩', color: '#9B6DFF' },
-    { name: 'Transport',    icon: '🚛', color: '#4BA8D8' },
-    { name: 'Registration', icon: '📄', color: '#E879A0' },
-    { name: 'Fuel',         icon: '⛽', color: '#9B6DFF' },
-    { name: 'Sale Income',  icon: '💵', color: '#4FBF7F' },
+    { name: 'Mechanic',     icon: '🔧', color: '#F07A3E', type: 'expense' },
+    { name: 'Tires',        icon: '🛞', color: '#F5C842', type: 'expense' },
+    { name: 'Maintenance',  icon: '🔩', color: '#9B6DFF', type: 'expense' },
+    { name: 'Transport',    icon: '🚛', color: '#4BA8D8', type: 'expense' },
+    { name: 'Registration', icon: '📄', color: '#E879A0', type: 'expense' },
+    { name: 'Fuel',         icon: '⛽', color: '#9B6DFF', type: 'expense' },
+    { name: 'Sale Income',  icon: '💵', color: '#4FBF7F', type: 'income'  },
   ],
   property: [
-    { name: 'Renovation',    icon: '🏗️', color: '#F07A3E' },
-    { name: 'Repairs',       icon: '🔨', color: '#F5C842' },
-    { name: 'Agent Fees',    icon: '🏡', color: '#9B6DFF' },
-    { name: 'Taxes',         icon: '🏛️', color: '#E879A0' },
-    { name: 'Insurance',     icon: '🛡️', color: '#4BA8D8' },
-    { name: 'Utilities',     icon: '💡', color: '#4FBF7F' },
-    { name: 'Rental Income', icon: '🏠', color: '#4FBF7F' },
-    { name: 'Sale Income',   icon: '💵', color: '#4FBF7F' },
+    { name: 'Renovation',    icon: '🏗️', color: '#F07A3E', type: 'expense' },
+    { name: 'Repairs',       icon: '🔨', color: '#F5C842', type: 'expense' },
+    { name: 'Agent Fees',    icon: '🏡', color: '#9B6DFF', type: 'expense' },
+    { name: 'Taxes',         icon: '🏛️', color: '#E879A0', type: 'expense' },
+    { name: 'Insurance',     icon: '🛡️', color: '#4BA8D8', type: 'expense' },
+    { name: 'Utilities',     icon: '💡', color: '#4FBF7F', type: 'expense' },
+    { name: 'Rental Income', icon: '🏠', color: '#4FBF7F', type: 'income'  },
+    { name: 'Sale Income',   icon: '💵', color: '#4FBF7F', type: 'income'  },
   ],
   business: [
-    { name: 'Equipment',  icon: '💻', color: '#9B6DFF' },
-    { name: 'Marketing',  icon: '📢', color: '#F07A3E' },
-    { name: 'Legal',      icon: '⚖️', color: '#E879A0' },
-    { name: 'Supplies',   icon: '📦', color: '#4BA8D8' },
-    { name: 'Labor',      icon: '👷', color: '#F5C842' },
-    { name: 'Revenue',    icon: '💰', color: '#4FBF7F' },
-    { name: 'Sale Income',icon: '💵', color: '#4FBF7F' },
+    { name: 'Equipment',  icon: '💻', color: '#9B6DFF', type: 'expense' },
+    { name: 'Marketing',  icon: '📢', color: '#F07A3E', type: 'expense' },
+    { name: 'Legal',      icon: '⚖️', color: '#E879A0', type: 'expense' },
+    { name: 'Supplies',   icon: '📦', color: '#4BA8D8', type: 'expense' },
+    { name: 'Labor',      icon: '👷', color: '#F5C842', type: 'expense' },
+    { name: 'Revenue',    icon: '💰', color: '#4FBF7F', type: 'income'  },
+    { name: 'Sale Income',icon: '💵', color: '#4FBF7F', type: 'income'  },
   ],
   other: [
-    { name: 'Materials',  icon: '📦', color: '#F07A3E' },
-    { name: 'Labor',      icon: '👷', color: '#F5C842' },
-    { name: 'Fees',       icon: '📄', color: '#9B6DFF' },
-    { name: 'Sale Income',icon: '💵', color: '#4FBF7F' },
+    { name: 'Materials',  icon: '📦', color: '#F07A3E', type: 'expense' },
+    { name: 'Labor',      icon: '👷', color: '#F5C842', type: 'expense' },
+    { name: 'Fees',       icon: '📄', color: '#9B6DFF', type: 'expense' },
+    { name: 'Sale Income',icon: '💵', color: '#4FBF7F', type: 'income'  },
   ],
 };
 
@@ -156,7 +156,7 @@ export class ProjectsService {
     if (existing === 0) {
       const seeds = DEFAULT_CATEGORIES[type] ?? DEFAULT_CATEGORIES.other;
       await this.catRepo.save(
-        seeds.map((s, i) => this.catRepo.create({ userId, projectType: type, name: s.name, icon: s.icon, color: s.color, order: i })),
+        seeds.map((s, i) => this.catRepo.create({ userId, projectType: type, name: s.name, icon: s.icon, color: s.color, type: s.type, order: i })),
       );
     }
 
@@ -235,7 +235,7 @@ export class ProjectsService {
     await this.catRepo.delete({ userId, projectType: type });
     const seeds = DEFAULT_CATEGORIES[type] ?? DEFAULT_CATEGORIES.other;
     return this.catRepo.save(
-      seeds.map((s, i) => this.catRepo.create({ userId, projectType: type, name: s.name, icon: s.icon, color: s.color, order: i })),
+      seeds.map((s, i) => this.catRepo.create({ userId, projectType: type, name: s.name, icon: s.icon, color: s.color, type: s.type, order: i })),
     );
   }
 
@@ -276,7 +276,7 @@ export class ProjectsService {
     await this.catRepo.delete({ userId, projectType: type });
     const seeds = DEFAULT_CATEGORIES[type] ?? DEFAULT_CATEGORIES.other;
     return this.catRepo.save(
-      seeds.map((s, i) => this.catRepo.create({ userId, projectType: type, name: s.name, icon: s.icon, color: s.color, order: i })),
+      seeds.map((s, i) => this.catRepo.create({ userId, projectType: type, name: s.name, icon: s.icon, color: s.color, type: s.type, order: i })),
     );
   }
 

@@ -6,12 +6,17 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 interface CsvRow { date: string; referenceNumber?: string; name: string; amount: number; }
 
+interface BankAccount {
+  id: string; bankName: string; accountName: string; accountType: string; color: string;
+}
+
 interface Props {
-  accountId: string;
-  accountName: string;
+  account: BankAccount;
   onClose: () => void;
   onImported: (count: number) => void;
 }
+
+interface Warning { level: 'warn' | 'error'; message: string; }
 
 const glass: React.CSSProperties = {
   background: 'rgba(25, 25, 38, 0.92)',
@@ -21,30 +26,55 @@ const glass: React.CSSProperties = {
   boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
 };
 
-export default function CsvImportModal({ accountId, accountName, onClose, onImported }: Props) {
-  const [rows, setRows]       = useState<CsvRow[]>([]);
+const ACC_ICONS: Record<string, string> = {
+  checking: '💳', savings: '🏦', cash: '💵', credit: '💰', investment: '📈', debit: '💳',
+};
+
+export default function CsvImportModal({ account, onClose, onImported }: Props) {
+  const [rows, setRows]         = useState<CsvRow[]>([]);
   const [fileName, setFileName] = useState('');
-  const [error, setError]     = useState('');
+  const [error, setError]       = useState('');
+  const [warnings, setWarnings] = useState<Warning[]>([]);
   const [importing, setImporting] = useState(false);
-  const [result, setResult]   = useState<{ imported: number; skipped: number } | null>(null);
+  const [result, setResult]     = useState<{ imported: number; skipped: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setError(''); setRows([]); setResult(null);
+  function processFile(file: File) {
+    setError(''); setRows([]); setResult(null); setWarnings([]);
     setFileName(file.name);
+    if (!file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.txt')) {
+      setError('Please select a CSV or TXT file.'); return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
         const parsed = parseCsv(ev.target?.result as string);
         if (parsed.length === 0) throw new Error('No transactions found in this file.');
         setRows(parsed);
+        setWarnings(validate(parsed, account, file.name));
       } catch (err: any) {
         setError(err.message ?? 'Could not parse CSV file.');
       }
     };
     reader.readAsText(file);
+  }
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault(); setDragging(true);
+  }
+  function handleDragLeave(e: React.DragEvent) {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
+  }
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault(); setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processFile(file);
   }
 
   async function handleImport() {
@@ -54,7 +84,7 @@ export default function CsvImportModal({ accountId, accountName, onClose, onImpo
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ bankAccountId: accountId, rows }),
+        body: JSON.stringify({ bankAccountId: account.id, rows }),
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -65,44 +95,98 @@ export default function CsvImportModal({ accountId, accountName, onClose, onImpo
     } finally { setImporting(false); }
   }
 
-  const income   = rows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
-  const expenses = rows.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0);
+  const hasErrors   = warnings.some((w) => w.level === 'error');
+  const income      = rows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
+  const expenses    = rows.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0);
+  const accIcon     = ACC_ICONS[account.accountType] ?? '🏦';
+  const accLabel    = `${account.bankName} — ${account.accountName}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
 
-      <div className="w-full max-w-2xl flex flex-col gap-5 p-6 rounded-card" style={glass}>
+      <div className="w-full max-w-2xl flex flex-col gap-5 p-6 rounded-2xl" style={glass}>
 
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h2 className="font-bold text-base">Import Transactions</h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{accountName}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              Upload a CSV exported from your bank
+            </p>
           </div>
           <button onClick={onClose}
             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"
             style={{ color: 'var(--color-text-muted)' }}>✕</button>
         </div>
 
-        {/* File picker */}
+        {/* Target account */}
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+          style={{ background: `${account.color}12`, border: `1px solid ${account.color}30` }}>
+          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
+            style={{ background: `${account.color}20` }}>
+            {accIcon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
+              Importing into
+            </p>
+            <p className="text-sm font-bold truncate" style={{ color: account.color }}>{accLabel}</p>
+          </div>
+          <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0 capitalize"
+            style={{ background: `${account.color}20`, color: account.color }}>
+            {account.accountType}
+          </span>
+        </div>
+
+        {/* File picker / drop zone */}
         {!result && (
-          <div>
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}>
             <input ref={inputRef} type="file" accept=".csv,.txt" onChange={handleFile} className="hidden" />
-            <button onClick={() => inputRef.current?.click()}
-              className="w-full py-8 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 transition-colors hover:border-card-violet/50"
-              style={{ borderColor: rows.length ? 'rgba(79,191,127,0.4)' : 'rgba(255,255,255,0.12)', color: 'var(--color-text-secondary)' }}>
-              <span className="text-2xl">{rows.length ? '✅' : '📂'}</span>
+            <button onClick={() => inputRef.current?.click()} type="button"
+              className="w-full py-8 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 transition-all"
+              style={{
+                borderColor: dragging
+                  ? account.color
+                  : rows.length ? 'rgba(79,191,127,0.4)' : 'rgba(255,255,255,0.12)',
+                background: dragging ? `${account.color}08` : 'transparent',
+                color: 'var(--color-text-secondary)',
+              }}>
+              <span className="text-2xl">{dragging ? '📥' : rows.length ? '✅' : '📂'}</span>
               <span className="text-sm font-medium">
-                {rows.length ? `${rows.length} transactions loaded — ${fileName}` : 'Click to select CSV file'}
+                {dragging
+                  ? 'Drop to import'
+                  : rows.length
+                    ? `${rows.length} transactions — ${fileName}`
+                    : 'Click to select or drag & drop a CSV file'}
               </span>
-              {!rows.length && (
+              {!rows.length && !dragging && (
                 <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  Export from your bank's website then upload here
+                  Supports Chase, Bank of America, Wells Fargo and most bank exports
                 </span>
               )}
             </button>
+          </div>
+        )}
+
+        {/* Warnings */}
+        {warnings.length > 0 && !result && (
+          <div className="flex flex-col gap-2">
+            {warnings.map((w, i) => (
+              <div key={i} className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs"
+                style={{
+                  background: w.level === 'error' ? 'rgba(255,107,107,0.10)' : 'rgba(245,200,66,0.10)',
+                  border: `1px solid ${w.level === 'error' ? 'rgba(255,107,107,0.25)' : 'rgba(245,200,66,0.25)'}`,
+                  color: w.level === 'error' ? '#FF6B6B' : '#F5C842',
+                }}>
+                <span className="shrink-0">{w.level === 'error' ? '✕' : '⚠'}</span>
+                <span>{w.message}</span>
+              </div>
+            ))}
           </div>
         )}
 
@@ -111,8 +195,8 @@ export default function CsvImportModal({ accountId, accountName, onClose, onImpo
           <>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { label: 'Transactions', value: rows.length.toString(),            color: '#9B6DFF' },
-                { label: 'Total Income',   value: `+$${income.toFixed(2)}`,            color: '#4FBF7F' },
+                { label: 'Transactions', value: rows.length.toString(),             color: '#9B6DFF' },
+                { label: 'Total Income',   value: `+$${income.toFixed(2)}`,             color: '#4FBF7F' },
                 { label: 'Total Expenses', value: `-$${Math.abs(expenses).toFixed(2)}`, color: '#F07A3E' },
               ].map((s) => (
                 <div key={s.label} className="p-3 rounded-xl text-center"
@@ -176,7 +260,7 @@ export default function CsvImportModal({ accountId, accountName, onClose, onImpo
             {result ? 'Close' : 'Cancel'}
           </button>
           {rows.length > 0 && !result && (
-            <button onClick={handleImport} disabled={importing}
+            <button onClick={handleImport} disabled={importing || hasErrors}
               className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60"
               style={{ background: 'var(--color-card-violet)' }}>
               {importing ? 'Importing…' : `Import ${rows.length} transactions`}
@@ -186,6 +270,56 @@ export default function CsvImportModal({ accountId, accountName, onClose, onImpo
       </div>
     </div>
   );
+}
+
+/* ── Validation ─────────────────────────────────────────────────── */
+
+function validate(rows: CsvRow[], account: BankAccount, fileName: string): Warning[] {
+  const warnings: Warning[] = [];
+  const positiveCount = rows.filter((r) => r.amount > 0).length;
+  const negativeCount = rows.filter((r) => r.amount < 0).length;
+  const total = rows.length;
+
+  /* Credit cards: expect mostly negative amounts (charges) */
+  if (account.accountType === 'credit' && positiveCount / total > 0.8) {
+    warnings.push({
+      level: 'warn',
+      message: `This CSV has mostly positive amounts but "${account.accountName}" is a credit card — credit card exports usually show charges as positive. Double-check you exported the right account.`,
+    });
+  }
+
+  /* Checking/savings: a file with zero negative rows is suspicious */
+  if (['checking', 'savings', 'debit'].includes(account.accountType) && negativeCount === 0) {
+    warnings.push({
+      level: 'warn',
+      message: `All ${total} transactions are income — no expenses found. Make sure this CSV belongs to "${account.accountName}".`,
+    });
+  }
+
+  /* Detect likely wrong bank from filename */
+  const fileLower = fileName.toLowerCase();
+  const bankLower = account.bankName.toLowerCase();
+  const BANK_KEYWORDS: Record<string, string[]> = {
+    chase:     ['chase'],
+    'bank of america': ['bofa', 'bankofamerica', 'boa'],
+    'wells fargo': ['wellsfargo', 'wells'],
+    citi:      ['citi'],
+    capital:   ['capital'],
+    amex:      ['amex', 'americanexpress'],
+  };
+  for (const [bank, keywords] of Object.entries(BANK_KEYWORDS)) {
+    const fileMatchesBank   = keywords.some((k) => fileLower.includes(k)) || fileLower.includes(bank);
+    const accountMatchesBank = bankLower.includes(bank) || keywords.some((k) => bankLower.includes(k));
+    if (fileMatchesBank && !accountMatchesBank) {
+      warnings.push({
+        level: 'warn',
+        message: `The file name suggests a ${bank.charAt(0).toUpperCase() + bank.slice(1)} export, but you're importing into "${account.bankName} — ${account.accountName}". Make sure this is the right account.`,
+      });
+      break;
+    }
+  }
+
+  return warnings;
 }
 
 /* ── Parser ─────────────────────────────────────────────────────── */
@@ -200,24 +334,13 @@ function parseCsv(text: string): CsvRow[] {
   const col = (names: string[]) =>
     names.map((n) => headers.indexOf(n)).find((i) => i >= 0) ?? -1;
 
-  /* Date — prefer "transaction date" over "post date" */
-  const dateIdx = col(['transaction date','trans date','trans. date','activity date','date','posted date','post date','value date','booking date']);
-
-  /* Description */
+  const dateIdx = col(['transaction date','trans date','trans. date','activity date','date','posting date','posted date','post date','value date','booking date']);
   const descIdx = col(['description','payee','memo','narrative','details','merchant','name','transaction details','particulars']);
-
-  /* Amount — single column */
   const amountIdx = col(['amount','transaction amount','net amount','trans amount']);
-
-  /* Amount — split debit/credit */
   const debitIdx  = col(['debit','debit amount','withdrawal','withdrawals','dr','debit(dr)','money out']);
   const creditIdx = col(['credit','credit amount','deposit','deposits','cr','credit(cr)','money in']);
   const splitMode = amountIdx < 0 && debitIdx >= 0 && creditIdx >= 0;
-
-  /* Optional: reference for dedup */
   const refIdx = col(['reference number','reference no','reference','ref no','check no','check number','transaction id']);
-
-  /* Optional: type column — used to skip certain rows (e.g. credit card payments) */
   const typeIdx = col(['type','transaction type','trans type']);
 
   if (dateIdx < 0) throw new Error('Could not find a Date column. Please share your CSV format so we can add support for it.');
@@ -230,7 +353,6 @@ function parseCsv(text: string): CsvRow[] {
   for (let i = 1; i < lines.length; i++) {
     const cols = parseRow(lines[i]);
 
-    /* Skip credit-card payment rows (they're transfers, not real transactions) */
     if (typeIdx >= 0 && SKIP_TYPES.has(cols[typeIdx]?.trim().toLowerCase() ?? '')) continue;
 
     let amount: number;

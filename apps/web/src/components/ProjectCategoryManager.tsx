@@ -14,7 +14,7 @@ const PROJECT_TYPES = [
 ];
 
 interface ProjectCategory {
-  id: string; name: string; icon: string; color: string; order: number;
+  id: string; name: string; icon: string; color: string; order: number; type: string;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -31,12 +31,12 @@ export default function ProjectCategoryManager() {
   const [seeding, setSeeding]       = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingId, setEditingId]   = useState<string | null>(null);
-  const [editForm, setEditForm]     = useState({ name: '', icon: '', color: '' });
+  const [editForm, setEditForm]     = useState({ name: '', icon: '', color: '', type: 'expense' });
   const [saving, setSaving]         = useState(false);
 
   /* New category form */
   const [showAdd, setShowAdd]   = useState(false);
-  const [addForm, setAddForm]   = useState({ name: '', icon: '📦', color: '#9B6DFF' });
+  const [addForm, setAddForm]   = useState({ name: '', icon: '📦', color: '#9B6DFF', type: 'expense' });
   const [addSaving, setAddSaving] = useState(false);
 
   const typeMeta = PROJECT_TYPES.find((t) => t.value === activeType)!;
@@ -79,7 +79,7 @@ export default function ProjectCategoryManager() {
 
   function startEdit(cat: ProjectCategory) {
     setEditingId(cat.id);
-    setEditForm({ name: cat.name, icon: cat.icon, color: cat.color });
+    setEditForm({ name: cat.name, icon: cat.icon, color: cat.color, type: cat.type ?? 'expense' });
   }
 
   async function handleUpdate(catId: string) {
@@ -154,6 +154,19 @@ export default function ProjectCategoryManager() {
                   <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
                     className="flex-1 px-2.5 py-1.5 text-sm outline-none rounded-lg min-w-0"
                     style={inputStyle} autoFocus />
+                  <div className="flex rounded-lg overflow-hidden shrink-0"
+                    style={{ border: '1px solid rgba(255,255,255,0.10)' }}>
+                    <button type="button" onClick={() => setEditForm((f) => ({ ...f, type: 'expense' }))}
+                      className="px-2 py-1.5 text-[10px] font-semibold transition-colors"
+                      style={{ background: editForm.type === 'expense' ? 'rgba(240,122,62,0.25)' : 'transparent', color: editForm.type === 'expense' ? '#F07A3E' : 'var(--color-text-muted)' }}>
+                      Exp
+                    </button>
+                    <button type="button" onClick={() => setEditForm((f) => ({ ...f, type: 'income' }))}
+                      className="px-2 py-1.5 text-[10px] font-semibold transition-colors"
+                      style={{ background: editForm.type === 'income' ? 'rgba(79,191,127,0.25)' : 'transparent', color: editForm.type === 'income' ? '#4FBF7F' : 'var(--color-text-muted)', borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+                      Inc
+                    </button>
+                  </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {PRESET_COLORS.map((c) => (
                       <button key={c} type="button" onClick={() => setEditForm((f) => ({ ...f, color: c }))}
@@ -180,6 +193,12 @@ export default function ProjectCategoryManager() {
                     {cat.icon}
                   </div>
                   <span className="flex-1 text-sm font-medium" style={{ color: cat.color }}>{cat.name}</span>
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+                    style={cat.type === 'income'
+                      ? { background: 'rgba(79,191,127,0.15)', color: '#4FBF7F' }
+                      : { background: 'rgba(240,122,62,0.15)', color: '#F07A3E' }}>
+                    {cat.type === 'income' ? 'Income' : 'Expense'}
+                  </span>
                   <div className="w-3 h-3 rounded-full shrink-0" style={{ background: cat.color }} />
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => startEdit(cat)}
@@ -210,6 +229,19 @@ export default function ProjectCategoryManager() {
             <input required value={addForm.name} onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
               className="flex-1 px-2.5 py-1.5 text-sm outline-none rounded-lg min-w-0"
               style={inputStyle} placeholder="Category name…" autoFocus />
+            <div className="flex rounded-lg overflow-hidden shrink-0"
+              style={{ border: '1px solid rgba(255,255,255,0.10)' }}>
+              <button type="button" onClick={() => setAddForm((f) => ({ ...f, type: 'expense' }))}
+                className="px-2 py-1.5 text-[10px] font-semibold transition-colors"
+                style={{ background: addForm.type === 'expense' ? 'rgba(240,122,62,0.25)' : 'transparent', color: addForm.type === 'expense' ? '#F07A3E' : 'var(--color-text-muted)' }}>
+                Exp
+              </button>
+              <button type="button" onClick={() => setAddForm((f) => ({ ...f, type: 'income' }))}
+                className="px-2 py-1.5 text-[10px] font-semibold transition-colors"
+                style={{ background: addForm.type === 'income' ? 'rgba(79,191,127,0.25)' : 'transparent', color: addForm.type === 'income' ? '#4FBF7F' : 'var(--color-text-muted)', borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+                Inc
+              </button>
+            </div>
             <div className="flex items-center gap-1 shrink-0">
               {PRESET_COLORS.map((c) => (
                 <button key={c} type="button" onClick={() => setAddForm((f) => ({ ...f, color: c }))}

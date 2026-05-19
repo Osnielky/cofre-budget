@@ -77,7 +77,7 @@ export default function TransactionsPage() {
   const [filter, setFilter]             = useState<Filter>('all');
   const [search, setSearch]             = useState('');
   const [openPickerId, setOpenPickerId] = useState<string | null>(null);
-  const [pickerPos, setPickerPos]       = useState<{ top: number; left: number } | null>(null);
+  const [pickerPos, setPickerPos]       = useState<{ top: number; left: number; maxHeight: number } | null>(null);
   const [updatingId, setUpdatingId]     = useState<string | null>(null);
   const [importAccount, setImportAccount]       = useState<BankAccount | null>(null);
   const [showImportPicker, setShowImportPicker] = useState(false);
@@ -199,6 +199,20 @@ export default function TransactionsPage() {
   /* ── category assign ── */
   async function assignCategory(txId: string, categoryId: string | null) {
     setUpdatingId(txId); setOpenPickerId(null);
+
+    /* If assigning a real budget category, fully unlink from any project */
+    if (categoryId) {
+      const tx = transactions.find((t) => t.id === txId);
+      if (tx?.projectId) {
+        await fetch(`${API}/projects/${tx.projectId}/unlink/${txId}`, {
+          method: 'PATCH', credentials: 'include',
+        });
+        setTransactions((prev) => prev.map((t) =>
+          t.id === txId ? { ...t, projectId: null, projectCategoryId: null } : t,
+        ));
+      }
+    }
+
     const res = await fetch(`${API}/transactions/${txId}/category`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       credentials: 'include', body: JSON.stringify({ categoryId }),
@@ -252,9 +266,22 @@ export default function TransactionsPage() {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ projectCategoryId }),
       });
-      setTransactions((prev) => prev.map((t) =>
-        t.id === txId ? { ...t, projectId, projectCategoryId } : t,
-      ));
+
+      /* If assigning a project category, clear the budget category */
+      if (projectCategoryId) {
+        await fetch(`${API}/transactions/${txId}/category`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({ categoryId: null }),
+        });
+        setTransactions((prev) => prev.map((t) =>
+          t.id === txId ? { ...t, projectId, projectCategoryId, categoryId: null, categoryRef: null } : t,
+        ));
+      } else {
+        setTransactions((prev) => prev.map((t) =>
+          t.id === txId ? { ...t, projectId, projectCategoryId } : t,
+        ));
+      }
+
       setOpenPickerId(null); setPickerProjectDrill(null);
     } finally { setLinkingProj(false); }
   }
@@ -684,9 +711,17 @@ export default function TransactionsPage() {
 
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold truncate">{acc?.bankName ?? 'Unknown Bank'}</p>
-                      <p className="text-xs truncate" style={{ color: 'var(--color-text-muted)' }}>
-                        {acc?.accountName}{acc?.accountType ? ` · ${acc.accountType}` : ''}
-                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                        <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                          {acc?.accountName}
+                        </p>
+                        {acc?.accountType && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 capitalize"
+                            style={{ background: `${accColor}22`, color: accColor, border: `1px solid ${accColor}40` }}>
+                            {acc.accountType}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0">
@@ -719,12 +754,36 @@ export default function TransactionsPage() {
                   </button>
 
                   {/* ── Date groups (shown when expanded) ── */}
-                  {!isCollapsed && dates.map((date) => {
+                  {!isCollapsed && (
+                  <div className="relative flex flex-col gap-2" style={{ paddingLeft: '28px' }}>
+                    {/* Main vertical trunk line on the far left */}
+                    <div className="absolute pointer-events-none"
+                      style={{
+                        left: '10px',
+                        top: 0,
+                        bottom: '16px',
+                        width: '2px',
+                        background: `linear-gradient(to bottom, ${accColor}80, ${accColor}08)`,
+                        borderRadius: '1px',
+                      }} />
+                  {dates.map((date, dateIdx) => {
                     const dateKey       = `${accountId}::${date}`;
                     const dateCollapsed = collapsedDates.has(dateKey);
                     const dayUncategorized = dateMap[date].filter((t) => !t.categoryId && !isTransfer(t)).length;
+                    const isLast = dateIdx === dates.length - 1;
                     return (
-                    <div key={date} className="pl-3">
+                    <div key={date} className="relative">
+                      {/* Curved branch connector: down from trunk then right */}
+                      <div className="absolute pointer-events-none"
+                        style={{
+                          left: '-18px',
+                          top: '0',
+                          width: '16px',
+                          height: '14px',
+                          borderLeft: `2px solid ${accColor}${isLast ? '40' : '60'}`,
+                          borderBottom: `2px solid ${accColor}60`,
+                          borderBottomLeftRadius: '10px',
+                        }} />
                       {/* Date header — collapsible */}
                       <button
                         onClick={() => toggleCollapseDate(dateKey)}
@@ -760,8 +819,8 @@ export default function TransactionsPage() {
                         const txIsTransfer = isTransfer(tx);
                         const isOpen       = openPickerId === tx.id;
                         const pickerCats   = isIncome
-                          ? categories.filter((c) => c.type !== 'expense')
-                          : categories.filter((c) => c.type !== 'income');
+                          ? categories.filter((c) => c.type === 'income' || c.type === 'transfer')
+                          : categories.filter((c) => c.type === 'expense' || c.type === 'transfer');
 
                         return (
                           <div key={tx.id} className="relative group"
@@ -816,8 +875,10 @@ export default function TransactionsPage() {
                                 const left = Math.max(4, rect.right - w);
                                 const spaceBelow = window.innerHeight - rect.bottom - 8;
                                 const spaceAbove = rect.top - 8;
-                                const openAbove = spaceBelow < 200 && spaceAbove > spaceBelow;
-                                setPickerPos({ top: openAbove ? rect.top - Math.min(300, spaceAbove) - 4 : rect.bottom + 4, left });
+                                const openAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
+                                const maxHeight = Math.min(360, openAbove ? spaceAbove : spaceBelow);
+                                const top = openAbove ? rect.top - maxHeight - 4 : rect.bottom + 4;
+                                setPickerPos({ top, left, maxHeight });
                                 setOpenPickerId(tx.id);
                                 setPickerProjectDrill(null);
                               }}
@@ -850,7 +911,7 @@ export default function TransactionsPage() {
 
                             {isOpen && pickerPos && createPortal(
                               <div ref={pickerRef} className="py-1 rounded-xl overflow-y-auto"
-                                style={{ ...glass, position: 'fixed', top: pickerPos.top, left: pickerPos.left, width: '220px', maxHeight: '300px', zIndex: 9999 }}>
+                                style={{ ...glass, position: 'fixed', top: pickerPos.top, left: pickerPos.left, width: '220px', maxHeight: pickerPos.maxHeight, zIndex: 9999 }}>
                                 {cat && (
                                   <>
                                     <button onClick={() => assignCategory(tx.id, null)}
@@ -1049,6 +1110,8 @@ export default function TransactionsPage() {
                     </div>
                     );
                   })}
+                  </div>
+                  )}
                 </div>
               );
             })
@@ -1187,8 +1250,7 @@ export default function TransactionsPage() {
         {/* CSV Import modal */}
         {importAccount && (
           <CsvImportModal
-            accountId={importAccount.id}
-            accountName={`${importAccount.bankName} — ${importAccount.accountName}`}
+            account={importAccount}
             onClose={() => setImportAccount(null)}
             onImported={() => { setImportAccount(null); loadTransactions(); }}
           />
