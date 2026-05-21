@@ -10,6 +10,7 @@ import { TransactionsModule } from '../transactions/transactions.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { BudgetsModule } from '../budgets/budgets.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { DataResetModule } from '../data-reset/data-reset.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ProjectsModule } from '../projects/projects.module';
     CategoriesModule,
     BudgetsModule,
     ProjectsModule,
+    DataResetModule,
   ],
 })
 export class AppModule {}

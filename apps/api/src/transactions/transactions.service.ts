@@ -18,6 +18,27 @@ export class TransactionsService {
     @InjectRepository(BankAccount) private accountRepo: Repository<BankAccount>,
   ) {}
 
+  async getCategoryHints(userId: string): Promise<Record<string, { id: string; name: string; icon: string; color: string }>> {
+    const txs = await this.repo
+      .createQueryBuilder('tx')
+      .leftJoinAndSelect('tx.categoryRef', 'categoryRef')
+      .where('tx.userId = :userId', { userId })
+      .andWhere('tx.categoryId IS NOT NULL')
+      .andWhere('categoryRef.type != :t', { t: 'transfer' })
+      .orderBy('tx.date', 'DESC')
+      .limit(2000)
+      .getMany();
+
+    const hints: Record<string, { id: string; name: string; icon: string; color: string }> = {};
+    for (const tx of txs) {
+      if (!hints[tx.name] && tx.categoryRef) {
+        const { id, name, icon, color } = tx.categoryRef;
+        hints[tx.name] = { id, name, icon, color };
+      }
+    }
+    return hints;
+  }
+
   findByUser(
     userId: string,
     bankAccountId?: string,
@@ -28,6 +49,7 @@ export class TransactionsService {
     const qb = this.repo.createQueryBuilder('tx')
       .leftJoinAndSelect('tx.categoryRef', 'categoryRef')
       .leftJoinAndSelect('tx.bankAccount', 'bankAccount')
+      .leftJoinAndSelect('tx.transferAccount', 'transferAccount')
       .where('tx.userId = :userId', { userId })
       .orderBy('tx.date', 'DESC')
       .addOrderBy('tx.createdAt', 'DESC')
@@ -37,6 +59,57 @@ export class TransactionsService {
     if (from) qb.andWhere('tx.date >= :from', { from });
     if (to)   qb.andWhere('tx.date <= :to', { to });
     return qb.getMany();
+  }
+
+  async checkDuplicates(
+    userId: string, bankAccountId: string, rows: CsvRow[],
+  ): Promise<{ newCount: number; duplicateCount: number; duplicateExternalIds: string[] }> {
+    const account = await this.accountRepo.findOneBy({ id: bankAccountId });
+    if (!account || account.userId !== userId) throw new ForbiddenException();
+
+    /* Load all existing CSV transactions for this account once */
+    const existing = await this.repo.find({
+      where: { bankAccountId, userId, source: 'csv' },
+      select: ['id', 'externalId', 'date', 'amount', 'name'],
+    });
+
+    /* Build lookup maps for fast in-memory checks */
+    const byExternalId = new Map(existing.filter((t) => t.externalId).map((t) => [t.externalId, true]));
+
+    const duplicateExternalIds: string[] = [];
+
+    for (const row of rows) {
+      const ref = row.referenceNumber?.trim();
+      const amt2 = Number(row.amount).toFixed(2);           // "10.00"
+      const amtRaw = String(row.amount);                    // "10" (old format, no toFixed)
+
+      /* 1. Exact match by bank reference number */
+      if (ref && byExternalId.has(`csv_${ref}`)) {
+        duplicateExternalIds.push(`csv_${ref}`); continue;
+      }
+
+      /* 2. Composite key — new format (amount.toFixed(2)) */
+      const key2 = `csv_${row.date}|${row.name}|${amt2}`;
+      if (byExternalId.has(key2)) { duplicateExternalIds.push(key2); continue; }
+
+      /* 3. Composite key — old format (${amount} without toFixed) for backward compat */
+      const keyOld = `csv_${row.date}|${row.name}|${amtRaw}`;
+      if (byExternalId.has(keyOld)) { duplicateExternalIds.push(keyOld); continue; }
+
+      /* 4. Field match — catches transactions stored without externalId */
+      const match = existing.find((t) =>
+        t.date === row.date &&
+        t.name === row.name &&
+        Math.abs(Number(t.amount) - Number(row.amount)) < 0.005,
+      );
+      if (match) { duplicateExternalIds.push(`csv_${row.date}|${row.name}|${amt2}`); }
+    }
+
+    return {
+      newCount: rows.length - duplicateExternalIds.length,
+      duplicateCount: duplicateExternalIds.length,
+      duplicateExternalIds,
+    };
   }
 
   async importCsv(userId: string, bankAccountId: string, rows: CsvRow[]): Promise<{ imported: number; skipped: number }> {
@@ -53,6 +126,16 @@ export class TransactionsService {
         const exists = await this.repo.findOneBy({ externalId });
         if (exists) { skipped++; continue; }
       }
+
+      /* Fallback: match by account + date + amount + name for rows without externalId in DB */
+      const fieldMatch = await this.repo
+        .createQueryBuilder('tx')
+        .where('tx.bankAccountId = :bankAccountId', { bankAccountId })
+        .andWhere('tx.date = :date', { date: normalizeDate(row.date) })
+        .andWhere('CAST(tx.amount AS DECIMAL(12,2)) = :amount', { amount: Number(row.amount).toFixed(2) })
+        .andWhere('tx.name = :name', { name: row.name })
+        .getOne();
+      if (fieldMatch) { skipped++; continue; }
 
       await this.repo.save(
         this.repo.create({
@@ -99,14 +182,118 @@ export class TransactionsService {
     const tx = await this.repo.findOneBy({ id, userId });
     if (!tx) throw new NotFoundException();
     if (tx.source !== 'manual') throw new BadRequestException('Only manual transactions can be deleted');
+
+    /* Reverse the transfer account balance adjustment */
+    if (tx.transferAccountId) {
+      await this.adjustTransferBalance(tx.transferAccountId, userId, Number(tx.amount), 'undo');
+    }
+
+    /* Clear the counterpart's back-link */
+    if (tx.counterpartTxId) {
+      const counterpart = await this.repo.findOneBy({ id: tx.counterpartTxId, userId });
+      if (counterpart) {
+        counterpart.counterpartTxId   = undefined;
+        counterpart.transferAccountId = undefined;
+        await this.repo.save(counterpart);
+      }
+    }
+
     await this.repo.remove(tx);
   }
 
   async updateCategory(id: string, userId: string, categoryId: string | null): Promise<Transaction> {
     const tx = await this.repo.findOneByOrFail({ id, userId });
+    /* If clearing a transfer category, undo balance + clear counterpart link */
+    if (!categoryId && tx.transferAccountId) {
+      await this.adjustTransferBalance(tx.transferAccountId, userId, Number(tx.amount), 'undo');
+      if (tx.counterpartTxId) {
+        const counterpart = await this.repo.findOneBy({ id: tx.counterpartTxId, userId });
+        if (counterpart) {
+          counterpart.counterpartTxId   = undefined;
+          counterpart.transferAccountId = undefined;
+          await this.repo.save(counterpart);
+        }
+      }
+      tx.transferAccountId = undefined;
+      tx.counterpartTxId   = undefined;
+    }
     tx.categoryId = categoryId ?? undefined;
     const saved = await this.repo.save(tx);
-    return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef'] });
+    return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'transferAccount'] });
+  }
+
+  async findTransferMatches(userId: string, amount: number, date: string, excludeAccountId: string): Promise<Transaction[]> {
+    const absAmount = Math.abs(amount);
+    const d = new Date(date + 'T12:00:00');
+    const from = new Date(d.getTime() - 5 * 86400_000).toISOString().slice(0, 10);
+    const to   = new Date(d.getTime() + 5 * 86400_000).toISOString().slice(0, 10);
+
+    const candidates = await this.repo.createQueryBuilder('tx')
+      .leftJoinAndSelect('tx.bankAccount', 'bankAccount')
+      .leftJoinAndSelect('tx.categoryRef', 'categoryRef')
+      .where('tx.userId = :userId', { userId })
+      .andWhere('tx.bankAccountId != :excludeAccountId', { excludeAccountId })
+      .andWhere('tx.date >= :from', { from })
+      .andWhere('tx.date <= :to', { to })
+      .getMany();
+
+    return candidates
+      .filter(tx => Math.abs(Math.abs(Number(tx.amount)) - absAmount) < 1.00)
+      .sort((a, b) => {
+        const ad = Math.abs(new Date(a.date).getTime() - d.getTime());
+        const bd = Math.abs(new Date(b.date).getTime() - d.getTime());
+        return ad - bd;
+      });
+  }
+
+  async updateTransferAccount(
+    id: string, userId: string,
+    transferAccountId: string | null,
+    matchTxId?: string | null,
+  ): Promise<Transaction> {
+    const tx = await this.repo.findOneByOrFail({ id, userId });
+    const amount = Number(tx.amount);
+
+    /* Undo previous transfer account balance change */
+    if (tx.transferAccountId) {
+      await this.adjustTransferBalance(tx.transferAccountId, userId, amount, 'undo');
+    }
+    /* Apply new transfer account balance change */
+    if (transferAccountId) {
+      await this.adjustTransferBalance(transferAccountId, userId, amount, 'apply');
+    }
+
+    tx.transferAccountId = transferAccountId ?? undefined;
+    await this.repo.save(tx);
+
+    /* Auto-categorize the matched transaction on the other side */
+    if (matchTxId) {
+      const matchTx = await this.repo.findOneBy({ id: matchTxId, userId });
+      if (matchTx) {
+        if (matchTx.transferAccountId) {
+          await this.adjustTransferBalance(matchTx.transferAccountId, userId, Number(matchTx.amount), 'undo');
+        }
+        matchTx.categoryId        = tx.categoryId ?? undefined;
+        matchTx.transferAccountId = tx.bankAccountId ?? undefined;
+        matchTx.counterpartTxId   = id;
+        await this.repo.save(matchTx);
+      }
+      /* Store the back-reference */
+      await this.repo.update(id, { counterpartTxId: matchTxId });
+    }
+
+    return this.repo.findOne({ where: { id }, relations: ['categoryRef', 'bankAccount', 'transferAccount'] });
+  }
+
+  /* delta = -amount: outgoing -$2000 → dest gets +$2000; incoming +$2000 → source loses $2000 */
+  private async adjustTransferBalance(
+    accountId: string, userId: string, txAmount: number, mode: 'apply' | 'undo',
+  ): Promise<void> {
+    const acc = await this.accountRepo.findOneBy({ id: accountId, userId });
+    if (!acc) return;
+    const delta = -txAmount; // positive for outgoing tx, negative for incoming
+    acc.balance = Number(acc.balance) + (mode === 'apply' ? delta : -delta);
+    await this.accountRepo.save(acc);
   }
 }
 

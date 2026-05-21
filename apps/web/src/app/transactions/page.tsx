@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Sidebar from '@/components/Sidebar';
 import CsvImportModal from '@/components/CsvImportModal';
 import BankSelect from '@/components/BankSelect';
 import CategoryFormModal from '@/components/CategoryFormModal';
+import AccountTypeIcon from '@/components/AccountTypeIcon';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -14,12 +15,16 @@ interface BankAccount { id: string; bankName: string; accountName: string; accou
 interface Budget { id: string; categoryId: string; category: Category; amount: string | number; spent: number }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
 interface Project { id: string; name: string; icon: string; color: string; status: string; categories?: ProjectCategory[] }
+interface TransferMatch { id: string; name: string; amount: number; date: string; bankAccount: BankAccount | null }
 interface Transaction {
   id: string; name: string; amount: number; date: string; source: string; pending: boolean;
   categoryId: string | null; categoryRef: Category | null;
   bankAccountId: string; bankAccount: BankAccount | null;
   projectId: string | null;
   projectCategoryId: string | null;
+  transferAccountId: string | null;
+  transferAccount: BankAccount | null;
+  counterpartTxId: string | null;
 }
 
 type Filter    = 'all' | 'uncategorized' | 'expense' | 'income';
@@ -59,7 +64,8 @@ function formatAmount(n: number) {
   const abs = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2 });
   return n >= 0 ? `+$${abs}` : `-$${abs}`;
 }
-const TYPE_META: Record<string, string> = { checking: '💳', savings: '🏦', credit: '💰', investment: '📈' };
+/* TYPE_META kept only as a fallback label map; icons now use AccountTypeIcon */
+const TYPE_META: Record<string, string> = { savings: '🏦', investment: '📈', cash: '💵', loan: '🤝' };
 
 /* ═══════════════════════════════════════════════════════════════ */
 export default function TransactionsPage() {
@@ -84,12 +90,16 @@ export default function TransactionsPage() {
   const [showAddAccForm, setShowAddAccForm]     = useState(false);
   const [addingAcc, setAddingAcc]               = useState(false);
   const [addAccError, setAddAccError]           = useState('');
-  const [newAcc, setNewAcc] = useState({ bankName: '', accountName: '', accountType: 'checking', color: '#9B6DFF', currency: 'USD' });
+  const [newAcc, setNewAcc] = useState({ bankName: '', accountName: '', accountType: 'checking', color: '#9B6DFF', currency: 'USD', openingBalance: '' });
   const pickerRef     = useRef<HTMLDivElement>(null);
   const importBtnRef  = useRef<HTMLDivElement>(null);
 
   const [pickerProjectDrill, setPickerProjectDrill]   = useState<string | null>(null);
+  const [pickerTransferStep, setPickerTransferStep]   = useState(false);
+  const [transferMatches, setTransferMatches]         = useState<TransferMatch[]>([]);
+  const [transferMatchesLoading, setTransferMatchesLoading] = useState(false);
   const [linkingProj, setLinkingProj]                 = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId]         = useState<string | null>(null);
   const [markAsSaleConfirm, setMarkAsSaleConfirm]     = useState<string | null>(null); // projectId
   const [markAsSaleSaving, setMarkAsSaleSaving]       = useState(false);
 
@@ -100,14 +110,20 @@ export default function TransactionsPage() {
   const today = new Date().toISOString().slice(0, 10);
   const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '' });
 
-  const [budgetWidth, setBudgetWidth] = useState<number>(() => {
-    if (typeof window === 'undefined') return 256;
-    return Number(localStorage.getItem('budgetWidth') || '256');
-  });
-  const [showNotifications, setShowNotifications] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    return localStorage.getItem('showNotifications') !== 'false';
-  });
+  const [importToast, setImportToast] = useState<{ imported: number; skipped: number; account: BankAccount } | null>(null);
+  const importToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* name → most-recently-used category (cross-period, loaded once) */
+  const [categoryHints, setCategoryHints] = useState<Record<string, { id: string; name: string; icon: string; color: string }>>({});
+
+  const [budgetWidth, setBudgetWidth] = useState(256);
+  const [showNotifications, setShowNotifications] = useState(true);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('budgetWidth');
+    if (saved) setBudgetWidth(Number(saved));
+    setShowNotifications(localStorage.getItem('showNotifications') !== 'false');
+  }, []);
   const dragRef = useRef<{ active: boolean; startX: number; startWidth: number }>({ active: false, startX: 0, startWidth: 0 });
 
   function startBudgetResize(e: React.MouseEvent) {
@@ -168,7 +184,13 @@ export default function TransactionsPage() {
       fetch(`${API}/categories`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/bank-accounts`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/projects`, { credentials: 'include' }).then((r) => r.json()),
-    ]).then(([cats, accs, projs]) => { setCategories(cats); setAccounts(accs); setProjects(Array.isArray(projs) ? projs : []); });
+      fetch(`${API}/transactions/category-hints`, { credentials: 'include' }).then((r) => r.json()),
+    ]).then(([cats, accs, projs, hints]) => {
+      setCategories(cats);
+      setAccounts(accs);
+      setProjects(Array.isArray(projs) ? projs : []);
+      if (hints && typeof hints === 'object') setCategoryHints(hints);
+    });
   }, []);
 
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
@@ -180,6 +202,7 @@ export default function TransactionsPage() {
       if (openPickerId && pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
         setOpenPickerId(null);
         setPickerProjectDrill(null);
+        setPickerTransferStep(false);
         setMarkAsSaleConfirm(null);
       }
       if (showImportPicker && importBtnRef.current && !importBtnRef.current.contains(e.target as Node)) {
@@ -197,8 +220,9 @@ export default function TransactionsPage() {
   }, [openPickerId, showImportPicker]);
 
   /* ── category assign ── */
-  async function assignCategory(txId: string, categoryId: string | null) {
-    setUpdatingId(txId); setOpenPickerId(null);
+  async function assignCategory(txId: string, categoryId: string | null, keepOpen = false) {
+    setUpdatingId(txId);
+    if (!keepOpen) setOpenPickerId(null);
 
     /* If assigning a real budget category, fully unlink from any project */
     if (categoryId) {
@@ -221,6 +245,14 @@ export default function TransactionsPage() {
     setTransactions((prev) => prev.map((t) =>
       t.id === txId ? { ...t, categoryId: updated.categoryId, categoryRef: updated.categoryRef } : t,
     ));
+    /* Keep hints fresh so newly-categorized names suggest immediately on other rows */
+    if (categoryId && updated.categoryRef) {
+      const tx = transactions.find((t) => t.id === txId);
+      if (tx) {
+        const { id, name, icon, color } = updated.categoryRef;
+        setCategoryHints((prev) => ({ ...prev, [tx.name]: { id, name, icon, color } }));
+      }
+    }
     setUpdatingId(null);
   }
 
@@ -254,8 +286,21 @@ export default function TransactionsPage() {
   }
 
   async function deleteManualTx(id: string) {
+    const tx = transactions.find((t) => t.id === id);
     await fetch(`${API}/transactions/${id}`, { method: 'DELETE', credentials: 'include' });
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    setTransactions((prev) => prev
+      .filter((t) => t.id !== id)
+      .map((t) => t.id === tx?.counterpartTxId
+        ? { ...t, transferAccountId: null, transferAccount: null, counterpartTxId: null }
+        : t,
+      ),
+    );
+    /* Refresh balances if there was a transfer account */
+    if (tx?.transferAccountId) {
+      fetch(`${API}/bank-accounts`, { credentials: 'include' })
+        .then((r) => r.json()).then((accs) => { if (Array.isArray(accs)) setAccounts(accs); });
+    }
+    setDeleteConfirmId(null);
   }
 
   /* ── project link ── */
@@ -284,6 +329,29 @@ export default function TransactionsPage() {
 
       setOpenPickerId(null); setPickerProjectDrill(null);
     } finally { setLinkingProj(false); }
+  }
+
+  async function setTransferAccount(txId: string, transferAccountId: string | null, matchTxId?: string) {
+    const res = await fetch(`${API}/transactions/${txId}/transfer-account`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ transferAccountId, matchTxId: matchTxId ?? null }),
+    });
+    const updated: Transaction = await res.json();
+    setTransactions((prev) => prev.map((t) => {
+      if (t.id === txId) return { ...t, transferAccountId: updated.transferAccountId, transferAccount: updated.transferAccount, counterpartTxId: matchTxId ?? null };
+      /* Also update the matched transaction on the other side */
+      if (matchTxId && t.id === matchTxId) {
+        const srcAcc = prev.find((s) => s.id === txId)?.bankAccount ?? null;
+        return { ...t, categoryId: updated.categoryId, categoryRef: updated.categoryRef, transferAccountId: updated.bankAccountId, transferAccount: srcAcc, counterpartTxId: txId };
+      }
+      return t;
+    }));
+    /* Refresh account balances */
+    fetch(`${API}/bank-accounts`, { credentials: 'include' })
+      .then((r) => r.json()).then((accs) => { if (Array.isArray(accs)) setAccounts(accs); });
+    setOpenPickerId(null);
+    setPickerTransferStep(false);
+    setTransferMatches([]);
   }
 
   async function unlinkFromProject(txId: string, projectId: string) {
@@ -345,14 +413,14 @@ export default function TransactionsPage() {
     try {
       const res = await fetch(`${API}/bank-accounts`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ ...newAcc, balance: 0 }),
+        body: JSON.stringify({ ...newAcc, balance: newAcc.openingBalance ? parseFloat(newAcc.openingBalance) : 0 }),
       });
       const created: BankAccount = await res.json();
       setAccounts((prev) => [...prev, created]);
       setImportAccount(created);
       setShowImportPicker(false);
       setShowAddAccForm(false);
-      setNewAcc({ bankName: '', accountName: '', accountType: 'checking', color: '#9B6DFF', currency: 'USD' });
+      setNewAcc({ bankName: '', accountName: '', accountType: 'checking', color: '#9B6DFF', currency: 'USD', openingBalance: '' });
     } finally { setAddingAcc(false); }
   }
 
@@ -425,85 +493,118 @@ export default function TransactionsPage() {
                   <UploadIcon /> Import Transactions (CSV)
                 </button>
                 {showImportPicker && (
-                  <div className="absolute right-0 top-full mt-2 z-30 rounded-xl min-w-64"
-                    style={{ ...glass }}>
+                  <div className="absolute right-0 top-full mt-2 z-30 rounded-2xl overflow-hidden"
+                    style={{
+                      background: 'rgba(14,14,24,0.98)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      boxShadow: '0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)',
+                      backdropFilter: 'blur(24px)',
+                      WebkitBackdropFilter: 'blur(24px)',
+                      minWidth: '280px',
+                    }}>
 
                     {!showAddAccForm ? (
                       /* ── Account list ── */
                       <>
-                        <p className="px-3 pt-3 pb-1 text-[10px] font-bold tracking-widest uppercase"
-                          style={{ color: 'var(--color-text-muted)' }}>Select account</p>
+                        <div className="px-4 pt-3.5 pb-2 flex items-center gap-2"
+                          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                          <span className="text-[10px] font-bold tracking-widest uppercase flex-1"
+                            style={{ color: 'rgba(155,109,255,0.8)' }}>Select account to import into</span>
+                        </div>
 
-                        {accounts.length === 0 ? (
-                          <p className="px-3 py-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                            No accounts yet — create one below.
+                        {(() => {
+                          const importableAccounts = accounts.filter((a) =>
+                            ['checking', 'savings', 'credit', 'investment'].includes(a.accountType),
+                          );
+                          return importableAccounts.length === 0 ? (
+                          <p className="px-4 py-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                            No bank accounts yet — create one below.
                           </p>
                         ) : (
-                          accounts.map((a) => (
-                            <button key={a.id}
-                              onClick={() => { setImportAccount(a); setShowImportPicker(false); }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10 text-left">
-                              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-sm"
-                                style={{ background: `${a.color || '#9B6DFF'}20` }}>
-                                {TYPE_META[a.accountType] ?? '🏦'}
-                              </span>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold truncate">{a.bankName}</p>
-                                <p className="truncate" style={{ color: 'var(--color-text-muted)' }}>{a.accountName}</p>
-                              </div>
-                            </button>
-                          ))
-                        )}
+                          <div className="py-1.5">
+                            {importableAccounts.map((a) => {
+                              const c = a.color || '#9B6DFF';
+                              return (
+                                <button key={a.id}
+                                  onClick={() => { setImportAccount(a); setShowImportPicker(false); }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 text-left transition-all group"
+                                  style={{ borderLeft: '3px solid transparent' }}
+                                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${c}12`; (e.currentTarget as HTMLElement).style.borderLeftColor = `${c}80`; }}
+                                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderLeftColor = 'transparent'; }}>
+                                  <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base"
+                                    style={{ background: `${c}25`, border: `1px solid ${c}35` }}>
+                                    <AccountTypeIcon type={a.accountType} size={16} />
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{a.bankName}</p>
+                                    <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.accountName}</p>
+                                  </div>
+                                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md capitalize shrink-0"
+                                    style={{ background: `${c}18`, color: c, border: `1px solid ${c}30` }}>
+                                    {a.accountType}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                        })()}
 
-                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }} />
                         <button
                           onClick={() => { setShowAddAccForm(true); setAddAccError(''); }}
-                          className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-white/10"
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-xs font-semibold transition-colors hover:bg-white/5"
                           style={{ color: '#9B6DFF' }}>
-                          <span className="text-base leading-none">+</span> Create new account
+                          <span className="w-5 h-5 rounded-lg flex items-center justify-center text-sm"
+                            style={{ background: 'rgba(155,109,255,0.15)' }}>+</span>
+                          Create new account
                         </button>
                       </>
                     ) : (
                       /* ── Inline add account form ── */
-                      <form onSubmit={handleAddAccount} className="p-3 flex flex-col gap-2.5">
-                        <div className="flex items-center gap-2 mb-1">
+                      <form onSubmit={handleAddAccount} className="flex flex-col gap-3">
+                        <div className="flex items-center gap-2 px-4 py-3"
+                          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
                           <button type="button" onClick={() => { setShowAddAccForm(false); setAddAccError(''); }}
-                            className="text-lg leading-none hover:opacity-70" style={{ color: 'var(--color-text-muted)' }}>
+                            className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-white/10"
+                            style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>
                             ←
                           </button>
-                          <p className="text-xs font-bold" style={{ color: 'var(--color-text-secondary)' }}>New Account</p>
+                          <p className="text-xs font-bold flex-1" style={{ color: 'var(--color-text-primary)' }}>New Account</p>
                         </div>
 
+                        <div className="px-4 flex flex-col gap-2.5 pb-4">
                         <BankSelect
                           value={newAcc.bankName}
                           onChange={(v: string) => setNewAcc((f) => ({ ...f, bankName: v }))}
                           compact
-                          inputStyle={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
+                          inputStyle={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
                         />
 
                         <input required placeholder="Account name (e.g. Checking)" value={newAcc.accountName}
                           onChange={(e) => setNewAcc((f) => ({ ...f, accountName: e.target.value }))}
                           className="w-full px-3 py-2 text-xs rounded-lg outline-none"
-                          style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)' }} />
+                          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }} />
 
                         <div className="flex gap-2">
                           <select value={newAcc.accountType} onChange={(e) => setNewAcc((f) => ({ ...f, accountType: e.target.value }))}
                             className="flex-1 px-2 py-2 text-xs rounded-lg outline-none appearance-none"
-                            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)' }}>
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }}>
                             <option value="checking">Checking</option>
                             <option value="savings">Savings</option>
                             <option value="credit">Credit Card</option>
                             <option value="investment">Investment</option>
+                            <option value="loan">Loan / Receivable</option>
                           </select>
                           <select value={newAcc.currency} onChange={(e) => setNewAcc((f) => ({ ...f, currency: e.target.value }))}
                             className="px-2 py-2 text-xs rounded-lg outline-none appearance-none"
-                            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)' }}>
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }}>
                             {['USD','EUR','GBP','MXN','BRL','CAD'].map((c) => <option key={c}>{c}</option>)}
                           </select>
                         </div>
 
                         {/* Color swatches */}
-                        <div className="flex items-center gap-1.5 px-1">
+                        <div className="flex items-center gap-2">
                           {ACC_COLORS.map((c) => (
                             <button key={c} type="button" onClick={() => setNewAcc((f) => ({ ...f, color: c }))}
                               className="w-5 h-5 rounded-full transition-transform hover:scale-110 shrink-0"
@@ -511,15 +612,31 @@ export default function TransactionsPage() {
                           ))}
                         </div>
 
+                        {/* Opening balance */}
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-semibold"
+                            style={{ color: 'var(--color-text-muted)' }}>
+                            {newAcc.accountType === 'loan' ? 'Amount currently owed to you' : 'Opening balance'}{' '}
+                            <span className="opacity-50">(optional)</span>
+                          </label>
+                          <input
+                            type="number" min="0" step="0.01" placeholder="0.00"
+                            value={newAcc.openingBalance}
+                            onChange={(e) => setNewAcc((f) => ({ ...f, openingBalance: e.target.value }))}
+                            className="w-full px-3 py-2 text-xs rounded-lg outline-none"
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }} />
+                        </div>
+
                         {addAccError && (
-                          <p className="text-[10px] px-1" style={{ color: '#FF6B6B' }}>{addAccError}</p>
+                          <p className="text-[10px]" style={{ color: '#FF6B6B' }}>{addAccError}</p>
                         )}
 
                         <button type="submit" disabled={addingAcc}
-                          className="w-full py-2 text-xs font-bold rounded-lg transition-all hover:brightness-110 disabled:opacity-50"
+                          className="w-full py-2.5 text-xs font-bold rounded-xl transition-all hover:brightness-110 disabled:opacity-50"
                           style={{ background: 'var(--color-card-violet)', color: 'white' }}>
                           {addingAcc ? 'Creating…' : 'Create & Import'}
                         </button>
+                        </div>
                       </form>
                     )}
                   </div>
@@ -620,7 +737,7 @@ export default function TransactionsPage() {
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'var(--color-text-primary)' }} />
             </div>
             <div className="flex gap-1 p-1 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
               {([
                 { id: 'all',          label: 'All',           count: transactions.length },
                 { id: 'uncategorized',label: 'Uncategorized', count: uncategorizedCount, dot: true },
@@ -630,8 +747,8 @@ export default function TransactionsPage() {
                 <button key={f.id} onClick={() => setFilter(f.id)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
                   style={filter === f.id
-                    ? { background: 'rgba(155,109,255,0.18)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.28)' }
-                    : { color: 'var(--color-text-muted)', border: '1px solid transparent' }}>
+                    ? { background: 'rgba(155,109,255,0.22)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.40)' }
+                    : { color: 'rgba(255,255,255,0.70)', border: '1px solid transparent' }}>
                   {f.dot && f.count > 0 && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#F5C842' }} />}
                   {f.label}
                   <span className="opacity-50">{f.count}</span>
@@ -706,7 +823,7 @@ export default function TransactionsPage() {
 
                     <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
                       style={{ background: `${accColor}20` }}>
-                      {TYPE_META[acc?.accountType ?? ''] ?? '🏦'}
+                      <AccountTypeIcon type={acc?.accountType ?? ''} size={18} />
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -818,9 +935,10 @@ export default function TransactionsPage() {
                         const cat          = tx.categoryRef;
                         const txIsTransfer = isTransfer(tx);
                         const isOpen       = openPickerId === tx.id;
-                        const pickerCats   = isIncome
-                          ? categories.filter((c) => c.type === 'income' || c.type === 'transfer')
-                          : categories.filter((c) => c.type === 'expense' || c.type === 'transfer');
+                        const primaryType   = isIncome ? 'income' : 'expense';
+                        const secondaryType = isIncome ? 'expense' : 'income';
+                        const pickerCats    = categories.filter((c) => c.type === primaryType || c.type === 'transfer');
+                        const pickerCatsAlt = categories.filter((c) => c.type === secondaryType);
 
                         return (
                           <div key={tx.id} className="relative group"
@@ -861,15 +979,45 @@ export default function TransactionsPage() {
                                       </span>
                                     );
                                   })() : null}
+                                  {tx.categoryRef?.type === 'transfer' && (
+                                    <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                                      style={{ background: 'rgba(107,107,138,0.15)', border: '1px solid rgba(107,107,138,0.30)', color: '#9B9BB8' }}>
+                                      <span>
+                                        {Number(tx.amount) >= 0
+                                          ? <>{tx.transferAccount?.accountName ?? '?'} → {tx.bankAccount?.accountName ?? '?'}</>
+                                          : <>{tx.bankAccount?.accountName ?? '?'} → {tx.transferAccount?.accountName ?? '?'}</>
+                                        }
+                                      </span>
+                                    </span>
+                                  )}
                                 </div>
                               </div>
+
+                          {/* ── Category suggestion ── */}
+                          {(() => {
+                            if (tx.categoryId || tx.projectId || txIsTransfer) return null;
+                            const hint = categoryHints[tx.name];
+                            if (!hint) return null;
+                            return (
+                              <button
+                                onClick={() => assignCategory(tx.id, hint.id)}
+                                disabled={updatingId === tx.id}
+                                title={`Apply past category: ${hint.name}`}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all hover:brightness-125 disabled:opacity-40"
+                                style={{ background: `${hint.color}14`, border: `1px solid ${hint.color}38`, color: hint.color }}>
+                                <span>{hint.icon}</span>
+                                <span className="max-w-24 truncate">{hint.name}</span>
+                                <span className="text-[9px] opacity-55 font-normal shrink-0">✓ apply</span>
+                              </button>
+                            );
+                          })()}
 
                           {/* Category picker */}
                           <div className="relative shrink-0">
                             <button
                               onMouseDown={(e) => { if (isOpen) e.stopPropagation(); }}
                               onClick={(e) => {
-                                if (isOpen) { setOpenPickerId(null); setPickerProjectDrill(null); return; }
+                                if (isOpen) { setOpenPickerId(null); setPickerProjectDrill(null); setPickerTransferStep(false); return; }
                                 const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
                                 const w = 220;
                                 const left = Math.max(4, rect.right - w);
@@ -881,9 +1029,10 @@ export default function TransactionsPage() {
                                 setPickerPos({ top, left, maxHeight });
                                 setOpenPickerId(tx.id);
                                 setPickerProjectDrill(null);
+                                setPickerTransferStep(false);
                               }}
                               disabled={updatingId === tx.id}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:brightness-110 disabled:opacity-40 max-w-40"
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:brightness-110 disabled:opacity-40"
                               style={(() => {
                                 if (tx.projectId) {
                                   const _proj = projects.find((p) => p.id === tx.projectId);
@@ -900,10 +1049,22 @@ export default function TransactionsPage() {
                                 const _proj = projects.find((p) => p.id === tx.projectId);
                                 const _pCat = tx.projectCategoryId ? _proj?.categories?.find((c) => c.id === tx.projectCategoryId) : null;
                                 return _pCat
-                                  ? <><span>{_pCat.icon}</span><span className="truncate">{_pCat.name}</span><ChevronIcon /></>
-                                  : <><span>{_proj?.icon}</span><span className="truncate">{_proj?.name}</span><ChevronIcon /></>;
+                                  ? <><span>{_pCat.icon}</span><span>{_pCat.name}</span><ChevronIcon /></>
+                                  : <><span>{_proj?.icon}</span><span>{_proj?.name}</span><ChevronIcon /></>;
                               })() : cat ? (
-                                <><span>{cat.icon}</span><span className="truncate">{cat.name}</span><ChevronIcon /></>
+                                <>
+                                  <span>{cat.icon}</span>
+                                  <span>{cat.name}</span>
+                                  {cat.type === 'transfer' && (
+                                    <span className="opacity-70">
+                                      {Number(tx.amount) >= 0
+                                        ? <>{tx.transferAccount?.accountName ?? '?'} → {tx.bankAccount?.accountName ?? '?'}</>
+                                        : <>{tx.bankAccount?.accountName ?? '?'} → {tx.transferAccount?.accountName ?? '?'}</>
+                                      }
+                                    </span>
+                                  )}
+                                  <ChevronIcon />
+                                </>
                               ) : (
                                 <><TagIcon /><span>Categorize</span><ChevronIcon /></>
                               )}
@@ -922,11 +1083,116 @@ export default function TransactionsPage() {
                                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }} />
                                   </>
                                 )}
-                                {!pickerProjectDrill ? (
+                                {pickerTransferStep && openPickerId === tx.id ? (
+                                  /* ── Transfer account picker ── */
+                                  <>
+                                    <div className="flex items-center gap-2 px-3 py-2"
+                                      style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                                      <button onClick={() => setPickerTransferStep(false)}
+                                        className="text-sm hover:opacity-70 shrink-0"
+                                        style={{ color: 'var(--color-text-muted)' }}>←</button>
+                                      <span className="text-xs font-bold flex-1" style={{ color: '#6B6B8A' }}>
+                                        {Number(tx.amount) >= 0 ? 'Money coming from…' : 'Money going to…'}
+                                      </span>
+                                    </div>
+                                    {/* Suggested matching transactions */}
+                                    {transferMatchesLoading && (
+                                      <p className="px-3 py-2 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Finding matches…</p>
+                                    )}
+                                    {!transferMatchesLoading && transferMatches.length > 0 && (
+                                      <>
+                                        <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase flex items-center gap-1"
+                                          style={{ color: '#F5C842' }}>
+                                          <span>✦</span> Suggested Matches
+                                        </p>
+                                        {transferMatches.map((m) => {
+                                          const acc  = m.bankAccount;
+                                          const c    = acc?.color || '#9B6DFF';
+                                          const selected = tx.transferAccountId === acc?.id;
+                                          return (
+                                            <button key={m.id}
+                                              onClick={() => setTransferAccount(tx.id, acc?.id ?? null, m.id)}
+                                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10"
+                                              style={{ background: selected ? `${c}12` : 'rgba(245,200,66,0.04)', borderLeft: `2px solid ${c}60` }}>
+                                              <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                                style={{ background: `${c}20` }}>
+                                                <AccountTypeIcon type={acc?.accountType ?? ''} size={18} />
+                                              </span>
+                                              <div className="flex-1 text-left min-w-0">
+                                                <p className="font-semibold truncate" style={{ color: selected ? c : 'var(--color-text-primary)' }}>
+                                                  {m.name}
+                                                </p>
+                                                <p className="truncate" style={{ color: 'var(--color-text-muted)' }}>
+                                                  {acc?.bankName} · {acc?.accountName} · {m.date}
+                                                </p>
+                                              </div>
+                                              <div className="text-right shrink-0">
+                                                <p className="font-bold tabular-nums" style={{ color: Number(m.amount) >= 0 ? '#4FBF7F' : '#F07A3E' }}>
+                                                  {Number(m.amount) >= 0 ? '+' : ''}{Number(m.amount).toFixed(2)}
+                                                </p>
+                                                <p className="text-[9px]" style={{ color: '#F5C842' }}>auto-link both</p>
+                                              </div>
+                                            </button>
+                                          );
+                                        })}
+                                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0' }} />
+                                        <p className="px-3 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
+                                          style={{ color: 'var(--color-text-muted)' }}>Or pick account manually</p>
+                                      </>
+                                    )}
+
+                                    <button
+                                      onClick={() => setTransferAccount(tx.id, null)}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10"
+                                      style={!tx.transferAccountId ? { background: 'rgba(107,107,138,0.12)' } : {}}>
+                                      <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                        style={{ background: 'rgba(255,255,255,0.06)' }}>🏷️</span>
+                                      <span className="flex-1 text-left" style={{ color: 'var(--color-text-secondary)' }}>
+                                        External / Unknown
+                                      </span>
+                                      {!tx.transferAccountId && <span style={{ color: '#6B6B8A' }}>✓</span>}
+                                    </button>
+                                    {accounts.filter((a) => a.id !== tx.bankAccountId).map((acc) => {
+                                      const c = acc.color || '#9B6DFF';
+                                      const selected = tx.transferAccountId === acc.id;
+                                      return (
+                                        <button key={acc.id}
+                                          onClick={() => setTransferAccount(tx.id, acc.id)}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10"
+                                          style={selected ? { background: `${c}12` } : {}}>
+                                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                            style={{ background: `${c}20` }}>
+                                            <AccountTypeIcon type={acc.accountType} size={16} />
+                                          </span>
+                                          <div className="flex-1 text-left min-w-0">
+                                            <p className="font-medium truncate" style={{ color: selected ? c : 'var(--color-text-primary)' }}>
+                                              {acc.accountName}
+                                            </p>
+                                            <p className="truncate" style={{ color: 'var(--color-text-muted)' }}>{acc.bankName}</p>
+                                          </div>
+                                          {selected && <span style={{ color: c }}>✓</span>}
+                                        </button>
+                                      );
+                                    })}
+                                  </>
+                                ) : !pickerProjectDrill ? (
                                   /* ── Normal categories ── */
                                   <>
                                     {pickerCats.map((c) => (
-                                      <button key={c.id} onClick={() => { assignCategory(tx.id, c.id); setPickerProjectDrill(null); }}
+                                      <button key={c.id} onClick={() => {
+                                        const isTransfer = c.type === 'transfer';
+                                        assignCategory(tx.id, c.id, isTransfer);
+                                        setPickerProjectDrill(null);
+                                        if (isTransfer) {
+                                          setPickerTransferStep(true);
+                                          setTransferMatches([]);
+                                          setTransferMatchesLoading(true);
+                                          fetch(`${API}/transactions/matches?amount=${tx.amount}&date=${tx.date}&excludeAccountId=${tx.bankAccountId}`, { credentials: 'include' })
+                                            .then((r) => r.json())
+                                            .then((m) => { if (Array.isArray(m)) setTransferMatches(m); })
+                                            .finally(() => setTransferMatchesLoading(false));
+                                        }
+                                      }}
                                         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10"
                                         style={tx.categoryId === c.id ? { background: `${c.color}15` } : {}}>
                                         <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
@@ -935,9 +1201,37 @@ export default function TransactionsPage() {
                                           style={{ color: tx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}>
                                           {c.name}
                                         </span>
+                                        {c.type === 'transfer' && (
+                                          <span className="text-[9px] px-1 py-0.5 rounded shrink-0"
+                                            style={{ background: 'rgba(107,107,138,0.2)', color: '#6B6B8A' }}>→ acct</span>
+                                        )}
                                         {tx.categoryId === c.id && <span style={{ color: c.color }}>✓</span>}
                                       </button>
                                     ))}
+
+                                    {/* Secondary type (e.g. expense categories for a positive/refund transaction) */}
+                                    {pickerCatsAlt.length > 0 && (
+                                      <>
+                                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
+                                        <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
+                                          style={{ color: 'var(--color-text-muted)' }}>
+                                          {isIncome ? 'Refund / Expense' : 'Income'}
+                                        </p>
+                                        {pickerCatsAlt.map((c) => (
+                                          <button key={c.id} onClick={() => assignCategory(tx.id, c.id)}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10"
+                                            style={tx.categoryId === c.id ? { background: `${c.color}15` } : {}}>
+                                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                              style={{ background: `${c.color}20` }}>{c.icon}</span>
+                                            <span className="font-medium flex-1 text-left"
+                                              style={{ color: tx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}>
+                                              {c.name}
+                                            </span>
+                                            {tx.categoryId === c.id && <span style={{ color: c.color }}>✓</span>}
+                                          </button>
+                                        ))}
+                                      </>
+                                    )}
 
                                     {/* Projects section */}
                                     {projects.length > 0 && (
@@ -977,7 +1271,7 @@ export default function TransactionsPage() {
                                       New category
                                     </button>
                                   </>
-                                ) : (
+                                ) : pickerProjectDrill ? (
                                   /* ── Project category drill-down ── */
                                   (() => {
                                     const proj = projects.find((p) => p.id === pickerProjectDrill)!;
@@ -1081,7 +1375,7 @@ export default function TransactionsPage() {
                                       </>
                                     );
                                   })()
-                                )}
+                                ) : null}
                               </div>,
                               document.body
                             )}
@@ -1089,11 +1383,32 @@ export default function TransactionsPage() {
 
                           {/* Delete — manual only */}
                           {tx.source === 'manual' && (
-                            <button onClick={() => deleteManualTx(tx.id)}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 shrink-0"
-                              title="Delete transaction">
-                              <TrashIcon />
-                            </button>
+                            deleteConfirmId === tx.id ? (
+                              <div className="flex items-center gap-1 shrink-0">
+                                {tx.transferAccountId && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-md mr-1"
+                                    style={{ background: 'rgba(255,107,107,0.12)', color: '#FF6B6B' }}>
+                                    ⚠ linked transfer
+                                  </span>
+                                )}
+                                <button onClick={() => deleteManualTx(tx.id)}
+                                  className="text-[10px] font-semibold px-2 py-1 rounded-lg"
+                                  style={{ background: 'rgba(255,107,107,0.20)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.35)' }}>
+                                  Delete
+                                </button>
+                                <button onClick={() => setDeleteConfirmId(null)}
+                                  className="text-[10px] px-2 py-1 rounded-lg hover:bg-white/10"
+                                  style={{ color: 'var(--color-text-muted)' }}>
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setDeleteConfirmId(tx.id)}
+                                className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 shrink-0"
+                                title="Delete transaction">
+                                <TrashIcon />
+                              </button>
+                            )
                           )}
 
                           {/* Amount */}
@@ -1102,6 +1417,45 @@ export default function TransactionsPage() {
                             {formatAmount(amount)}
                           </p>
                         </div>
+
+                        {/* ── Transfer pair connector ── */}
+                        {tx.counterpartTxId && (() => {
+                          const cp = transactions.find((t) => t.id === tx.counterpartTxId);
+                          if (!cp) return null;
+                          const cpAcc    = cp.bankAccount;
+                          const cpAmount = Number(cp.amount);
+                          const cpColor  = cpAcc?.color || '#6B6B8A';
+                          return (
+                            <div className="mx-4 mb-3 rounded-xl overflow-hidden"
+                              style={{ background: 'rgba(107,107,138,0.06)', border: '1px solid rgba(107,107,138,0.22)' }}>
+                              <div className="flex items-center gap-1.5 px-3 py-1.5"
+                                style={{ borderBottom: '1px dashed rgba(107,107,138,0.18)' }}>
+                                <span style={{ color: 'rgba(155,155,184,0.6)', fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                                  ⇄ matched transfer
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2.5 px-3 py-2">
+                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                  style={{ background: `${cpColor}20` }}>
+                                  <AccountTypeIcon type={cpAcc?.accountType ?? ''} size={16} />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                                    {cp.name}
+                                  </p>
+                                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                                    {cpAcc?.bankName} · {cpAcc?.accountName} · {formatDate(cp.date)}
+                                  </p>
+                                </div>
+                                <span className="text-xs font-bold tabular-nums shrink-0"
+                                  style={{ color: cpAmount >= 0 ? '#4FBF7F' : 'white' }}>
+                                  {formatAmount(cpAmount)}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
                       </div>
                     );
                         })}
@@ -1247,12 +1601,72 @@ export default function TransactionsPage() {
           />
         )}
 
+        {/* ── Import toast notification ── */}
+        {importToast && createPortal(
+          <div
+            className="fixed bottom-6 right-6 z-50 flex items-start gap-3 px-4 py-3.5 rounded-2xl"
+            style={{
+              background: 'rgba(22,22,36,0.97)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(20px)',
+              minWidth: '260px',
+              maxWidth: '340px',
+              animation: 'slideUp 0.25s ease-out',
+            }}>
+            {/* Account icon */}
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+              style={{ background: `${importToast.account.color || '#9B6DFF'}22` }}>
+              <AccountTypeIcon type={importToast.account.accountType} size={18} />
+            </div>
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold" style={{ color: 'var(--color-text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Import complete
+              </p>
+              <p className="text-sm font-semibold mt-0.5 truncate">
+                {importToast.account.bankName} · {importToast.account.accountName}
+              </p>
+              <div className="flex items-center gap-3 mt-1.5">
+                <span className="flex items-center gap-1 text-xs font-semibold"
+                  style={{ color: '#4FBF7F' }}>
+                  <span>✓</span>
+                  <span>{importToast.imported} new</span>
+                </span>
+                {importToast.skipped > 0 && (
+                  <span className="flex items-center gap-1 text-xs"
+                    style={{ color: 'var(--color-text-muted)' }}>
+                    <span>⟳</span>
+                    <span>{importToast.skipped} skipped</span>
+                  </span>
+                )}
+                {importToast.imported === 0 && importToast.skipped === 0 && (
+                  <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No transactions found</span>
+                )}
+              </div>
+            </div>
+            {/* Dismiss */}
+            <button onClick={() => { setImportToast(null); if (importToastTimer.current) clearTimeout(importToastTimer.current); }}
+              className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-white/10 shrink-0 mt-0.5"
+              style={{ color: 'var(--color-text-muted)' }}>
+              <CloseIcon />
+            </button>
+          </div>,
+          document.body
+        )}
+
         {/* CSV Import modal */}
         {importAccount && (
           <CsvImportModal
             account={importAccount}
             onClose={() => setImportAccount(null)}
-            onImported={() => { setImportAccount(null); loadTransactions(); }}
+            onImported={(result) => {
+              setImportAccount(null);
+              loadTransactions();
+              setImportToast(result);
+              if (importToastTimer.current) clearTimeout(importToastTimer.current);
+              importToastTimer.current = setTimeout(() => setImportToast(null), 6000);
+            }}
           />
         )}
       </main>
