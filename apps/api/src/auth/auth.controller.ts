@@ -1,5 +1,6 @@
 import { Controller, Post, Get, UseGuards, Request, Res } from '@nestjs/common';
 import { Response } from 'express';
+import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -34,5 +35,18 @@ export class AuthController {
   @Get('me')
   me(@Request() req: any) {
     return req.user;
+  }
+
+  @UseGuards(AuthGuard('google'))
+  @Get('google')
+  googleLogin() { /* passport redirects */ }
+
+  @UseGuards(AuthGuard('google'))
+  @Get('google/callback')
+  googleCallback(@Request() req: any, @Res() res: Response) {
+    const result = this.authService.login(req.user);
+    res.cookie('access_token', result.access_token, COOKIE_OPTS);
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    return res.redirect(`${frontendUrl}/dashboard`);
   }
 }
