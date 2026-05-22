@@ -144,12 +144,15 @@ export default function TransactionsPage() {
 
   const loadTransactions = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams();
-    if (from) params.set('from', from);
-    if (to)   params.set('to', to);
-    const res = await fetch(`${API}/transactions?${params}`, { credentials: 'include' });
-    setTransactions(await res.json());
-    setLoading(false);
+    try {
+      const params = new URLSearchParams();
+      if (from) params.set('from', from);
+      if (to)   params.set('to', to);
+      const res = await fetch(`${API}/transactions?${params}`, { credentials: 'include' });
+      setTransactions(await res.json());
+    } finally {
+      setLoading(false);
+    }
   }, [from, to]);
 
   const budgetMonth = rangeMode === 'month' ? month : (from ? from.slice(0, 7) : currentMonth());
