@@ -8,11 +8,13 @@ import CsvImportModal from '@/components/CsvImportModal';
 import CategoryManager from '@/components/CategoryManager';
 import ProjectCategoryManager from '@/components/ProjectCategoryManager';
 import BankSelect from '@/components/BankSelect';
+import AccountTypeIcon from '@/components/AccountTypeIcon';
+import DataResetModal from '@/components/DataResetModal';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash';
-type Tab = 'banks' | 'categories' | 'projects';
+type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash' | 'loan';
+type Tab = 'banks' | 'categories' | 'projects' | 'data';
 
 interface BankAccount {
   id: string;
@@ -32,6 +34,7 @@ const TYPE_META: Record<AccountType, { label: string; accent: string; icon: stri
   credit:     { label: 'Credit',      accent: '#F07A3E', icon: '💰' },
   investment: { label: 'Investment',  accent: '#4BA8D8', icon: '📈' },
   cash:       { label: 'Cash',        accent: '#4FBF7F', icon: '💵' },
+  loan:       { label: 'Loan',        accent: '#F5C842', icon: '🤝' },
 };
 
 const PRESET_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0'];
@@ -45,8 +48,11 @@ const glass: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.10)',
+  background: 'rgba(255,255,255,0.07)',
+  borderTop: '1px solid rgba(255,255,255,0.14)',
+  borderRight: '1px solid rgba(255,255,255,0.14)',
+  borderBottom: '1px solid rgba(255,255,255,0.14)',
+  borderLeft: '1px solid rgba(255,255,255,0.14)',
   borderRadius: 'var(--radius-input)',
   color: 'var(--color-text-primary)',
 };
@@ -79,6 +85,16 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
       </svg>
     ),
   },
+  {
+    id: 'data',
+    label: 'Data',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+      </svg>
+    ),
+  },
 ];
 
 export default function SettingsPage() {
@@ -99,6 +115,8 @@ export default function SettingsPage() {
     bankName: '', accountName: '', accountType: 'checking' as AccountType,
     balance: '', currency: 'USD', color: PRESET_COLORS[0],
   });
+
+  const [showResetModal, setShowResetModal] = useState(false);
 
   useEffect(() => {
     fetch(`${API}/bank-accounts`, { credentials: 'include' })
@@ -226,11 +244,14 @@ export default function SettingsPage() {
           {/* Tab bar */}
           <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
             {TABS.map((tab) => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              <button key={tab.id}
+                onClick={() => tab.id === 'data' ? setShowResetModal(true) : setActiveTab(tab.id)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                style={activeTab === tab.id
-                  ? { background: 'rgba(155,109,255,0.18)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.30)' }
-                  : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
+                style={tab.id === 'data'
+                  ? { color: '#FF6B6B', border: '1px solid rgba(255,80,80,0.28)', background: 'rgba(255,80,80,0.08)' }
+                  : activeTab === tab.id
+                    ? { background: 'rgba(155,109,255,0.18)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.30)' }
+                    : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
                 {tab.icon}
                 {tab.label}
               </button>
@@ -293,28 +314,10 @@ export default function SettingsPage() {
 
                     <div className="flex flex-col gap-4">
 
-                      {/* Row 1: Bank + Account Name */}
+                      {/* Row 1: Account Type + Currency */}
                       <div className="flex gap-3">
                         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Bank / Institution</span>
-                          <BankSelect
-                            value={form.bankName}
-                            onChange={(v: string) => setForm((f) => ({ ...f, bankName: v }))}
-                            inputStyle={{ ...inputStyle, borderRadius: 'var(--radius-input)' }}
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Account Name</span>
-                          <input required placeholder="e.g. Main Checking" value={form.accountName}
-                            onChange={(e) => setForm((f) => ({ ...f, accountName: e.target.value }))}
-                            className="px-3 py-2.5 text-sm outline-none" style={inputStyle} />
-                        </div>
-                      </div>
-
-                      {/* Row 2: Type + Currency */}
-                      <div className="flex gap-3">
-                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Account Type</span>
+                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Account Type</span>
                           <select value={form.accountType} onChange={(e) => setForm((f) => ({ ...f, accountType: e.target.value as AccountType }))}
                             className="px-3 py-2.5 text-sm outline-none appearance-none w-full" style={inputStyle}>
                             <option value="checking">Checking</option>
@@ -322,10 +325,11 @@ export default function SettingsPage() {
                             <option value="credit">Credit Card</option>
                             <option value="investment">Investment</option>
                             <option value="cash">Cash</option>
+                            <option value="loan">🤝 Loan / Receivable</option>
                           </select>
                         </div>
                         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Currency</span>
+                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Currency</span>
                           <select value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
                             className="px-3 py-2.5 text-sm outline-none appearance-none w-full" style={inputStyle}>
                             {['USD', 'EUR', 'GBP', 'BRL', 'CUP', 'MXN', 'CAD'].map((c) => (
@@ -335,13 +339,46 @@ export default function SettingsPage() {
                         </div>
                       </div>
 
+                      {/* Row 2: Bank/Person + Account Name */}
+                      <div className="flex gap-3">
+                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                            {form.accountType === 'loan' ? 'Institution or Person' : 'Bank / Institution'}
+                          </span>
+                          {form.accountType === 'loan' ? (
+                            <input required placeholder="e.g. John Smith" value={form.bankName}
+                              onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))}
+                              className="px-3 py-2.5 text-sm outline-none"
+                              style={{ ...inputStyle, borderRadius: 'var(--radius-input)' }} />
+                          ) : (
+                            <BankSelect
+                              value={form.bankName}
+                              onChange={(v: string) => setForm((f) => ({ ...f, bankName: v }))}
+                              inputStyle={{ ...inputStyle, borderRadius: 'var(--radius-input)' }}
+                            />
+                          )}
+                        </div>
+                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                            {form.accountType === 'loan' ? 'Description' : 'Account Name'}
+                          </span>
+                          <input required
+                            placeholder={form.accountType === 'loan' ? 'e.g. Personal Loan' : 'e.g. Main Checking'}
+                            value={form.accountName}
+                            onChange={(e) => setForm((f) => ({ ...f, accountName: e.target.value }))}
+                            className="px-3 py-2.5 text-sm outline-none" style={inputStyle} />
+                        </div>
+                      </div>
+
                       {/* Row 3: Balance + Color */}
                       <div className="flex gap-3">
                         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Current Balance</span>
+                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                            {form.accountType === 'loan' ? 'Amount owed to you' : 'Current Balance'}
+                          </span>
                           <div className="flex">
                             <span className="flex items-center px-3 text-sm shrink-0"
-                              style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', borderRight: 'none', borderRadius: 'var(--radius-input) 0 0 var(--radius-input)', color: 'var(--color-text-muted)' }}>
+                              style={{ background: 'rgba(255,255,255,0.09)', borderTop: '1px solid rgba(255,255,255,0.14)', borderLeft: '1px solid rgba(255,255,255,0.14)', borderBottom: '1px solid rgba(255,255,255,0.14)', borderRight: 'none', borderRadius: 'var(--radius-input) 0 0 var(--radius-input)', color: 'var(--color-text-muted)' }}>
                               {form.currency}
                             </span>
                             <input type="number" step="0.01" placeholder="0.00" value={form.balance}
@@ -349,9 +386,14 @@ export default function SettingsPage() {
                               className="flex-1 px-3 py-2.5 text-sm outline-none min-w-0"
                               style={{ ...inputStyle, borderRadius: '0 var(--radius-input) var(--radius-input) 0', borderLeft: 'none' }} />
                           </div>
+                          {form.accountType === 'loan' && (
+                            <p className="text-[11px] mt-0.5 px-0.5" style={{ color: 'rgba(245,200,66,0.7)' }}>
+                              Set this if the loan existed before you started tracking.
+                            </p>
+                          )}
                         </div>
                         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Color</span>
+                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Color</span>
                           <div className="flex flex-wrap items-center gap-2 px-3 py-2.5" style={{ ...inputStyle, borderRadius: 'var(--radius-input)' }}>
                             {PRESET_COLORS.map((c) => (
                               <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
@@ -407,9 +449,9 @@ export default function SettingsPage() {
                       <div key={account.id}
                         className="flex items-center gap-4 p-4 transition-colors hover:bg-white/2"
                         style={{ ...glass, borderRadius: 'var(--radius-card)', borderLeft: `3px solid ${color}` }}>
-                        <div className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center text-lg"
-                          style={{ background: `rgba(${hexToRgb(color)}, 0.15)` }}>
-                          {meta.icon}
+                        <div className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center"
+                          style={{ background: `rgba(${hexToRgb(color)}, 0.15)`, color }}>
+                          <AccountTypeIcon type={account.accountType} size={20} />
                         </div>
 
                         <div className="flex-1 min-w-0">
@@ -478,15 +520,28 @@ export default function SettingsPage() {
           {/* ── PROJECT CATEGORIES TAB ── */}
           {activeTab === 'projects' && <ProjectCategoryManager />}
 
+
         </div>
       </main>
 
       {importAccount && (
         <CsvImportModal
-          accountId={importAccount.id}
-          accountName={`${importAccount.bankName} — ${importAccount.accountName}`}
+          account={importAccount}
           onClose={() => setImportAccount(null)}
           onImported={() => setImportAccount(null)}
+        />
+      )}
+
+      {showResetModal && (
+        <DataResetModal
+          accounts={accounts}
+          onClose={() => setShowResetModal(false)}
+          onDone={() => {
+            setShowResetModal(false);
+            /* Reload accounts in case they were deleted */
+            fetch(`${API}/bank-accounts`, { credentials: 'include' })
+              .then((r) => r.json()).then(setAccounts);
+          }}
         />
       )}
     </div>

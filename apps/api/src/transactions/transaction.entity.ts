@@ -50,6 +50,18 @@ export class Transaction {
   @Column({ nullable: true })
   categoryId: string;
 
+  /* For transfer-type categories: the counterpart account */
+  @ManyToOne(() => BankAccount, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'transferAccountId' })
+  transferAccount: BankAccount;
+
+  @Column({ nullable: true })
+  transferAccountId: string;
+
+  /* The transaction on the other side of this transfer */
+  @Column({ nullable: true })
+  counterpartTxId: string;
+
   /* Project this transaction is linked to */
   @Column({ nullable: true })
   projectId: string;

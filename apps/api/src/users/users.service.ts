@@ -21,4 +21,22 @@ export class UsersService {
       .where('user.email = :email', { email })
       .getOne();
   }
+
+  async findOrCreateByGoogle(profile: { id: string; email: string; name: string }): Promise<User> {
+    let user = await this.repo.findOneBy({ googleId: profile.id });
+    if (user) return user;
+
+    user = await this.repo.findOneBy({ email: profile.email });
+    if (user) {
+      user.googleId = profile.id;
+      if (!user.name) user.name = profile.name;
+      return this.repo.save(user);
+    }
+
+    return this.repo.save(this.repo.create({
+      googleId: profile.id,
+      email: profile.email,
+      name: profile.name,
+    }));
+  }
 }

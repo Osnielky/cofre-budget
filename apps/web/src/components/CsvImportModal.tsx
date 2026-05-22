@@ -10,10 +10,12 @@ interface BankAccount {
   id: string; bankName: string; accountName: string; accountType: string; color: string;
 }
 
+interface ImportResult { imported: number; skipped: number; account: BankAccount; }
+
 interface Props {
   account: BankAccount;
   onClose: () => void;
-  onImported: (count: number) => void;
+  onImported: (result: ImportResult) => void;
 }
 
 interface Warning { level: 'warn' | 'error'; message: string; }
@@ -30,6 +32,8 @@ const ACC_ICONS: Record<string, string> = {
   checking: '💳', savings: '🏦', cash: '💵', credit: '💰', investment: '📈', debit: '💳',
 };
 
+interface DupCheck { newCount: number; duplicateCount: number; duplicateIds: Set<string> }
+
 export default function CsvImportModal({ account, onClose, onImported }: Props) {
   const [rows, setRows]         = useState<CsvRow[]>([]);
   const [fileName, setFileName] = useState('');
@@ -38,10 +42,25 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
   const [importing, setImporting] = useState(false);
   const [result, setResult]     = useState<{ imported: number; skipped: number } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [dupCheck, setDupCheck] = useState<DupCheck | null>(null);
+  const [dupChecking, setDupChecking] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  async function checkDups(parsed: CsvRow[]) {
+    setDupChecking(true); setDupCheck(null);
+    try {
+      const res = await fetch(`${API}/transactions/check-duplicates`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ bankAccountId: account.id, rows: parsed }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setDupCheck({ newCount: data.newCount, duplicateCount: data.duplicateCount, duplicateIds: new Set(data.duplicateExternalIds) });
+    } finally { setDupChecking(false); }
+  }
+
   function processFile(file: File) {
-    setError(''); setRows([]); setResult(null); setWarnings([]);
+    setError(''); setRows([]); setResult(null); setWarnings([]); setDupCheck(null);
     setFileName(file.name);
     if (!file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.txt')) {
       setError('Please select a CSV or TXT file.'); return;
@@ -53,6 +72,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
         if (parsed.length === 0) throw new Error('No transactions found in this file.');
         setRows(parsed);
         setWarnings(validate(parsed, account, file.name));
+        checkDups(parsed);
       } catch (err: any) {
         setError(err.message ?? 'Could not parse CSV file.');
       }
@@ -89,7 +109,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
       if (!res.ok) throw new Error();
       const data = await res.json();
       setResult(data);
-      onImported(data.imported);
+      onImported({ imported: data.imported, skipped: data.skipped, account });
     } catch {
       setError('Import failed. Please try again.');
     } finally { setImporting(false); }
@@ -193,20 +213,35 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
         {/* Preview */}
         {rows.length > 0 && !result && (
           <>
-            <div className="grid grid-cols-3 gap-3">
+            {/* Stats row */}
+            <div className="grid grid-cols-4 gap-2">
               {[
-                { label: 'Transactions', value: rows.length.toString(),             color: '#9B6DFF' },
-                { label: 'Total Income',   value: `+$${income.toFixed(2)}`,             color: '#4FBF7F' },
-                { label: 'Total Expenses', value: `-$${Math.abs(expenses).toFixed(2)}`, color: '#F07A3E' },
+                { label: 'Total',    value: rows.length.toString(),                    color: '#9B6DFF' },
+                { label: 'New',      value: dupChecking ? '…' : (dupCheck ? dupCheck.newCount.toString() : rows.length.toString()), color: '#4FBF7F' },
+                { label: 'Skipped',  value: dupChecking ? '…' : (dupCheck ? dupCheck.duplicateCount.toString() : '0'),              color: dupCheck?.duplicateCount ? '#F5C842' : 'rgba(255,255,255,0.25)' },
+                { label: 'Income',   value: `+$${income.toFixed(2)}`,                  color: '#4FBF7F' },
               ].map((s) => (
-                <div key={s.label} className="p-3 rounded-xl text-center"
-                  style={{ background: `rgba(${hexToRgb(s.color)},0.10)`, border: `1px solid rgba(${hexToRgb(s.color)},0.20)` }}>
-                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
+                <div key={s.label} className="p-2.5 rounded-xl text-center"
+                  style={{ background: `rgba(${hexToRgb(s.color)},0.08)`, border: `1px solid rgba(${hexToRgb(s.color)},0.18)` }}>
+                  <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
                   <p className="font-bold text-sm mt-0.5" style={{ color: s.color }}>{s.value}</p>
                 </div>
               ))}
             </div>
 
+            {/* Duplicate banner */}
+            {dupCheck && dupCheck.duplicateCount > 0 && (
+              <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs"
+                style={{ background: 'rgba(245,200,66,0.08)', border: '1px solid rgba(245,200,66,0.25)' }}>
+                <span>⟳</span>
+                <span style={{ color: '#F5C842' }}>
+                  <strong>{dupCheck.duplicateCount} already imported</strong> — they'll be skipped automatically.
+                  Only <strong>{dupCheck.newCount} new transactions</strong> will be added.
+                </span>
+              </div>
+            )}
+
+            {/* Transaction table */}
             <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="max-h-56 overflow-y-auto">
                 <table className="w-full text-xs">
@@ -215,19 +250,36 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
                       <th className="text-left px-3 py-2 font-medium">Date</th>
                       <th className="text-left px-3 py-2 font-medium">Description</th>
                       <th className="text-right px-3 py-2 font-medium">Amount</th>
+                      {dupCheck && dupCheck.duplicateCount > 0 && <th className="px-3 py-2 w-8" />}
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.slice(0, 150).map((row, i) => (
-                      <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                        <td className="px-3 py-2 tabular-nums shrink-0" style={{ color: 'var(--color-text-muted)' }}>{row.date}</td>
-                        <td className="px-3 py-2 truncate max-w-60" style={{ color: 'var(--color-text-secondary)' }}>{row.name}</td>
-                        <td className="px-3 py-2 text-right tabular-nums font-medium"
-                          style={{ color: row.amount >= 0 ? '#4FBF7F' : '#F07A3E' }}>
-                          {row.amount >= 0 ? '+' : ''}{row.amount.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
+                    {rows.slice(0, 150).map((row, i) => {
+                      const extId = row.referenceNumber ? `csv_${row.referenceNumber}` : null;
+                      const compositeKey = `csv_${row.date}|${row.name}|${row.amount.toFixed(2)}`;
+                      const isDup = dupCheck
+                        ? (extId ? dupCheck.duplicateIds.has(extId) : false) || dupCheck.duplicateIds.has(compositeKey)
+                        : false;
+                      return (
+                        <tr key={i}
+                          style={{
+                            borderTop: '1px solid rgba(255,255,255,0.04)',
+                            opacity: isDup ? 0.4 : 1,
+                          }}>
+                          <td className="px-3 py-2 tabular-nums shrink-0" style={{ color: 'var(--color-text-muted)' }}>{row.date}</td>
+                          <td className="px-3 py-2 truncate max-w-60" style={{ color: isDup ? 'var(--color-text-muted)' : 'var(--color-text-secondary)', textDecoration: isDup ? 'line-through' : 'none' }}>{row.name}</td>
+                          <td className="px-3 py-2 text-right tabular-nums font-medium"
+                            style={{ color: isDup ? 'var(--color-text-muted)' : row.amount >= 0 ? '#4FBF7F' : '#F07A3E' }}>
+                            {row.amount >= 0 ? '+' : ''}{row.amount.toFixed(2)}
+                          </td>
+                          {dupCheck && dupCheck.duplicateCount > 0 && (
+                            <td className="px-3 py-2 text-center">
+                              {isDup && <span className="text-[9px] px-1 py-0.5 rounded font-bold" style={{ background: 'rgba(245,200,66,0.15)', color: '#F5C842' }}>skip</span>}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
                 {rows.length > 150 && (
@@ -260,10 +312,16 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
             {result ? 'Close' : 'Cancel'}
           </button>
           {rows.length > 0 && !result && (
-            <button onClick={handleImport} disabled={importing || hasErrors}
+            <button onClick={handleImport} disabled={importing || hasErrors || dupChecking}
               className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60"
               style={{ background: 'var(--color-card-violet)' }}>
-              {importing ? 'Importing…' : `Import ${rows.length} transactions`}
+              {importing
+                ? 'Importing…'
+                : dupChecking
+                  ? 'Checking…'
+                  : dupCheck
+                    ? `Import ${dupCheck.newCount} new transaction${dupCheck.newCount !== 1 ? 's' : ''}`
+                    : `Import ${rows.length} transactions`}
             </button>
           )}
         </div>
@@ -386,8 +444,10 @@ function parseCsv(text: string): CsvRow[] {
     const name    = rawDesc;
     if (!date || !name) continue;
 
-    const refRaw = refIdx >= 0 ? cols[refIdx]?.trim() : '';
-    const referenceNumber = refRaw || `${date}|${name}|${amount}`;
+    const refRaw = refIdx >= 0 ? cols[refIdx]?.trim().replace(/\s+/g, ' ') : '';
+    /* Use bank's transaction ID when available; otherwise a stable composite.
+       amount.toFixed(2) prevents floating-point string differences between imports. */
+    const referenceNumber = refRaw || `${date}|${name}|${amount.toFixed(2)}`;
 
     rows.push({ date, referenceNumber, name, amount });
   }
