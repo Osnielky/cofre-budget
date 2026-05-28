@@ -5,4 +5,5 @@ export class CreateBankAccountDto {
   balance?: number;
   currency?: string;
   color?: string;
+  last4?: string;
 }

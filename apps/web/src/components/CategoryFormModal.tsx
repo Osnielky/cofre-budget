@@ -107,106 +107,120 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
 
       <form onSubmit={handleSubmit}
-        className="w-full max-w-lg flex flex-col gap-5 p-6 rounded-2xl"
-        style={{ background: 'rgba(22,22,36,0.98)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+        className="w-full max-w-sm flex flex-col rounded-2xl overflow-hidden"
+        style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <p className="font-bold text-base">{editing ? 'Edit Category' : 'New Category'}</p>
-          <div className="flex items-center gap-3">
-            {/* Live preview */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
-              style={{ background: `${form.color}18`, border: `1px solid ${form.color}44` }}>
-              <span className="text-base">{form.icon}</span>
-              <span className="text-sm font-semibold" style={{ color: form.color }}>{form.name || 'Preview'}</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                style={{ background: `${typeMeta.color}20`, color: typeMeta.color }}>{typeMeta.label}</span>
+        {/* Live preview header */}
+        <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+              style={{ background: `${form.color}22`, boxShadow: `0 0 0 1px ${form.color}44` }}>
+              {form.icon}
             </div>
-            <button type="button" onClick={onClose}
-              className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10"
-              style={{ color: 'var(--color-text-muted)' }}>
-              <CloseIcon />
-            </button>
+            <div className="min-w-0">
+              <p className="font-bold text-sm truncate" style={{ color: form.name ? form.color : 'var(--color-text-muted)' }}>
+                {form.name || 'Category name'}
+              </p>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                style={{ background: `${typeMeta.color}20`, color: typeMeta.color }}>
+                {typeMeta.label}
+              </span>
+            </div>
           </div>
+          <button type="button" onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 shrink-0"
+            style={{ color: 'var(--color-text-muted)' }}>
+            <CloseIcon />
+          </button>
         </div>
 
-        {/* Name + Description */}
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Name</span>
-            <input required placeholder="e.g. Groceries" value={form.name}
+        <div className="flex flex-col gap-4 px-5 py-4">
+
+          {/* Type pill group */}
+          <div className="flex flex-col gap-2">
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</span>
+            <div className="grid grid-cols-4 gap-1.5 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              {Object.entries(TYPE_META).map(([val, meta]) => (
+                <button key={val} type="button"
+                  onClick={() => setForm((f) => ({ ...f, type: val }))}
+                  className="py-1.5 rounded-lg text-xs font-semibold transition-all"
+                  style={{
+                    background: form.type === val ? `${meta.color}22` : 'transparent',
+                    color: form.type === val ? meta.color : 'var(--color-text-muted)',
+                    border: form.type === val ? `1px solid ${meta.color}44` : '1px solid transparent',
+                  }}>
+                  {meta.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] px-0.5" style={{ color: 'var(--color-text-muted)' }}>{TYPE_TIPS[form.type]}</p>
+          </div>
+
+          {/* Name */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Name</span>
+            <input required autoFocus placeholder="e.g. Groceries" value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className="px-3 py-2.5 text-sm outline-none" style={inputStyle} />
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-              Description <span className="opacity-50">(optional)</span>
+              className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
+          </div>
+
+          {/* Icon + Color */}
+          <div className="flex gap-3">
+            <div className="flex flex-col gap-1.5 shrink-0">
+              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Icon</span>
+              <button ref={emojiTriggerRef} type="button"
+                onClick={() => {
+                  if (!showEmojiPicker && emojiTriggerRef.current) {
+                    const r = emojiTriggerRef.current.getBoundingClientRect();
+                    const spaceBelow = window.innerHeight - r.bottom - 8;
+                    setEmojiPos({ top: spaceBelow > 260 ? r.bottom + 4 : r.top - 264, left: r.left });
+                  }
+                  setShowEmojiPicker((v) => !v);
+                }}
+                className="w-16 h-10 rounded-xl flex items-center justify-center gap-1.5 text-xl transition-colors hover:bg-white/10"
+                style={inputStyle}>
+                {form.icon}
+                <svg width="8" height="8" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
+                  <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</span>
+              <div className="flex flex-wrap items-center gap-2 px-3 h-10 rounded-xl" style={inputStyle}>
+                {PRESET_COLORS.map((c) => (
+                  <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
+                    className="w-4 h-4 rounded-full transition-all hover:scale-110 shrink-0"
+                    style={{ background: c, boxShadow: form.color === c ? `0 0 0 2px rgba(0,0,0,0.6), 0 0 0 4px ${c}` : 'none' }} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+              Description <span style={{ opacity: 0.5, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
             </span>
             <input placeholder="e.g. Restaurants, groceries…" value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              maxLength={100} className="px-3 py-2.5 text-sm outline-none" style={inputStyle} />
-          </label>
-        </div>
-
-        {/* Type */}
-        <label className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Type</span>
-          <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-            className="px-3 py-2.5 text-sm outline-none appearance-none" style={inputStyle}>
-            <option value="expense">Expense</option>
-            <option value="income">Income</option>
-            <option value="both">Both</option>
-            <option value="transfer">Transfer</option>
-          </select>
-          <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl"
-            style={{ background: form.type === 'transfer' ? 'rgba(107,107,138,0.12)' : 'rgba(255,255,255,0.03)',
-                     border: `1px solid ${form.type === 'transfer' ? 'rgba(107,107,138,0.30)' : 'rgba(255,255,255,0.06)'}` }}>
-            <span className="text-sm shrink-0 mt-0.5">{form.type === 'transfer' ? 'ℹ️' : '💡'}</span>
-            <p className="text-xs leading-relaxed ml-2" style={{ color: 'var(--color-text-muted)' }}>{TYPE_TIPS[form.type]}</p>
+              maxLength={100} className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
           </div>
-        </label>
 
-        {/* Icon + Color */}
-        <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Icon</span>
-            <button ref={emojiTriggerRef} type="button"
-              onClick={() => {
-                if (!showEmojiPicker && emojiTriggerRef.current) {
-                  const r = emojiTriggerRef.current.getBoundingClientRect();
-                  const spaceBelow = window.innerHeight - r.bottom - 8;
-                  setEmojiPos({ top: spaceBelow > 260 ? r.bottom + 4 : r.top - 264, left: r.left });
-                }
-                setShowEmojiPicker((v) => !v);
-              }}
-              className="w-full px-3 py-2.5 text-left flex items-center gap-3 text-sm" style={inputStyle}>
-              <span className="text-xl">{form.icon}</span>
-              <span style={{ color: 'var(--color-text-muted)' }}>Choose icon</span>
-              <span className="ml-auto text-xs" style={{ color: 'var(--color-text-muted)' }}>▾</span>
-            </button>
-          </label>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Color</span>
-            <div className="flex flex-wrap items-center gap-2 px-3 py-2.5" style={inputStyle}>
-              {PRESET_COLORS.map((c) => (
-                <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
-                  className="w-5 h-5 rounded-full transition-transform hover:scale-110 shrink-0"
-                  style={{ background: c, outline: form.color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }} />
-              ))}
-            </div>
-          </label>
         </div>
 
-        {/* Actions */}
-        <div className="flex gap-2 justify-end pt-1">
+        {/* Footer */}
+        <div className="flex gap-2 justify-end px-5 py-4"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
           <button type="button" onClick={onClose}
-            className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10"
-            style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
+            className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+            style={{ color: 'var(--color-text-secondary)' }}>
             Cancel
           </button>
           <button type="submit" disabled={saving}
-            className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60"
-            style={{ background: 'var(--color-card-violet)' }}>
+            className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
+            style={{ background: typeMeta.color }}>
             {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Category'}
           </button>
         </div>

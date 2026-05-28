@@ -39,7 +39,9 @@ export default function CategoryManager() {
 
   useEffect(() => {
     fetch(`${API}/categories`, { credentials: 'include' })
-      .then((r) => r.json()).then(setCategories).finally(() => setLoading(false));
+      .then((r) => r.json()).then(setCategories)
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   function startCreate() { setEditing(null); setShowForm(true); }

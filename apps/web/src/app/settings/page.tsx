@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { usePlaidLink } from 'react-plaid-link';
 import Sidebar from '@/components/Sidebar';
@@ -26,6 +26,7 @@ interface BankAccount {
   color: string;
   provider: string;
   plaidItemId: string | null;
+  last4?: string | null;
 }
 
 const TYPE_META: Record<AccountType, { label: string; accent: string; icon: string }> = {
@@ -110,17 +111,31 @@ export default function SettingsPage() {
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState('');
+  const [typeOpen, setTypeOpen] = useState(false);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (typeDropdownRef.current && !typeDropdownRef.current.contains(e.target as Node)) {
+        setTypeOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
 
   const [form, setForm] = useState({
     bankName: '', accountName: '', accountType: 'checking' as AccountType,
-    balance: '', currency: 'USD', color: PRESET_COLORS[0],
+    balance: '', currency: 'USD', color: PRESET_COLORS[0], last4: '',
   });
 
   const [showResetModal, setShowResetModal] = useState(false);
 
   useEffect(() => {
     fetch(`${API}/bank-accounts`, { credentials: 'include' })
-      .then((r) => r.json()).then(setAccounts).finally(() => setLoading(false));
+      .then((r) => r.json()).then(setAccounts)
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const openPlaidLink = async () => {
@@ -169,13 +184,13 @@ export default function SettingsPage() {
     try {
       const res = await fetch(`${API}/bank-accounts`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ ...form, balance: parseFloat(form.balance) || 0 }),
+        body: JSON.stringify({ ...form, balance: parseFloat(form.balance) || 0, last4: form.last4.trim() || null }),
       });
       if (!res.ok) throw new Error();
       const created = await res.json();
       setAccounts((prev) => [...prev, created]);
       setShowManualForm(false);
-      setForm({ bankName: '', accountName: '', accountType: 'checking', balance: '', currency: 'USD', color: PRESET_COLORS[0] });
+      setForm({ bankName: '', accountName: '', accountType: 'checking', balance: '', currency: 'USD', color: PRESET_COLORS[0], last4: '' });
     } catch { setError('Could not add account. Please try again.'); }
     finally { setSubmitting(false); }
   }
@@ -188,6 +203,7 @@ export default function SettingsPage() {
       balance: String(account.balance),
       currency: account.currency,
       color: account.color || PRESET_COLORS[0],
+      last4: account.last4 ?? '',
     });
     setEditingAccount(account);
     setShowManualForm(true);
@@ -201,14 +217,14 @@ export default function SettingsPage() {
     try {
       const res = await fetch(`${API}/bank-accounts/${editingAccount.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ ...form, balance: parseFloat(form.balance) || 0 }),
+        body: JSON.stringify({ ...form, balance: parseFloat(form.balance) || 0, last4: form.last4.trim() || null }),
       });
       if (!res.ok) throw new Error();
       const updated = await res.json();
       setAccounts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
       setShowManualForm(false);
       setEditingAccount(null);
-      setForm({ bankName: '', accountName: '', accountType: 'checking', balance: '', currency: 'USD', color: PRESET_COLORS[0] });
+      setForm({ bankName: '', accountName: '', accountType: 'checking', balance: '', currency: 'USD', color: PRESET_COLORS[0], last4: '' });
     } catch { setError('Could not update account. Please try again.'); }
     finally { setSubmitting(false); }
   }
@@ -227,7 +243,8 @@ export default function SettingsPage() {
     try {
       await fetch(`${API}/plaid/sync/${account.plaidItemId}`, { method: 'POST', credentials: 'include' });
       const res = await fetch(`${API}/bank-accounts`, { credentials: 'include' });
-      setAccounts(await res.json());
+      const data = await res.json();
+      setAccounts(Array.isArray(data) ? data : []);
     } finally { setSyncingId(null); }
   }
 
@@ -299,12 +316,26 @@ export default function SettingsPage() {
                   onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowManualForm(false); setEditingAccount(null); setError(''); } }}>
 
                   <form onSubmit={editingAccount ? handleUpdate : handleAdd}
-                    className="w-full max-w-lg flex flex-col gap-5 p-6 rounded-2xl"
-                    style={{ background: 'rgba(22,22,36,0.98)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+                    className="w-full max-w-md flex flex-col rounded-2xl overflow-hidden"
+                    style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
 
                     {/* Header */}
-                    <div className="flex items-center justify-between">
-                      <p className="font-bold text-base">{editingAccount ? 'Edit Account' : 'Add Account'}</p>
+                    <div className="flex items-center justify-between px-6 py-5"
+                      style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+                          style={{ background: `${TYPE_META[form.accountType]?.accent ?? '#9B6DFF'}22`, color: TYPE_META[form.accountType]?.accent ?? '#9B6DFF' }}>
+                          {TYPE_META[form.accountType]?.icon}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>
+                            {editingAccount ? 'Edit Account' : 'New Account'}
+                          </p>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                            {TYPE_META[form.accountType]?.label} · {form.currency}
+                          </p>
+                        </div>
+                      </div>
                       <button type="button" onClick={() => { setShowManualForm(false); setEditingAccount(null); setError(''); }}
                         className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
                         style={{ color: 'var(--color-text-muted)' }}>
@@ -312,26 +343,49 @@ export default function SettingsPage() {
                       </button>
                     </div>
 
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-4 px-6 py-5">
 
                       {/* Row 1: Account Type + Currency */}
                       <div className="flex gap-3">
-                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Account Type</span>
-                          <select value={form.accountType} onChange={(e) => setForm((f) => ({ ...f, accountType: e.target.value as AccountType }))}
-                            className="px-3 py-2.5 text-sm outline-none appearance-none w-full" style={inputStyle}>
-                            <option value="checking">Checking</option>
-                            <option value="savings">Savings</option>
-                            <option value="credit">Credit Card</option>
-                            <option value="investment">Investment</option>
-                            <option value="cash">Cash</option>
-                            <option value="loan">🤝 Loan / Receivable</option>
-                          </select>
+                        <div className="flex flex-col gap-1.5 flex-1 min-w-0" ref={typeDropdownRef} style={{ position: 'relative' }}>
+                          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</label>
+                          <button type="button" onClick={() => setTypeOpen((o) => !o)}
+                            className="px-3 py-2.5 text-sm outline-none w-full flex items-center justify-between gap-2 rounded-xl"
+                            style={inputStyle}>
+                            <span className="flex items-center gap-2">
+                              <span>{TYPE_META[form.accountType]?.icon}</span>
+                              <span style={{ color: 'var(--color-text-primary)' }}>{TYPE_META[form.accountType]?.label}</span>
+                            </span>
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0, transition: 'transform .15s', transform: typeOpen ? 'rotate(180deg)' : undefined }}>
+                              <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                          {typeOpen && (
+                            <div style={{
+                              position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 100,
+                              background: 'rgba(18,18,30,0.99)', backdropFilter: 'blur(20px)',
+                              WebkitBackdropFilter: 'blur(20px)',
+                              border: '1px solid rgba(255,255,255,0.10)',
+                              borderRadius: '0.75rem', overflow: 'hidden',
+                              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+                            }}>
+                              {(Object.entries(TYPE_META) as [AccountType, typeof TYPE_META[AccountType]][]).map(([val, meta]) => (
+                                <button key={val} type="button"
+                                  onClick={() => { setForm((f) => ({ ...f, accountType: val })); setTypeOpen(false); }}
+                                  className="w-full px-3 py-2.5 text-sm text-left flex items-center gap-2.5 transition-colors"
+                                  style={{ color: form.accountType === val ? meta.accent : 'var(--color-text-primary)', background: form.accountType === val ? `${meta.accent}18` : 'transparent' }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = `${meta.accent}15`)}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = form.accountType === val ? `${meta.accent}18` : 'transparent')}>
+                                  <span>{meta.icon}</span><span>{meta.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Currency</span>
+                        <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 90 }}>
+                          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Currency</label>
                           <select value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
-                            className="px-3 py-2.5 text-sm outline-none appearance-none w-full" style={inputStyle}>
+                            className="px-3 py-2.5 text-sm outline-none appearance-none w-full rounded-xl" style={inputStyle}>
                             {['USD', 'EUR', 'GBP', 'BRL', 'CUP', 'MXN', 'CAD'].map((c) => (
                               <option key={c} value={c}>{c}</option>
                             ))}
@@ -339,66 +393,78 @@ export default function SettingsPage() {
                         </div>
                       </div>
 
-                      {/* Row 2: Bank/Person + Account Name */}
+                      {/* Bank */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                          {form.accountType === 'loan' ? 'Institution or Person' : 'Bank'}
+                        </label>
+                        {form.accountType === 'loan' ? (
+                          <input required placeholder="e.g. John Smith" value={form.bankName}
+                            onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))}
+                            className="px-3 py-2.5 text-sm outline-none rounded-xl w-full" style={inputStyle} />
+                        ) : (
+                          <BankSelect value={form.bankName} onChange={(v) => setForm((f) => ({ ...f, bankName: v }))}
+                            inputStyle={{ ...inputStyle, borderRadius: '0.75rem' }} />
+                        )}
+                      </div>
+
+                      {/* Account Name + Last 4 */}
                       <div className="flex gap-3">
                         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-                            {form.accountType === 'loan' ? 'Institution or Person' : 'Bank / Institution'}
-                          </span>
-                          {form.accountType === 'loan' ? (
-                            <input required placeholder="e.g. John Smith" value={form.bankName}
-                              onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))}
-                              className="px-3 py-2.5 text-sm outline-none"
-                              style={{ ...inputStyle, borderRadius: 'var(--radius-input)' }} />
-                          ) : (
-                            <BankSelect
-                              value={form.bankName}
-                              onChange={(v: string) => setForm((f) => ({ ...f, bankName: v }))}
-                              inputStyle={{ ...inputStyle, borderRadius: 'var(--radius-input)' }}
-                            />
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                             {form.accountType === 'loan' ? 'Description' : 'Account Name'}
-                          </span>
+                          </label>
                           <input required
                             placeholder={form.accountType === 'loan' ? 'e.g. Personal Loan' : 'e.g. Main Checking'}
                             value={form.accountName}
                             onChange={(e) => setForm((f) => ({ ...f, accountName: e.target.value }))}
-                            className="px-3 py-2.5 text-sm outline-none" style={inputStyle} />
+                            className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
+                        </div>
+                        <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 84 }}>
+                          <label className="text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                            Last 4
+                            <span className="relative group" style={{ lineHeight: 0 }}>
+                              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ cursor: 'pointer', color: 'var(--color-text-muted)', opacity: 0.6 }}>
+                                <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
+                                <path d="M8 7v5M8 5.5v.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                              </svg>
+                              <span className="absolute bottom-full right-0 mb-2 w-48 text-[11px] leading-relaxed font-normal normal-case tracking-normal rounded-lg px-3 py-2.5 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                                style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--color-text-secondary)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', whiteSpace: 'normal' }}>
+                                Last 4 digits of your card or account number. Used to detect if a CSV file belongs to this account on import.
+                                <span className="absolute top-full right-2 -mt-px" style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid rgba(255,255,255,0.12)' }} />
+                              </span>
+                            </span>
+                          </label>
+                          <input placeholder="···· " maxLength={4} value={form.last4}
+                            onChange={(e) => setForm((f) => ({ ...f, last4: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                            className="px-3 py-2.5 text-sm outline-none text-center tracking-[0.3em] rounded-xl" style={inputStyle} />
                         </div>
                       </div>
 
-                      {/* Row 3: Balance + Color */}
+                      {/* Balance + Color */}
                       <div className="flex gap-3">
                         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-                            {form.accountType === 'loan' ? 'Amount owed to you' : 'Current Balance'}
-                          </span>
-                          <div className="flex">
-                            <span className="flex items-center px-3 text-sm shrink-0"
-                              style={{ background: 'rgba(255,255,255,0.09)', borderTop: '1px solid rgba(255,255,255,0.14)', borderLeft: '1px solid rgba(255,255,255,0.14)', borderBottom: '1px solid rgba(255,255,255,0.14)', borderRight: 'none', borderRadius: 'var(--radius-input) 0 0 var(--radius-input)', color: 'var(--color-text-muted)' }}>
+                          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                            {form.accountType === 'loan' ? 'Amount Owed' : 'Balance'}
+                          </label>
+                          <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
+                            <span className="flex items-center px-3 text-xs font-semibold shrink-0"
+                              style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
                               {form.currency}
                             </span>
                             <input type="number" step="0.01" placeholder="0.00" value={form.balance}
                               onChange={(e) => setForm((f) => ({ ...f, balance: e.target.value }))}
                               className="flex-1 px-3 py-2.5 text-sm outline-none min-w-0"
-                              style={{ ...inputStyle, borderRadius: '0 var(--radius-input) var(--radius-input) 0', borderLeft: 'none' }} />
+                              style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)' }} />
                           </div>
-                          {form.accountType === 'loan' && (
-                            <p className="text-[11px] mt-0.5 px-0.5" style={{ color: 'rgba(245,200,66,0.7)' }}>
-                              Set this if the loan existed before you started tracking.
-                            </p>
-                          )}
                         </div>
                         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Color</span>
-                          <div className="flex flex-wrap items-center gap-2 px-3 py-2.5" style={{ ...inputStyle, borderRadius: 'var(--radius-input)' }}>
+                          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</label>
+                          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ ...inputStyle }}>
                             {PRESET_COLORS.map((c) => (
                               <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
-                                className="w-5 h-5 rounded-full transition-transform hover:scale-110 shrink-0"
-                                style={{ background: c, outline: form.color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }} />
+                                className="w-5 h-5 rounded-full transition-all hover:scale-110 shrink-0"
+                                style={{ background: c, boxShadow: form.color === c ? `0 0 0 2px rgba(0,0,0,0.6), 0 0 0 4px ${c}` : 'none' }} />
                             ))}
                           </div>
                         </div>
@@ -406,21 +472,24 @@ export default function SettingsPage() {
 
                     </div>
 
-                    {error && (
-                      <p className="text-xs px-1" style={{ color: 'var(--color-card-orange)' }}>{error}</p>
-                    )}
-
-                    <div className="flex gap-2 justify-end pt-1">
-                      <button type="button" onClick={() => { setShowManualForm(false); setEditingAccount(null); setError(''); }}
-                        className="px-4 py-2 text-sm font-medium rounded-xl transition-colors hover:bg-white/10"
-                        style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        Cancel
-                      </button>
-                      <button type="submit" disabled={submitting}
-                        className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60"
-                        style={{ background: 'var(--color-card-violet)' }}>
-                        {submitting ? 'Saving…' : editingAccount ? 'Save Changes' : 'Add Account'}
-                      </button>
+                    {/* Footer */}
+                    <div className="flex items-center justify-between px-6 py-4"
+                      style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                      {error
+                        ? <p className="text-xs" style={{ color: 'var(--color-card-orange)' }}>{error}</p>
+                        : <span />}
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => { setShowManualForm(false); setEditingAccount(null); setError(''); }}
+                          className="px-4 py-2 text-sm font-medium rounded-xl transition-colors hover:bg-white/10"
+                          style={{ color: 'var(--color-text-secondary)' }}>
+                          Cancel
+                        </button>
+                        <button type="submit" disabled={submitting}
+                          className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
+                          style={{ background: TYPE_META[form.accountType]?.accent ?? 'var(--color-card-violet)' }}>
+                          {submitting ? 'Saving…' : editingAccount ? 'Save Changes' : 'Add Account'}
+                        </button>
+                      </div>
                     </div>
                   </form>
                 </div>,

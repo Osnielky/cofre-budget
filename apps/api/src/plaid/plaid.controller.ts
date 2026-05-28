@@ -1,8 +1,11 @@
 import { Controller, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PlanGuard } from '../auth/guards/plan.guard';
+import { RequiresPlan } from '../auth/decorators/require-plan.decorator';
 import { PlaidService } from './plaid.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PlanGuard)
+@RequiresPlan('pro')
 @Controller('plaid')
 export class PlaidController {
   constructor(private service: PlaidService) {}

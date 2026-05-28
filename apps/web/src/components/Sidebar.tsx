@@ -28,7 +28,8 @@ export default function Sidebar() {
   useEffect(() => {
     fetch(`${API}/auth/me`, { credentials: 'include' })
       .then((r) => r.ok ? r.json() : null)
-      .then((u) => { if (u) setUser(u); });
+      .then((u) => { if (u) setUser(u); })
+      .catch(() => {});
   }, []);
 
   async function handleLogout() {

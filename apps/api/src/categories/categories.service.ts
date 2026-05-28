@@ -18,6 +18,7 @@ const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'created
   { name: 'Utilities',      icon: '💡', color: '#F5C842', type: 'expense',  description: 'Electric, water, gas & internet bills' },
   { name: 'Travel',         icon: '✈️', color: '#4BA8D8', type: 'expense',  description: 'Hotels, flights & vacation expenses' },
   { name: 'Subscriptions',  icon: '📱', color: '#9B6DFF', type: 'expense',  description: 'Streaming, apps & recurring services' },
+  { name: 'Memberships',    icon: '🪪', color: '#4BA8D8', type: 'expense',  description: 'Gym, clubs & membership dues' },
   { name: 'Phone',          icon: '📞', color: '#4BA8D8', type: 'expense',  description: 'Mobile & home phone bills' },
   { name: 'Education',      icon: '🎓', color: '#4FBF7F', type: 'expense',  description: 'Tuition, books & online courses' },
   { name: 'Car Insurance',  icon: '🛡️', color: '#4BA8D8', type: 'expense',  description: 'Auto insurance premiums & claims' },

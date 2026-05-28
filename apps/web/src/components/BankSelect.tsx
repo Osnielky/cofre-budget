@@ -186,25 +186,45 @@ export default function BankSelect({ value, onChange, inputStyle, compact = fals
   );
 }
 
+const LOGO_SOURCES = (domain: string) => [
+  `https://logo.clearbit.com/${domain}`,
+  `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+];
+
 function BankLogo({ bank, size, imgErrors, onError }: {
   bank: Bank; size: number;
   imgErrors: Record<string, boolean>;
   onError: (domain: string) => void;
 }) {
+  const [srcIdx, setSrcIdx] = useState(0);
   const failed = imgErrors[bank.domain];
-  return (
-    <span className="rounded-lg overflow-hidden shrink-0 flex items-center justify-center"
-      style={{ width: size, height: size, background: failed ? bank.color : 'white' }}>
-      {failed ? (
+  const sources = LOGO_SOURCES(bank.domain);
+
+  if (failed) {
+    return (
+      <span className="rounded-lg shrink-0 flex items-center justify-center"
+        style={{ width: size, height: size, background: bank.color }}>
         <span style={{ fontSize: size * 0.38, fontWeight: 700, color: 'white', lineHeight: 1 }}>
           {bank.abbr}
         </span>
-      ) : (
-        <img src={`https://logo.clearbit.com/${bank.domain}`} alt={bank.name}
-          width={size} height={size}
-          style={{ objectFit: 'contain', display: 'block' }}
-          onError={() => onError(bank.domain)} />
-      )}
+      </span>
+    );
+  }
+
+  const isClearbit = srcIdx === 0;
+  return (
+    <span className="rounded-lg overflow-hidden shrink-0 flex items-center justify-center"
+      style={{ width: size, height: size, background: isClearbit ? 'white' : 'transparent', padding: isClearbit ? 0 : 1 }}>
+      <img
+        src={sources[srcIdx]}
+        alt={bank.name}
+        width={size} height={size}
+        style={{ objectFit: 'contain', display: 'block' }}
+        onError={() => {
+          if (srcIdx < sources.length - 1) setSrcIdx((i) => i + 1);
+          else onError(bank.domain);
+        }}
+      />
     </span>
   );
 }

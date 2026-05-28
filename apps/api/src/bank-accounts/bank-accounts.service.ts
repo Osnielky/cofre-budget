@@ -15,6 +15,10 @@ export class BankAccountsService {
     return this.repo.find({ where: { userId }, order: { createdAt: 'ASC' } });
   }
 
+  countByUser(userId: string): Promise<number> {
+    return this.repo.count({ where: { userId } });
+  }
+
   create(userId: string, dto: CreateBankAccountDto): Promise<BankAccount> {
     const account = this.repo.create({ ...dto, userId });
     return this.repo.save(account);

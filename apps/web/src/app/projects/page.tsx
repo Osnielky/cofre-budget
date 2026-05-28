@@ -110,7 +110,9 @@ export default function ProjectsPage() {
     if (sellAllTx.length === 0) {
       setSellLoadingTx(true);
       fetch(`${API}/transactions?limit=1000`, { credentials: 'include' })
-        .then((r) => r.json()).then(setSellAllTx).finally(() => setSellLoadingTx(false));
+        .then((r) => r.json()).then(setSellAllTx)
+        .catch(() => {})
+        .finally(() => setSellLoadingTx(false));
     }
   }, [showSell?.id]);
 
@@ -118,7 +120,8 @@ export default function ProjectsPage() {
     setLoading(true);
     try {
       const res = await fetch(`${API}/projects`, { credentials: 'include' });
-      setProjects(await res.json());
+      const data = await res.json();
+      setProjects(Array.isArray(data) ? data : []);
     } finally { setLoading(false); }
   }
 

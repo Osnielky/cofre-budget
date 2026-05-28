@@ -47,7 +47,10 @@ export default function ProjectCategoryManager() {
     setLoading(true);
     try {
       const res = await fetch(`${API}/projects/type-categories?type=${type}`, { credentials: 'include' });
-      setCats(await res.json());
+      const data = await res.json();
+      setCats(Array.isArray(data) ? data : []);
+    } catch {
+      setCats([]);
     } finally { setLoading(false); }
   }
 

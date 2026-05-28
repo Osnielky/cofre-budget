@@ -8,6 +8,7 @@ interface CsvRow { date: string; referenceNumber?: string; name: string; amount:
 
 interface BankAccount {
   id: string; bankName: string; accountName: string; accountType: string; color: string;
+  last4?: string | null;
 }
 
 interface ImportResult { imported: number; skipped: number; account: BankAccount; }
@@ -68,10 +69,11 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
-        const parsed = parseCsv(ev.target?.result as string);
+        const raw = ev.target?.result as string;
+        const parsed = parseCsv(raw);
         if (parsed.length === 0) throw new Error('No transactions found in this file.');
         setRows(parsed);
-        setWarnings(validate(parsed, account, file.name));
+        setWarnings(validate(parsed, account, file.name, raw));
         checkDups(parsed);
       } catch (err: any) {
         setError(err.message ?? 'Could not parse CSV file.');
@@ -332,8 +334,43 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
 
 /* ── Validation ─────────────────────────────────────────────────── */
 
-function validate(rows: CsvRow[], account: BankAccount, fileName: string): Warning[] {
+function detectCsvType(rawText: string): 'bank' | 'credit' | 'unknown' {
+  const header = rawText.split('\n').slice(0, 15).join('\n').toLowerCase();
+  if (header.includes('running bal') || header.includes('running balance')) return 'bank';
+  if (header.includes('reference number') || header.includes('ref no')) return 'credit';
+  return 'unknown';
+}
+
+function validate(rows: CsvRow[], account: BankAccount, fileName: string, rawText = ''): Warning[] {
   const warnings: Warning[] = [];
+
+  /* Column-header type mismatch — hard block */
+  const csvType = detectCsvType(rawText);
+  const acctIsCredit = account.accountType === 'credit';
+  const acctIsBank   = ['checking', 'savings', 'cash', 'debit'].includes(account.accountType);
+  if (csvType === 'bank' && acctIsCredit) {
+    warnings.push({ level: 'error', message: `These transactions do not belong to this account.` });
+  }
+  if (csvType === 'credit' && acctIsBank) {
+    warnings.push({ level: 'error', message: `These transactions do not belong to this account.` });
+  }
+
+  /* Last-4 check: extract 4-digit suffix from filename e.g. "May2026_1564.csv" → "1564" */
+  const fileLast4Match = fileName.match(/(\d{4})\.(?:csv|txt)$/i);
+  const fileLast4 = fileLast4Match?.[1];
+  if (fileLast4 && account.last4 && fileLast4 !== account.last4) {
+    warnings.push({
+      level: 'error',
+      message: `These transactions do not belong to this account.`,
+    });
+  }
+  if (fileLast4 && !account.last4) {
+    warnings.push({
+      level: 'warn',
+      message: `This file appears to belong to an account ending in ${fileLast4}. Set the "Last 4" digits on "${account.accountName}" in Settings to enable automatic detection next time.`,
+    });
+  }
+
   const positiveCount = rows.filter((r) => r.amount > 0).length;
   const negativeCount = rows.filter((r) => r.amount < 0).length;
   const total = rows.length;

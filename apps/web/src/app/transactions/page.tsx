@@ -96,6 +96,7 @@ export default function TransactionsPage() {
 
   const [pickerProjectDrill, setPickerProjectDrill]   = useState<string | null>(null);
   const [pickerTransferStep, setPickerTransferStep]   = useState(false);
+  const [pickerSearch, setPickerSearch]               = useState('');
   const [transferMatches, setTransferMatches]         = useState<TransferMatch[]>([]);
   const [transferMatchesLoading, setTransferMatchesLoading] = useState(false);
   const [linkingProj, setLinkingProj]                 = useState(false);
@@ -165,7 +166,8 @@ export default function TransactionsPage() {
       if (from) params.set('from', from);
       if (to)   params.set('to', to);
       const res = await fetch(`${API}/transactions?${params}`, { credentials: 'include' });
-      setTransactions(await res.json());
+      const data = await res.json();
+      setTransactions(Array.isArray(data) ? data : []);
     } finally {
       setLoading(false);
     }
@@ -177,9 +179,13 @@ export default function TransactionsPage() {
 
   const loadBudgets = useCallback(async () => {
     setBudgetsLoading(true);
-    const res = await fetch(`${API}/budgets?month=${budgetMonth}`, { credentials: 'include' });
-    setBudgets(await res.json());
-    setBudgetsLoading(false);
+    try {
+      const res = await fetch(`${API}/budgets?month=${budgetMonth}`, { credentials: 'include' });
+      const data = await res.json();
+      setBudgets(Array.isArray(data) ? data : []);
+    } catch {} finally {
+      setBudgetsLoading(false);
+    }
   }, [budgetMonth]);
 
   useEffect(() => {
@@ -206,6 +212,7 @@ export default function TransactionsPage() {
         setOpenPickerId(null);
         setPickerProjectDrill(null);
         setPickerTransferStep(false);
+        setPickerSearch('');
         setMarkAsSaleConfirm(null);
       }
       if (showImportPicker && importBtnRef.current && !importBtnRef.current.contains(e.target as Node)) {
@@ -240,14 +247,25 @@ export default function TransactionsPage() {
       }
     }
 
+    const txBefore = transactions.find((t) => t.id === txId);
     const res = await fetch(`${API}/transactions/${txId}/category`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       credentials: 'include', body: JSON.stringify({ categoryId }),
     });
     const updated: Transaction = await res.json();
-    setTransactions((prev) => prev.map((t) =>
-      t.id === txId ? { ...t, categoryId: updated.categoryId, categoryRef: updated.categoryRef } : t,
-    ));
+    const counterpartId = !categoryId ? txBefore?.counterpartTxId : null;
+    setTransactions((prev) => prev.map((t) => {
+      if (t.id === txId) return {
+        ...t,
+        categoryId: updated.categoryId,
+        categoryRef: updated.categoryRef,
+        ...(!categoryId && { transferAccountId: null, transferAccount: null, counterpartTxId: null }),
+      };
+      if (counterpartId && t.id === counterpartId) return {
+        ...t, transferAccountId: null, transferAccount: null, counterpartTxId: null,
+      };
+      return t;
+    }));
     /* Keep hints fresh so newly-categorized names suggest immediately on other rows */
     if (categoryId && updated.categoryRef) {
       const tx = transactions.find((t) => t.id === txId);
@@ -940,8 +958,9 @@ export default function TransactionsPage() {
                         const isOpen       = openPickerId === tx.id;
                         const primaryType   = isIncome ? 'income' : 'expense';
                         const secondaryType = isIncome ? 'expense' : 'income';
-                        const pickerCats    = categories.filter((c) => c.type === primaryType || c.type === 'transfer');
-                        const pickerCatsAlt = categories.filter((c) => c.type === secondaryType);
+                        const searchQ       = pickerSearch.toLowerCase();
+                        const pickerCats    = categories.filter((c) => (c.type === primaryType || c.type === 'transfer') && (!searchQ || c.name.toLowerCase().includes(searchQ)));
+                        const pickerCatsAlt = categories.filter((c) => c.type === secondaryType && (!searchQ || c.name.toLowerCase().includes(searchQ)));
 
                         return (
                           <div key={tx.id} className="relative group"
@@ -1033,6 +1052,7 @@ export default function TransactionsPage() {
                                 setOpenPickerId(tx.id);
                                 setPickerProjectDrill(null);
                                 setPickerTransferStep(false);
+                                setPickerSearch('');
                               }}
                               disabled={updatingId === tx.id}
                               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:brightness-110 disabled:opacity-40"
@@ -1085,6 +1105,19 @@ export default function TransactionsPage() {
                                     </button>
                                     <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }} />
                                   </>
+                                )}
+                                {!pickerTransferStep && !pickerProjectDrill && (
+                                  <div className="px-2 pt-1.5 pb-1">
+                                    <input
+                                      autoFocus
+                                      placeholder="Search…"
+                                      value={pickerSearch}
+                                      onChange={(e) => setPickerSearch(e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="w-full px-2.5 py-1.5 text-xs outline-none rounded-lg"
+                                      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)' }}
+                                    />
+                                  </div>
                                 )}
                                 {pickerTransferStep && openPickerId === tx.id ? (
                                   /* ── Transfer account picker ── */
@@ -1428,30 +1461,34 @@ export default function TransactionsPage() {
                           const cpAcc    = cp.bankAccount;
                           const cpAmount = Number(cp.amount);
                           const cpColor  = cpAcc?.color || '#6B6B8A';
+                          const fromAcc  = Number(tx.amount) < 0 ? tx.bankAccount : cpAcc;
+                          const toAcc    = Number(tx.amount) < 0 ? cpAcc : tx.bankAccount;
                           return (
-                            <div className="mx-4 mb-3 rounded-xl overflow-hidden"
-                              style={{ background: 'rgba(107,107,138,0.06)', border: '1px solid rgba(107,107,138,0.22)' }}>
-                              <div className="flex items-center gap-1.5 px-3 py-1.5"
-                                style={{ borderBottom: '1px dashed rgba(107,107,138,0.18)' }}>
-                                <span style={{ color: 'rgba(155,155,184,0.6)', fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-                                  ⇄ matched transfer
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2.5 px-3 py-2">
-                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                  style={{ background: `${cpColor}20` }}>
-                                  <AccountTypeIcon type={cpAcc?.accountType ?? ''} size={16} />
-                                </span>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>
-                                    {cp.name}
-                                  </p>
-                                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
-                                    {cpAcc?.bankName} · {cpAcc?.accountName} · {formatDate(cp.date)}
-                                  </p>
+                            <div className="mx-4 mb-3 flex items-stretch gap-0 rounded-xl overflow-hidden"
+                              style={{ background: 'rgba(107,107,138,0.07)', border: '1px solid rgba(107,107,138,0.18)' }}>
+                              {/* Left accent */}
+                              <div className="w-0.5 shrink-0" style={{ background: 'linear-gradient(to bottom, #6B6B8A55, #6B6B8A22)' }} />
+                              <div className="flex items-center gap-3 px-3 py-2.5 flex-1 min-w-0">
+                                {/* Link icon */}
+                                <div className="w-6 h-6 rounded-lg shrink-0 flex items-center justify-center"
+                                  style={{ background: 'rgba(107,107,138,0.20)' }}>
+                                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ color: '#9B9BB8' }}>
+                                    <path d="M6 8a2 2 0 1 0 4 0M2 4l3 3M14 4l-3 3M2 12l3-3M14 12l-3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                  </svg>
                                 </div>
+                                {/* Transfer direction */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 mb-0.5">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(155,155,184,0.5)' }}>Transfer</span>
+                                    <span className="text-[10px]" style={{ color: 'rgba(155,155,184,0.4)' }}>
+                                      {fromAcc?.accountName ?? '?'} → {toAcc?.accountName ?? '?'}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>{cp.name}</p>
+                                </div>
+                                {/* Counterpart amount */}
                                 <span className="text-xs font-bold tabular-nums shrink-0"
-                                  style={{ color: cpAmount >= 0 ? '#4FBF7F' : 'white' }}>
+                                  style={{ color: cpAmount >= 0 ? '#4FBF7F88' : 'rgba(255,255,255,0.3)' }}>
                                   {formatAmount(cpAmount)}
                                 </span>
                               </div>

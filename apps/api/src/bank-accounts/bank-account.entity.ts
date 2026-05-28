@@ -49,6 +49,10 @@ export class BankAccount {
   @Column({ nullable: true })
   plaidAccountId: string;
 
+  /* Last 4 digits of account/card number — used to validate CSV imports */
+  @Column({ nullable: true, length: 4 })
+  last4: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

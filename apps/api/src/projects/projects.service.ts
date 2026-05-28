@@ -90,12 +90,19 @@ export class ProjectsService {
     @InjectRepository(Transaction)     private txRepo: Repository<Transaction>,
   ) {}
 
-  /* Load categories for a project type, scoped to the user */
-  loadTypeCategories(userId: string, projectType: string) {
-    return this.catRepo.find({
+  /* Load categories for a project type, scoped to the user — lazy-seeds defaults on first access */
+  async loadTypeCategories(userId: string, projectType: string): Promise<ProjectCategory[]> {
+    const existing = await this.catRepo.find({
       where: { userId, projectType },
       order: { order: 'ASC', createdAt: 'ASC' },
     });
+    if (existing.length > 0) return existing;
+
+    const seeds = DEFAULT_CATEGORIES[projectType] ?? DEFAULT_CATEGORIES.other;
+    await this.catRepo.save(
+      seeds.map((s, i) => this.catRepo.create({ userId, projectType, name: s.name, icon: s.icon, color: s.color, type: s.type, order: i })),
+    );
+    return this.catRepo.find({ where: { userId, projectType }, order: { order: 'ASC', createdAt: 'ASC' } });
   }
 
   async findAllByUser(userId: string): Promise<(ProjectWithStats & { categories: ProjectCategory[] })[]> {

@@ -43,6 +43,10 @@ export class BudgetsService {
     );
   }
 
+  countByUser(userId: string): Promise<number> {
+    return this.repo.count({ where: { userId } });
+  }
+
   async create(userId: string, dto: { categoryId: string; amount: number }): Promise<Budget> {
     return this.repo.save(this.repo.create({ ...dto, userId }));
   }

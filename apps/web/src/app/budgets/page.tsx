@@ -60,6 +60,7 @@ export default function BudgetsPage() {
       fetch(`${API}/budgets?month=${month}`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/categories`, { credentials: 'include' }).then((r) => r.json()),
     ]).then(([b, c]) => { setBudgets(Array.isArray(b) ? b : []); setCategories(Array.isArray(c) ? c : []); })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [month]);
 

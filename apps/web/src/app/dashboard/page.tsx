@@ -78,24 +78,29 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const from = monthFrom(month), to = monthTo(month);
-    const yearFrom = `${new Date().getFullYear()}-01-01`;
-    const yearTo   = new Date().toISOString().slice(0, 10);
-    const [tx, ytx, accs, bdg, proj, me] = await Promise.all([
-      fetch(`${API}/transactions?from=${from}&to=${to}&limit=500`, { credentials:'include' }).then(r=>r.json()),
-      fetch(`${API}/transactions?from=${yearFrom}&to=${yearTo}&limit=5000`, { credentials:'include' }).then(r=>r.json()),
-      fetch(`${API}/bank-accounts`, { credentials:'include' }).then(r=>r.json()),
-      fetch(`${API}/budgets?month=${month}`, { credentials:'include' }).then(r=>r.json()),
-      fetch(`${API}/projects`, { credentials:'include' }).then(r=>r.json()),
-      fetch(`${API}/auth/me`, { credentials:'include' }).then(r=>r.ok?r.json():null).catch(()=>null),
-    ]);
-    setTransactions(Array.isArray(tx) ? tx : []);
-    setYearTx(Array.isArray(ytx) ? ytx : []);
-    setAccounts(Array.isArray(accs) ? accs : []);
-    setBudgets(Array.isArray(bdg) ? bdg : []);
-    setProjects(Array.isArray(proj) ? proj : []);
-    setUser(me);
-    setLoading(false);
+    try {
+      const from = monthFrom(month), to = monthTo(month);
+      const yearFrom = `${new Date().getFullYear()}-01-01`;
+      const yearTo   = new Date().toISOString().slice(0, 10);
+      const [tx, ytx, accs, bdg, proj, me] = await Promise.all([
+        fetch(`${API}/transactions?from=${from}&to=${to}&limit=500`, { credentials:'include' }).then(r=>r.json()),
+        fetch(`${API}/transactions?from=${yearFrom}&to=${yearTo}&limit=5000`, { credentials:'include' }).then(r=>r.json()),
+        fetch(`${API}/bank-accounts`, { credentials:'include' }).then(r=>r.json()),
+        fetch(`${API}/budgets?month=${month}`, { credentials:'include' }).then(r=>r.json()),
+        fetch(`${API}/projects`, { credentials:'include' }).then(r=>r.json()),
+        fetch(`${API}/auth/me`, { credentials:'include' }).then(r=>r.ok?r.json():null).catch(()=>null),
+      ]);
+      setTransactions(Array.isArray(tx) ? tx : []);
+      setYearTx(Array.isArray(ytx) ? ytx : []);
+      setAccounts(Array.isArray(accs) ? accs : []);
+      setBudgets(Array.isArray(bdg) ? bdg : []);
+      setProjects(Array.isArray(proj) ? proj : []);
+      setUser(me);
+    } catch {
+      // API unreachable — leave state as empty defaults
+    } finally {
+      setLoading(false);
+    }
   }, [month]);
 
   useEffect(() => { load(); }, [load]);

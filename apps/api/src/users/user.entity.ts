@@ -20,6 +20,9 @@ export class User {
   @Column({ nullable: true, unique: true })
   googleId: string;
 
+  @Column({ default: 'free' })
+  plan: 'free' | 'pro';
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { Transaction } from './transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 
@@ -59,6 +59,15 @@ export class TransactionsService {
     if (from) qb.andWhere('tx.date >= :from', { from });
     if (to)   qb.andWhere('tx.date <= :to', { to });
     return qb.getMany();
+  }
+
+  countThisMonth(userId: string): Promise<number> {
+    const now = new Date();
+    const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const to   = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    return this.repo.count({
+      where: { userId, date: Between(from, to) },
+    });
   }
 
   async checkDuplicates(
