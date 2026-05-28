@@ -7,9 +7,11 @@ import { UsersService } from '../../users/users.service';
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(config: ConfigService, private usersService: UsersService) {
+    const clientID = config.get<string>('GOOGLE_CLIENT_ID') ?? 'GOOGLE_CLIENT_ID_NOT_SET';
+    const clientSecret = config.get<string>('GOOGLE_CLIENT_SECRET') ?? 'GOOGLE_CLIENT_SECRET_NOT_SET';
     super({
-      clientID: config.get<string>('GOOGLE_CLIENT_ID')!,
-      clientSecret: config.get<string>('GOOGLE_CLIENT_SECRET')!,
+      clientID,
+      clientSecret,
       callbackURL: config.get<string>('GOOGLE_CALLBACK_URL', 'http://localhost:3333/api/auth/google/callback'),
       scope: ['email', 'profile'],
     });
