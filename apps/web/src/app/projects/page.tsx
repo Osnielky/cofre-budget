@@ -8,11 +8,24 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 const PRESET_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0'];
 
-const PROJECT_TYPES: { value: string; label: string; icon: string }[] = [
-  { value: 'vehicle',  label: 'Vehicle',   icon: '🚗' },
-  { value: 'property', label: 'Property',  icon: '🏠' },
-  { value: 'business', label: 'Business',  icon: '💼' },
-  { value: 'other',    label: 'Other',     icon: '📦' },
+const PROJECT_TYPES: { value: string; label: string; icon: string; placeholder: string; hint: string }[] = [
+  { value: 'vehicle',  label: 'Vehicle',  icon: '🚗', placeholder: 'e.g. 2019 Honda Civic',      hint: 'Flip, fix or track a vehicle' },
+  { value: 'property', label: 'Property', icon: '🏠', placeholder: 'e.g. Miami Rental Property', hint: 'Real estate & rentals' },
+  { value: 'business', label: 'Business', icon: '💼', placeholder: 'e.g. Coffee Shop',           hint: 'Product-based business' },
+  { value: 'service',  label: 'Business', icon: '💼', placeholder: 'e.g. Uber, Consulting, Freelance', hint: 'Service-based business' },
+  { value: 'other',    label: 'Other',    icon: '📦', placeholder: 'e.g. Camera Collection',     hint: 'Any investment or project' },
+];
+
+const MAIN_TYPES = [
+  { value: 'vehicle',  label: 'Vehicle',  icon: '🚗' },
+  { value: 'property', label: 'Property', icon: '🏠' },
+  { value: 'business', label: 'Business', icon: '💼' },
+  { value: 'other',    label: 'Other',    icon: '📦' },
+];
+
+const BUSINESS_SUBTYPES = [
+  { value: 'business', label: 'Product', icon: '📦', hint: 'Sell physical or digital products' },
+  { value: 'service',  label: 'Service', icon: '🛎️', hint: 'Offer skills, consulting or labor' },
 ];
 
 interface ProjectCategory {
@@ -633,96 +646,156 @@ export default function ProjectsPage() {
             style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
             onMouseDown={(e) => { if (e.target === e.currentTarget) closeForm(); }}>
             <form onSubmit={handleSave}
-              className="w-full max-w-lg flex flex-col gap-5 p-6 rounded-2xl"
-              style={{ background: 'rgba(22,22,36,0.98)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+              className="w-full max-w-md flex flex-col rounded-2xl overflow-hidden"
+              style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
 
-              <div className="flex items-center justify-between">
-                <p className="font-bold text-base">{editing ? 'Edit Project' : 'New Project'}</p>
-                <button type="button" onClick={closeForm}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10"
-                  style={{ color: 'var(--color-text-muted)' }}>✕</button>
-              </div>
-
-              {/* Type selector */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Type</span>
-                <div className="grid grid-cols-4 gap-2">
-                  {PROJECT_TYPES.map((t) => (
-                    <button key={t.value} type="button"
-                      onClick={() => setForm((f) => ({ ...f, type: t.value, icon: t.icon }))}
-                      className="flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs font-medium transition-colors"
-                      style={form.type === t.value
-                        ? { background: `${form.color}20`, border: `1px solid ${form.color}50`, color: form.color }
-                        : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--color-text-muted)' }}>
-                      <span className="text-xl">{t.icon}</span>{t.label}
-                    </button>
-                  ))}
-                </div>
-                {!editing && (
-                  <p className="text-[10px] px-1" style={{ color: 'var(--color-text-muted)' }}>
-                    Expense categories will be pre-populated based on type — you can customize them after.
-                  </p>
-                )}
-              </div>
-
-              {/* Name + Description */}
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Name *</span>
-                  <input required placeholder="e.g. 2019 Honda Civic" value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    className="px-3 py-2.5 text-sm outline-none" style={inputStyle} />
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Description <span className="opacity-50">(optional)</span></span>
-                  <input placeholder="Short note…" value={form.description}
-                    onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                    className="px-3 py-2.5 text-sm outline-none" style={inputStyle} />
-                </label>
-              </div>
-
-              {/* Purchase Price + Date */}
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Purchase Price</span>
-                  <div className="flex">
-                    <span className="flex items-center px-3 text-sm shrink-0"
-                      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', borderRight: 'none', borderRadius: '10px 0 0 10px', color: 'var(--color-text-muted)' }}>$</span>
-                    <input type="number" step="0.01" min="0" placeholder="0.00" value={form.purchasePrice}
-                      onChange={(e) => setForm((f) => ({ ...f, purchasePrice: e.target.value }))}
-                      className="flex-1 px-3 py-2.5 text-sm outline-none min-w-0"
-                      style={{ ...inputStyle, borderRadius: '0 10px 10px 0', borderLeft: 'none' }} />
+              {/* Live preview header */}
+              {(() => {
+                const typeMeta = PROJECT_TYPES.find((t) => t.value === form.type)!;
+                return (
+                  <div className="flex items-center justify-between gap-3 px-5 py-4"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: `linear-gradient(135deg, ${form.color}10 0%, transparent 60%)` }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                        style={{ background: `${form.color}22`, boxShadow: `0 0 0 1px ${form.color}44` }}>
+                        {typeMeta.icon}
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm" style={{ color: form.name ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                          {form.name || (editing ? 'Edit Project' : 'New Project')}
+                        </p>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                          style={{ background: `${form.color}22`, color: form.color }}>
+                          {typeMeta.label} · {typeMeta.hint}
+                        </span>
+                      </div>
+                    </div>
+                    <button type="button" onClick={closeForm}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 shrink-0"
+                      style={{ color: 'var(--color-text-muted)' }}>✕</button>
                   </div>
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Purchase Date</span>
-                  <input type="date" value={form.purchaseDate}
-                    onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))}
-                    className="px-3 py-2.5 text-sm outline-none" style={{ ...inputStyle, colorScheme: 'dark' }} />
-                </label>
-              </div>
+                );
+              })()}
 
-              {/* Color */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Color</span>
-                <div className="flex items-center gap-2 px-3 py-2.5" style={inputStyle}>
-                  {PRESET_COLORS.map((c) => (
-                    <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
-                      className="w-5 h-5 rounded-full transition-transform hover:scale-110 shrink-0"
-                      style={{ background: c, outline: form.color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }} />
-                  ))}
+              <div className="flex flex-col gap-4 px-5 py-4">
+
+                {/* Type selector */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {MAIN_TYPES.map((t) => {
+                      const active = form.type === t.value || (t.value === 'business' && form.type === 'service');
+                      return (
+                        <button key={t.value} type="button"
+                          onClick={() => setForm((f) => ({ ...f, type: t.value, icon: t.icon }))}
+                          className="flex flex-col items-center gap-1.5 py-3 rounded-xl text-xs font-semibold transition-all"
+                          style={active
+                            ? { background: `${form.color}20`, border: `1px solid ${form.color}55`, color: form.color, boxShadow: `0 0 12px ${form.color}20` }
+                            : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--color-text-muted)' }}>
+                          <span className="text-lg">{t.icon}</span>
+                          <span>{t.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Business sub-type */}
+                  {(form.type === 'business' || form.type === 'service') && (
+                    <div className="flex gap-2 mt-1">
+                      {BUSINESS_SUBTYPES.map((s) => (
+                        <button key={s.value} type="button"
+                          onClick={() => setForm((f) => ({ ...f, type: s.value }))}
+                          className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+                          style={form.type === s.value
+                            ? { background: `${form.color}18`, border: `1px solid ${form.color}44`, color: form.color }
+                            : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: 'var(--color-text-muted)' }}>
+                          <span className="text-base">{s.icon}</span>
+                          <div className="text-left">
+                            <p className="font-semibold leading-tight">{s.label}</p>
+                            <p className="text-[10px] leading-tight opacity-70">{s.hint}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {!editing && (
+                    <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                      Categories will be pre-filled based on type.
+                    </p>
+                  )}
                 </div>
+
+                {/* Name */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Name</span>
+                  <input required autoFocus
+                    placeholder={PROJECT_TYPES.find((t) => t.value === form.type)?.placeholder ?? 'Project name'}
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    className="px-3 py-2.5 text-sm outline-none rounded-xl w-full" style={inputStyle} />
+                </div>
+
+                {/* Description + Purchase Price (hidden for service) */}
+                <div className={`grid gap-3 ${form.type === 'service' ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                      Description <span style={{ opacity: 0.5, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                    </span>
+                    <input placeholder="Short note…" value={form.description}
+                      onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                      className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
+                  </div>
+                  {form.type !== 'service' && (
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                        {form.type === 'property' ? 'Purchase Price' : form.type === 'vehicle' ? 'Purchase Price' : 'Initial Investment'}
+                      </span>
+                      <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.10)' }}>
+                        <span className="flex items-center px-2.5 text-xs font-semibold shrink-0"
+                          style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)', borderRight: '1px solid rgba(255,255,255,0.08)' }}>$</span>
+                        <input type="number" step="0.01" min="0" placeholder="0.00" value={form.purchasePrice}
+                          onChange={(e) => setForm((f) => ({ ...f, purchasePrice: e.target.value }))}
+                          className="flex-1 px-3 py-2.5 text-sm outline-none min-w-0"
+                          style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-primary)' }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Date + Color */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                      {form.type === 'service' ? 'Start Date' : 'Purchase Date'}
+                    </span>
+                    <input type="date" value={form.purchaseDate}
+                      onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))}
+                      className="px-3 py-2.5 text-sm outline-none rounded-xl w-full" style={{ ...inputStyle, colorScheme: 'dark' }} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</span>
+                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl h-[42px]" style={inputStyle}>
+                      {PRESET_COLORS.map((c) => (
+                        <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
+                          className="w-4 h-4 rounded-full transition-all hover:scale-110 shrink-0"
+                          style={{ background: c, boxShadow: form.color === c ? `0 0 0 2px rgba(0,0,0,0.6), 0 0 0 4px ${c}` : 'none' }} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
               </div>
 
-              <div className="flex gap-2 justify-end pt-1">
+              {/* Footer */}
+              <div className="flex gap-2 justify-end px-5 py-4"
+                style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
                 <button type="button" onClick={closeForm}
-                  className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10"
-                  style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+                  style={{ color: 'var(--color-text-secondary)' }}>
                   Cancel
                 </button>
                 <button type="submit" disabled={saving}
-                  className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60"
-                  style={{ background: 'var(--color-card-violet)' }}>
+                  className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
+                  style={{ background: form.color }}>
                   {saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Project'}
                 </button>
               </div>

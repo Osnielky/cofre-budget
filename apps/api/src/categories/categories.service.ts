@@ -43,11 +43,9 @@ export class CategoriesService {
   async findAllByUser(userId: string): Promise<Category[]> {
     const existing = await this.repo.find({ where: { userId }, order: { isDefault: 'DESC', createdAt: 'ASC' } });
 
-    const existingNames = new Set(existing.map((c) => c.name));
-    const missing = DEFAULTS.filter((d) => !existingNames.has(d.name));
-
-    if (missing.length > 0) {
-      const entities = missing.map((d) => this.repo.create({ ...d, userId, isDefault: true }));
+    // Only seed on first visit — never re-add deleted categories
+    if (existing.length === 0) {
+      const entities = DEFAULTS.map((d) => this.repo.create({ ...d, userId, isDefault: true }));
       await this.repo.save(entities);
       return this.repo.find({ where: { userId }, order: { isDefault: 'DESC', createdAt: 'ASC' } });
     }

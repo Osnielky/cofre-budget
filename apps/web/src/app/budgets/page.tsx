@@ -53,6 +53,7 @@ export default function BudgetsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [form, setForm]         = useState({ categoryId: '', amount: '' });
   const [sort, setSort]         = useState<'pct' | 'spent' | 'name'>('pct');
+  const [catDropOpen, setCatDropOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -417,68 +418,130 @@ export default function BudgetsPage() {
         {/* ── Add / Edit modal ── */}
         {showForm && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
-            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowForm(false); setEditingId(null); } }}>
-            <form onSubmit={handleSubmit}
-              className="w-full max-w-md flex flex-col gap-5 p-6 rounded-2xl"
-              style={{ background: 'rgba(22,22,36,0.98)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+            style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
+            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowForm(false); setEditingId(null); setCatDropOpen(false); } }}>
+            {(() => {
+              const selCat   = categories.find((c) => c.id === form.categoryId);
+              const accent   = selCat?.color ?? '#9B6DFF';
+              const amt      = parseFloat(form.amount) || 0;
+              const quickAmts = [100, 250, 500, 1000];
+              return (
+                <form onSubmit={handleSubmit}
+                  className="w-full max-w-md flex flex-col rounded-2xl"
+                  style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
 
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-base">{editingId ? 'Edit Budget' : 'New Budget'}</p>
-                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{monthLabel(month)}</p>
-                </div>
-                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 text-lg leading-none"
-                  style={{ color: 'var(--color-text-muted)' }}>
-                  ✕
-                </button>
-              </div>
+                  {/* Preview header */}
+                  <div className="px-5 py-4 flex items-center justify-between gap-3 rounded-t-2xl overflow-hidden"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: `linear-gradient(135deg, ${accent}12 0%, transparent 60%)` }}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
+                        style={{ background: `${accent}22`, boxShadow: `0 0 0 1px ${accent}44` }}>
+                        {selCat?.icon ?? '🎯'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-sm" style={{ color: selCat ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                          {selCat?.name ?? (editingId ? 'Edit Budget' : 'New Budget')}
+                        </p>
+                        <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                          {amt > 0 ? `$${amt.toLocaleString()} / month · ${monthLabel(month)}` : monthLabel(month)}
+                        </p>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); }}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 shrink-0"
+                      style={{ color: 'var(--color-text-muted)' }}>✕</button>
+                  </div>
 
-              {/* Category */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Category</span>
-                <select required value={form.categoryId}
-                  onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
-                  disabled={!!editingId}
-                  className="px-3 py-2.5 text-sm outline-none appearance-none rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: form.categoryId ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                  <option value="">Select a category…</option>
-                  {available.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-                </select>
-              </div>
+                  <div className="flex flex-col gap-4 px-5 py-4">
 
-              {/* Amount */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Monthly Limit</span>
-                <div className="flex">
-                  <span className="flex items-center px-3 text-sm"
-                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', borderRight: 'none', borderRadius: '12px 0 0 12px', color: 'var(--color-text-muted)' }}>
-                    $
-                  </span>
-                  <input required type="number" step="0.01" min="1" placeholder="0.00"
-                    value={form.amount}
-                    onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
-                    className="flex-1 px-3 py-2.5 text-sm outline-none"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', borderLeft: 'none', borderRadius: '0 12px 12px 0', color: 'var(--color-text-primary)' }} />
-                </div>
-              </div>
+                    {/* Category picker */}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Category</span>
+                      <div style={{ position: 'relative' }}>
+                        <button type="button" disabled={!!editingId}
+                          onClick={() => setCatDropOpen((o) => !o)}
+                          className="w-full px-3 py-2.5 text-sm flex items-center gap-2.5 rounded-xl outline-none text-left disabled:opacity-60"
+                          style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${selCat ? accent + '44' : 'rgba(255,255,255,0.10)'}`, color: selCat ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                          {selCat ? (
+                            <>
+                              <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                style={{ background: `${accent}20` }}>{selCat.icon}</span>
+                              <span className="flex-1 font-medium" style={{ color: accent }}>{selCat.name}</span>
+                            </>
+                          ) : (
+                            <span className="flex-1">Select a category…</span>
+                          )}
+                          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0, transition: 'transform .15s', transform: catDropOpen ? 'rotate(180deg)' : undefined }}>
+                            <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        {catDropOpen && (
+                          <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
+                            style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 10, maxHeight: '50vh' }}>
+                            {available.map((c) => (
+                              <button key={c.id} type="button"
+                                onClick={() => { setForm((f) => ({ ...f, categoryId: c.id })); setCatDropOpen(false); }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                                style={{ background: form.categoryId === c.id ? `${c.color}18` : 'transparent', color: form.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = `${c.color}12`)}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = form.categoryId === c.id ? `${c.color}18` : 'transparent')}>
+                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                  style={{ background: `${c.color}20` }}>{c.icon}</span>
+                                <span className="font-medium">{c.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-              {/* Actions */}
-              <div className="flex gap-2 justify-end pt-1">
-                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }}
-                  className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10"
-                  style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  Cancel
-                </button>
-                <button type="submit"
-                  className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110"
-                  style={{ background: 'var(--color-card-violet)' }}>
-                  {editingId ? 'Save Changes' : 'Create Budget'}
-                </button>
-              </div>
-            </form>
+                    {/* Amount */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Monthly Limit</span>
+                      <div className="flex rounded-xl overflow-hidden" style={{ border: `1px solid ${amt > 0 ? accent + '55' : 'rgba(255,255,255,0.10)'}`, transition: 'border-color .2s' }}>
+                        <span className="flex items-center px-3 text-sm font-semibold shrink-0"
+                          style={{ background: 'rgba(255,255,255,0.06)', color: amt > 0 ? accent : 'var(--color-text-muted)', borderRight: '1px solid rgba(255,255,255,0.08)', transition: 'color .2s' }}>$</span>
+                        <input required type="number" step="0.01" min="1" placeholder="0.00"
+                          autoFocus={!!editingId}
+                          value={form.amount}
+                          onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                          className="flex-1 px-3 py-2.5 text-sm outline-none font-semibold"
+                          style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-primary)' }} />
+                      </div>
+                      {/* Quick amounts */}
+                      <div className="flex gap-1.5">
+                        {quickAmts.map((q) => (
+                          <button key={q} type="button"
+                            onClick={() => setForm((f) => ({ ...f, amount: String(q) }))}
+                            className="flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                            style={{
+                              background: Number(form.amount) === q ? `${accent}22` : 'rgba(255,255,255,0.04)',
+                              border: `1px solid ${Number(form.amount) === q ? accent + '44' : 'rgba(255,255,255,0.08)'}`,
+                              color: Number(form.amount) === q ? accent : 'var(--color-text-muted)',
+                            }}>
+                            ${q}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex gap-2 justify-end px-5 py-4 rounded-b-2xl overflow-hidden"
+                    style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                    <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); }}
+                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+                      style={{ color: 'var(--color-text-secondary)' }}>Cancel</button>
+                    <button type="submit"
+                      className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all"
+                      style={{ background: accent }}>
+                      {editingId ? 'Save Changes' : 'Create Budget'}
+                    </button>
+                  </div>
+                </form>
+              );
+            })()}
           </div>,
           document.body
         )}

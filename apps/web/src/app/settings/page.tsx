@@ -371,7 +371,7 @@ export default function SettingsPage() {
                             }}>
                               {(Object.entries(TYPE_META) as [AccountType, typeof TYPE_META[AccountType]][]).map(([val, meta]) => (
                                 <button key={val} type="button"
-                                  onClick={() => { setForm((f) => ({ ...f, accountType: val })); setTypeOpen(false); }}
+                                  onClick={() => { setForm((f) => ({ ...f, accountType: val, bankName: val === 'cash' ? 'Personal' : f.bankName, accountName: val === 'cash' && !f.accountName ? 'My Cash' : f.accountName })); setTypeOpen(false); }}
                                   className="w-full px-3 py-2.5 text-sm text-left flex items-center gap-2.5 transition-colors"
                                   style={{ color: form.accountType === val ? meta.accent : 'var(--color-text-primary)', background: form.accountType === val ? `${meta.accent}18` : 'transparent' }}
                                   onMouseEnter={(e) => (e.currentTarget.style.background = `${meta.accent}15`)}
@@ -393,7 +393,8 @@ export default function SettingsPage() {
                         </div>
                       </div>
 
-                      {/* Bank */}
+                      {/* Bank — hidden for cash */}
+                      {form.accountType !== 'cash' && (
                       <div className="flex flex-col gap-1.5">
                         <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                           {form.accountType === 'loan' ? 'Institution or Person' : 'Bank'}
@@ -407,6 +408,7 @@ export default function SettingsPage() {
                             inputStyle={{ ...inputStyle, borderRadius: '0.75rem' }} />
                         )}
                       </div>
+                      )}
 
                       {/* Account Name + Last 4 */}
                       <div className="flex gap-3">
@@ -420,6 +422,7 @@ export default function SettingsPage() {
                             onChange={(e) => setForm((f) => ({ ...f, accountName: e.target.value }))}
                             className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
                         </div>
+                        {form.accountType !== 'cash' && (
                         <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 84 }}>
                           <label className="text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                             Last 4
@@ -439,6 +442,7 @@ export default function SettingsPage() {
                             onChange={(e) => setForm((f) => ({ ...f, last4: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
                             className="px-3 py-2.5 text-sm outline-none text-center tracking-[0.3em] rounded-xl" style={inputStyle} />
                         </div>
+                        )}
                       </div>
 
                       {/* Balance + Color */}

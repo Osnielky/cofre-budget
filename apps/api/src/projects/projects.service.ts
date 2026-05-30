@@ -74,6 +74,17 @@ const DEFAULT_CATEGORIES: Record<string, { name: string; icon: string; color: st
     { name: 'Revenue',    icon: '💰', color: '#4FBF7F', type: 'income'  },
     { name: 'Sale Income',icon: '💵', color: '#4FBF7F', type: 'income'  },
   ],
+  service: [
+    { name: 'Revenue',         icon: '💼', color: '#4FBF7F', type: 'income'  },
+    { name: 'Tips',            icon: '💵', color: '#4FBF7F', type: 'income'  },
+    { name: 'Bonuses',         icon: '🎯', color: '#4FBF7F', type: 'income'  },
+    { name: 'Fuel',            icon: '⛽', color: '#F07A3E', type: 'expense' },
+    { name: 'Contractors',     icon: '👷', color: '#F5C842', type: 'expense' },
+    { name: 'Software & Tools',icon: '💻', color: '#9B6DFF', type: 'expense' },
+    { name: 'Marketing',       icon: '📢', color: '#E879A0', type: 'expense' },
+    { name: 'Supplies',        icon: '📦', color: '#4BA8D8', type: 'expense' },
+    { name: 'Legal & Fees',    icon: '⚖️', color: '#5C5C78', type: 'expense' },
+  ],
   other: [
     { name: 'Materials',  icon: '📦', color: '#F07A3E', type: 'expense' },
     { name: 'Labor',      icon: '👷', color: '#F5C842', type: 'expense' },

@@ -108,6 +108,8 @@ export default function TransactionsPage() {
   const [newCatForTxId, setNewCatForTxId]     = useState<string | null>(null);
   const [showManualTx, setShowManualTx]   = useState(false);
   const [manualTxSaving, setManualTxSaving] = useState(false);
+  const [manualAccOpen, setManualAccOpen] = useState(false);
+  const [manualCatOpen, setManualCatOpen] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
   const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '' });
 
@@ -195,11 +197,11 @@ export default function TransactionsPage() {
       fetch(`${API}/projects`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/transactions/category-hints`, { credentials: 'include' }).then((r) => r.json()),
     ]).then(([cats, accs, projs, hints]) => {
-      setCategories(cats);
-      setAccounts(accs);
+      setCategories(Array.isArray(cats) ? cats : []);
+      setAccounts(Array.isArray(accs) ? accs : []);
       setProjects(Array.isArray(projs) ? projs : []);
       if (hints && typeof hints === 'object') setCategoryHints(hints);
-    });
+    }).catch(() => {});
   }, []);
 
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
@@ -1515,115 +1517,169 @@ export default function TransactionsPage() {
         {/* Manual transaction modal */}
         {showManualTx && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
-            onMouseDown={(e) => { if (e.target === e.currentTarget) setShowManualTx(false); }}>
-            <form onSubmit={saveManualTx}
-              className="w-full max-w-md flex flex-col gap-5 p-6 rounded-2xl"
-              style={{ background: 'rgba(22,22,36,0.98)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+            style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
+            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowManualTx(false); setManualAccOpen(false); setManualCatOpen(false); } }}>
+            {(() => {
+              const isExpense  = manualTx.sign === '-';
+              const accent     = isExpense ? '#F07A3E' : '#4FBF7F';
+              const selAcc     = accounts.find((a) => a.id === manualTx.bankAccountId);
+              const selCat     = categories.find((c) => c.id === manualTx.categoryId);
+              const catOptions = categories.filter((c) => c.type === (isExpense ? 'expense' : 'income') || c.type === 'both');
+              const amt        = parseFloat(manualTx.amountStr) || 0;
+              return (
+                <form onSubmit={saveManualTx}
+                  className="w-full max-w-md flex flex-col rounded-2xl"
+                  style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
 
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <p className="font-bold text-base">New Transaction</p>
-                <button type="button" onClick={() => setShowManualTx(false)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10"
-                  style={{ color: 'var(--color-text-muted)' }}>
-                  <CloseIcon />
-                </button>
-              </div>
+                  {/* Hero header */}
+                  <div className="flex flex-col items-center gap-3 px-6 pt-6 pb-5 rounded-t-2xl"
+                    style={{ background: `linear-gradient(160deg, ${accent}14 0%, transparent 60%)`, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                    <div className="flex items-center justify-between w-full">
+                      {/* Type toggle */}
+                      <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '-', categoryId: '' }))}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                          style={{ background: isExpense ? '#F07A3E22' : 'transparent', color: isExpense ? '#F07A3E' : 'var(--color-text-muted)', border: isExpense ? '1px solid #F07A3E44' : '1px solid transparent' }}>
+                          − Expense
+                        </button>
+                        <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '+', categoryId: '' }))}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                          style={{ background: !isExpense ? '#4FBF7F22' : 'transparent', color: !isExpense ? '#4FBF7F' : 'var(--color-text-muted)', border: !isExpense ? '1px solid #4FBF7F44' : '1px solid transparent' }}>
+                          + Income
+                        </button>
+                      </div>
+                      <button type="button" onClick={() => setShowManualTx(false)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10"
+                        style={{ color: 'var(--color-text-muted)' }}>
+                        <CloseIcon />
+                      </button>
+                    </div>
+                    {/* Big amount */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-2xl font-black" style={{ color: accent }}>{isExpense ? '−' : '+'}</span>
+                      <span className="text-3xl font-black" style={{ color: accent }}>$</span>
+                      <input required type="number" min="0.01" step="0.01" placeholder="0.00" autoFocus
+                        value={manualTx.amountStr}
+                        onChange={(e) => setManualTx((f) => ({ ...f, amountStr: e.target.value }))}
+                        className="text-3xl font-black outline-none bg-transparent w-40 text-center"
+                        style={{ color: amt > 0 ? accent : 'var(--color-text-muted)', caretColor: accent }} />
+                    </div>
+                    {/* Description inline */}
+                    <input placeholder="What was this for?" value={manualTx.name}
+                      onChange={(e) => setManualTx((f) => ({ ...f, name: e.target.value }))}
+                      className="text-sm text-center outline-none bg-transparent w-full"
+                      style={{ color: manualTx.name ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }} />
+                  </div>
 
-              {/* Description */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Description</span>
-                <input required placeholder="e.g. Grocery run, Coffee…" value={manualTx.name}
-                  onChange={(e) => setManualTx((f) => ({ ...f, name: e.target.value }))}
-                  className="px-3 py-2.5 text-sm outline-none rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)' }} />
-              </div>
+                  <div className="flex flex-col gap-3 px-5 py-4">
 
-              {/* Amount row */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Amount</span>
-                <div className="flex gap-2">
-                  {/* Expense / Income toggle */}
-                  <div className="flex rounded-xl overflow-hidden shrink-0"
-                    style={{ border: '1px solid rgba(255,255,255,0.10)' }}>
-                    <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '-', categoryId: '' }))}
-                      className="px-3 py-2.5 text-sm font-semibold transition-colors"
-                      style={{ background: manualTx.sign === '-' ? 'rgba(240,122,62,0.2)' : 'transparent',
-                               color: manualTx.sign === '-' ? '#F07A3E' : 'var(--color-text-muted)' }}>
-                      − Expense
-                    </button>
-                    <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '+', categoryId: '' }))}
-                      className="px-3 py-2.5 text-sm font-semibold transition-colors"
-                      style={{ background: manualTx.sign === '+' ? 'rgba(79,191,127,0.2)' : 'transparent',
-                               color: manualTx.sign === '+' ? '#4FBF7F' : 'var(--color-text-muted)',
-                               borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
-                      + Income
+                    {/* Date + Account */}
+                    <div className="flex gap-3">
+                      <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Date</span>
+                        <input required type="date" value={manualTx.date}
+                          onChange={(e) => setManualTx((f) => ({ ...f, date: e.target.value }))}
+                          className="px-3 py-2.5 text-sm outline-none rounded-xl w-full"
+                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)', colorScheme: 'dark' }} />
+                      </div>
+                      <div className="flex flex-col gap-1.5 flex-1 min-w-0" style={{ position: 'relative' }}>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Account</span>
+                        <button type="button" onClick={() => { setManualAccOpen((o) => !o); setManualCatOpen(false); }}
+                          className="px-3 py-2.5 text-sm flex items-center gap-2 rounded-xl outline-none text-left w-full"
+                          style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${selAcc ? (selAcc.color || accent) + '55' : 'rgba(255,255,255,0.10)'}`, color: selAcc ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                          {selAcc ? (
+                            <>
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: selAcc.color || accent }} />
+                              <span className="flex-1 truncate text-xs">{selAcc.accountName}</span>
+                            </>
+                          ) : <span className="flex-1 text-xs">Select…</span>}
+                          <svg width="8" height="8" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
+                            <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        {manualAccOpen && (
+                          <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
+                            style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 60, maxHeight: 200 }}>
+                            {accounts.map((a) => (
+                              <button key={a.id} type="button"
+                                onClick={() => { setManualTx((f) => ({ ...f, bankAccountId: a.id })); setManualAccOpen(false); }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left"
+                                style={{ background: manualTx.bankAccountId === a.id ? `${a.color || accent}18` : 'transparent', color: 'var(--color-text-primary)' }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = `${a.color || accent}12`)}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.bankAccountId === a.id ? `${a.color || accent}18` : 'transparent')}>
+                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: a.color || '#9B6DFF' }} />
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium truncate">{a.accountName}</p>
+                                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.bankName}</p>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Category */}
+                    <div className="flex flex-col gap-1.5" style={{ position: 'relative' }}>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                        Category <span style={{ opacity: 0.5, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                      </span>
+                      <button type="button" onClick={() => { setManualCatOpen((o) => !o); setManualAccOpen(false); }}
+                        className="px-3 py-2.5 text-sm flex items-center gap-2.5 rounded-xl outline-none text-left w-full"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${selCat ? selCat.color + '44' : 'rgba(255,255,255,0.10)'}`, color: selCat ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                        {selCat ? (
+                          <>
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${selCat.color}20` }}>{selCat.icon}</span>
+                            <span className="flex-1 font-medium" style={{ color: selCat.color }}>{selCat.name}</span>
+                          </>
+                        ) : <span className="flex-1">Uncategorized</span>}
+                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
+                          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      {manualCatOpen && (
+                        <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
+                          style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 60, maxHeight: 220 }}>
+                          <button type="button" onClick={() => { setManualTx((f) => ({ ...f, categoryId: '' })); setManualCatOpen(false); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
+                            style={{ color: 'var(--color-text-muted)' }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }}>—</span>
+                            Uncategorized
+                          </button>
+                          {catOptions.map((c) => (
+                            <button key={c.id} type="button"
+                              onClick={() => { setManualTx((f) => ({ ...f, categoryId: c.id })); setManualCatOpen(false); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                              style={{ background: manualTx.categoryId === c.id ? `${c.color}18` : 'transparent', color: manualTx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = `${c.color}12`)}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.categoryId === c.id ? `${c.color}18` : 'transparent')}>
+                              <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${c.color}20` }}>{c.icon}</span>
+                              <span className="font-medium">{c.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex gap-2 justify-end px-5 py-4 rounded-b-2xl"
+                    style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                    <button type="button" onClick={() => setShowManualTx(false)}
+                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+                      style={{ color: 'var(--color-text-secondary)' }}>Cancel</button>
+                    <button type="submit" disabled={manualTxSaving}
+                      className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
+                      style={{ background: accent }}>
+                      {manualTxSaving ? 'Saving…' : 'Add Transaction'}
                     </button>
                   </div>
-                  <input required type="number" min="0.01" step="0.01" placeholder="0.00"
-                    value={manualTx.amountStr}
-                    onChange={(e) => setManualTx((f) => ({ ...f, amountStr: e.target.value }))}
-                    className="flex-1 px-3 py-2.5 text-sm outline-none rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)' }} />
-                </div>
-              </div>
-
-              {/* Date + Account */}
-              <div className="flex gap-3">
-                <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Date</span>
-                  <input required type="date" value={manualTx.date}
-                    onChange={(e) => setManualTx((f) => ({ ...f, date: e.target.value }))}
-                    className="px-3 py-2.5 text-sm outline-none rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)', colorScheme: 'dark' }} />
-                </div>
-                <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Account</span>
-                  <select required value={manualTx.bankAccountId}
-                    onChange={(e) => setManualTx((f) => ({ ...f, bankAccountId: e.target.value }))}
-                    className="px-3 py-2.5 text-sm outline-none appearance-none rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: manualTx.bankAccountId ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                    <option value="">Select account…</option>
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>{a.bankName} — {a.accountName}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Category (optional) */}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-                  Category <span className="opacity-50">(optional)</span>
-                </span>
-                <select value={manualTx.categoryId}
-                  onChange={(e) => setManualTx((f) => ({ ...f, categoryId: e.target.value }))}
-                  className="px-3 py-2.5 text-sm outline-none appearance-none rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: manualTx.categoryId ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                  <option value="">Uncategorized</option>
-                  {categories
-                    .filter((c) => c.type === (manualTx.sign === '+' ? 'income' : 'expense'))
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-                    ))}
-                </select>
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2 justify-end pt-1">
-                <button type="button" onClick={() => setShowManualTx(false)}
-                  className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10"
-                  style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  Cancel
-                </button>
-                <button type="submit" disabled={manualTxSaving}
-                  className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60"
-                  style={{ background: 'var(--color-card-violet)' }}>
-                  {manualTxSaving ? 'Saving…' : 'Add Transaction'}
-                </button>
-              </div>
-            </form>
+                </form>
+              );
+            })()}
           </div>,
           document.body
         )}
