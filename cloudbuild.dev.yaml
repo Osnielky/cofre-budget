@@ -1,0 +1,89 @@
+substitutions:
+  _REGION: us-central1
+  _PROJECT: cofre-dev          # ← replace with your GCP dev project ID
+  _API_IMAGE: gcr.io/$_PROJECT/cofre-api
+  _WEB_IMAGE: gcr.io/$_PROJECT/cofre-web
+  _API_SERVICE: cofre-api
+  _WEB_SERVICE: cofre-web
+  _API_URL: https://cofre-api-XXXXXXXX-uc.a.run.app   # ← update after first API deploy
+
+steps:
+
+  # ── 1. Build API image ────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: build-api
+    args:
+      - build
+      - -f
+      - apps/api/Dockerfile
+      - -t
+      - $_API_IMAGE:$SHORT_SHA
+      - -t
+      - $_API_IMAGE:latest
+      - .
+
+  # ── 2. Push API image ─────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: push-api
+    waitFor: [build-api]
+    args: [push, --all-tags, $_API_IMAGE]
+
+  # ── 3. Deploy API to Cloud Run ────────────────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-api
+    waitFor: [push-api]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - $_API_SERVICE
+      - --image=$_API_IMAGE:$SHORT_SHA
+      - --region=$_REGION
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=3333
+      - --set-secrets=DB_HOST=DB_HOST:latest,DB_PORT=DB_PORT:latest,DB_USER=DB_USER:latest,DB_PASS=DB_PASS:latest,DB_NAME=DB_NAME_DEV:latest,JWT_SECRET=JWT_SECRET:latest,JWT_EXPIRES_IN=JWT_EXPIRES_IN:latest,FRONTEND_URL=FRONTEND_URL_DEV:latest
+
+  # ── 4. Build Web image ────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: build-web
+    waitFor: [deploy-api]
+    args:
+      - build
+      - -f
+      - apps/web/Dockerfile
+      - --build-arg
+      - NEXT_PUBLIC_API_URL=$_API_URL/api
+      - -t
+      - $_WEB_IMAGE:$SHORT_SHA
+      - -t
+      - $_WEB_IMAGE:latest
+      - .
+
+  # ── 5. Push Web image ─────────────────────────────────────────────
+  - name: gcr.io/cloud-builders/docker
+    id: push-web
+    waitFor: [build-web]
+    args: [push, --all-tags, $_WEB_IMAGE]
+
+  # ── 6. Deploy Web to Cloud Run ────────────────────────────────────
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: deploy-web
+    waitFor: [push-web]
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - $_WEB_SERVICE
+      - --image=$_WEB_IMAGE:$SHORT_SHA
+      - --region=$_REGION
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=3000
+
+images:
+  - $_API_IMAGE:$SHORT_SHA
+  - $_WEB_IMAGE:$SHORT_SHA
+
+options:
+  logging: CLOUD_LOGGING_ONLY
