@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
 import { Transaction } from './transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
+import { ProjectCategory } from '../projects/project-category.entity';
 
 export interface CsvRow {
   date: string;        // MM/DD/YYYY or YYYY-MM-DD
@@ -16,6 +17,7 @@ export class TransactionsService {
   constructor(
     @InjectRepository(Transaction) private repo: Repository<Transaction>,
     @InjectRepository(BankAccount) private accountRepo: Repository<BankAccount>,
+    @InjectRepository(ProjectCategory) private projCatRepo: Repository<ProjectCategory>,
   ) {}
 
   async getCategoryHints(userId: string): Promise<Record<string, { id: string; name: string; icon: string; color: string }>> {
@@ -29,12 +31,46 @@ export class TransactionsService {
       .limit(2000)
       .getMany();
 
+    const normalize = (n: string) => n.replace(/\s+(?:conf#\S+|[A-Z0-9]{6,})$/i, '').trim();
+
     const hints: Record<string, { id: string; name: string; icon: string; color: string }> = {};
     for (const tx of txs) {
-      if (!hints[tx.name] && tx.categoryRef) {
-        const { id, name, icon, color } = tx.categoryRef;
-        hints[tx.name] = { id, name, icon, color };
+      if (!tx.categoryRef) continue;
+      const { id, name, icon, color } = tx.categoryRef;
+      // Store under exact name AND normalized name so both lookups hit
+      if (!hints[tx.name]) hints[tx.name] = { id, name, icon, color };
+      const norm = normalize(tx.name);
+      if (norm && !hints[norm]) hints[norm] = { id, name, icon, color };
+    }
+    return hints;
+  }
+
+  async getProjectHints(userId: string): Promise<Record<string, { projectId: string; projectCategoryId: string; catName: string; catIcon: string; catColor: string }>> {
+    const txs = await this.repo
+      .createQueryBuilder('tx')
+      .where('tx.userId = :userId', { userId })
+      .andWhere('tx.projectId IS NOT NULL')
+      .andWhere('tx.projectCategoryId IS NOT NULL')
+      .orderBy('tx.date', 'DESC')
+      .limit(2000)
+      .getMany();
+
+    const normalize = (n: string) => n.replace(/\s+(?:conf#\S+|[A-Z0-9]{6,})$/i, '').trim();
+    const catCache: Record<string, ProjectCategory> = {};
+
+    const hints: Record<string, { projectId: string; projectCategoryId: string; catName: string; catIcon: string; catColor: string }> = {};
+    for (const tx of txs) {
+      if (!tx.projectCategoryId) continue;
+      if (!catCache[tx.projectCategoryId]) {
+        const cat = await this.projCatRepo.findOneBy({ id: tx.projectCategoryId });
+        if (cat) catCache[tx.projectCategoryId] = cat;
       }
+      const cat = catCache[tx.projectCategoryId];
+      if (!cat) continue;
+      const entry = { projectId: tx.projectId, projectCategoryId: tx.projectCategoryId, catName: cat.name, catIcon: cat.icon, catColor: cat.color };
+      if (!hints[tx.name]) hints[tx.name] = entry;
+      const norm = normalize(tx.name);
+      if (norm && !hints[norm]) hints[norm] = entry;
     }
     return hints;
   }
@@ -121,7 +157,7 @@ export class TransactionsService {
     };
   }
 
-  async importCsv(userId: string, bankAccountId: string, rows: CsvRow[]): Promise<{ imported: number; skipped: number }> {
+  async importCsv(userId: string, bankAccountId: string, rows: CsvRow[], finalBalance?: number): Promise<{ imported: number; skipped: number; balanceUpdated?: boolean }> {
     const account = await this.accountRepo.findOneBy({ id: bankAccountId });
     if (!account || account.userId !== userId) throw new ForbiddenException();
 
@@ -161,7 +197,30 @@ export class TransactionsService {
       imported++;
     }
 
-    return { imported, skipped };
+    let balanceUpdated = false;
+
+    if (imported > 0) {
+      if (finalBalance !== undefined && !isNaN(finalBalance)) {
+        // CSV had an explicit balance column (e.g. BofA checking "Running Bal.")
+        account.balance = finalBalance;
+        await this.accountRepo.save(account);
+        balanceUpdated = true;
+      } else if (['credit', 'loan'].includes(account.accountType)) {
+        // Credit/loan: recalculate balance as total amount owed from all transactions
+        const raw = await this.repo
+          .createQueryBuilder('tx')
+          .select('COALESCE(SUM(tx.amount), 0)', 'total')
+          .where('tx.bankAccountId = :bankAccountId', { bankAccountId })
+          .getRawOne<{ total: string }>();
+        const total = parseFloat(raw?.total ?? '0');
+        // Expenses are negative, payments are positive → owed = -total
+        account.balance = parseFloat((-total).toFixed(2));
+        await this.accountRepo.save(account);
+        balanceUpdated = true;
+      }
+    }
+
+    return { imported, skipped, balanceUpdated };
   }
 
   async createManual(userId: string, dto: {
@@ -184,6 +243,26 @@ export class TransactionsService {
         categoryId: dto.categoryId ?? undefined,
       }),
     );
+    return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'bankAccount'] });
+  }
+
+  async updateManual(id: string, userId: string, dto: {
+    name?: string; amount?: number; date?: string; bankAccountId?: string | null;
+  }): Promise<Transaction> {
+    const tx = await this.repo.findOneBy({ id, userId });
+    if (!tx) throw new NotFoundException();
+    if (tx.source !== 'manual') throw new BadRequestException('Only manual transactions can be edited');
+    if (dto.bankAccountId !== undefined) {
+      if (dto.bankAccountId) {
+        const account = await this.accountRepo.findOneBy({ id: dto.bankAccountId });
+        if (!account || account.userId !== userId) throw new ForbiddenException();
+      }
+      tx.bankAccountId = dto.bankAccountId ?? undefined;
+    }
+    if (dto.name !== undefined) tx.name = dto.name;
+    if (dto.amount !== undefined) tx.amount = dto.amount;
+    if (dto.date !== undefined) tx.date = dto.date;
+    const saved = await this.repo.save(tx);
     return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'bankAccount'] });
   }
 

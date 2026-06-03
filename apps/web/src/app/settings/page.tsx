@@ -7,7 +7,7 @@ import Sidebar from '@/components/Sidebar';
 import CsvImportModal from '@/components/CsvImportModal';
 import CategoryManager from '@/components/CategoryManager';
 import ProjectCategoryManager from '@/components/ProjectCategoryManager';
-import BankSelect from '@/components/BankSelect';
+import BankSelect, { BANKS } from '@/components/BankSelect';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import DataResetModal from '@/components/DataResetModal';
 
@@ -449,7 +449,7 @@ export default function SettingsPage() {
                       <div className="flex gap-3">
                         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                           <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                            {form.accountType === 'loan' ? 'Amount Owed' : 'Balance'}
+                            {form.accountType === 'loan' ? 'Amount Owed' : form.accountType === 'credit' ? 'Current Debt' : 'Balance'}
                           </label>
                           <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
                             <span className="flex items-center px-3 text-xs font-semibold shrink-0"
@@ -514,44 +514,77 @@ export default function SettingsPage() {
               ) : (
                 <div className="flex flex-col gap-2">
                   {accounts.map((account) => {
-                    const meta = TYPE_META[account.accountType as AccountType] ?? TYPE_META.checking;
-                    const color = account.color || meta.accent;
-                    const balance = Number(account.balance);
+                    const meta       = TYPE_META[account.accountType as AccountType] ?? TYPE_META.checking;
+                    const color      = account.color || meta.accent;
+                    const balance    = Number(account.balance);
+                    const isDebt     = ['credit', 'loan'].includes(account.accountType);
                     const isConnected = account.provider === 'plaid';
+                    const bankMeta   = BANKS.find((b) => b.name === account.bankName);
+                    const isCash     = account.accountType === 'cash';
+
                     return (
                       <div key={account.id}
-                        className="flex items-center gap-4 p-4 transition-colors hover:bg-white/2"
-                        style={{ ...glass, borderRadius: 'var(--radius-card)', borderLeft: `3px solid ${color}` }}>
-                        <div className="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center"
-                          style={{ background: `rgba(${hexToRgb(color)}, 0.15)`, color }}>
-                          <AccountTypeIcon type={account.accountType} size={20} />
+                        className="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all hover:brightness-110"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}28`, borderLeft: `3px solid ${color}` }}>
+
+                        {/* Mini card visual */}
+                        <div className="shrink-0 w-14 h-10 rounded-xl flex flex-col items-center justify-center relative overflow-hidden"
+                          style={{ background: `linear-gradient(135deg, ${color}55 0%, ${color}22 100%)`, border: `1px solid ${color}44` }}>
+                          {isCash ? (
+                            <span className="text-xl">💵</span>
+                          ) : bankMeta ? (
+                            <img src={`https://logo.clearbit.com/${bankMeta.domain}`}
+                              alt={account.bankName} width={28} height={28}
+                              style={{ objectFit: 'contain', borderRadius: 4, background: 'white', padding: 2 }}
+                              onError={(e) => {
+                                const img = e.currentTarget;
+                                img.src = `https://www.google.com/s2/favicons?domain=${bankMeta.domain}&sz=64`;
+                                img.style.background = 'transparent';
+                                img.style.padding = '0';
+                              }} />
+                          ) : (
+                            <AccountTypeIcon type={account.accountType} size={22} />
+                          )}
+                          {account.last4 && (
+                            <span className="text-[8px] font-bold tracking-widest leading-none mt-0.5"
+                              style={{ color: 'rgba(255,255,255,0.7)' }}>
+                              ···{account.last4}
+                            </span>
+                          )}
                         </div>
 
+                        {/* Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm truncate">{account.bankName}</span>
+                            <span className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>
+                              {account.accountName}
+                            </span>
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                              style={{ background: `rgba(${hexToRgb(meta.accent)},0.15)`, color: meta.accent }}>
+                              style={{ background: `${meta.accent}18`, color: meta.accent }}>
                               {meta.label}
                             </span>
                             {isConnected && (
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1"
                                 style={{ background: 'rgba(79,191,127,0.12)', color: '#4FBF7F' }}>
-                                <span className="w-1.5 h-1.5 rounded-full bg-card-green inline-block" />
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#4FBF7F' }} />
                                 Synced
                               </span>
                             )}
                           </div>
-                          <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
-                            {account.accountName}
+                          <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
+                            {account.bankName}{account.currency !== 'USD' ? ` · ${account.currency}` : ''}
                           </p>
                         </div>
 
+                        {/* Balance */}
                         <div className="text-right shrink-0">
-                          <p className="font-bold text-base"
-                            style={{ color: account.accountType === 'credit' && balance > 0 ? 'var(--color-card-orange)' : 'white' }}>
-                            {balance < 0 ? '−' : ''}{account.currency} {Math.abs(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          <p className="font-black text-base tabular-nums"
+                            style={{ color: isDebt && balance > 0 ? '#FF6B6B' : 'var(--color-text-primary)' }}>
+                            {isDebt && balance > 0 ? '−' : ''}{account.currency} {Math.abs(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </p>
+                          {isDebt && balance > 0 && (
+                            <p className="text-[10px] font-semibold" style={{ color: 'rgba(255,107,107,0.6)' }}>owed</p>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-1 ml-1">

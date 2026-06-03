@@ -12,7 +12,6 @@ const NAV = [
   { label: 'Transactions', href: '/transactions', icon: TransactionsIcon },
   { label: 'Budgets',      href: '/budgets',      icon: BudgetsIcon },
   { label: 'Projects',     href: '/projects',     icon: ProjectsIcon },
-  { label: 'Reports',      href: '/reports',      icon: ReportsIcon },
 ];
 
 export default function Sidebar() {

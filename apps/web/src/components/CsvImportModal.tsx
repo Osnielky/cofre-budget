@@ -37,6 +37,7 @@ interface DupCheck { newCount: number; duplicateCount: number; duplicateIds: Set
 
 export default function CsvImportModal({ account, onClose, onImported }: Props) {
   const [rows, setRows]         = useState<CsvRow[]>([]);
+  const [csvBalance, setCsvBalance] = useState<number | undefined>(undefined);
   const [fileName, setFileName] = useState('');
   const [error, setError]       = useState('');
   const [warnings, setWarnings] = useState<Warning[]>([]);
@@ -57,6 +58,8 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
       if (!res.ok) return;
       const data = await res.json();
       setDupCheck({ newCount: data.newCount, duplicateCount: data.duplicateCount, duplicateIds: new Set(data.duplicateExternalIds) });
+    } catch {
+      // network/CORS error — silently skip dup check
     } finally { setDupChecking(false); }
   }
 
@@ -70,9 +73,10 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
     reader.onload = (ev) => {
       try {
         const raw = ev.target?.result as string;
-        const parsed = parseCsv(raw);
+        const { rows: parsed, finalBalance } = parseCsv(raw);
         if (parsed.length === 0) throw new Error('No transactions found in this file.');
         setRows(parsed);
+        setCsvBalance(finalBalance);
         setWarnings(validate(parsed, account, file.name, raw));
         checkDups(parsed);
       } catch (err: any) {
@@ -106,7 +110,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ bankAccountId: account.id, rows }),
+        body: JSON.stringify({ bankAccountId: account.id, rows, finalBalance: csvBalance }),
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -123,209 +127,196 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
   const accIcon     = ACC_ICONS[account.accountType] ?? '🏦';
   const accLabel    = `${account.bankName} — ${account.accountName}`;
 
+  const newCount = dupCheck ? dupCheck.newCount : rows.length;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
 
-      <div className="w-full max-w-2xl flex flex-col gap-5 p-6 rounded-2xl" style={glass}>
+      <div className="w-full max-w-xl flex flex-col rounded-2xl overflow-hidden"
+        style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)', maxHeight: '90vh' }}>
 
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="font-bold text-base">Import Transactions</h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              Upload a CSV exported from your bank
-            </p>
+        <div className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: `linear-gradient(135deg, ${account.color}10 0%, transparent 50%)` }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+              style={{ background: `${account.color}22`, boxShadow: `0 0 0 1px ${account.color}44` }}>
+              {accIcon}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>Importing into</p>
+              <p className="text-sm font-bold truncate" style={{ color: account.color }}>{accLabel}</p>
+            </div>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md capitalize shrink-0"
+              style={{ background: `${account.color}20`, color: account.color }}>
+              {account.accountType}
+            </span>
           </div>
           <button onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors shrink-0"
             style={{ color: 'var(--color-text-muted)' }}>✕</button>
         </div>
 
-        {/* Target account */}
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-          style={{ background: `${account.color}12`, border: `1px solid ${account.color}30` }}>
-          <div className="w-9 h-9 rounded-lg flex items-center justify-center text-lg shrink-0"
-            style={{ background: `${account.color}20` }}>
-            {accIcon}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-              Importing into
-            </p>
-            <p className="text-sm font-bold truncate" style={{ color: account.color }}>{accLabel}</p>
-          </div>
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium shrink-0 capitalize"
-            style={{ background: `${account.color}20`, color: account.color }}>
-            {account.accountType}
-          </span>
-        </div>
+        <div className="flex flex-col gap-4 px-5 py-4 overflow-y-auto flex-1">
 
-        {/* File picker / drop zone */}
-        {!result && (
-          <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}>
-            <input ref={inputRef} type="file" accept=".csv,.txt" onChange={handleFile} className="hidden" />
-            <button onClick={() => inputRef.current?.click()} type="button"
-              className="w-full py-8 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 transition-all"
-              style={{
-                borderColor: dragging
-                  ? account.color
-                  : rows.length ? 'rgba(79,191,127,0.4)' : 'rgba(255,255,255,0.12)',
-                background: dragging ? `${account.color}08` : 'transparent',
-                color: 'var(--color-text-secondary)',
-              }}>
-              <span className="text-2xl">{dragging ? '📥' : rows.length ? '✅' : '📂'}</span>
-              <span className="text-sm font-medium">
-                {dragging
-                  ? 'Drop to import'
-                  : rows.length
-                    ? `${rows.length} transactions — ${fileName}`
-                    : 'Click to select or drag & drop a CSV file'}
-              </span>
-              {!rows.length && !dragging && (
-                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  Supports Chase, Bank of America, Wells Fargo and most bank exports
-                </span>
-              )}
-            </button>
-          </div>
-        )}
-
-        {/* Warnings */}
-        {warnings.length > 0 && !result && (
-          <div className="flex flex-col gap-2">
-            {warnings.map((w, i) => (
-              <div key={i} className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-xs"
+          {/* Drop zone */}
+          {!result && (
+            <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+              <input ref={inputRef} type="file" accept=".csv,.txt" onChange={handleFile} className="hidden" />
+              <button onClick={() => inputRef.current?.click()} type="button"
+                className="w-full py-6 rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all"
                 style={{
-                  background: w.level === 'error' ? 'rgba(255,107,107,0.10)' : 'rgba(245,200,66,0.10)',
-                  border: `1px solid ${w.level === 'error' ? 'rgba(255,107,107,0.25)' : 'rgba(245,200,66,0.25)'}`,
-                  color: w.level === 'error' ? '#FF6B6B' : '#F5C842',
+                  borderColor: dragging ? account.color : rows.length ? 'rgba(79,191,127,0.35)' : 'rgba(255,255,255,0.10)',
+                  background: dragging ? `${account.color}08` : rows.length ? 'rgba(79,191,127,0.05)' : 'rgba(255,255,255,0.02)',
                 }}>
-                <span className="shrink-0">{w.level === 'error' ? '✕' : '⚠'}</span>
-                <span>{w.message}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Preview */}
-        {rows.length > 0 && !result && (
-          <>
-            {/* Stats row */}
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { label: 'Total',    value: rows.length.toString(),                    color: '#9B6DFF' },
-                { label: 'New',      value: dupChecking ? '…' : (dupCheck ? dupCheck.newCount.toString() : rows.length.toString()), color: '#4FBF7F' },
-                { label: 'Skipped',  value: dupChecking ? '…' : (dupCheck ? dupCheck.duplicateCount.toString() : '0'),              color: dupCheck?.duplicateCount ? '#F5C842' : 'rgba(255,255,255,0.25)' },
-                { label: 'Income',   value: `+$${income.toFixed(2)}`,                  color: '#4FBF7F' },
-              ].map((s) => (
-                <div key={s.label} className="p-2.5 rounded-xl text-center"
-                  style={{ background: `rgba(${hexToRgb(s.color)},0.08)`, border: `1px solid rgba(${hexToRgb(s.color)},0.18)` }}>
-                  <p className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
-                  <p className="font-bold text-sm mt-0.5" style={{ color: s.color }}>{s.value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Duplicate banner */}
-            {dupCheck && dupCheck.duplicateCount > 0 && (
-              <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs"
-                style={{ background: 'rgba(245,200,66,0.08)', border: '1px solid rgba(245,200,66,0.25)' }}>
-                <span>⟳</span>
-                <span style={{ color: '#F5C842' }}>
-                  <strong>{dupCheck.duplicateCount} already imported</strong> — they'll be skipped automatically.
-                  Only <strong>{dupCheck.newCount} new transactions</strong> will be added.
-                </span>
-              </div>
-            )}
-
-            {/* Transaction table */}
-            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="max-h-56 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-muted)' }}>
-                      <th className="text-left px-3 py-2 font-medium">Date</th>
-                      <th className="text-left px-3 py-2 font-medium">Description</th>
-                      <th className="text-right px-3 py-2 font-medium">Amount</th>
-                      {dupCheck && dupCheck.duplicateCount > 0 && <th className="px-3 py-2 w-8" />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.slice(0, 150).map((row, i) => {
-                      const extId = row.referenceNumber ? `csv_${row.referenceNumber}` : null;
-                      const compositeKey = `csv_${row.date}|${row.name}|${row.amount.toFixed(2)}`;
-                      const isDup = dupCheck
-                        ? (extId ? dupCheck.duplicateIds.has(extId) : false) || dupCheck.duplicateIds.has(compositeKey)
-                        : false;
-                      return (
-                        <tr key={i}
-                          style={{
-                            borderTop: '1px solid rgba(255,255,255,0.04)',
-                            opacity: isDup ? 0.4 : 1,
-                          }}>
-                          <td className="px-3 py-2 tabular-nums shrink-0" style={{ color: 'var(--color-text-muted)' }}>{row.date}</td>
-                          <td className="px-3 py-2 truncate max-w-60" style={{ color: isDup ? 'var(--color-text-muted)' : 'var(--color-text-secondary)', textDecoration: isDup ? 'line-through' : 'none' }}>{row.name}</td>
-                          <td className="px-3 py-2 text-right tabular-nums font-medium"
-                            style={{ color: isDup ? 'var(--color-text-muted)' : row.amount >= 0 ? '#4FBF7F' : '#F07A3E' }}>
-                            {row.amount >= 0 ? '+' : ''}{row.amount.toFixed(2)}
-                          </td>
-                          {dupCheck && dupCheck.duplicateCount > 0 && (
-                            <td className="px-3 py-2 text-center">
-                              {isDup && <span className="text-[9px] px-1 py-0.5 rounded font-bold" style={{ background: 'rgba(245,200,66,0.15)', color: '#F5C842' }}>skip</span>}
-                            </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {rows.length > 150 && (
-                  <p className="text-center py-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    … and {rows.length - 150} more
+                <span className="text-xl">{dragging ? '📥' : rows.length ? '✅' : '📂'}</span>
+                <div className="text-left">
+                  <p className="text-sm font-semibold" style={{ color: rows.length ? '#4FBF7F' : 'var(--color-text-secondary)' }}>
+                    {dragging ? 'Drop to import' : rows.length ? `${rows.length} transactions — ${fileName}` : 'Click to select or drag & drop'}
                   </p>
+                  {!rows.length && !dragging && (
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                      Supports Chase, Bank of America, Wells Fargo & most banks
+                    </p>
+                  )}
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* Warnings */}
+          {warnings.length > 0 && !result && warnings.map((w, i) => (
+            <div key={i} className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-xs"
+              style={{
+                background: w.level === 'error' ? 'rgba(255,107,107,0.08)' : 'rgba(245,200,66,0.08)',
+                border: `1px solid ${w.level === 'error' ? 'rgba(255,107,107,0.25)' : 'rgba(245,200,66,0.20)'}`,
+                color: w.level === 'error' ? '#FF6B6B' : '#F5C842',
+              }}>
+              <span className="shrink-0 mt-0.5">{w.level === 'error' ? '✕' : '⚠'}</span>
+              <span className="leading-relaxed">{w.message}</span>
+            </div>
+          ))}
+
+          {/* Stats + table */}
+          {rows.length > 0 && !result && (
+            <>
+              {/* Stats bar */}
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { label: 'Total',   value: rows.length,                                               color: '#9B6DFF' },
+                  { label: 'New',     value: dupChecking ? '…' : newCount,                             color: '#4FBF7F' },
+                  { label: 'Skipped', value: dupChecking ? '…' : (dupCheck?.duplicateCount ?? 0),      color: dupCheck?.duplicateCount ? '#F5C842' : 'rgba(255,255,255,0.2)' },
+                  { label: 'Income',  value: income > 0 ? `+$${income.toFixed(2)}` : '$0.00',          color: income > 0 ? '#4FBF7F' : 'rgba(255,255,255,0.2)' },
+                ].map((s) => (
+                  <div key={s.label} className="flex flex-col items-center py-2.5 rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    <p className="text-[9px] uppercase tracking-widest font-bold" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
+                    <p className="font-black text-base mt-0.5 tabular-nums" style={{ color: s.color }}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Duplicate notice */}
+              {dupCheck && dupCheck.duplicateCount > 0 && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
+                  style={{ background: 'rgba(245,200,66,0.07)', border: '1px solid rgba(245,200,66,0.18)' }}>
+                  <span style={{ color: '#F5C842' }}>⟳</span>
+                  <span style={{ color: '#F5C842' }}>
+                    <strong>{dupCheck.duplicateCount} already imported</strong> — skipped automatically.
+                    Only <strong>{dupCheck.newCount} new</strong> will be added.
+                  </span>
+                </div>
+              )}
+
+              {/* Table */}
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="max-h-52 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0">
+                      <tr style={{ background: 'rgba(18,18,30,0.98)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                        <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Date</th>
+                        <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Description</th>
+                        <th className="text-right px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.slice(0, 150).map((row, i) => {
+                        const extId = row.referenceNumber ? `csv_${row.referenceNumber}` : null;
+                        const compositeKey = `csv_${row.date}|${row.name}|${row.amount.toFixed(2)}`;
+                        const isDup = dupCheck
+                          ? (extId ? dupCheck.duplicateIds.has(extId) : false) || dupCheck.duplicateIds.has(compositeKey)
+                          : false;
+                        return (
+                          <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.04)', opacity: isDup ? 0.35 : 1 }}>
+                            <td className="px-3 py-2 tabular-nums whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{row.date}</td>
+                            <td className="px-3 py-2 truncate max-w-xs" style={{ color: isDup ? 'var(--color-text-muted)' : 'var(--color-text-primary)', textDecoration: isDup ? 'line-through' : 'none' }}>{row.name}</td>
+                            <td className="px-3 py-2 text-right tabular-nums font-semibold whitespace-nowrap"
+                              style={{ color: isDup ? 'var(--color-text-muted)' : row.amount >= 0 ? '#4FBF7F' : 'var(--color-text-primary)' }}>
+                              {row.amount >= 0 ? '+' : ''}${Math.abs(row.amount).toFixed(2)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {rows.length > 150 && (
+                    <p className="text-center py-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                      +{rows.length - 150} more transactions
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Success */}
+          {result && (
+            <div className="py-8 flex flex-col items-center gap-3 text-center">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
+                style={{ background: 'rgba(79,191,127,0.15)', border: '1px solid rgba(79,191,127,0.3)' }}>🎉</div>
+              <div>
+                <p className="font-bold text-lg" style={{ color: '#4FBF7F' }}>{result.imported} transactions imported</p>
+                {result.skipped > 0 && (
+                  <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>{result.skipped} duplicates skipped</p>
                 )}
               </div>
             </div>
-          </>
-        )}
-
-        {/* Success */}
-        {result && (
-          <div className="py-6 flex flex-col items-center gap-3 text-center">
-            <span className="text-4xl">🎉</span>
-            <p className="font-bold text-lg">{result.imported} transactions imported</p>
-            {result.skipped > 0 && (
-              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>{result.skipped} duplicates skipped</p>
-            )}
-          </div>
-        )}
-
-        {error && <p className="text-xs px-1" style={{ color: 'var(--color-card-orange)' }}>{error}</p>}
-
-        <div className="flex gap-2 justify-end">
-          <button onClick={onClose}
-            className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
-            style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
-            {result ? 'Close' : 'Cancel'}
-          </button>
-          {rows.length > 0 && !result && (
-            <button onClick={handleImport} disabled={importing || hasErrors || dupChecking}
-              className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60"
-              style={{ background: 'var(--color-card-violet)' }}>
-              {importing
-                ? 'Importing…'
-                : dupChecking
-                  ? 'Checking…'
-                  : dupCheck
-                    ? `Import ${dupCheck.newCount} new transaction${dupCheck.newCount !== 1 ? 's' : ''}`
-                    : `Import ${rows.length} transactions`}
-            </button>
           )}
+
+          {error && <p className="text-xs px-1" style={{ color: 'var(--color-card-orange)' }}>{error}</p>}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-5 py-4"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          <span />
+          <div className="flex gap-2">
+            <button onClick={onClose}
+              className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+              style={{ color: 'var(--color-text-secondary)' }}>
+              {result ? 'Close' : 'Cancel'}
+            </button>
+            {rows.length > 0 && !result && (() => {
+              const nothingNew = dupCheck && dupCheck.newCount === 0;
+              if (nothingNew) return (
+                <span className="text-xs font-semibold px-3 py-2 rounded-xl"
+                  style={{ background: 'rgba(79,191,127,0.12)', color: '#4FBF7F', border: '1px solid rgba(79,191,127,0.25)' }}>
+                  ✓ All already imported
+                </span>
+              );
+              return (
+                <button onClick={handleImport} disabled={importing || hasErrors || dupChecking}
+                  className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50 transition-all"
+                  style={{ background: hasErrors ? 'rgba(255,107,107,0.3)' : account.color }}>
+                  {importing ? 'Importing…' : dupChecking ? 'Checking…'
+                    : dupCheck ? `Import ${dupCheck.newCount} transaction${dupCheck.newCount !== 1 ? 's' : ''}`
+                    : `Import ${rows.length} transactions`}
+                </button>
+              );
+            })()}
+          </div>
         </div>
       </div>
     </div>
@@ -355,9 +346,11 @@ function validate(rows: CsvRow[], account: BankAccount, fileName: string, rawTex
     warnings.push({ level: 'error', message: `These transactions do not belong to this account.` });
   }
 
-  /* Last-4 check: extract 4-digit suffix from filename e.g. "May2026_1564.csv" → "1564" */
-  const fileLast4Match = fileName.match(/(\d{4})\.(?:csv|txt)$/i);
-  const fileLast4 = fileLast4Match?.[1];
+  /* Last-4 check: find standalone 4-digit groups that aren't years or part of longer numbers.
+     e.g. "Chase7682_Activity_20260530.CSV" → "7682" (skips 20260530 as it's an 8-digit date) */
+  const baseName = fileName.replace(/\.(?:csv|txt)$/i, '');
+  const allLast4 = [...baseName.matchAll(/(?<!\d)(\d{4})(?!\d)/g)].map((m) => m[1]);
+  const fileLast4 = allLast4.filter((n) => { const v = parseInt(n, 10); return v < 1900 || v > 2099; }).at(-1) ?? null;
   if (fileLast4 && account.last4 && fileLast4 !== account.last4) {
     warnings.push({
       level: 'error',
@@ -453,8 +446,9 @@ function parseCsv(text: string): CsvRow[] {
   if (descIdx < 0) throw new Error('Could not find a Description/Payee column.');
   if (amountIdx < 0 && !splitMode) throw new Error('Could not find an Amount column.');
 
-  const SKIP_TYPES = new Set(['payment', 'credit card payment', 'online payment', 'autopay']);
+  const SKIP_TYPES = new Set<string>(); // nothing skipped by type — let the user see all transactions
   const SKIP_DESC  = /^(beginning balance|ending balance|opening balance|closing balance)/i;
+  const balIdx     = col(['balance','running bal','running balance','available balance','ledger balance','current balance']);
 
   const rows: CsvRow[] = [];
   for (let i = 1; i < lines.length; i++) {
@@ -488,7 +482,17 @@ function parseCsv(text: string): CsvRow[] {
 
     rows.push({ date, referenceNumber, name, amount });
   }
-  return rows;
+
+  // Extract most recent balance from the first data row (banks sort newest first)
+  let finalBalance: number | undefined;
+  if (balIdx >= 0 && lines.length > 1) {
+    const firstDataRow = parseRow(lines[1]);
+    const raw = firstDataRow[balIdx]?.replace(/[$,\s]/g, '') ?? '';
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed)) finalBalance = parsed;
+  }
+
+  return { rows, finalBalance };
 }
 
 /* MM/DD/YYYY → YYYY-MM-DD; already ISO dates pass through unchanged */

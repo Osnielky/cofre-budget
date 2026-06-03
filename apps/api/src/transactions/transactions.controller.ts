@@ -12,6 +12,11 @@ export class TransactionsController {
     return this.service.getCategoryHints(req.user.id);
   }
 
+  @Get('project-hints')
+  getProjectHints(@Request() req: any) {
+    return this.service.getProjectHints(req.user.id);
+  }
+
   @Get('matches')
   findTransferMatches(
     @Request() req: any,
@@ -49,9 +54,18 @@ export class TransactionsController {
   @Post('import')
   importCsv(
     @Request() req: any,
-    @Body() body: { bankAccountId: string; rows: CsvRow[] },
+    @Body() body: { bankAccountId: string; rows: CsvRow[]; finalBalance?: number },
   ) {
-    return this.service.importCsv(req.user.id, body.bankAccountId, body.rows);
+    return this.service.importCsv(req.user.id, body.bankAccountId, body.rows, body.finalBalance);
+  }
+
+  @Patch(':id')
+  updateManual(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: { name?: string; amount?: number; date?: string; bankAccountId?: string | null },
+  ) {
+    return this.service.updateManual(id, req.user.id, body);
   }
 
   @Delete(':id')

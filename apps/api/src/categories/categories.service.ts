@@ -25,6 +25,7 @@ const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'created
   { name: 'House Rent',     icon: '🏡', color: '#F5C842', type: 'expense',  description: 'Monthly rent payments' },
   { name: 'Child Support',  icon: '👨‍👧', color: '#E879A0', type: 'expense',  description: 'Court-ordered child support payments' },
   { name: 'Child Expenses', icon: '🧒', color: '#9B6DFF', type: 'expense',  description: 'School, activities & child care costs' },
+  { name: 'Reimbursement',  icon: '🤝', color: '#4FBF7F', type: 'income',   description: 'Money received back from shared expenses or refunds' },
   { name: 'Salary',         icon: '💼', color: '#4FBF7F', type: 'income',   description: 'Regular employment income' },
   { name: 'Freelance',      icon: '💻', color: '#9B6DFF', type: 'income',   description: 'Contract & self-employment earnings' },
   { name: 'Investments',    icon: '📈', color: '#F5C842', type: 'income',   description: 'Dividends, returns & capital gains' },

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
-export const BANKS = [
+export const BANKS: readonly { name: string; domain: string; color: string; abbr: string }[] = [
   { name: 'Chase',           domain: 'chase.com',           color: '#117ACA', abbr: 'CH' },
   { name: 'Bank of America', domain: 'bankofamerica.com',   color: '#E31837', abbr: 'BA' },
   { name: 'Wells Fargo',     domain: 'wellsfargo.com',      color: '#CC0000', abbr: 'WF' },

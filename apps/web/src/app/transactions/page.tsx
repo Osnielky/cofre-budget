@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Sidebar from '@/components/Sidebar';
 import CsvImportModal from '@/components/CsvImportModal';
-import BankSelect from '@/components/BankSelect';
+import BankSelect, { BANKS } from '@/components/BankSelect';
 import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 
@@ -91,6 +91,7 @@ export default function TransactionsPage() {
   const [addingAcc, setAddingAcc]               = useState(false);
   const [addAccError, setAddAccError]           = useState('');
   const [newAcc, setNewAcc] = useState({ bankName: '', accountName: '', accountType: 'checking', color: '#9B6DFF', currency: 'USD', openingBalance: '' });
+  const [newAccTypeOpen, setNewAccTypeOpen] = useState(false);
   const pickerRef     = useRef<HTMLDivElement>(null);
   const importBtnRef  = useRef<HTMLDivElement>(null);
 
@@ -101,6 +102,11 @@ export default function TransactionsPage() {
   const [transferMatchesLoading, setTransferMatchesLoading] = useState(false);
   const [linkingProj, setLinkingProj]                 = useState(false);
   const [deleteConfirmId, setDeleteConfirmId]         = useState<string | null>(null);
+  const [editingTxId, setEditingTxId]                 = useState<string | null>(null);
+  const [transferModal, setTransferModal]             = useState<{ tx: Transaction } | null>(null);
+  const [transferModalMatches, setTransferModalMatches] = useState<Transaction[]>([]);
+  const [transferModalLoading, setTransferModalLoading] = useState(false);
+  const [transferModalSelected, setTransferModalSelected] = useState<string | null>(null); // tx id
   const [markAsSaleConfirm, setMarkAsSaleConfirm]     = useState<string | null>(null); // projectId
   const [markAsSaleSaving, setMarkAsSaleSaving]       = useState(false);
 
@@ -118,6 +124,7 @@ export default function TransactionsPage() {
 
   /* name → most-recently-used category (cross-period, loaded once) */
   const [categoryHints, setCategoryHints] = useState<Record<string, { id: string; name: string; icon: string; color: string }>>({});
+  const [projectHints, setProjectHints]   = useState<Record<string, { projectId: string; projectCategoryId: string; catName: string; catIcon: string; catColor: string }>>({});
 
   const [budgetWidth, setBudgetWidth] = useState(256);
   const [showNotifications, setShowNotifications] = useState(true);
@@ -196,11 +203,13 @@ export default function TransactionsPage() {
       fetch(`${API}/bank-accounts`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/projects`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/transactions/category-hints`, { credentials: 'include' }).then((r) => r.json()),
-    ]).then(([cats, accs, projs, hints]) => {
+      fetch(`${API}/transactions/project-hints`, { credentials: 'include' }).then((r) => r.json()).catch(() => ({})),
+    ]).then(([cats, accs, projs, hints, pHints]) => {
       setCategories(Array.isArray(cats) ? cats : []);
       setAccounts(Array.isArray(accs) ? accs : []);
       setProjects(Array.isArray(projs) ? projs : []);
       if (hints && typeof hints === 'object') setCategoryHints(hints);
+      if (pHints && typeof pHints === 'object') setProjectHints(pHints);
     }).catch(() => {});
   }, []);
 
@@ -286,13 +295,29 @@ export default function TransactionsPage() {
     if (!manualTx.bankAccountId || !manualTx.amountStr || isNaN(amount)) return;
     setManualTxSaving(true);
     try {
+      const finalAmount = amount * (manualTx.sign === '-' ? -1 : 1);
+      if (editingTxId) {
+        const res = await fetch(`${API}/transactions/${editingTxId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ name: manualTx.name, amount: finalAmount, date: manualTx.date, bankAccountId: manualTx.bankAccountId }),
+        });
+        if (!res.ok) return;
+        const updated: Transaction = await res.json();
+        setTransactions((prev) => prev.map((t) => t.id === editingTxId ? { ...t, ...updated } : t));
+        setShowManualTx(false);
+        setEditingTxId(null);
+        setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '' });
+        return;
+      }
       const res = await fetch(`${API}/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           name: manualTx.name,
-          amount: amount * (manualTx.sign === '-' ? -1 : 1),
+          amount: finalAmount,
           date: manualTx.date,
           bankAccountId: manualTx.bankAccountId,
           categoryId: manualTx.categoryId || null,
@@ -351,30 +376,36 @@ export default function TransactionsPage() {
       }
 
       setOpenPickerId(null); setPickerProjectDrill(null);
+    } catch {
+      // network/CORS error — silently ignore
     } finally { setLinkingProj(false); }
   }
 
   async function setTransferAccount(txId: string, transferAccountId: string | null, matchTxId?: string) {
-    const res = await fetch(`${API}/transactions/${txId}/transfer-account`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-      body: JSON.stringify({ transferAccountId, matchTxId: matchTxId ?? null }),
-    });
-    const updated: Transaction = await res.json();
-    setTransactions((prev) => prev.map((t) => {
-      if (t.id === txId) return { ...t, transferAccountId: updated.transferAccountId, transferAccount: updated.transferAccount, counterpartTxId: matchTxId ?? null };
-      /* Also update the matched transaction on the other side */
-      if (matchTxId && t.id === matchTxId) {
-        const srcAcc = prev.find((s) => s.id === txId)?.bankAccount ?? null;
-        return { ...t, categoryId: updated.categoryId, categoryRef: updated.categoryRef, transferAccountId: updated.bankAccountId, transferAccount: srcAcc, counterpartTxId: txId };
-      }
-      return t;
-    }));
-    /* Refresh account balances */
-    fetch(`${API}/bank-accounts`, { credentials: 'include' })
-      .then((r) => r.json()).then((accs) => { if (Array.isArray(accs)) setAccounts(accs); });
-    setOpenPickerId(null);
-    setPickerTransferStep(false);
-    setTransferMatches([]);
+    try {
+      const res = await fetch(`${API}/transactions/${txId}/transfer-account`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ transferAccountId, matchTxId: matchTxId ?? null }),
+      });
+      if (!res.ok) return;
+      const updated: Transaction = await res.json();
+      setTransactions((prev) => prev.map((t) => {
+        if (t.id === txId) return { ...t, transferAccountId: updated.transferAccountId, transferAccount: updated.transferAccount, counterpartTxId: matchTxId ?? null };
+        if (matchTxId && t.id === matchTxId) {
+          const srcAcc = prev.find((s) => s.id === txId)?.bankAccount ?? null;
+          return { ...t, categoryId: updated.categoryId, categoryRef: updated.categoryRef, transferAccountId: updated.bankAccountId, transferAccount: srcAcc, counterpartTxId: txId };
+        }
+        return t;
+      }));
+      fetch(`${API}/bank-accounts`, { credentials: 'include' })
+        .then((r) => r.json()).then((accs) => { if (Array.isArray(accs)) setAccounts(accs); });
+    } catch {
+      // network error — ignore
+    } finally {
+      setOpenPickerId(null);
+      setPickerTransferStep(false);
+      setTransferMatches([]);
+    }
   }
 
   async function unlinkFromProject(txId: string, projectId: string) {
@@ -610,15 +641,32 @@ export default function TransactionsPage() {
                           style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }} />
 
                         <div className="flex gap-2">
-                          <select value={newAcc.accountType} onChange={(e) => setNewAcc((f) => ({ ...f, accountType: e.target.value }))}
-                            className="flex-1 px-2 py-2 text-xs rounded-lg outline-none appearance-none"
-                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }}>
-                            <option value="checking">Checking</option>
-                            <option value="savings">Savings</option>
-                            <option value="credit">Credit Card</option>
-                            <option value="investment">Investment</option>
-                            <option value="loan">Loan / Receivable</option>
-                          </select>
+                          {/* Custom account type dropdown */}
+                          <div className="flex-1 relative">
+                            <button type="button" onClick={() => setNewAccTypeOpen((o) => !o)}
+                              className="w-full px-2 py-2 text-xs rounded-lg flex items-center justify-between gap-1"
+                              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }}>
+                              <span className="capitalize">{newAcc.accountType === 'credit' ? 'Credit Card' : newAcc.accountType === 'loan' ? 'Loan' : newAcc.accountType.charAt(0).toUpperCase() + newAcc.accountType.slice(1)}</span>
+                              <svg width="8" height="8" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
+                                <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </button>
+                            {newAccTypeOpen && (
+                              <div className="absolute top-full left-0 right-0 mt-1 rounded-lg overflow-hidden z-50"
+                                style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                                {[['checking','Checking'],['savings','Savings'],['credit','Credit Card'],['investment','Investment'],['cash','Cash'],['loan','Loan']].map(([val, label]) => (
+                                  <button key={val} type="button"
+                                    onClick={() => { setNewAcc((f) => ({ ...f, accountType: val })); setNewAccTypeOpen(false); }}
+                                    className="w-full px-3 py-2 text-xs text-left transition-colors"
+                                    style={{ background: newAcc.accountType === val ? 'rgba(155,109,255,0.15)' : 'transparent', color: newAcc.accountType === val ? '#9B6DFF' : 'var(--color-text-primary)' }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = newAcc.accountType === val ? 'rgba(155,109,255,0.15)' : 'transparent')}>
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           <select value={newAcc.currency} onChange={(e) => setNewAcc((f) => ({ ...f, currency: e.target.value }))}
                             className="px-2 py-2 text-xs rounded-lg outline-none appearance-none"
                             style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }}>
@@ -844,10 +892,42 @@ export default function TransactionsPage() {
                       boxShadow: `0 4px 24px rgba(0,0,0,0.3), inset 0 0 0 1px ${accColor}10`,
                     }}>
 
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
-                      style={{ background: `${accColor}20` }}>
-                      <AccountTypeIcon type={acc?.accountType ?? ''} size={18} />
-                    </div>
+                    {/* Composite icon: bank logo + type badge */}
+                    {(() => {
+                      const bankMeta = BANKS.find((b) => b.name === acc?.bankName);
+                      const isCash   = acc?.accountType === 'cash';
+                      return (
+                        <div className="relative shrink-0" style={{ width: 38, height: 38 }}>
+                          {/* Main bank logo or cash icon */}
+                          <div className="w-full h-full rounded-xl flex items-center justify-center overflow-hidden"
+                            style={{ background: isCash ? `${accColor}25` : 'white', border: `1px solid ${accColor}30` }}>
+                            {isCash ? (
+                              <span style={{ fontSize: 20 }}>💵</span>
+                            ) : bankMeta ? (
+                              <img
+                                src={`https://logo.clearbit.com/${bankMeta.domain}`}
+                                alt={acc?.bankName}
+                                width={28} height={28}
+                                style={{ objectFit: 'contain' }}
+                                onError={(e) => {
+                                  e.currentTarget.src = `https://www.google.com/s2/favicons?domain=${bankMeta.domain}&sz=64`;
+                                  e.currentTarget.style.background = 'transparent';
+                                }}
+                              />
+                            ) : (
+                              <AccountTypeIcon type={acc?.accountType ?? ''} size={20} />
+                            )}
+                          </div>
+                          {/* Type badge overlay — bottom-right */}
+                          {!isCash && acc?.accountType && (
+                            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-lg flex items-center justify-center"
+                              style={{ background: accColor, border: '2px solid rgba(15,15,24,0.9)' }}>
+                              <AccountTypeIcon type={acc.accountType} size={11} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold truncate">{acc?.bankName ?? 'Unknown Bank'}</p>
@@ -1019,8 +1099,31 @@ export default function TransactionsPage() {
 
                           {/* ── Category suggestion ── */}
                           {(() => {
-                            if (tx.categoryId || tx.projectId || txIsTransfer) return null;
-                            const hint = categoryHints[tx.name];
+                            if (tx.categoryId || txIsTransfer) return null;
+                            // 1. Normalize name: strip trailing unique codes like "WFCT126NB7CP"
+                            const normName = tx.name.replace(/\s+(?:conf#\S+|[A-Z0-9]{6,})$/i, '').trim();
+                            // 2. Past-history hints
+                            const pastHint = categoryHints[tx.name] ?? categoryHints[normName]
+                              ?? Object.entries(categoryHints).find(([k]) => normName && k.toLowerCase().startsWith(normName.toLowerCase()))?.[1]
+                              ?? null;
+                            // 3. Pattern-based hints for common transaction types
+                            const patternHint = (() => {
+                              const n = tx.name.toLowerCase();
+                              const find = (name: string) => { const c = categories.find(x => x.name === name); return c ? { id: c.id, name: c.name, icon: c.icon, color: c.color } : null; };
+                              if (/payment to .+card|loan_pmt|credit card payment/i.test(tx.name)) return find('Credit Card Payment');
+                              if (/zelle payment to |transfer to /i.test(tx.name) && amount < 0) return find('Internal Transfer');
+                              if (/zelle payment from |transfer from /i.test(tx.name) && amount > 0) return find('Reimbursement');
+                              if (/monthly service fee|service fee|bank fee|overdraft/i.test(n)) return find('Subscriptions');
+                              if (/payroll|direct deposit|salary/i.test(n) && amount > 0) return find('Salary');
+                              if (/amazon|amzn/i.test(n)) return find('Shopping');
+                              if (/uber|lyft|doordash|grubhub/i.test(n) && amount < 0) return find('Transport');
+                              if (/netflix|spotify|apple\.com\/bill|hulu|disney/i.test(n)) return find('Subscriptions');
+                              if (/wholefds|whole foods|publix|kroger|trader joe/i.test(n)) return find('Groceries');
+                              if (/chevron|shell|bp |exxon|sunoco|marathon|fuel|gas station|sunpass/i.test(n)) return find('Transport');
+                              if (/mcdonald|burger king|wendy|chipotle|starbucks|dunkin/i.test(n)) return find('Food & Dining');
+                              return null;
+                            })();
+                            const hint = pastHint ?? patternHint;
                             if (!hint) return null;
                             return (
                               <button
@@ -1031,6 +1134,30 @@ export default function TransactionsPage() {
                                 style={{ background: `${hint.color}14`, border: `1px solid ${hint.color}38`, color: hint.color }}>
                                 <span>{hint.icon}</span>
                                 <span className="max-w-24 truncate">{hint.name}</span>
+                                <span className="text-[9px] opacity-55 font-normal shrink-0">✓ apply</span>
+                              </button>
+                            );
+                          })()}
+
+                          {/* ── Project category suggestion ── */}
+                          {(() => {
+                            if (tx.projectId || tx.categoryId) return null;
+                            const normName = tx.name.replace(/\s+(?:conf#\S+|[A-Z0-9]{6,})$/i, '').trim();
+                            const ph = projectHints[tx.name] ?? projectHints[normName] ?? null;
+                            if (!ph) return null;
+                            const proj = projects.find((p) => p.id === ph.projectId);
+                            if (!proj) return null;
+                            return (
+                              <button
+                                onClick={() => linkToProject(tx.id, ph.projectId, ph.projectCategoryId)}
+                                disabled={updatingId === tx.id || linkingProj}
+                                title={`Link to ${proj.name} → ${ph.catName}`}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all hover:brightness-125 disabled:opacity-40"
+                                style={{ background: `${ph.catColor}14`, border: `1px solid ${ph.catColor}38`, color: ph.catColor }}>
+                                <span>{proj.icon}</span>
+                                <span className="max-w-20 truncate">{proj.name}</span>
+                                <span className="opacity-50">·</span>
+                                <span className="max-w-16 truncate">{ph.catName}</span>
                                 <span className="text-[9px] opacity-55 font-normal shrink-0">✓ apply</span>
                               </button>
                             );
@@ -1137,6 +1264,42 @@ export default function TransactionsPage() {
                                     {transferMatchesLoading && (
                                       <p className="px-3 py-2 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Finding matches…</p>
                                     )}
+                                    {/* No matches — show credit card accounts as quick suggestions */}
+                                    {!transferMatchesLoading && transferMatches.length === 0 && (() => {
+                                      const creditAccs = accounts.filter((a) => ['credit', 'loan'].includes(a.accountType) && a.id !== tx.bankAccountId);
+                                      if (!creditAccs.length) return null;
+                                      return (
+                                        <>
+                                          <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase flex items-center gap-1"
+                                            style={{ color: '#9B6DFF' }}>
+                                            <span>💳</span> Credit Cards
+                                          </p>
+                                          {creditAccs.map((a) => {
+                                            const c = a.color || '#9B6DFF';
+                                            const selected = tx.transferAccountId === a.id;
+                                            return (
+                                              <button key={a.id}
+                                                onClick={() => setTransferAccount(tx.id, a.id)}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10"
+                                                style={{ background: selected ? `${c}15` : `${c}06`, borderLeft: `2px solid ${c}50` }}>
+                                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                                  style={{ background: `${c}20` }}>
+                                                  <AccountTypeIcon type={a.accountType} size={16} />
+                                                </span>
+                                                <div className="flex-1 text-left min-w-0">
+                                                  <p className="font-semibold truncate" style={{ color: selected ? c : 'var(--color-text-primary)' }}>{a.accountName}</p>
+                                                  <p className="truncate" style={{ color: 'var(--color-text-muted)' }}>{a.bankName}</p>
+                                                </div>
+                                                {selected && <span style={{ color: c }}>✓</span>}
+                                              </button>
+                                            );
+                                          })}
+                                          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0' }} />
+                                          <p className="px-3 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
+                                            style={{ color: 'var(--color-text-muted)' }}>All accounts</p>
+                                        </>
+                                      );
+                                    })()}
                                     {!transferMatchesLoading && transferMatches.length > 0 && (
                                       <>
                                         <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase flex items-center gap-1"
@@ -1222,13 +1385,16 @@ export default function TransactionsPage() {
                                         assignCategory(tx.id, c.id, isTransfer);
                                         setPickerProjectDrill(null);
                                         if (isTransfer) {
-                                          setPickerTransferStep(true);
-                                          setTransferMatches([]);
-                                          setTransferMatchesLoading(true);
+                                          setOpenPickerId(null);
+                                          setTransferModal({ tx });
+                                          setTransferModalSelected(null);
+                                          setTransferModalMatches([]);
+                                          setTransferModalLoading(true);
                                           fetch(`${API}/transactions/matches?amount=${tx.amount}&date=${tx.date}&excludeAccountId=${tx.bankAccountId}`, { credentials: 'include' })
                                             .then((r) => r.json())
-                                            .then((m) => { if (Array.isArray(m)) setTransferMatches(m); })
-                                            .finally(() => setTransferMatchesLoading(false));
+                                            .then((m) => { if (Array.isArray(m)) { setTransferModalMatches(m); if (m.length > 0) setTransferModalSelected(m[0].id); } })
+                                            .catch(() => {})
+                                            .finally(() => setTransferModalLoading(false));
                                         }
                                       }}
                                         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10"
@@ -1420,6 +1586,30 @@ export default function TransactionsPage() {
                           </div>
 
                           {/* Delete — manual only */}
+                          {tx.source === 'manual' && deleteConfirmId !== tx.id && (
+                            <button
+                              onClick={() => {
+                                const absAmt = Math.abs(Number(tx.amount));
+                                setEditingTxId(tx.id);
+                                setManualTx({
+                                  name: tx.name,
+                                  amountStr: String(absAmt),
+                                  sign: Number(tx.amount) >= 0 ? '+' : '-',
+                                  date: tx.date,
+                                  bankAccountId: tx.bankAccountId ?? '',
+                                  categoryId: tx.categoryId ?? '',
+                                });
+                                setShowManualTx(true);
+                              }}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10 shrink-0"
+                              style={{ color: 'var(--color-text-muted)' }}
+                              title="Edit transaction">
+                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                            </button>
+                          )}
                           {tx.source === 'manual' && (
                             deleteConfirmId === tx.id ? (
                               <div className="flex items-center gap-1 shrink-0">
@@ -1518,7 +1708,7 @@ export default function TransactionsPage() {
         {showManualTx && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowManualTx(false); setManualAccOpen(false); setManualCatOpen(false); } }}>
+            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowManualTx(false); setManualAccOpen(false); setManualCatOpen(false); setEditingTxId(null); } }}>
             {(() => {
               const isExpense  = manualTx.sign === '-';
               const accent     = isExpense ? '#F07A3E' : '#4FBF7F';
@@ -1674,10 +1864,211 @@ export default function TransactionsPage() {
                     <button type="submit" disabled={manualTxSaving}
                       className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
                       style={{ background: accent }}>
-                      {manualTxSaving ? 'Saving…' : 'Add Transaction'}
+                      {manualTxSaving ? 'Saving…' : editingTxId ? 'Save Changes' : 'Add Transaction'}
                     </button>
                   </div>
                 </form>
+              );
+            })()}
+          </div>,
+          document.body
+        )}
+
+        {/* ── Link Transfer modal ── */}
+        {transferModal && createPortal(
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
+            onMouseDown={(e) => { if (e.target === e.currentTarget) setTransferModal(null); }}>
+            {(() => {
+              const srcTx      = transferModal.tx;
+              const srcAmt     = Number(srcTx.amount);
+              const isOutgoing = srcAmt < 0;
+              const absAmt     = Math.abs(srcAmt);
+              const isTxSel    = transferModalSelected && !transferModalSelected.startsWith('acc:');
+              const isAccSel   = transferModalSelected?.startsWith('acc:');
+              const selMatch   = isTxSel ? transferModalMatches.find((m) => m.id === transferModalSelected) : null;
+              const selAccId   = isAccSel ? transferModalSelected!.replace('acc:', '') : null;
+              const selAcc     = selAccId ? accounts.find((a) => a.id === selAccId) : null;
+              const confirmColor = selMatch ? (selMatch.bankAccount?.color || '#9B6DFF') : selAcc ? (selAcc.color || '#9B6DFF') : '#6B6B8A';
+
+              return (
+                <div className="w-full max-w-md flex flex-col rounded-2xl overflow-hidden"
+                  style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
+
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-5 py-4"
+                    style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                    <div>
+                      <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>Link Transfer</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                        {isOutgoing ? 'Where did this money go?' : 'Where did this money come from?'}
+                      </p>
+                    </div>
+                    <button onClick={() => setTransferModal(null)}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10"
+                      style={{ color: 'var(--color-text-muted)' }}>✕</button>
+                  </div>
+
+                  <div className="flex flex-col px-5 py-4 gap-3">
+
+                    {/* FROM card */}
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
+                        style={{ color: 'var(--color-text-muted)' }}>{isOutgoing ? 'Money leaving' : 'Money arriving at'}</p>
+                      <div className="flex items-center gap-3 p-3 rounded-xl"
+                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ background: isOutgoing ? 'rgba(255,107,107,0.15)' : 'rgba(79,191,127,0.15)' }}>
+                          <AccountTypeIcon type={srcTx.bankAccount?.accountType ?? ''} size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{srcTx.name}</p>
+                          <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                            {srcTx.bankAccount?.accountName} · {srcTx.date}
+                          </p>
+                        </div>
+                        <p className="text-base font-black tabular-nums shrink-0"
+                          style={{ color: isOutgoing ? '#FF6B6B' : '#4FBF7F' }}>
+                          {isOutgoing ? '−' : '+'}${absAmt.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Flow arrow */}
+                    <div className="flex flex-col items-center gap-0.5">
+                      <div className="w-px h-3" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
+                        style={{ background: 'rgba(107,107,138,0.15)', border: '1px solid rgba(107,107,138,0.25)' }}>
+                        <span style={{ color: '#9B9BB8', fontSize: 11 }}>{isOutgoing ? '↓' : '↑'}</span>
+                        <span className="text-xs font-bold tabular-nums" style={{ color: '#9B9BB8' }}>${absAmt.toFixed(2)}</span>
+                        <span style={{ color: '#9B9BB8', fontSize: 11 }}>{isOutgoing ? '↓' : '↑'}</span>
+                      </div>
+                      <div className="w-px h-3" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                    </div>
+
+                    {/* TO section */}
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
+                        style={{ color: 'var(--color-text-muted)' }}>{isOutgoing ? 'Money arriving at' : 'Money coming from'}</p>
+
+                      {/* Selected preview */}
+                      {(selMatch || selAcc) && (
+                        <div className="flex items-center gap-3 p-3 rounded-xl mb-2"
+                          style={{ background: `${confirmColor}15`, border: `1px solid ${confirmColor}44` }}>
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ background: `${confirmColor}25` }}>
+                            <AccountTypeIcon type={selMatch?.bankAccount?.accountType ?? selAcc?.accountType ?? ''} size={18} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold truncate" style={{ color: confirmColor }}>
+                              {selMatch ? selMatch.name : selAcc?.accountName}
+                            </p>
+                            <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                              {selMatch ? `${selMatch.bankAccount?.accountName} · ${selMatch.date}` : selAcc?.bankName}
+                            </p>
+                          </div>
+                          {selMatch && (
+                            <p className="text-sm font-black tabular-nums shrink-0"
+                              style={{ color: Number(selMatch.amount) >= 0 ? '#4FBF7F' : '#FF6B6B' }}>
+                              {Number(selMatch.amount) >= 0 ? '+' : '−'}${Math.abs(Number(selMatch.amount)).toFixed(2)}
+                            </p>
+                          )}
+                          <span className="text-xs shrink-0" style={{ color: confirmColor }}>✓</span>
+                        </div>
+                      )}
+
+                      {/* Matches / picker */}
+                      {transferModalLoading ? (
+                        <p className="text-xs py-3 text-center" style={{ color: 'var(--color-text-muted)' }}>Searching for matches…</p>
+                      ) : (
+                        <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto overflow-x-hidden">
+                          {/* Auto matches */}
+                          {transferModalMatches.length > 0 && (
+                            <>
+                              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#4FBF7F' }}>✦ Suggested matches</p>
+                              {transferModalMatches.map((m) => {
+                                const acc = m.bankAccount;
+                                const c   = acc?.color || '#9B6DFF';
+                                const sel = transferModalSelected === m.id;
+                                return (
+                                  <button key={m.id} type="button" onClick={() => setTransferModalSelected(sel ? null : m.id)}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
+                                    style={{ background: sel ? `${c}18` : 'rgba(79,191,127,0.05)', border: `1px solid ${sel ? c + '55' : 'rgba(79,191,127,0.2)'}` }}>
+                                    <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                                      style={{ background: `${c}20` }}>
+                                      <AccountTypeIcon type={acc?.accountType ?? ''} size={14} />
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-semibold truncate" style={{ color: sel ? c : 'var(--color-text-primary)' }}>{m.name}</p>
+                                      <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{acc?.accountName} · {m.date}</p>
+                                    </div>
+                                    <p className="text-xs font-bold tabular-nums shrink-0"
+                                      style={{ color: Number(m.amount) >= 0 ? '#4FBF7F' : '#FF6B6B' }}>
+                                      {Number(m.amount) >= 0 ? '+' : '−'}${Math.abs(Number(m.amount)).toFixed(2)}
+                                    </p>
+                                  </button>
+                                );
+                              })}
+                              <div className="my-1" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }} />
+                            </>
+                          )}
+                          {/* Account picker */}
+                          <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                            {transferModalMatches.length > 0 ? 'Or pick account only' : 'Select destination account'}
+                          </p>
+                          {accounts.filter((a) => a.id !== srcTx.bankAccountId)
+                            .sort((a, b) => {
+                              const aCredit = ['credit', 'loan'].includes(a.accountType) ? 0 : 1;
+                              const bCredit = ['credit', 'loan'].includes(b.accountType) ? 0 : 1;
+                              return aCredit - bCredit;
+                            })
+                            .map((a) => {
+                              const c   = a.color || '#9B6DFF';
+                              const sel = transferModalSelected === `acc:${a.id}`;
+                              return (
+                                <button key={a.id} type="button" onClick={() => setTransferModalSelected(sel ? null : `acc:${a.id}`)}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
+                                  style={{ background: sel ? `${c}18` : 'rgba(255,255,255,0.03)', border: `1px solid ${sel ? c + '55' : 'rgba(255,255,255,0.07)'}` }}>
+                                  <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                                    style={{ background: `${c}20` }}>
+                                    <AccountTypeIcon type={a.accountType} size={14} />
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-semibold truncate" style={{ color: sel ? c : 'var(--color-text-primary)' }}>{a.accountName}</p>
+                                    <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.bankName}</p>
+                                  </div>
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded capitalize shrink-0"
+                                    style={{ background: `${c}18`, color: c }}>{a.accountType}</span>
+                                </button>
+                              );
+                            })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between px-5 py-4"
+                    style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                    <button onClick={() => setTransferModal(null)}
+                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+                      style={{ color: 'var(--color-text-secondary)' }}>Skip</button>
+                    <button disabled={!transferModalSelected}
+                      onClick={async () => {
+                        if (!transferModalSelected) return;
+                        const isTxMatch = !transferModalSelected.startsWith('acc:');
+                        const matchTx   = isTxMatch ? transferModalMatches.find((m) => m.id === transferModalSelected) : null;
+                        const accId     = isTxMatch ? (matchTx?.bankAccountId ?? null) : transferModalSelected.replace('acc:', '');
+                        await setTransferAccount(srcTx.id, accId, matchTx?.id);
+                        setTransferModal(null);
+                        setTransferModalSelected(null);
+                      }}
+                      className="px-5 py-2 text-sm font-bold text-white rounded-xl hover:brightness-110 disabled:opacity-40 transition-all"
+                      style={{ background: transferModalSelected ? confirmColor : '#6B6B8A' }}>
+                      {transferModalSelected ? 'Confirm Link ⇄' : 'Select destination'}
+                    </button>
+                  </div>
+                </div>
               );
             })()}
           </div>,
