@@ -47,10 +47,7 @@ export default function Sidebar() {
       {/* ── Logo ── */}
       <div className="px-5 pt-6 pb-4">
         <Link href="/dashboard" className="flex items-center gap-3 no-underline group">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
-            style={{ background: 'linear-gradient(135deg, #9B6DFF 0%, #E879A0 100%)', boxShadow: '0 0 16px rgba(155,109,255,0.35)' }}>
-            <Logo size={18} />
-          </div>
+          <Logo size={52} />
           <div>
             <p className="font-black text-sm tracking-widest uppercase leading-none"
               style={{ color: 'var(--color-text-primary)' }}>Cofre</p>

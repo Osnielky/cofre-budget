@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 export const metadata = {
   title: 'Cofre — Budget',
   description: 'Personal budget tracker',
-  icons: { icon: '/logo.svg' },
+  icons: { icon: '/logo-chest.png', apple: '/logo-chest.png' },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
