@@ -68,7 +68,7 @@ export default function LoginPage() {
 
         {/* Form area */}
         <div className="px-8 pb-8 pt-5 flex flex-col gap-6">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4" suppressHydrationWarning>
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Email</span>
             <input
@@ -105,8 +105,8 @@ export default function LoginPage() {
 
           <button
             type="submit" disabled={loading}
-            className="py-3 mt-1 text-sm font-semibold text-white transition-all hover:brightness-110 disabled:opacity-60"
-            style={{ background: 'var(--color-card-violet)', borderRadius: 'var(--radius-card)' }}
+            className="py-3 mt-1 text-sm font-semibold transition-all hover:brightness-110 disabled:opacity-60"
+            style={{ background: '#F5C842', borderRadius: 'var(--radius-card)', color: '#06101E', fontWeight: 700 }}
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>

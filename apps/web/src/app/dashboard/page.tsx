@@ -157,8 +157,9 @@ export default function DashboardPage() {
       m[c.id].total += Math.abs(Number(t.amount));
       return m;
     }, {});
-  const topCats    = Object.values(catSpend).sort((a,b) => b.total - a.total).slice(0,6);
-  const maxCatSpend = topCats[0]?.total || 1;
+  const topCats      = Object.values(catSpend).sort((a,b) => b.total - a.total).slice(0,6);
+  const maxCatSpend  = topCats[0]?.total || 1;
+  const totalCatSpend = topCats.reduce((s,c) => s + c.total, 0);
 
   /* Budget health */
   const overBudget     = budgets.filter(b => Number(b.spent) > Number(b.amount));
@@ -393,42 +394,75 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Top spending categories */}
+            {/* Spending by Category — donut */}
             <div className="flex flex-col gap-4 p-5 rounded-2xl" style={glass}>
+              {/* Header */}
               <div className="flex items-center justify-between">
-                <p className="font-bold text-sm">Top Spending</p>
-                <span className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>{monthLabel(month)}</span>
+                <div>
+                  <p className="font-bold text-sm">Spending by Category</p>
+                  <p className="text-2xl font-extrabold mt-0.5 tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
+                    {loading ? '—' : `$${fmt(expenses)}`}
+                  </p>
+                </div>
+                <span className="text-[10px] font-semibold px-2.5 py-1 rounded-lg"
+                  style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  {monthLabel(month)}
+                </span>
               </div>
+
               {loading ? (
-                <p className="text-xs py-4 text-center" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
+                <div className="h-40 flex items-center justify-center text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</div>
               ) : topCats.length === 0 ? (
-                <p className="text-xs py-4 text-center" style={{ color: 'var(--color-text-muted)' }}>No categorized expenses.</p>
+                <div className="h-40 flex flex-col items-center justify-center gap-2">
+                  <span className="text-3xl opacity-25">🧾</span>
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No categorized expenses.</p>
+                </div>
               ) : (
-                <div className="flex flex-col gap-3">
-                  {topCats.map(({ cat, total }) => {
-                    const pct = (total / maxCatSpend * 100).toFixed(1);
-                    const budgetForCat = budgets.find(b => b.category.id === cat.id);
-                    const overBudg = budgetForCat && total > Number(budgetForCat.amount);
-                    return (
-                      <div key={cat.id} className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0"
-                          style={{ background: `${cat.color}20` }}>{cat.icon}</div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between text-xs mb-1.5">
-                            <span className="font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>{cat.name}</span>
-                            <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                              {overBudg && <span className="text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: 'rgba(255,107,107,0.15)', color: '#FF6B6B' }}>over</span>}
-                              <span className="font-bold tabular-nums" style={{ color: cat.color }}>${fmt(total)}</span>
-                            </div>
-                          </div>
-                          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                            <div className="h-full rounded-full transition-all duration-500"
-                              style={{ width: `${pct}%`, background: overBudg ? '#FF6B6B' : cat.color }} />
-                          </div>
+                <div className="flex gap-4 items-center">
+                  {/* Donut */}
+                  <div className="relative shrink-0" style={{ width: 148, height: 148 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={topCats.map(({ cat, total }) => ({ name: cat.name, value: total, color: cat.color }))}
+                          cx="50%" cy="50%"
+                          innerRadius={46} outerRadius={68}
+                          dataKey="value" paddingAngle={2} stroke="none"
+                          startAngle={90} endAngle={-270}>
+                          {topCats.map(({ cat }, i) => <Cell key={i} fill={cat.color} />)}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ background: 'rgba(18,18,30,0.97)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, fontSize: 11 }}
+                          formatter={(v: number, name: string) => [`$${fmt(v)}`, name]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    {/* Center label */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <p className="text-lg font-extrabold leading-none" style={{ color: 'var(--color-text-primary)' }}>
+                        {budgetPct > 0 ? `${Math.min(100, budgetPct).toFixed(0)}%` : `${topCats.length}`}
+                      </p>
+                      <p className="text-[9px] font-semibold mt-0.5 text-center leading-tight px-2" style={{ color: 'var(--color-text-muted)' }}>
+                        {budgetPct > 0 ? 'Total\nExpends' : 'Categories'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Legend */}
+                  <div className="flex flex-col gap-2 flex-1 min-w-0">
+                    {topCats.map(({ cat, total }) => {
+                      const pct = totalCatSpend > 0 ? (total / totalCatSpend * 100).toFixed(0) : '0';
+                      return (
+                        <div key={cat.id} className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: cat.color }} />
+                          <span className="text-xs flex-1 truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                            {cat.icon} {cat.name}
+                          </span>
+                          <span className="text-[10px] font-bold shrink-0" style={{ color: cat.color }}>{pct}%</span>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

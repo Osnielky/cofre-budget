@@ -1,23 +1,42 @@
 @import "tailwindcss";
 
 @theme {
-  /* ── Brand palette ── */
-  --color-base:      #0F0F1A;
-  --color-surface:   rgba(35, 35, 47, 0.55);
-  --color-elevated:  rgba(42, 42, 56, 0.50);
-  --color-border:    rgba(255, 255, 255, 0.08);
+  /* ── Base surfaces ── */
+  --color-base:      #06101E;
+  --color-surface:   rgba(8, 22, 55, 0.60);
+  --color-elevated:  rgba(12, 30, 72, 0.68);
+  --color-border:    rgba(255, 255, 255, 0.07);
 
   /* ── Text ── */
-  --color-text-primary:   #FFFFFF;
-  --color-text-secondary: #9A9AB0;
-  --color-text-muted:     #5C5C78;
+  --color-text-primary:   #F0F4FF;
+  --color-text-secondary: #8BA3C7;
+  --color-text-muted:     #3D5A80;
 
-  /* ── Stat card accents ── */
+  /* ── Semantic colors ── */
+  --color-primary:  #F5C842;
+  --color-green:    #22C55E;
+  --color-rose:     #F43F5E;
+  --color-amber:    #FBBF24;
+  --color-orange:   #F97316;
+  --color-sky:      #38BDF8;
+  --color-violet:   #818CF8;
+
+  /* ── Card accents ── */
   --color-card-amber:  #F5C842;
-  --color-card-orange: #F07A3E;
-  --color-card-violet: #9B6DFF;
-  --color-card-green:  #4FBF7F;
-  --color-card-sky:    #4BA8D8;
+  --color-card-orange: #F97316;
+  --color-card-violet: #818CF8;
+  --color-card-green:  #22C55E;
+  --color-card-sky:    #38BDF8;
+  --color-card-red:    #F43F5E;
+
+  /* ── Nav ── */
+  --nav-active-bg:  rgba(245, 200, 66, 0.10);
+  --nav-active-bar: linear-gradient(180deg, #F5C842 0%, #22C55E 100%);
+  --nav-icon-active: #F5C842;
+
+  /* ── Layout ── */
+  --sidebar-bg: rgba(4, 10, 26, 0.92);
+  --header-bg:  rgba(4, 10, 26, 0.94);
 
   /* ── Shape ── */
   --radius-card:  1.25rem;
@@ -26,12 +45,15 @@
   /* ── Font ── */
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
-  /* ── Glass helpers ── */
-  --glass-blur:   blur(20px);
-  --glass-border: 1px solid rgba(255, 255, 255, 0.09);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  /* ── Glass system ── */
+  --glass-blur:   blur(28px) saturate(180%);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.08);
+  --glass-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 
+/* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; border-width: 0; border-style: solid; }
 
 html {
@@ -41,19 +63,30 @@ html {
   scroll-behavior: smooth;
 }
 
+/* ── Background: dark ocean + gold + emerald aurora ── */
 body {
   margin: 0;
   min-height: 100dvh;
   background-color: var(--color-base);
-  /* Ambient gradient blobs */
   background-image:
-    radial-gradient(ellipse 80% 60% at 10%  10%,  rgba(155, 109, 255, 0.18) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 90%  80%,  rgba(75,  168, 216, 0.14) 0%, transparent 55%),
-    radial-gradient(ellipse 50% 40% at 50%  50%,  rgba(79,  191, 127, 0.08) 0%, transparent 60%);
+    radial-gradient(ellipse 80% 65% at  5%   5%,   rgba(30,  64, 175, 0.45) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 50% at  95%  10%,  rgba(245, 200,  66, 0.22) 0%, transparent 58%),
+    radial-gradient(ellipse 55% 65% at  10%  92%,  rgba(34,  197,  94, 0.20) 0%, transparent 60%),
+    radial-gradient(ellipse 45% 40% at  80%  80%,  rgba(56,  189, 248, 0.10) 0%, transparent 55%);
   background-attachment: fixed;
 }
 
-/* Glass surface utility */
+/* ── Grain texture ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  opacity: 0.025;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── Glass utility ── */
 .glass {
   background: var(--color-surface);
   backdrop-filter: var(--glass-blur);
@@ -62,9 +95,78 @@ body {
   box-shadow: var(--glass-shadow);
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-
-::-webkit-scrollbar        { width: 5px; height: 5px; }
+/* ── Scrollbar ── */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(255,255,255,0.12); border-radius: 3px; }
+::-webkit-scrollbar-thumb  { background: rgba(245, 200, 66, 0.20); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(245, 200, 66, 0.38); }
+
+/* ── Focus & selection ── */
+:focus-visible {
+  outline: 2px solid rgba(245, 200, 66, 0.55);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+::selection {
+  background: rgba(245, 200, 66, 0.25);
+  color: #fff;
+}
+
+/* ── Structural overrides: force dark-blue tint on hardcoded surfaces ── */
+
+/* Sidebar */
+aside {
+  background: rgba(4, 8, 22, 0.92) !important;
+  border-right: 1px solid rgba(245, 200, 66, 0.12) !important;
+  backdrop-filter: blur(32px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(180%) !important;
+}
+
+/* Sticky headers / toolbars */
+.sticky {
+  background: rgba(4, 8, 22, 0.94) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(245, 200, 66, 0.10) !important;
+}
+
+/* Card surfaces — replace dark gray with dark blue tint */
+[style*="rgba(35,35,47"],
+[style*="rgba(35, 35, 47"],
+[style*="rgba(22,22,36"],
+[style*="rgba(18,18,30"],
+[style*="rgba(25, 25, 38"],
+[style*="rgba(15,15,24"] {
+  background: rgba(8, 18, 48, 0.72) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border-color: rgba(245, 200, 66, 0.09) !important;
+}
+
+/* Active nav items — gold highlight */
+[style*="rgba(155,109,255,0.18)"],
+[style*="rgba(155, 109, 255, 0.18)"] {
+  background: rgba(245, 200, 66, 0.12) !important;
+}
+
+/* Active nav text/icons — gold */
+[style*="color: #A78BFA"],
+[style*="color:#A78BFA"] {
+  color: #F5C842 !important;
+}
+
+/* Elevated panels */
+[style*="rgba(14,20,50"],
+[style*="rgba(14, 20, 50"] {
+  background: rgba(10, 22, 58, 0.68) !important;
+}
+
+/* ── Animations ── */
+@keyframes spin    { to { transform: rotate(360deg); } }
+@keyframes fadeUp  { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}

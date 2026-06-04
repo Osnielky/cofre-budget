@@ -19,4 +19,5 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   entities: [User, BankAccount, PlaidItem, Transaction, Category, Budget, Project, ProjectCategory],
   synchronize: true,
   logging: false,
+  ssl: process.env.DB_HOST?.includes('supabase') ? true : false,
 }));
