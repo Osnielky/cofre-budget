@@ -42,6 +42,67 @@ const TYPE_META: Record<AccountType, { label: string; accent: string; icon: stri
 
 const PRESET_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0'];
 
+interface CardDesign { id: string; name: string; gradient: string; color: string; brand: 'VISA' | 'MC' | 'AMEX' | '' }
+
+const CARD_DESIGNS: Record<string, CardDesign[]> = {
+  'Bank of America': [
+    /* Customized Cash Rewards — deep faceted red, diagonal geometric planes, VISA Signature */
+    { id: 'boa-cash',    name: 'Cash Rewards',    gradient: 'linear-gradient(145deg,#D91A2A 0%,#9B0F1A 22%,#C81828 40%,#7D0A15 62%,#B51522 80%,#D41A2E 100%)', color: '#C81828', brand: 'VISA' },
+    /* Travel Rewards — navy blue with lighter blue diagonal planes */
+    { id: 'boa-travel',  name: 'Travel Rewards',  gradient: 'linear-gradient(145deg,#003580 0%,#002060 22%,#1B4FA0 42%,#001540 62%,#1B5FB0 82%,#003087 100%)', color: '#003087', brand: 'VISA' },
+    /* Premium Rewards — dark charcoal with subtle geometric planes */
+    { id: 'boa-premium', name: 'Premium Rewards', gradient: 'linear-gradient(145deg,#2C2C2C 0%,#141414 25%,#383838 48%,#0A0A0A 68%,#282828 85%,#1A1A1A 100%)', color: '#1A1A1A', brand: 'VISA' },
+    /* BankAmericard — silver/gray geometric planes */
+    { id: 'boa-bank',    name: 'BankAmericard',   gradient: 'linear-gradient(145deg,#A0A0A0 0%,#6E6E6E 25%,#BABABA 48%,#585858 68%,#969696 85%,#7B7B7B 100%)', color: '#7B7B7B', brand: 'VISA' },
+    /* Checking debit — standard BofA red, no brand mark */
+    { id: 'boa-check',   name: 'Checking',        gradient: 'linear-gradient(145deg,#D91A2A 0%,#9B0F1A 22%,#C81828 40%,#7D0A15 62%,#B51522 80%,#D41A2E 100%)', color: '#C81828', brand: '' },
+  ],
+  'Chase': [
+    { id: 'ch-sap-p',  name: 'Sapphire Preferred', gradient: 'linear-gradient(135deg,#1C3F6E 0%,#2471A3 100%)', color: '#1C3F6E', brand: 'VISA' },
+    { id: 'ch-sap-r',  name: 'Sapphire Reserve',   gradient: 'linear-gradient(135deg,#212121 0%,#424242 100%)', color: '#212121', brand: 'VISA' },
+    { id: 'ch-freedom',name: 'Freedom',             gradient: 'linear-gradient(135deg,#0070BA 0%,#00A8E0 100%)', color: '#0070BA', brand: 'VISA' },
+    { id: 'ch-ink',    name: 'Ink Business',        gradient: 'linear-gradient(135deg,#1A1A1A 0%,#333 100%)',    color: '#1A1A1A', brand: 'VISA' },
+    { id: 'ch-check',  name: 'Checking',            gradient: 'linear-gradient(135deg,#117ACA 0%,#0A5E9E 100%)', color: '#117ACA', brand: '' },
+  ],
+  'Wells Fargo': [
+    { id: 'wf-active',    name: 'Active Cash',  gradient: 'linear-gradient(135deg,#CC0000 0%,#990000 100%)', color: '#CC0000', brand: 'VISA' },
+    { id: 'wf-autograph', name: 'Autograph',    gradient: 'linear-gradient(135deg,#8B0000 0%,#CC3333 100%)', color: '#8B0000', brand: 'VISA' },
+    { id: 'wf-check',     name: 'Checking',     gradient: 'linear-gradient(135deg,#CC0000 0%,#B8860B 60%)',  color: '#CC0000', brand: '' },
+  ],
+  'Citibank': [
+    { id: 'citi-double', name: 'Double Cash',  gradient: 'linear-gradient(135deg,#003B70 0%,#1A5276 100%)', color: '#003B70', brand: 'MC' },
+    { id: 'citi-custom', name: 'Custom Cash',  gradient: 'linear-gradient(135deg,#1A3A6B 0%,#E67E22 100%)', color: '#1A3A6B', brand: 'MC' },
+    { id: 'citi-check',  name: 'Checking',     gradient: 'linear-gradient(135deg,#003B70 0%,#0055A0 100%)', color: '#003B70', brand: '' },
+  ],
+  'Capital One': [
+    { id: 'c1-venture',  name: 'Venture X',     gradient: 'linear-gradient(135deg,#1A1A1A 0%,#3D3D3D 100%)', color: '#2D2D2D', brand: 'VISA' },
+    { id: 'c1-quick',    name: 'Quicksilver',   gradient: 'linear-gradient(135deg,#8A8A8A 0%,#C0C0C0 100%)', color: '#8A8A8A', brand: 'MC' },
+    { id: 'c1-savor',    name: 'Savor',         gradient: 'linear-gradient(135deg,#D03027 0%,#AA1010 100%)', color: '#D03027', brand: 'MC' },
+    { id: 'c1-check',    name: 'Checking',      gradient: 'linear-gradient(135deg,#D03027 0%,#B01020 100%)', color: '#D03027', brand: '' },
+  ],
+  'U.S. Bank': [
+    { id: 'usb-altitude', name: 'Altitude Go', gradient: 'linear-gradient(135deg,#0C2074 0%,#1A3899 100%)', color: '#0C2074', brand: 'VISA' },
+    { id: 'usb-cash',     name: 'Cash+',       gradient: 'linear-gradient(135deg,#0C2074 0%,#3D5AF1 100%)', color: '#1A3899', brand: 'VISA' },
+    { id: 'usb-check',    name: 'Checking',    gradient: 'linear-gradient(135deg,#0C2074 0%,#1A3899 100%)', color: '#0C2074', brand: '' },
+  ],
+  'Truist': [
+    { id: 'tr-check', name: 'Checking',   gradient: 'linear-gradient(135deg,#6B2C91 0%,#4A1E6B 100%)', color: '#6B2C91', brand: '' },
+    { id: 'tr-cash',  name: 'Enjoy Cash', gradient: 'linear-gradient(135deg,#4A1E6B 0%,#7B35A5 100%)', color: '#4A1E6B', brand: 'VISA' },
+  ],
+  'PNC Bank': [
+    { id: 'pnc-check', name: 'Checking',     gradient: 'linear-gradient(135deg,#FF6600 0%,#CC5200 100%)', color: '#FF6600', brand: '' },
+    { id: 'pnc-cash',  name: 'Cash Rewards', gradient: 'linear-gradient(135deg,#FF6600 0%,#003087 100%)', color: '#FF6600', brand: 'VISA' },
+  ],
+  'TD Bank': [
+    { id: 'td-check',  name: 'Checking',   gradient: 'linear-gradient(135deg,#34B233 0%,#27892B 100%)', color: '#34B233', brand: '' },
+    { id: 'td-cash',   name: 'Cash Back',  gradient: 'linear-gradient(135deg,#27892B 0%,#34B233 100%)', color: '#34B233', brand: 'VISA' },
+  ],
+  'Goldman Sachs': [
+    { id: 'gs-marcus', name: 'Marcus',     gradient: 'linear-gradient(135deg,#2E4D3A 0%,#4A7B5E 100%)', color: '#2E4D3A', brand: '' },
+    { id: 'gs-apple',  name: 'Apple Card', gradient: 'linear-gradient(135deg,#1C1C1C 0%,#3D3D3D 100%)', color: '#1C1C1C', brand: 'MC' },
+  ],
+};
+
 const glass: React.CSSProperties = {
   background: 'var(--color-surface)',
   backdropFilter: 'var(--glass-blur)',
@@ -413,8 +474,10 @@ export default function SettingsPage() {
                             onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))}
                             className="px-3 py-2.5 text-sm outline-none rounded-xl w-full" style={inputStyle} />
                         ) : (
-                          <BankSelect value={form.bankName} onChange={(v) => setForm((f) => ({ ...f, bankName: v }))}
-                            inputStyle={{ ...inputStyle, borderRadius: '0.75rem' }} />
+                          <BankSelect value={form.bankName} onChange={(v: string) => {
+                            const firstCard = CARD_DESIGNS[v]?.[0];
+                            setForm((f) => ({ ...f, bankName: v, color: firstCard ? firstCard.color : PRESET_COLORS[0] }));
+                          }} inputStyle={{ ...inputStyle, borderRadius: '0.75rem' }} />
                         )}
                       </div>
                       )}
@@ -454,34 +517,94 @@ export default function SettingsPage() {
                         )}
                       </div>
 
-                      {/* Balance + Color */}
-                      <div className="flex gap-3">
-                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                            {form.accountType === 'loan' ? 'Amount Owed' : form.accountType === 'credit' ? 'Current Debt' : 'Balance'}
-                          </label>
-                          <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.12)' }}>
-                            <span className="flex items-center px-3 text-xs font-semibold shrink-0"
-                              style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
-                              {form.currency}
-                            </span>
-                            <input type="number" step="0.01" placeholder="0.00" value={form.balance}
-                              onChange={(e) => setForm((f) => ({ ...f, balance: e.target.value }))}
-                              className="flex-1 px-3 py-2.5 text-sm outline-none min-w-0"
-                              style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-primary)' }} />
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</label>
-                          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ ...inputStyle }}>
-                            {PRESET_COLORS.map((c) => (
-                              <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
-                                className="w-5 h-5 rounded-full transition-all hover:scale-110 shrink-0"
-                                style={{ background: c, boxShadow: form.color === c ? `0 0 0 2px rgba(0,0,0,0.6), 0 0 0 4px ${c}` : 'none' }} />
-                            ))}
-                          </div>
+                      {/* Balance */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                          {form.accountType === 'loan' ? 'Amount Owed' : form.accountType === 'credit' ? 'Current Debt' : 'Balance'}
+                        </label>
+                        <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+                          <span className="flex items-center px-3 text-xs font-semibold shrink-0"
+                            style={{ background: 'var(--color-surface)', color: 'var(--color-text-muted)', borderRight: '1px solid var(--color-border)' }}>
+                            {form.currency}
+                          </span>
+                          <input type="number" step="0.01" placeholder="0.00" value={form.balance}
+                            onChange={(e) => setForm((f) => ({ ...f, balance: e.target.value }))}
+                            className="flex-1 px-3 py-2.5 text-sm outline-none min-w-0"
+                            style={{ background: 'var(--color-elevated)', color: 'var(--color-text-primary)' }} />
                         </div>
                       </div>
+
+                      {/* Card Design / Color picker */}
+                      {(() => {
+                        const bankCards = CARD_DESIGNS[form.bankName] ?? [];
+                        if (bankCards.length > 0) {
+                          return (
+                            <div className="flex flex-col gap-2">
+                              <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                                Card Design
+                              </label>
+                              <div className="grid grid-cols-5 gap-2.5 p-3 rounded-xl" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                                {bankCards.map((design) => {
+                                  const sel = form.color === design.color;
+                                  return (
+                                    <button key={design.id} type="button"
+                                      onClick={() => setForm((f) => ({ ...f, color: design.color }))}
+                                      className="flex flex-col gap-1 items-center group outline-none"
+                                      title={design.name}>
+                                      {/* Card thumbnail */}
+                                      <div className="relative transition-transform hover:scale-105 duration-150"
+                                        style={{
+                                          width: 72, height: 45, borderRadius: 6,
+                                          background: design.gradient,
+                                          border: sel ? '2px solid rgba(255,255,255,0.9)' : '2px solid transparent',
+                                          boxShadow: sel
+                                            ? `0 0 0 2px ${design.color}, 0 6px 20px rgba(0,0,0,0.4)`
+                                            : '0 2px 8px rgba(0,0,0,0.25)',
+                                          overflow: 'hidden',
+                                          flexShrink: 0,
+                                        }}>
+                                        {/* EMV chip */}
+                                        <div className="absolute" style={{ top: 7, left: 8, width: 20, height: 14, borderRadius: 3, background: 'linear-gradient(135deg,#D4AF37 0%,#F5E06B 50%,#D4AF37 100%)' }} />
+                                        {/* Brand mark */}
+                                        {design.brand === 'VISA' && (
+                                          <span className="absolute font-black italic" style={{ bottom: 4, right: 5, fontSize: 8, color: 'rgba(255,255,255,0.85)', letterSpacing: 0.5 }}>VISA</span>
+                                        )}
+                                        {design.brand === 'MC' && (
+                                          <div className="absolute flex" style={{ bottom: 4, right: 5 }}>
+                                            <div className="w-3.5 h-3.5 rounded-full opacity-85" style={{ background: '#EB001B' }} />
+                                            <div className="w-3.5 h-3.5 rounded-full -ml-1.5 opacity-85" style={{ background: '#F79E1B' }} />
+                                          </div>
+                                        )}
+                                        {design.brand === 'AMEX' && (
+                                          <span className="absolute font-black" style={{ bottom: 4, right: 5, fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>AMEX</span>
+                                        )}
+                                        {/* Shimmer */}
+                                        <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.25) 0%,transparent 50%)', pointerEvents: 'none' }} />
+                                      </div>
+                                      {/* Card name */}
+                                      <p className="text-center leading-tight" style={{ fontSize: 9, width: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: sel ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                                        {design.name}
+                                      </p>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="flex flex-col gap-1.5">
+                            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</label>
+                            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ ...inputStyle }}>
+                              {PRESET_COLORS.map((c) => (
+                                <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
+                                  className="w-5 h-5 rounded-full transition-all hover:scale-110 shrink-0"
+                                  style={{ background: c, boxShadow: form.color === c ? `0 0 0 2px rgba(0,0,0,0.6), 0 0 0 4px ${c}` : 'none' }} />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                     </div>
 
