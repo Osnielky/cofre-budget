@@ -325,43 +325,119 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
 
 /* ── Validation ─────────────────────────────────────────────────── */
 
+interface BankFingerprint {
+  bank: string;       // normalized bank name for matching
+  type: 'bank' | 'credit';
+  headerIncludes: string[];   // ALL must be present in header row
+  headerExcludes?: string[];  // NONE must be present
+}
+
+const BANK_FINGERPRINTS: BankFingerprint[] = [
+  // Chase Checking: Details, Posting Date, Type (with values like PARTNERFI_TO_CHASE)
+  { bank: 'chase', type: 'bank',   headerIncludes: ['details', 'posting date', 'check or slip'] },
+  // Chase Credit: Card, Transaction Date, Category, Memo
+  { bank: 'chase', type: 'credit', headerIncludes: ['card', 'transaction date', 'post date', 'category', 'memo'] },
+  // Bank of America Checking: Date, Description, Amount, Running Bal.
+  { bank: 'bank of america', type: 'bank',   headerIncludes: ['running bal'] },
+  // Bank of America Credit: Posted Date, Reference Number, Payee, Address
+  { bank: 'bank of america', type: 'credit', headerIncludes: ['posted date', 'reference number', 'payee', 'address'] },
+  // Wells Fargo: Date, Amount, Balance, Description (no "type" col)
+  { bank: 'wells fargo', type: 'bank',   headerIncludes: ['date', 'amount', 'balance', 'description'], headerExcludes: ['details', 'running bal', 'reference number'] },
+  // Citibank credit: Status, Date, Description, Debit, Credit
+  { bank: 'citi',        type: 'credit', headerIncludes: ['status', 'debit', 'credit', 'description'], headerExcludes: ['balance'] },
+  // Capital One: Transaction Date, Posted Date, Card No., Description, Category, Debit, Credit
+  { bank: 'capital one', type: 'credit', headerIncludes: ['transaction date', 'posted date', 'card no'] },
+];
+
+const DATE_COL_HINTS = ['date','posting date','transaction date','trans date','post date','activity date','value date'];
+
+function detectCsvFingerprint(rawText: string): { bank: string | null; type: 'bank' | 'credit' | 'unknown' } {
+  // Find the real header row (some banks like BofA prepend a summary block)
+  const allLines = rawText.split('\n').map(l => l.trim().replace(/\r/g, ''));
+  let headerLine = allLines[0].toLowerCase();
+  for (let i = 0; i < Math.min(allLines.length, 15); i++) {
+    const lower = allLines[i].toLowerCase();
+    if (DATE_COL_HINTS.some(d => lower.split(',').some(col => col.trim() === d))) {
+      headerLine = lower;
+      break;
+    }
+  }
+  const context = allLines.slice(0, 15).join('\n').toLowerCase();
+
+  for (const fp of BANK_FINGERPRINTS) {
+    const allPresent = fp.headerIncludes.every(h => headerLine.includes(h));
+    const noneExcluded = !fp.headerExcludes?.some(h => headerLine.includes(h));
+    if (allPresent && noneExcluded) return { bank: fp.bank, type: fp.type };
+  }
+
+  // Fallback type-only detection (no bank identified)
+  if (context.includes('running bal') || context.includes('partnerfi_to_chase') || context.includes('fee_transaction')) {
+    return { bank: null, type: 'bank' };
+  }
+  if (headerLine.includes('reference number') || headerLine.includes('ref no')) {
+    return { bank: null, type: 'credit' };
+  }
+  return { bank: null, type: 'unknown' };
+}
+
+function bankNamesMatch(csvBank: string, accountBank: string): boolean {
+  const csv = csvBank.toLowerCase();
+  const acc = accountBank.toLowerCase();
+  // Allow partial matches: "chase" matches "Chase Bank", "JPMorgan Chase", etc.
+  return acc.includes(csv) || csv.includes(acc) ||
+    (csv === 'bank of america' && (acc.includes('bofa') || acc.includes('boa'))) ||
+    (csv === 'citi' && acc.includes('citibank'));
+}
+
+// Keep old name as wrapper for backward compatibility
 function detectCsvType(rawText: string): 'bank' | 'credit' | 'unknown' {
-  const header = rawText.split('\n').slice(0, 15).join('\n').toLowerCase();
-  if (header.includes('running bal') || header.includes('running balance')) return 'bank';
-  if (header.includes('reference number') || header.includes('ref no')) return 'credit';
-  return 'unknown';
+  return detectCsvFingerprint(rawText).type;
 }
 
 function validate(rows: CsvRow[], account: BankAccount, fileName: string, rawText = ''): Warning[] {
   const warnings: Warning[] = [];
 
-  /* Column-header type mismatch — hard block */
-  const csvType = detectCsvType(rawText);
+  /* ── Primary: bank format fingerprint ── */
+  const { bank: csvBank, type: csvType } = detectCsvFingerprint(rawText);
   const acctIsCredit = account.accountType === 'credit';
   const acctIsBank   = ['checking', 'savings', 'cash', 'debit'].includes(account.accountType);
+
+  // Wrong account TYPE (credit vs bank)
   if (csvType === 'bank' && acctIsCredit) {
-    warnings.push({ level: 'error', message: `These transactions do not belong to this account.` });
+    warnings.push({ level: 'error', message: 'These transactions do not belong to this account.' });
   }
   if (csvType === 'credit' && acctIsBank) {
-    warnings.push({ level: 'error', message: `These transactions do not belong to this account.` });
+    warnings.push({ level: 'error', message: 'These transactions do not belong to this account.' });
   }
 
-  /* Last-4 check: find standalone 4-digit groups that aren't years or part of longer numbers.
-     e.g. "Chase7682_Activity_20260530.CSV" → "7682" (skips 20260530 as it's an 8-digit date) */
-  const baseName = fileName.replace(/\.(?:csv|txt)$/i, '');
-  const allLast4 = [...baseName.matchAll(/(?<!\d)(\d{4})(?!\d)/g)].map((m) => m[1]);
-  const fileLast4 = allLast4.filter((n) => { const v = parseInt(n, 10); return v < 1900 || v > 2099; }).at(-1) ?? null;
+  // Wrong BANK — same account type but different institution
+  if (csvBank) {
+    const csvBankLabel = csvBank.charAt(0).toUpperCase() + csvBank.slice(1);
+    if (account.bankName && !bankNamesMatch(csvBank, account.bankName)) {
+      // Bank name is set and doesn't match
+      warnings.push({
+        level: 'error',
+        message: `This file is from ${csvBankLabel} but "${account.accountName}" is at ${account.bankName}.`,
+      });
+    } else if (!account.bankName) {
+      // Account has no bank name set — can't verify, warn the user
+      warnings.push({
+        level: 'warn',
+        message: `This file appears to be from ${csvBankLabel}. Make sure "${account.accountName}" is also a ${csvBankLabel} account.`,
+      });
+    }
+  }
+
+  /* ── Secondary: last-4 digit check (account-level, not just bank-level) ── */
+  const baseName  = fileName.replace(/\.(?:csv|txt)$/i, '');
+  const allLast4  = [...baseName.matchAll(/(?<!\d)(\d{4})(?!\d)/g)].map(m => m[1]);
+  const fileLast4 = allLast4.filter(n => { const v = parseInt(n,10); return v < 1900 || v > 2099; }).at(-1) ?? null;
+
   if (fileLast4 && account.last4 && fileLast4 !== account.last4) {
-    warnings.push({
-      level: 'error',
-      message: `These transactions do not belong to this account.`,
-    });
+    warnings.push({ level: 'error', message: 'These transactions do not belong to this account.' });
   }
   if (fileLast4 && !account.last4) {
-    warnings.push({
-      level: 'warn',
-      message: `This file appears to belong to an account ending in ${fileLast4}. Set the "Last 4" digits on "${account.accountName}" in Settings to enable automatic detection next time.`,
-    });
+    warnings.push({ level: 'warn', message: `File appears to be for account ending in ${fileLast4}. Set "Last 4" on "${account.accountName}" in Settings to auto-detect next time.` });
   }
 
   const positiveCount = rows.filter((r) => r.amount > 0).length;

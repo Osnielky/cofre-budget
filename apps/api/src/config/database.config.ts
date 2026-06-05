@@ -1,5 +1,7 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
+import * as fs from 'fs';
+import * as path from 'path';
 import { User } from '../users/user.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { PlaidItem } from '../plaid/plaid-item.entity';
@@ -19,5 +21,10 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   entities: [User, BankAccount, PlaidItem, Transaction, Category, Budget, Project, ProjectCategory],
   synchronize: true,
   logging: false,
-  ssl: process.env.DB_HOST?.includes('supabase') ? true : false,
+  ssl: (() => {
+    if (!process.env.DB_HOST?.includes('supabase.co')) return false;
+    const caPath = ['supabase-ca.crt.crt', 'supabase-ca.crt'].map(f => path.resolve(process.cwd(), f)).find(p => fs.existsSync(p)) ?? '';
+    if (caPath) return { rejectUnauthorized: true, ca: fs.readFileSync(caPath).toString() };
+    return { rejectUnauthorized: false };
+  })(),
 }));

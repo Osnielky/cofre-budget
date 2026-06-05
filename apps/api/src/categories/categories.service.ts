@@ -26,6 +26,7 @@ const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'created
   { name: 'Child Support',  icon: '👨‍👧', color: '#E879A0', type: 'expense',  description: 'Court-ordered child support payments' },
   { name: 'Child Expenses', icon: '🧒', color: '#9B6DFF', type: 'expense',  description: 'School, activities & child care costs' },
   { name: 'Reimbursement',  icon: '🤝', color: '#4FBF7F', type: 'income',   description: 'Money received back from shared expenses or refunds' },
+  { name: 'Cash-reward',    icon: '🎁', color: '#F5C842', type: 'income',   description: 'Credit card cash back, bank rewards & bonuses' },
   { name: 'Salary',         icon: '💼', color: '#4FBF7F', type: 'income',   description: 'Regular employment income' },
   { name: 'Freelance',      icon: '💻', color: '#9B6DFF', type: 'income',   description: 'Contract & self-employment earnings' },
   { name: 'Investments',    icon: '📈', color: '#F5C842', type: 'income',   description: 'Dividends, returns & capital gains' },
@@ -44,9 +45,21 @@ export class CategoriesService {
   async findAllByUser(userId: string): Promise<Category[]> {
     const existing = await this.repo.find({ where: { userId }, order: { isDefault: 'DESC', createdAt: 'ASC' } });
 
-    // Only seed on first visit — never re-add deleted categories
     if (existing.length === 0) {
+      // First visit — seed all defaults
       const entities = DEFAULTS.map((d) => this.repo.create({ ...d, userId, isDefault: true }));
+      await this.repo.save(entities);
+      return this.repo.find({ where: { userId }, order: { isDefault: 'DESC', createdAt: 'ASC' } });
+    }
+
+    // Add any new defaults that don't exist yet (never re-add ones the user deleted)
+    const existingNames = new Set(existing.map((c) => c.name));
+    const existingDefaults = new Set(existing.filter((c) => c.isDefault).map((c) => c.name));
+    const newDefaults = DEFAULTS.filter(
+      (d) => !existingNames.has(d.name) && !existingDefaults.has(d.name),
+    );
+    if (newDefaults.length > 0) {
+      const entities = newDefaults.map((d) => this.repo.create({ ...d, userId, isDefault: true }));
       await this.repo.save(entities);
       return this.repo.find({ where: { userId }, order: { isDefault: 'DESC', createdAt: 'ASC' } });
     }
