@@ -61,9 +61,11 @@ interface Project {
 }
 
 const glass: React.CSSProperties = {
-  background: 'rgba(35,35,47,0.50)', backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)',
-  boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+  background: 'var(--color-surface)',
+  backdropFilter: 'var(--glass-blur)',
+  WebkitBackdropFilter: 'var(--glass-blur)',
+  border: 'var(--glass-border)',
+  boxShadow: 'var(--glass-shadow)',
 };
 
 const inputStyle: React.CSSProperties = {
@@ -325,7 +327,7 @@ export default function ProjectsPage() {
 
         {/* Header */}
         <div className="sticky top-0 z-20 px-6 pt-5 pb-4 flex items-center justify-between gap-3"
-          style={{ background: 'rgba(15,15,26,0.88)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Projects</h1>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
@@ -647,7 +649,7 @@ export default function ProjectsPage() {
             onMouseDown={(e) => { if (e.target === e.currentTarget) closeForm(); }}>
             <form onSubmit={handleSave}
               className="w-full max-w-md flex flex-col rounded-2xl overflow-hidden"
-              style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
+              style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
 
               {/* Live preview header */}
               {(() => {
@@ -811,7 +813,7 @@ export default function ProjectsPage() {
             onMouseDown={(e) => { if (e.target === e.currentTarget) setShowSell(null); }}>
             <form onSubmit={handleSell}
               className="w-full max-w-lg flex flex-col gap-5 p-6 rounded-2xl"
-              style={{ background: 'rgba(22,22,36,0.98)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)', maxHeight: '90vh', overflowY: 'auto' }}>
+              style={{ background: 'var(--color-surface)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '90vh', overflowY: 'auto' }}>
 
               {/* Header */}
               <div className="flex items-center gap-3">
@@ -1025,7 +1027,7 @@ export default function ProjectsPage() {
             style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
             onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowLinkPicker(null); setPendingLinkTx(null); } }}>
             <div className="w-full max-w-lg flex flex-col gap-4 p-6 rounded-2xl"
-              style={{ background: 'rgba(22,22,36,0.98)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)', maxHeight: '80vh' }}>
+              style={{ background: 'var(--color-surface)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '80vh' }}>
 
               {!pendingLinkTx ? (
                 /* ── Step 1: pick transaction ── */
@@ -1190,7 +1192,7 @@ export default function ProjectsPage() {
             style={{ background: 'rgba(0,0,0,0.70)', backdropFilter: 'blur(6px)' }}
             onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmDelete(null); }}>
             <div className="w-full max-w-sm flex flex-col gap-5 p-6 rounded-2xl"
-              style={{ background: 'rgba(22,22,36,0.98)', border: '1px solid rgba(255,107,107,0.20)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+              style={{ background: 'var(--color-surface)', border: '1px solid rgba(255,107,107,0.20)', boxShadow: 'var(--glass-shadow)' }}>
 
               <div className="flex items-start gap-4">
                 <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0"
@@ -1261,7 +1263,7 @@ function ProjectCategoryPicker({
       </button>
       {open && (
         <div className="absolute left-0 top-full mt-1 z-30 rounded-xl overflow-hidden min-w-36"
-          style={{ background: 'rgba(22,22,36,0.98)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+          style={{ background: 'var(--color-surface)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
           {current && (
             <button
               onClick={() => { onAssign(null); setOpen(false); }}

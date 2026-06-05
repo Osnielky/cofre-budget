@@ -137,7 +137,7 @@ export default function DataResetModal({ accounts, onClose, onDone }: Props) {
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
 
       <div className="w-full max-w-lg flex flex-col rounded-2xl overflow-hidden"
-        style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
+        style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
 
         {/* ── Modal header ── */}
         <div className="flex items-center justify-between px-6 py-4"

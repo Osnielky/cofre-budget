@@ -22,11 +22,11 @@ interface Props {
 interface Warning { level: 'warn' | 'error'; message: string; }
 
 const glass: React.CSSProperties = {
-  background: 'rgba(25, 25, 38, 0.92)',
-  backdropFilter: 'blur(24px)',
-  WebkitBackdropFilter: 'blur(24px)',
-  border: '1px solid rgba(255,255,255,0.10)',
-  boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+  background: 'var(--color-surface)',
+  backdropFilter: 'var(--glass-blur)',
+  WebkitBackdropFilter: 'var(--glass-blur)',
+  border: 'var(--glass-border)',
+  boxShadow: 'var(--glass-shadow)',
 };
 
 const ACC_ICONS: Record<string, string> = {
@@ -135,7 +135,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
 
       <div className="w-full max-w-xl flex flex-col rounded-2xl overflow-hidden"
-        style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)', maxHeight: '90vh' }}>
+        style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '90vh' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4"
@@ -235,7 +235,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
                 <div className="max-h-52 overflow-y-auto">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0">
-                      <tr style={{ background: 'rgba(18,18,30,0.98)', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                      <tr style={{ background: 'var(--color-elevated)', borderBottom: '1px solid var(--color-border)' }}>
                         <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Date</th>
                         <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Description</th>
                         <th className="text-right px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Amount</th>

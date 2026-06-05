@@ -31,9 +31,11 @@ type Filter    = 'all' | 'uncategorized' | 'expense' | 'income';
 type RangeMode = 'month' | 'custom';
 
 const glass: React.CSSProperties = {
-  background: 'rgba(35,35,47,0.50)', backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)',
-  boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+  background: 'var(--color-surface)',
+  backdropFilter: 'var(--glass-blur)',
+  WebkitBackdropFilter: 'var(--glass-blur)',
+  border: 'var(--glass-border)',
+  boxShadow: 'var(--glass-shadow)',
 };
 
 /* ── date helpers ──────────────────────────────────────────────── */
@@ -527,7 +529,7 @@ export default function TransactionsPage() {
 
         {/* ── Sticky header ── */}
         <div className="sticky top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-4"
-          style={{ background: 'rgba(15,15,26,0.88)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
 
           {/* Title + actions */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -549,11 +551,11 @@ export default function TransactionsPage() {
                 {showImportPicker && (
                   <div className="absolute right-0 top-full mt-2 z-30 rounded-2xl overflow-hidden"
                     style={{
-                      background: 'rgba(14,14,24,0.98)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      boxShadow: '0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)',
-                      backdropFilter: 'blur(24px)',
-                      WebkitBackdropFilter: 'blur(24px)',
+                      background: 'var(--color-elevated)',
+                      border: 'var(--glass-border)',
+                      boxShadow: 'var(--glass-shadow)',
+                      backdropFilter: 'var(--glass-blur)',
+                      WebkitBackdropFilter: 'var(--glass-blur)',
                       minWidth: '280px',
                     }}>
 
@@ -653,7 +655,7 @@ export default function TransactionsPage() {
                             </button>
                             {newAccTypeOpen && (
                               <div className="absolute top-full left-0 right-0 mt-1 rounded-lg overflow-hidden z-50"
-                                style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)' }}>
+                                style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
                                 {[['checking','Checking'],['savings','Savings'],['credit','Credit Card'],['investment','Investment'],['cash','Cash'],['loan','Loan']].map(([val, label]) => (
                                   <button key={val} type="button"
                                     onClick={() => { setNewAcc((f) => ({ ...f, accountType: val })); setNewAccTypeOpen(false); }}
@@ -886,8 +888,8 @@ export default function TransactionsPage() {
                     onClick={() => toggleCollapse(accountId)}
                     className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left transition-all hover:brightness-110"
                     style={{
-                      background: `linear-gradient(135deg, ${accColor}14 0%, rgba(35,35,47,0.50) 100%)`,
-                      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+                      background: `linear-gradient(135deg, ${accColor}14 0%, var(--color-surface) 100%)`,
+                      backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
                       border: `1px solid ${accColor}35`,
                       boxShadow: `0 4px 24px rgba(0,0,0,0.3), inset 0 0 0 1px ${accColor}10`,
                     }}>
@@ -1719,7 +1721,7 @@ export default function TransactionsPage() {
               return (
                 <form onSubmit={saveManualTx}
                   className="w-full max-w-md flex flex-col rounded-2xl"
-                  style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
+                  style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
 
                   {/* Hero header */}
                   <div className="flex flex-col items-center gap-3 px-6 pt-6 pb-5 rounded-t-2xl"
@@ -1789,7 +1791,7 @@ export default function TransactionsPage() {
                         </button>
                         {manualAccOpen && (
                           <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
-                            style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 60, maxHeight: 200 }}>
+                            style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', zIndex: 60, maxHeight: 200 }}>
                             {accounts.map((a) => (
                               <button key={a.id} type="button"
                                 onClick={() => { setManualTx((f) => ({ ...f, bankAccountId: a.id })); setManualAccOpen(false); }}
@@ -1829,7 +1831,7 @@ export default function TransactionsPage() {
                       </button>
                       {manualCatOpen && (
                         <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
-                          style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)', zIndex: 60, maxHeight: 220 }}>
+                          style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', zIndex: 60, maxHeight: 220 }}>
                           <button type="button" onClick={() => { setManualTx((f) => ({ ...f, categoryId: '' })); setManualCatOpen(false); }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
                             style={{ color: 'var(--color-text-muted)' }}
@@ -1893,7 +1895,7 @@ export default function TransactionsPage() {
 
               return (
                 <div className="w-full max-w-md flex flex-col rounded-2xl overflow-hidden"
-                  style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
+                  style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
 
                   {/* Header */}
                   <div className="flex items-center justify-between px-5 py-4"
@@ -2093,10 +2095,10 @@ export default function TransactionsPage() {
           <div
             className="fixed bottom-6 right-6 z-50 flex items-start gap-3 px-4 py-3.5 rounded-2xl"
             style={{
-              background: 'rgba(22,22,36,0.97)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-              backdropFilter: 'blur(20px)',
+              background: 'var(--color-surface)',
+              border: 'var(--glass-border)',
+              boxShadow: 'var(--glass-shadow)',
+              backdropFilter: 'var(--glass-blur)',
               minWidth: '260px',
               maxWidth: '340px',
               animation: 'slideUp 0.25s ease-out',
@@ -2170,10 +2172,10 @@ export default function TransactionsPage() {
 
       {/* ── Budget column ── */}
       <div className="shrink-0 flex flex-col overflow-hidden border-l"
-        style={{ width: budgetWidth, minWidth: 180, maxWidth: 480, borderColor: 'rgba(255,255,255,0.06)', background: 'rgba(12,12,22,0.6)' }}>
+        style={{ width: budgetWidth, minWidth: 180, maxWidth: 480, borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
 
         <div className="px-4 py-4 border-b shrink-0 flex items-center justify-between gap-2"
-          style={{ borderColor: 'rgba(255,255,255,0.06)', background: 'rgba(15,15,26,0.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
+          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
           <div>
             <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Budget</p>
             <p className="text-sm font-semibold mt-0.5">{monthLabel(budgetMonth)}</p>
@@ -2240,9 +2242,9 @@ export default function TransactionsPage() {
       {/* ── Notifications column ── */}
       {showNotifications ? (
         <aside className="hidden 2xl:flex w-64 shrink-0 flex-col border-l"
-          style={{ borderColor: 'rgba(255,255,255,0.06)', background: 'rgba(10,10,20,0.5)' }}>
+          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
           <div className="px-4 py-4 border-b shrink-0 flex items-center justify-between gap-2"
-            style={{ borderColor: 'rgba(255,255,255,0.06)', background: 'rgba(15,15,26,0.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
+            style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
             <div>
               <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Notifications</p>
             </div>
@@ -2259,7 +2261,7 @@ export default function TransactionsPage() {
         </aside>
       ) : (
         <div className="hidden 2xl:flex w-8 shrink-0 flex-col items-center border-l"
-          style={{ borderColor: 'rgba(255,255,255,0.06)', background: 'rgba(10,10,20,0.5)' }}>
+          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
           <button onClick={toggleNotifications} title="Show notifications"
             className="mt-4 w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
             style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-muted)' }}>

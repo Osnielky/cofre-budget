@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Logo from './Logo';
+import { useUser } from './UserProvider';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -17,15 +18,8 @@ const NAV = [
 export default function Sidebar() {
   const pathname   = usePathname();
   const router     = useRouter();
-  const [user, setUser]         = useState<{ name?: string; email: string } | null>(null);
+  const { user } = useUser();
   const [loggingOut, setLoggingOut] = useState(false);
-
-  useEffect(() => {
-    fetch(`${API}/auth/me`, { credentials: 'include' })
-      .then((r) => r.ok ? r.json() : null)
-      .then((u) => { if (u) setUser(u); })
-      .catch(() => {});
-  }, []);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -38,10 +32,10 @@ export default function Sidebar() {
 
   return (
     <aside className="w-56 shrink-0 flex flex-col" style={{
-      background: 'rgba(15,15,24,0.85)',
-      backdropFilter: 'blur(24px)',
-      WebkitBackdropFilter: 'blur(24px)',
-      borderRight: '1px solid rgba(255,255,255,0.06)',
+      background: 'var(--color-surface)',
+      backdropFilter: 'var(--glass-blur)',
+      WebkitBackdropFilter: 'var(--glass-blur)',
+      borderRight: '1px solid var(--color-border)',
     }}>
 
       {/* ── Logo ── */}
@@ -52,7 +46,7 @@ export default function Sidebar() {
             <p className="font-black text-sm tracking-widest uppercase leading-none"
               style={{ color: 'var(--color-text-primary)' }}>Cofre</p>
             <p className="text-[9px] font-bold tracking-widest uppercase leading-none mt-0.5"
-              style={{ color: 'rgba(155,109,255,0.6)' }}>Budget</p>
+              style={{ color: 'var(--color-primary)', opacity: 0.6 }}>Budget</p>
           </div>
         </Link>
       </div>
@@ -65,17 +59,17 @@ export default function Sidebar() {
             <Link key={href} href={href}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group relative"
               style={{
-                color: active ? 'white' : 'var(--color-text-muted)',
-                background: active ? 'rgba(155,109,255,0.14)' : 'transparent',
+                color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                background: active ? 'var(--nav-active-bg)' : 'transparent',
               }}
-              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(128,128,128,0.08)'; }}
               onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
               {active && (
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full"
-                  style={{ background: '#9B6DFF', boxShadow: '0 0 8px #9B6DFF' }} />
+                  style={{ background: 'var(--nav-active-bar)' }} />
               )}
-              <span style={{ color: active ? '#9B6DFF' : 'var(--color-text-muted)', transition: 'color .15s' }}>
+              <span style={{ color: active ? 'var(--nav-icon-active)' : 'var(--color-text-secondary)', transition: 'color .15s' }}>
                 <Icon />
               </span>
               {label}
@@ -92,17 +86,17 @@ export default function Sidebar() {
             <Link href="/settings"
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
               style={{
-                color: active ? 'white' : 'var(--color-text-muted)',
-                background: active ? 'rgba(155,109,255,0.14)' : 'transparent',
+                color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                background: active ? 'var(--nav-active-bg)' : 'transparent',
               }}
-              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(128,128,128,0.08)'; }}
               onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
               {active && (
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full"
-                  style={{ background: '#9B6DFF' }} />
+                  style={{ background: 'var(--nav-active-bar)' }} />
               )}
-              <span style={{ color: active ? '#9B6DFF' : 'var(--color-text-muted)' }}><SettingsIcon /></span>
+              <span style={{ color: active ? 'var(--nav-icon-active)' : 'var(--color-text-muted)' }}><SettingsIcon /></span>
               Settings
             </Link>
           );
@@ -111,7 +105,7 @@ export default function Sidebar() {
 
       {/* ── User block ── */}
       <div className="mx-3 mb-4 p-3 rounded-2xl flex items-center gap-2.5"
-        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)' }}>
         <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0"
           style={{ background: 'linear-gradient(135deg, #9B6DFF 0%, #E879A0 100%)', color: 'white' }}>
           {initials}

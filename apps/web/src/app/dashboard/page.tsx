@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
+import { useUser } from '@/components/UserProvider';
 import { BANKS } from '@/components/BankSelect';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -61,9 +62,11 @@ function greeting() {
 }
 
 const glass: React.CSSProperties = {
-  background: 'rgba(22,22,36,0.60)', backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)',
-  boxShadow: '0 4px 32px rgba(0,0,0,0.3)',
+  background: 'var(--color-surface)',
+  backdropFilter: 'var(--glass-blur)',
+  WebkitBackdropFilter: 'var(--glass-blur)',
+  border: 'var(--glass-border)',
+  boxShadow: 'var(--glass-shadow)',
 };
 
 function TrendBadge({ delta, inverse = false }: { delta: number; inverse?: boolean }) {
@@ -102,7 +105,7 @@ export default function DashboardPage() {
   const [budgets, setBudgets]      = useState<Budget[]>([]);
   const [projects, setProjects]    = useState<Project[]>([]);
   const [loading, setLoading]      = useState(true);
-  const [user, setUser]            = useState<{ name?: string; email?: string } | null>(null);
+  const { user } = useUser();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,20 +113,18 @@ export default function DashboardPage() {
       const from = monthFrom(month), to = monthTo(month);
       const yearFrom = `${new Date().getFullYear()}-01-01`;
       const yearTo   = new Date().toISOString().slice(0, 10);
-      const [tx, ytx, accs, bdg, proj, me] = await Promise.all([
+      const [tx, ytx, accs, bdg, proj] = await Promise.all([
         fetch(`${API}/transactions?from=${from}&to=${to}&limit=500`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/transactions?from=${yearFrom}&to=${yearTo}&limit=5000`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/bank-accounts`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/budgets?month=${month}`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/projects`, { credentials:'include' }).then(r=>r.json()),
-        fetch(`${API}/auth/me`, { credentials:'include' }).then(r=>r.ok?r.json():null).catch(()=>null),
       ]);
       setTx(Array.isArray(tx) ? tx : []);
       setYearTx(Array.isArray(ytx) ? ytx : []);
       setAccounts(Array.isArray(accs) ? accs : []);
       setBudgets(Array.isArray(bdg) ? bdg : []);
       setProjects(Array.isArray(proj) ? proj : []);
-      setUser(me);
     } catch {} finally { setLoading(false); }
   }, [month]);
 
@@ -218,12 +219,12 @@ export default function DashboardPage() {
 
         {/* ── Sticky header ── */}
         <div className="sticky top-0 z-20 px-6 pt-5 pb-4 flex items-center justify-between gap-4"
-          style={{ background: 'rgba(15,15,24,0.92)', backdropFilter: 'blur(24px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
           <div>
             <h1 className="text-xl font-bold tracking-tight">
               {greeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''} 👋
             </h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
               Here's your financial snapshot
             </p>
           </div>
@@ -295,7 +296,7 @@ export default function DashboardPage() {
                       tick={{ fill: '#6B6B8A', fontSize: 10 }} axisLine={false} tickLine={false} width={46} />
                     <Tooltip
                       cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                      contentStyle={{ background: 'rgba(18,18,30,0.97)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 12, fontSize: 12 }}
+                      contentStyle={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 12, fontSize: 12 }}
                       labelStyle={{ color: 'white', fontWeight: 700, marginBottom: 4 }}
                       formatter={(v: number, name: string) => [`$${fmt(v)}`, name === 'revenue' ? 'Revenue' : name === 'expenses' ? 'Expenses' : 'Cumulative Net']}
                     />
@@ -329,7 +330,7 @@ export default function DashboardPage() {
                           dataKey="value" nameKey="name" paddingAngle={3} stroke="none">
                           {revPieData.map((e,i) => <Cell key={i} fill={e.color} />)}
                         </Pie>
-                        <Tooltip contentStyle={{ background: 'rgba(18,18,30,0.97)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, fontSize: 11 }}
+                        <Tooltip contentStyle={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 10, fontSize: 11 }}
                           formatter={(v: number) => [`$${fmt(v)}`]} />
                       </PieChart>
                     </ResponsiveContainer>
@@ -386,7 +387,7 @@ export default function DashboardPage() {
                     <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.04)" />
                     <XAxis dataKey="date" tick={{ fill: '#6B6B8A', fontSize: 9 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
                     <YAxis tickFormatter={v => `$${v}`} tick={{ fill: '#6B6B8A', fontSize: 9 }} axisLine={false} tickLine={false} width={36} />
-                    <Tooltip contentStyle={{ background: 'rgba(18,18,30,0.97)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, fontSize: 11 }}
+                    <Tooltip contentStyle={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 10, fontSize: 11 }}
                       formatter={(v: number) => [`$${fmt(v)}`, 'Spent']} />
                     <Area type="monotone" dataKey="total" stroke="#F07A3E" strokeWidth={2} fill="url(#spendGrad)" dot={false} />
                   </AreaChart>
@@ -432,7 +433,7 @@ export default function DashboardPage() {
                           {topCats.map(({ cat }, i) => <Cell key={i} fill={cat.color} />)}
                         </Pie>
                         <Tooltip
-                          contentStyle={{ background: 'rgba(18,18,30,0.97)', border: '1px solid rgba(255,255,255,0.10)', borderRadius: 10, fontSize: 11 }}
+                          contentStyle={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 10, fontSize: 11 }}
                           formatter={(v: number, name: string) => [`$${fmt(v)}`, name]}
                         />
                       </PieChart>

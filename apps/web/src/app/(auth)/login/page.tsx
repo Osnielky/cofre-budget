@@ -37,11 +37,11 @@ export default function LoginPage() {
       <div
         className="w-full max-w-sm flex flex-col overflow-hidden"
         style={{
-          background: 'rgba(35, 35, 47, 0.75)',
-          backdropFilter: 'blur(24px)',
-          WebkitBackdropFilter: 'blur(24px)',
-          border: '1px solid rgba(255,255,255,0.09)',
-          boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
+          background: 'var(--color-surface)',
+          backdropFilter: 'var(--glass-blur)',
+          WebkitBackdropFilter: 'var(--glass-blur)',
+          border: 'var(--glass-border)',
+          boxShadow: 'var(--glass-shadow)',
           borderRadius: 'var(--radius-card)',
         }}
       >
@@ -76,8 +76,8 @@ export default function LoginPage() {
               placeholder="you@example.com"
               className="px-4 py-3 text-sm outline-none transition-colors"
               style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.10)',
+                background: 'var(--color-elevated)',
+                border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-input)',
                 color: 'var(--color-text-primary)',
               }}
@@ -91,8 +91,8 @@ export default function LoginPage() {
               placeholder="••••••••"
               className="px-4 py-3 text-sm outline-none transition-colors"
               style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.10)',
+                background: 'var(--color-elevated)',
+                border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-input)',
                 color: 'var(--color-text-primary)',
               }}
@@ -113,17 +113,17 @@ export default function LoginPage() {
         </form>
 
         <div className="flex items-center gap-3">
-          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+          <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
           <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>or</span>
-          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+          <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
         </div>
 
         <a
           href={`${API}/auth/google`}
           className="flex items-center justify-center gap-3 py-3 text-sm font-semibold transition-all hover:brightness-110"
           style={{
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.12)',
+            background: 'var(--color-elevated)',
+            border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-card)',
             color: 'var(--color-text-primary)',
           }}

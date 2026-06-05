@@ -136,7 +136,7 @@ export default function ProjectCategoryManager() {
 
       {/* Category list */}
       <div className="flex flex-col gap-2 rounded-2xl p-4"
-        style={{ background: 'rgba(35,35,47,0.50)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)' }}>
 
         {loading ? (
           <p className="text-sm py-4 text-center" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>

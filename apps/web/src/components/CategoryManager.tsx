@@ -18,11 +18,11 @@ const TYPE_META: Record<string, { label: string; color: string }> = {
 };
 
 const glass: React.CSSProperties = {
-  background: 'rgba(35, 35, 47, 0.50)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+  background: 'var(--color-surface)',
+  backdropFilter: 'var(--glass-blur)',
+  WebkitBackdropFilter: 'var(--glass-blur)',
+  border: 'var(--glass-border)',
+  boxShadow: 'var(--glass-shadow)',
 };
 
 export default function CategoryManager() {
@@ -164,7 +164,7 @@ export default function CategoryManager() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
           <div className="w-full max-w-md rounded-2xl flex flex-col gap-5 p-6"
-            style={{ background: 'rgba(25,25,40,0.97)', border: '1px solid rgba(255,255,255,0.10)', boxShadow: '0 24px 64px rgba(0,0,0,0.7)' }}>
+            style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
 
             {/* Header */}
             <div className="flex items-start gap-3">
@@ -279,9 +279,11 @@ interface ColProps {
 }
 function CategoryColumn({ title, color, icon, cats, onEdit, onDelete, deletingId }: ColProps) {
   const glass: React.CSSProperties = {
-    background: 'rgba(35,35,47,0.50)', backdropFilter: 'blur(20px)',
-    WebkitBackdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.08)',
-    boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+    background: 'var(--color-surface)',
+    backdropFilter: 'var(--glass-blur)',
+    WebkitBackdropFilter: 'var(--glass-blur)',
+    border: 'var(--glass-border)',
+    boxShadow: 'var(--glass-shadow)',
   };
   return (
     <div className="flex flex-col gap-2">

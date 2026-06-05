@@ -15,7 +15,6 @@ export default function Logo({ size = 48, className }: LogoProps) {
       className={className}
       style={{ borderRadius: '50%', objectFit: 'cover' }}
       priority
-      unoptimized
     />
   );
 }

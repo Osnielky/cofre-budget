@@ -108,7 +108,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
 
       <form onSubmit={handleSubmit}
         className="w-full max-w-sm flex flex-col rounded-2xl overflow-hidden"
-        style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
+        style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
 
         {/* Live preview header */}
         <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3"
@@ -230,9 +230,9 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
       {showEmojiPicker && emojiPos && (
         <div ref={emojiPickerRef} className="p-3 rounded-xl grid grid-cols-10 gap-1"
           style={{ position: 'fixed', top: emojiPos.top, left: emojiPos.left, width: 360, maxHeight: 340,
-                   overflowY: 'auto', zIndex: 9999, background: 'rgba(25,25,40,0.97)',
-                   backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
-                   border: '1px solid rgba(255,255,255,0.12)', boxShadow: '0 12px 40px rgba(0,0,0,0.6)' }}>
+                   overflowY: 'auto', zIndex: 9999, background: 'var(--color-elevated)',
+                   backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
+                   border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
           {EMOJI_OPTIONS.map((em) => (
             <button key={em} type="button"
               onClick={() => { setForm((f) => ({ ...f, icon: em })); setShowEmojiPicker(false); }}

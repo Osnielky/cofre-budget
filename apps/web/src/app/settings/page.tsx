@@ -10,11 +10,13 @@ import ProjectCategoryManager from '@/components/ProjectCategoryManager';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import DataResetModal from '@/components/DataResetModal';
+import { useTheme } from '@/components/ThemeProvider';
+import { THEMES } from '@/lib/theme';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 type AccountType = 'checking' | 'savings' | 'credit' | 'investment' | 'cash' | 'loan';
-type Tab = 'banks' | 'categories' | 'projects' | 'data';
+type Tab = 'banks' | 'categories' | 'projects' | 'appearance' | 'data';
 
 interface BankAccount {
   id: string;
@@ -41,19 +43,16 @@ const TYPE_META: Record<AccountType, { label: string; accent: string; icon: stri
 const PRESET_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0'];
 
 const glass: React.CSSProperties = {
-  background: 'rgba(35, 35, 47, 0.50)',
-  backdropFilter: 'blur(20px)',
-  WebkitBackdropFilter: 'blur(20px)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+  background: 'var(--color-surface)',
+  backdropFilter: 'var(--glass-blur)',
+  WebkitBackdropFilter: 'var(--glass-blur)',
+  border: 'var(--glass-border)',
+  boxShadow: 'var(--glass-shadow)',
 };
 
 const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.07)',
-  borderTop: '1px solid rgba(255,255,255,0.14)',
-  borderRight: '1px solid rgba(255,255,255,0.14)',
-  borderBottom: '1px solid rgba(255,255,255,0.14)',
-  borderLeft: '1px solid rgba(255,255,255,0.14)',
+  background: 'var(--color-elevated)',
+  border: '1px solid var(--color-border)',
   borderRadius: 'var(--radius-input)',
   color: 'var(--color-text-primary)',
 };
@@ -87,6 +86,15 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    id: 'appearance',
+    label: 'Appearance',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+      </svg>
+    ),
+  },
+  {
     id: 'data',
     label: 'Data',
     icon: (
@@ -100,6 +108,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('banks');
+  const { theme: activeTheme, setTheme } = useTheme();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showManualForm, setShowManualForm] = useState(false);
@@ -255,7 +264,7 @@ export default function SettingsPage() {
       <main className="flex-1 overflow-y-auto">
         {/* Page header */}
         <div className="sticky top-0 z-10 px-6 pt-6 pb-4"
-          style={{ background: 'rgba(15,15,26,0.80)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
           <h1 className="text-2xl font-bold tracking-tight mb-4">Settings</h1>
 
           {/* Tab bar */}
@@ -317,7 +326,7 @@ export default function SettingsPage() {
 
                   <form onSubmit={editingAccount ? handleUpdate : handleAdd}
                     className="w-full max-w-md flex flex-col rounded-2xl overflow-hidden"
-                    style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.09)', boxShadow: '0 32px 80px rgba(0,0,0,0.8)' }}>
+                    style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
 
                     {/* Header */}
                     <div className="flex items-center justify-between px-6 py-5"
@@ -363,9 +372,9 @@ export default function SettingsPage() {
                           {typeOpen && (
                             <div style={{
                               position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 100,
-                              background: 'rgba(18,18,30,0.99)', backdropFilter: 'blur(20px)',
-                              WebkitBackdropFilter: 'blur(20px)',
-                              border: '1px solid rgba(255,255,255,0.10)',
+                              background: 'var(--color-elevated)', backdropFilter: 'var(--glass-blur)',
+                              WebkitBackdropFilter: 'var(--glass-blur)',
+                              border: 'var(--glass-border)',
                               borderRadius: '0.75rem', overflow: 'hidden',
                               boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
                             }}>
@@ -432,7 +441,7 @@ export default function SettingsPage() {
                                 <path d="M8 7v5M8 5.5v.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                               </svg>
                               <span className="absolute bottom-full right-0 mb-2 w-48 text-[11px] leading-relaxed font-normal normal-case tracking-normal rounded-lg px-3 py-2.5 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
-                                style={{ background: 'rgba(18,18,30,0.99)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--color-text-secondary)', boxShadow: '0 8px 24px rgba(0,0,0,0.5)', whiteSpace: 'normal' }}>
+                                style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', color: 'var(--color-text-secondary)', boxShadow: 'var(--glass-shadow)', whiteSpace: 'normal' }}>
                                 Last 4 digits of your card or account number. Used to detect if a CSV file belongs to this account on import.
                                 <span className="absolute top-full right-2 -mt-px" style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid rgba(255,255,255,0.12)' }} />
                               </span>
@@ -626,6 +635,61 @@ export default function SettingsPage() {
           {/* ── PROJECT CATEGORIES TAB ── */}
           {activeTab === 'projects' && <ProjectCategoryManager />}
 
+          {/* ── APPEARANCE TAB ── */}
+          {activeTab === 'appearance' && (
+            <div className="flex flex-col gap-6 max-w-2xl">
+              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                Choose a visual theme. Your preference is saved locally.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {THEMES.map((t) => {
+                  const selected = activeTheme === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setTheme(t.id)}
+                      className="text-left flex flex-col gap-4 p-4 rounded-2xl transition-all hover:scale-[1.02]"
+                      style={{
+                        background: t.preview.bg,
+                        border: selected ? `2px solid ${t.preview.accent}` : `2px solid ${t.preview.border}`,
+                        boxShadow: selected
+                          ? `0 0 0 3px ${t.preview.accent}33, 0 8px 32px rgba(0,0,0,0.30)`
+                          : '0 2px 12px rgba(0,0,0,0.12)',
+                      }}>
+
+                      {/* Color swatches */}
+                      <div className="flex items-center gap-2">
+                        <div className="w-10 h-10 rounded-xl shrink-0"
+                          style={{ background: t.preview.surface, border: `1px solid ${t.preview.border}` }} />
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex gap-1.5">
+                            <div className="w-4 h-4 rounded-md" style={{ background: t.preview.accent }} />
+                            <div className="w-4 h-4 rounded-md" style={{ background: t.preview.accent2 }} />
+                            <div className="w-4 h-4 rounded-md opacity-50" style={{ background: t.preview.textDim }} />
+                          </div>
+                          <div className="h-1.5 rounded-full" style={{ background: t.preview.accent, width: 40, opacity: 0.7 }} />
+                        </div>
+                      </div>
+
+                      {/* Name + description */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-bold leading-tight" style={{ color: t.preview.text }}>{t.name}</p>
+                          <p className="text-[11px] mt-0.5" style={{ color: t.preview.textDim }}>{t.description}</p>
+                        </div>
+                        {selected && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                            style={{ background: `${t.preview.accent}22`, color: t.preview.accent }}>
+                            Active
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
         </div>
       </main>
