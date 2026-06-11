@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cofre — Dark Neon v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700&family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --base:     #0d0d12;
+    --base-2:   #0a0a0f;
+    --surface:  #13131a;
+    --elevated: #1a1a24;
+    --border:   #1e1e2e;
+    --border2:  #2a2a3a;
+
+    --text:     #f2f2f5;
+    --dim:      #9292a4;
+    --muted:    #4c4c5e;
+
+    --lime:     #c6f135;
+    --cyan:     #4df0c0;
+    --purple:   #9b6dff;
+    --danger:   #ff5f7e;
+
+    --display: 'Unbounded', sans-serif;
+    --body:    'Sora', sans-serif;
+    --mono:    'JetBrains Mono', monospace;
+  }
+
+  html, body {
+    font-family: var(--body);
+    background: var(--base);
+    color: var(--text);
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* faint dot-matrix field */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: radial-gradient(circle, rgba(198,241,53,0.05) 1px, transparent 1px);
+    background-size: 32px 32px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  /* single lime horizon glow at very top */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -120px; left: 20%;
+    width: 60%; height: 200px;
+    background: radial-gradient(ellipse at center, rgba(198,241,53,0.10) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .layout { display: flex; height: 100vh; position: relative; z-index: 1; }
+
+  /* ════════ SIDEBAR ════════ */
+  .sidebar {
+    width: 232px;
+    flex-shrink: 0;
+    background: var(--base-2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .logo-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 26px 22px 24px;
+  }
+  .logo-mark {
+    width: 38px; height: 38px;
+    border-radius: 11px;
+    background: var(--lime);
+    display: grid; place-items: center;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 17px;
+    color: #0d0d12;
+    box-shadow: 0 0 24px rgba(198,241,53,0.35), 0 0 60px rgba(198,241,53,0.12);
+  }
+  .logo-word {
+    font-family: var(--display);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+  }
+  .logo-word em { font-style: normal; color: var(--lime); }
+
+  .nav { flex: 1; padding: 4px 12px; display: flex; flex-direction: column; gap: 3px; }
+  .nav-cap {
+    font-family: var(--mono);
+    font-size: 9px; font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.22em;
+    padding: 16px 12px 8px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    color: var(--dim);
+    font-size: 13.5px;
+    font-weight: 400;
+    cursor: pointer;
+    position: relative;
+    transition: color .15s, background .15s;
+  }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+  .nav-item svg { width: 17px; height: 17px; opacity: .55; transition: opacity .15s; }
+  .nav-item:hover svg { opacity: .9; }
+  .nav-item.active {
+    background: linear-gradient(90deg, rgba(198,241,53,0.13) 0%, rgba(198,241,53,0.03) 100%);
+    color: var(--lime);
+    font-weight: 600;
+  }
+  .nav-item.active svg { opacity: 1; filter: drop-shadow(0 0 5px rgba(198,241,53,0.7)); }
+  .nav-item.active::after {
+    content: '';
+    position: absolute; right: 10px; top: 50%;
+    width: 5px; height: 5px;
+    margin-top: -2.5px;
+    border-radius: 50%;
+    background: var(--lime);
+    box-shadow: 0 0 8px var(--lime);
+  }
+  .nav-num {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--elevated);
+    border: 1px solid var(--border2);
+    border-radius: 5px;
+    padding: 1px 6px;
+  }
+
+  .side-foot {
+    margin: 12px;
+    padding: 13px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    display: flex; align-items: center; gap: 11px;
+    position: relative;
+    overflow: hidden;
+  }
+  .side-foot::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(198,241,53,0.5), transparent);
+  }
+  .avatar {
+    width: 34px; height: 34px; border-radius: 10px;
+    background: conic-gradient(from 200deg, var(--purple), var(--cyan), var(--lime), var(--purple));
+    display: grid; place-items: center;
+    font-weight: 600; font-size: 13px; color: #0d0d12;
+  }
+  .u-name { font-size: 12.5px; font-weight: 600; }
+  .u-tier {
+    font-family: var(--mono); font-size: 8.5px; letter-spacing: .18em;
+    color: var(--lime); margin-top: 2px;
+  }
+
+  /* ════════ MAIN ════════ */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .topbar {
+    height: 64px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 32px;
+    border-bottom: 1px solid var(--border);
+  }
+  .crumb { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .08em; }
+  .crumb b { color: var(--text); font-weight: 500; }
+  .top-right { display: flex; align-items: center; gap: 10px; }
+  .pill {
+    font-family: var(--mono); font-size: 10.5px;
+    padding: 6px 14px; border-radius: 99px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--dim);
+    letter-spacing: .06em;
+    cursor: pointer;
+  }
+  .pill.hot {
+    border-color: rgba(198,241,53,0.4);
+    color: var(--lime);
+    background: rgba(198,241,53,0.06);
+    box-shadow: 0 0 16px rgba(198,241,53,0.10);
+  }
+
+  .scroll {
+    flex: 1; overflow-y: auto;
+    padding: 34px 32px 48px;
+  }
+  .scroll::-webkit-scrollbar { width: 3px; }
+  .scroll::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ════════ HERO ════════ */
+  .hero {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin-bottom: 30px;
+    animation: rise .6s cubic-bezier(.2,.7,.2,1) both;
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: .26em; color: var(--muted);
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::before {
+    content: ''; width: 24px; height: 1px; background: var(--lime);
+    box-shadow: 0 0 6px var(--lime);
+  }
+  .hero-num {
+    font-family: var(--display);
+    font-size: clamp(40px, 5vw, 58px);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.01em;
+  }
+  .hero-num .cents { font-size: .45em; color: var(--muted); font-weight: 500; }
+  .hero-meta { display: flex; gap: 14px; margin-top: 14px; align-items: center; }
+  .delta {
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    color: #0d0d12;
+    background: var(--lime);
+    padding: 4px 10px; border-radius: 7px;
+    box-shadow: 0 0 18px rgba(198,241,53,0.45);
+  }
+  .hero-sub { font-size: 12px; color: var(--dim); font-weight: 300; }
+
+  .hero-cta {
+    display: flex; gap: 10px;
+  }
+  .btn {
+    font-family: var(--body); font-size: 13px; font-weight: 600;
+    padding: 12px 22px; border-radius: 12px; cursor: pointer;
+    border: 1px solid var(--border2);
+    background: var(--surface); color: var(--text);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn.primary {
+    background: var(--lime); color: #0d0d12; border: none;
+    box-shadow: 0 0 22px rgba(198,241,53,0.35);
+  }
+  .btn.primary:hover { box-shadow: 0 0 34px rgba(198,241,53,0.55); }
+
+  /* ════════ BENTO GRID ════════ */
+  .bento {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-auto-rows: 96px;
+    gap: 14px;
+  }
+  .cell {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+    animation: rise .6s cubic-bezier(.2,.7,.2,1) both;
+  }
+  .cell:nth-child(1) { animation-delay: .05s; }
+  .cell:nth-child(2) { animation-delay: .10s; }
+  .cell:nth-child(3) { animation-delay: .15s; }
+  .cell:nth-child(4) { animation-delay: .20s; }
+  .cell:nth-child(5) { animation-delay: .25s; }
+  .cell:nth-child(6) { animation-delay: .30s; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  .c-flow   { grid-column: span 8; grid-row: span 3; }
+  .c-save   { grid-column: span 4; grid-row: span 2; }
+  .c-burn   { grid-column: span 4; grid-row: span 1; }
+  .c-tx     { grid-column: span 7; grid-row: span 3; }
+  .c-budget { grid-column: span 5; grid-row: span 3; }
+
+  .cell-cap {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .cell-cap h3 {
+    font-family: var(--mono); font-size: 10px; font-weight: 500;
+    letter-spacing: .2em; color: var(--dim);
+  }
+  .cell-link {
+    font-family: var(--mono); font-size: 10px; color: var(--lime);
+    letter-spacing: .08em; cursor: pointer; opacity: .8;
+  }
+
+  /* ── cashflow chart ── */
+  .flow-svg { width: 100%; height: calc(100% - 58px); display: block; }
+  .flow-legend { display: flex; gap: 18px; margin-top: 8px; }
+  .lg { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: .1em; }
+  .lg i { width: 14px; height: 3px; border-radius: 2px; display: block; }
+
+  /* ── savings ring ── */
+  .c-save { display: flex; flex-direction: column; }
+  .ring-wrap { flex: 1; display: flex; align-items: center; gap: 20px; }
+  .ring { position: relative; width: 104px; height: 104px; flex-shrink: 0; }
+  .ring svg { transform: rotate(-90deg); }
+  .ring-val {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    font-family: var(--display); font-size: 21px; font-weight: 700;
+    color: var(--lime);
+    text-shadow: 0 0 18px rgba(198,241,53,0.5);
+  }
+  .ring-side .big { font-family: var(--display); font-size: 17px; font-weight: 600; }
+  .ring-side .small { font-size: 11px; color: var(--dim); margin-top: 4px; font-weight: 300; line-height: 1.5; }
+
+  /* ── burn rate ── */
+  .c-burn { display: flex; align-items: center; justify-content: space-between; border-color: rgba(255,95,126,0.25); }
+  .c-burn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 70% 120% at 100% 50%, rgba(255,95,126,0.08), transparent 60%);
+    pointer-events: none;
+  }
+  .burn-left h3 { font-family: var(--mono); font-size: 10px; letter-spacing: .2em; color: var(--dim); font-weight: 500; margin-bottom: 8px; }
+  .burn-num { font-family: var(--display); font-size: 24px; font-weight: 700; color: var(--danger); text-shadow: 0 0 20px rgba(255,95,126,0.4); }
+  .burn-num span { font-size: 12px; color: var(--muted); font-family: var(--body); font-weight: 400; }
+  .spark { display: flex; align-items: flex-end; gap: 3px; height: 40px; }
+  .spark i { width: 6px; border-radius: 2px 2px 0 0; background: rgba(255,95,126,0.35); display: block; }
+  .spark i:last-child { background: var(--danger); box-shadow: 0 0 10px rgba(255,95,126,0.6); }
+
+  /* ── transactions ── */
+  .tx { display: flex; flex-direction: column; }
+  .tx-row {
+    display: grid;
+    grid-template-columns: 38px 1fr auto auto;
+    align-items: center; gap: 14px;
+    padding: 10.5px 0;
+    border-bottom: 1px solid rgba(30,30,46,0.7);
+  }
+  .tx-row:last-child { border-bottom: none; }
+  .tx-ico {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: var(--elevated); border: 1px solid var(--border2);
+    display: grid; place-items: center; font-size: 16px;
+  }
+  .tx-n { font-size: 13px; font-weight: 500; }
+  .tx-c { font-family: var(--mono); font-size: 9.5px; color: var(--muted); letter-spacing: .06em; margin-top: 3px; }
+  .tx-tag {
+    font-family: var(--mono); font-size: 9px;
+    padding: 3px 8px; border-radius: 5px;
+    letter-spacing: .08em;
+  }
+  .tag-food { background: rgba(198,241,53,0.09);  color: var(--lime);   border: 1px solid rgba(198,241,53,0.18); }
+  .tag-inc  { background: rgba(77,240,192,0.09);  color: var(--cyan);   border: 1px solid rgba(77,240,192,0.18); }
+  .tag-sub  { background: rgba(155,109,255,0.10); color: var(--purple); border: 1px solid rgba(155,109,255,0.2); }
+  .tag-bill { background: rgba(255,95,126,0.09);  color: var(--danger); border: 1px solid rgba(255,95,126,0.18); }
+  .tx-amt { font-family: var(--mono); font-size: 13px; font-weight: 700; text-align: right; }
+  .tx-amt.neg { color: var(--text); }
+  .tx-amt.pos { color: var(--cyan); text-shadow: 0 0 14px rgba(77,240,192,0.4); }
+
+  /* ── budgets ── */
+  .bud { margin-bottom: 16px; }
+  .bud:last-child { margin-bottom: 0; }
+  .bud-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+  .bud-name { font-size: 12.5px; font-weight: 500; color: var(--text); }
+  .bud-num { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+  .bud-num b { color: var(--text); font-weight: 700; }
+  .bud-bar {
+    height: 7px; border-radius: 4px;
+    background: var(--elevated);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    position: relative;
+  }
+  .bud-fill { height: 100%; border-radius: 4px; position: relative; }
+  .bud-fill::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 60%, rgba(255,255,255,0.35));
+  }
+  .f-lime { background: var(--lime); box-shadow: 0 0 10px rgba(198,241,53,0.4); }
+  .f-cyan { background: var(--cyan); box-shadow: 0 0 10px rgba(77,240,192,0.35); }
+  .f-purp { background: var(--purple); box-shadow: 0 0 10px rgba(155,109,255,0.4); }
+  .f-dang { background: var(--danger); box-shadow: 0 0 12px rgba(255,95,126,0.55); }
+  .over-flag {
+    font-family: var(--mono); font-size: 8.5px; font-weight: 700;
+    color: var(--danger); letter-spacing: .14em;
+    animation: blink 1.4s steps(2) infinite;
+  }
+  @keyframes blink { 50% { opacity: .35; } }
+
+  .corner-tag {
+    position: fixed; top: 18px; right: 20px; z-index: 50;
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em;
+    color: var(--lime);
+    border: 1px solid rgba(198,241,53,0.35);
+    background: rgba(198,241,53,0.05);
+    padding: 7px 14px; border-radius: 99px;
+    box-shadow: 0 0 20px rgba(198,241,53,0.15);
+  }
+</style>
+</head>
+<body>
+
+<div class="corner-tag">DARK NEON · V2</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo-row">
+      <div class="logo-mark">C</div>
+      <div class="logo-word">COF<em>RE</em></div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-cap">OVERVIEW</div>
+      <div class="nav-item active">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        Dashboard
+      </div>
+      <div class="nav-item">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+        Transactions <span class="nav-num">128</span>
+      </div>
+      <div class="nav-item">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Budgets
+      </div>
+      <div class="nav-item">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+        Accounts <span class="nav-num">4</span>
+      </div>
+
+      <div class="nav-cap">PLANNING</div>
+      <div class="nav-item">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+        Projects
+      </div>
+      <div class="nav-item">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008.6 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 8.6a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        Settings
+      </div>
+    </nav>
+
+    <div class="side-foot">
+      <div class="avatar">O</div>
+      <div>
+        <div class="u-name">Osnielky</div>
+        <div class="u-tier">PRO MEMBER</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="crumb">cofre / <b>dashboard</b></div>
+      <div class="top-right">
+        <div class="pill">JUN 2026 ▾</div>
+        <div class="pill hot">+ Add transaction</div>
+      </div>
+    </div>
+
+    <div class="scroll">
+
+      <!-- HERO -->
+      <div class="hero">
+        <div>
+          <div class="eyebrow">TOTAL NET WORTH</div>
+          <div class="hero-num">$48,290<span class="cents">.84</span></div>
+          <div class="hero-meta">
+            <span class="delta">▲ 3.2%</span>
+            <span class="hero-sub">+$1,490 since May · best month this year</span>
+          </div>
+        </div>
+        <div class="hero-cta">
+          <button class="btn">Export</button>
+          <button class="btn primary">New budget</button>
+        </div>
+      </div>
+
+      <!-- BENTO -->
+      <div class="bento">
+
+        <!-- cash flow -->
+        <div class="cell c-flow">
+          <div class="cell-cap">
+            <h3>CASH FLOW</h3>
+            <span class="cell-link">6 MONTHS ▾</span>
+          </div>
+          <svg class="flow-svg" viewBox="0 0 600 180" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="gLime" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#c6f135" stop-opacity=".30"/>
+                <stop offset="100%" stop-color="#c6f135" stop-opacity="0"/>
+              </linearGradient>
+              <linearGradient id="gRose" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ff5f7e" stop-opacity=".22"/>
+                <stop offset="100%" stop-color="#ff5f7e" stop-opacity="0"/>
+              </linearGradient>
+              <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+            </defs>
+            <!-- grid -->
+            <g stroke="#1e1e2e" stroke-width="1">
+              <line x1="0" y1="45"  x2="600" y2="45"/>
+              <line x1="0" y1="90"  x2="600" y2="90"/>
+              <line x1="0" y1="135" x2="600" y2="135"/>
+            </g>
+            <!-- expenses area -->
+            <path d="M0,128 C60,122 90,138 150,130 C210,122 240,142 300,134 C360,126 390,118 450,124 C510,130 540,112 600,108 L600,180 L0,180 Z" fill="url(#gRose)"/>
+            <path d="M0,128 C60,122 90,138 150,130 C210,122 240,142 300,134 C360,126 390,118 450,124 C510,130 540,112 600,108" fill="none" stroke="#ff5f7e" stroke-width="2" opacity=".85"/>
+            <!-- income area -->
+            <path d="M0,95 C60,85 90,70 150,72 C210,74 240,55 300,58 C360,61 390,40 450,45 C510,50 540,22 600,18 L600,180 L0,180 Z" fill="url(#gLime)"/>
+            <path d="M0,95 C60,85 90,70 150,72 C210,74 240,55 300,58 C360,61 390,40 450,45 C510,50 540,22 600,18" fill="none" stroke="#c6f135" stroke-width="2.5" filter="url(#glow)"/>
+            <!-- end dot -->
+            <circle cx="600" cy="18" r="5" fill="#c6f135" filter="url(#glow)"/>
+          </svg>
+          <div class="flow-legend">
+            <span class="lg"><i style="background:#c6f135; box-shadow:0 0 6px #c6f135;"></i>INCOME</span>
+            <span class="lg"><i style="background:#ff5f7e;"></i>EXPENSES</span>
+            <span class="lg" style="margin-left:auto;">NET +$2,560 / MO AVG</span>
+          </div>
+        </div>
+
+        <!-- savings ring -->
+        <div class="cell c-save">
+          <div class="cell-cap"><h3>SAVINGS RATE</h3></div>
+          <div class="ring-wrap">
+            <div class="ring">
+              <svg width="104" height="104" viewBox="0 0 104 104">
+                <circle cx="52" cy="52" r="44" fill="none" stroke="#1a1a24" stroke-width="9"/>
+                <circle cx="52" cy="52" r="44" fill="none" stroke="#c6f135" stroke-width="9"
+                        stroke-linecap="round" stroke-dasharray="276.5" stroke-dashoffset="154"
+                        style="filter: drop-shadow(0 0 6px rgba(198,241,53,.6));"/>
+              </svg>
+              <div class="ring-val">44%</div>
+            </div>
+            <div class="ring-side">
+              <div class="big">$2,560</div>
+              <div class="small">saved this month.<br>Goal: 40% — <span style="color:var(--cyan)">beating it</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- burn rate -->
+        <div class="cell c-burn">
+          <div class="burn-left">
+            <h3>DAILY BURN</h3>
+            <div class="burn-num">$108<span> /day</span></div>
+          </div>
+          <div class="spark">
+            <i style="height:35%"></i><i style="height:50%"></i><i style="height:42%"></i>
+            <i style="height:65%"></i><i style="height:48%"></i><i style="height:58%"></i>
+            <i style="height:80%"></i>
+          </div>
+        </div>
+
+        <!-- transactions -->
+        <div class="cell c-tx tx">
+          <div class="cell-cap">
+            <h3>LATEST ACTIVITY</h3>
+            <span class="cell-link">VIEW ALL →</span>
+          </div>
+          <div class="tx-row">
+            <div class="tx-ico">🛒</div>
+            <div><div class="tx-n">Whole Foods Market</div><div class="tx-c">JUN 11 · 09:42</div></div>
+            <span class="tx-tag tag-food">GROCERIES</span>
+            <div class="tx-amt neg">−$64.20</div>
+          </div>
+          <div class="tx-row">
+            <div class="tx-ico">💼</div>
+            <div><div class="tx-n">Freelance — Invoice #112</div><div class="tx-c">JUN 10 · 16:05</div></div>
+            <span class="tx-tag tag-inc">INCOME</span>
+            <div class="tx-amt pos">+$1,200.00</div>
+          </div>
+          <div class="tx-row">
+            <div class="tx-ico">⚡</div>
+            <div><div class="tx-n">FPL Electric</div><div class="tx-c">JUN 09 · 07:00</div></div>
+            <span class="tx-tag tag-bill">UTILITIES</span>
+            <div class="tx-amt neg">−$88.50</div>
+          </div>
+          <div class="tx-row">
+            <div class="tx-ico">🎵</div>
+            <div><div class="tx-n">Spotify Premium</div><div class="tx-c">JUN 08 · 03:12</div></div>
+            <span class="tx-tag tag-sub">SUBSCRIPTION</span>
+            <div class="tx-amt neg">−$9.99</div>
+          </div>
+          <div class="tx-row">
+            <div class="tx-ico">🍕</div>
+            <div><div class="tx-n">Uber Eats</div><div class="tx-c">JUN 07 · 20:31</div></div>
+            <span class="tx-tag tag-food">DINING</span>
+            <div class="tx-amt neg">−$32.40</div>
+          </div>
+        </div>
+
+        <!-- budgets -->
+        <div class="cell c-budget">
+          <div class="cell-cap">
+            <h3>BUDGETS · JUNE</h3>
+            <span class="cell-link">MANAGE →</span>
+          </div>
+          <div class="bud">
+            <div class="bud-top"><span class="bud-name">🛒 Groceries</span><span class="bud-num"><b>$280</b> / $350</span></div>
+            <div class="bud-bar"><div class="bud-fill f-lime" style="width:80%"></div></div>
+          </div>
+          <div class="bud">
+            <div class="bud-top"><span class="bud-name">🚗 Transport</span><span class="bud-num"><b>$85</b> / $150</span></div>
+            <div class="bud-bar"><div class="bud-fill f-cyan" style="width:57%"></div></div>
+          </div>
+          <div class="bud">
+            <div class="bud-top"><span class="bud-name">💊 Health</span><span class="bud-num"><b>$60</b> / $200</span></div>
+            <div class="bud-bar"><div class="bud-fill f-purp" style="width:30%"></div></div>
+          </div>
+          <div class="bud">
+            <div class="bud-top">
+              <span class="bud-name">🎬 Entertainment <span class="over-flag">● OVER</span></span>
+              <span class="bud-num"><b>$220</b> / $100</span>
+            </div>
+            <div class="bud-bar"><div class="bud-fill f-dang" style="width:100%"></div></div>
+          </div>
+          <div class="bud">
+            <div class="bud-top">
+              <span class="bud-name">🛍 Shopping <span class="over-flag">● OVER</span></span>
+              <span class="bud-num"><b>$310</b> / $300</span>
+            </div>
+            <div class="bud-bar"><div class="bud-fill f-dang" style="width:100%"></div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

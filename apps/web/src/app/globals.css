@@ -276,3 +276,76 @@ html[data-theme="linen"] ::-webkit-scrollbar-thumb       { background: rgba(48,6
 html[data-theme="linen"] ::-webkit-scrollbar-thumb:hover { background: rgba(48,66,81,0.28); }
 html[data-theme="linen"] :focus-visible { outline-color: rgba(243,153,62,0.65); }
 html[data-theme="linen"] ::selection    { background: rgba(243,153,62,0.22); color: #304251; }
+
+
+/* ═══════════════════════════════════════════════
+   CRÈME LEDGER — Cream paper · espresso · brass
+   Private-banking ledger aesthetic. Flat paper
+   surfaces, serif display headings, no glass.
+═══════════════════════════════════════════════ */
+html[data-theme="creme"] {
+  --font-sans: var(--font-outfit), "Outfit", ui-sans-serif, system-ui, sans-serif;
+
+  --color-base:     #F6F1E7;
+  --color-surface:  #FDFBF5;
+  --color-elevated: #EFE7D7;
+  --color-border:   #E3D9C4;
+
+  --color-text-primary:   #2B2117;
+  --color-text-secondary: #6B5D4A;
+  --color-text-muted:     #A89878;
+
+  --color-primary:  #B08D3E;
+  --color-green:    #2E5944;
+  --color-rose:     #C05B3C;
+  --color-amber:    #B08D3E;
+  --color-orange:   #C2702F;
+  --color-sky:      #5F8A6F;
+  --color-violet:   #6E4A66;
+
+  --color-card-amber:  #B08D3E;
+  --color-card-orange: #C2702F;
+  --color-card-violet: #6E4A66;
+  --color-card-green:  #2E5944;
+  --color-card-sky:    #5F8A6F;
+  --color-card-red:    #C05B3C;
+
+  /* Inverted espresso pill for active nav */
+  --nav-active-bg:   #2B2117;
+  --nav-active-fg:   #F6F1E7;
+  --nav-active-bar:  #B08D3E;
+  --nav-icon-active: #B08D3E;
+  --sidebar-bg:      #FDFBF5;
+  --header-bg:       rgba(246, 241, 231, 0.97);
+
+  --glass-blur:   none;
+  --glass-border: 1px solid #E3D9C4;
+  --glass-shadow: 0 2px 10px rgba(43, 33, 23, 0.06), inset 0 1px 0 #FFFFFF;
+}
+html[data-theme="creme"] body {
+  background-image: none;
+}
+html[data-theme="creme"] body::before {
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+}
+html[data-theme="creme"] h1,
+html[data-theme="creme"] h2 {
+  font-family: var(--font-fraunces), "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+html[data-theme="creme"] aside {
+  border-right: 1px solid #E3D9C4 !important;
+  box-shadow: 2px 0 14px rgba(43,33,23,0.04) !important;
+  backdrop-filter: none !important;
+}
+html[data-theme="creme"] .sticky {
+  border-bottom: 1px solid #E3D9C4 !important;
+  box-shadow: 0 1px 8px rgba(43,33,23,0.04) !important;
+}
+html[data-theme="creme"] ::-webkit-scrollbar-thumb       { background: #D4C6A8; }
+html[data-theme="creme"] ::-webkit-scrollbar-thumb:hover { background: #B08D3E; }
+html[data-theme="creme"] :focus-visible { outline-color: rgba(176,141,62,0.70); }
+html[data-theme="creme"] ::selection    { background: rgba(176,141,62,0.25); color: #2B2117; }

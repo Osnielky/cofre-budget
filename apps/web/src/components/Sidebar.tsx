@@ -59,7 +59,7 @@ export default function Sidebar() {
             <Link key={href} href={href}
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group relative"
               style={{
-                color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                color: active ? 'var(--nav-active-fg, var(--color-text-primary))' : 'var(--color-text-secondary)',
                 background: active ? 'var(--nav-active-bg)' : 'transparent',
               }}
               onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(128,128,128,0.08)'; }}
@@ -86,7 +86,7 @@ export default function Sidebar() {
             <Link href="/settings"
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
               style={{
-                color: active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                color: active ? 'var(--nav-active-fg, var(--color-text-primary))' : 'var(--color-text-secondary)',
                 background: active ? 'var(--nav-active-bg)' : 'transparent',
               }}
               onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(128,128,128,0.08)'; }}
