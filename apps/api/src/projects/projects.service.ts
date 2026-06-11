@@ -11,6 +11,7 @@ export interface ProjectDto {
   icon?: string;
   color?: string;
   description?: string;
+  imageUrl?: string;
   purchasePrice?: number;
   purchaseDate?: string;
   status?: string;
@@ -118,8 +119,24 @@ export class ProjectsService {
 
   async findAllByUser(userId: string): Promise<(ProjectWithStats & { categories: ProjectCategory[] })[]> {
     const projects = await this.repo.find({ where: { userId }, order: { createdAt: 'DESC' } });
+    if (projects.length === 0) return [];
 
-    /* Cache type→categories so we don't hit the DB once per project */
+    // Single query for ALL project transactions instead of one per project
+    const projectIds = projects.map(p => p.id);
+    const allTxs = await this.txRepo
+      .createQueryBuilder('tx')
+      .where('tx.userId = :userId', { userId })
+      .andWhere('tx.projectId IN (:...ids)', { ids: projectIds })
+      .getMany();
+
+    // Group in memory
+    const txByProject: Record<string, typeof allTxs> = {};
+    for (const tx of allTxs) {
+      if (!txByProject[tx.projectId]) txByProject[tx.projectId] = [];
+      txByProject[tx.projectId].push(tx);
+    }
+
+    // Cache type→categories (at most 4-5 distinct types)
     const typeCache: Record<string, ProjectCategory[]> = {};
     const getTypeCats = async (type: string) => {
       if (!typeCache[type]) typeCache[type] = await this.loadTypeCategories(userId, type);
@@ -127,10 +144,14 @@ export class ProjectsService {
     };
 
     return Promise.all(projects.map(async (p) => {
-      const [stats, categories] = await Promise.all([
-        this.withStats(p),
-        getTypeCats(p.type ?? 'other'),
-      ]);
+      const txs      = txByProject[p.id] ?? [];
+      const expenses = txs.filter(t => Number(t.amount) < 0).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+      const income   = txs.filter(t => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
+      const costBasis = Number(p.purchasePrice) + expenses;
+      const netGain  = p.status === 'sold' && p.salePrice != null ? Number(p.salePrice) - costBasis : null;
+      const roi      = netGain != null && costBasis > 0 ? (netGain / costBasis) * 100 : null;
+      const stats    = { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length };
+      const categories = await getTypeCats(p.type ?? 'other');
       return { ...stats, categories };
     }));
   }

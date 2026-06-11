@@ -8,7 +8,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [error, setError] = useState('');
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
@@ -34,6 +34,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex items-center justify-center min-h-dvh px-4">
+      {/* Card */}
       <div
         className="w-full max-w-sm flex flex-col overflow-hidden"
         style={{
@@ -41,12 +42,12 @@ export default function LoginPage() {
           backdropFilter: 'var(--glass-blur)',
           WebkitBackdropFilter: 'var(--glass-blur)',
           border: 'var(--glass-border)',
-          boxShadow: 'var(--glass-shadow)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.60), inset 0 1px 0 rgba(255,255,255,0.10)',
           borderRadius: 'var(--radius-card)',
         }}
       >
-        {/* Hero image banner */}
-        <div className="relative w-full" style={{ height: '220px' }}>
+        {/* Hero image */}
+        <div className="relative w-full" style={{ height: '200px' }}>
           <Image
             src="/logo-chest.png"
             alt="Cofre"
@@ -55,85 +56,165 @@ export default function LoginPage() {
             priority
             style={{ objectFit: 'cover', objectPosition: 'center 30%' }}
           />
-          {/* Gradient fade into card */}
-          <div className="absolute inset-0" style={{
-            background: 'linear-gradient(to bottom, transparent 40%, rgba(35,35,47,0.75) 100%)',
-          }} />
-          {/* Title overlaid at bottom of image */}
-          <div className="absolute bottom-0 left-0 right-0 px-8 pb-4 text-center">
-            <h1 className="text-3xl font-extrabold tracking-tight">Cofre</h1>
-            <p className="text-sm mt-0.5" style={{ color: 'rgba(255,255,255,0.55)' }}>Budget tracker</p>
+          <div
+            className="absolute inset-0"
+            style={{ background: 'linear-gradient(to bottom, transparent 30%, rgba(4,15,44,0.88) 100%)' }}
+          />
+          <div className="absolute bottom-0 left-0 right-0 px-7 pb-5 text-center">
+            <h1 className="text-2xl font-bold tracking-tight" style={{ letterSpacing: '-0.02em' }}>
+              Cofre
+            </h1>
+            <p className="text-xs mt-1 font-medium" style={{ color: 'rgba(255,255,255,0.50)' }}>
+              Personal budget tracker
+            </p>
           </div>
         </div>
 
-        {/* Form area */}
-        <div className="px-8 pb-8 pt-5 flex flex-col gap-6">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4" suppressHydrationWarning>
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Email</span>
-            <input
-              name="email" type="email" required autoComplete="email"
-              placeholder="you@example.com"
-              className="px-4 py-3 text-sm outline-none transition-colors"
+        {/* Form */}
+        <div className="px-7 pb-7 pt-6 flex flex-col gap-5">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4" suppressHydrationWarning>
+
+            {/* Email */}
+            <label className="flex flex-col gap-1.5">
+              <span
+                className="text-xs font-semibold tracking-wide"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
+                Email
+              </span>
+              <input
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="you@example.com"
+                className="px-4 py-3 text-sm outline-none transition-all duration-200"
+                style={{
+                  background:   'var(--color-elevated)',
+                  border:       '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-input)',
+                  color:        'var(--color-text-primary)',
+                }}
+                onFocus={e => {
+                  e.currentTarget.style.border = '1px solid rgba(245,200,66,0.55)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245,200,66,0.12)';
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.border = '1px solid var(--color-border)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+            </label>
+
+            {/* Password */}
+            <label className="flex flex-col gap-1.5">
+              <span
+                className="text-xs font-semibold tracking-wide"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
+                Password
+              </span>
+              <input
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+                className="px-4 py-3 text-sm outline-none transition-all duration-200"
+                style={{
+                  background:   'var(--color-elevated)',
+                  border:       '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-input)',
+                  color:        'var(--color-text-primary)',
+                }}
+                onFocus={e => {
+                  e.currentTarget.style.border = '1px solid rgba(245,200,66,0.55)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245,200,66,0.12)';
+                }}
+                onBlur={e => {
+                  e.currentTarget.style.border = '1px solid var(--color-border)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+            </label>
+
+            {/* Error */}
+            {error && (
+              <div
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm"
+                style={{ background: 'rgba(244,63,94,0.10)', border: '1px solid rgba(244,63,94,0.25)', color: '#F87171' }}
+              >
+                <ErrorIcon />
+                {error}
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="py-3 mt-1 text-sm font-semibold transition-all duration-150 disabled:opacity-60"
               style={{
-                background: 'var(--color-elevated)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-input)',
-                color: 'var(--color-text-primary)',
+                background:    loading ? 'rgba(245,200,66,0.75)' : '#F5C842',
+                borderRadius:  'var(--radius-input)',
+                color:         '#010D1E',
+                fontWeight:    700,
+                letterSpacing: '0.01em',
+                cursor:        loading ? 'not-allowed' : 'pointer',
+                boxShadow:     loading ? 'none' : '0 4px 16px rgba(245,200,66,0.28)',
               }}
-            />
-          </label>
+              onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLElement).style.boxShadow = '0 6px 22px rgba(245,200,66,0.40)'; }}
+              onMouseLeave={e => { if (!loading) (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(245,200,66,0.28)'; }}
+            >
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+          </form>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Password</span>
-            <input
-              name="password" type="password" required autoComplete="current-password"
-              placeholder="••••••••"
-              className="px-4 py-3 text-sm outline-none transition-colors"
-              style={{
-                background: 'var(--color-elevated)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-input)',
-                color: 'var(--color-text-primary)',
-              }}
-            />
-          </label>
+          {/* Divider */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
+            <span className="text-xs font-medium" style={{ color: 'var(--color-text-muted)' }}>or</span>
+            <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
+          </div>
 
-          {error && (
-            <p className="text-sm text-center" style={{ color: 'var(--color-card-orange)' }}>{error}</p>
-          )}
-
-          <button
-            type="submit" disabled={loading}
-            className="py-3 mt-1 text-sm font-semibold transition-all hover:brightness-110 disabled:opacity-60"
-            style={{ background: '#F5C842', borderRadius: 'var(--radius-card)', color: '#06101E', fontWeight: 700 }}
+          {/* Google */}
+          <a
+            href={`${API}/auth/google`}
+            className="flex items-center justify-center gap-3 py-3 text-sm font-semibold transition-all duration-150"
+            style={{
+              background:   'var(--color-elevated)',
+              border:       '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-input)',
+              color:        'var(--color-text-primary)',
+              cursor:       'pointer',
+            }}
+            onMouseEnter={e => {
+              (e.currentTarget as HTMLElement).style.border     = '1px solid rgba(255,255,255,0.14)';
+              (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)';
+            }}
+            onMouseLeave={e => {
+              (e.currentTarget as HTMLElement).style.border     = '1px solid var(--color-border)';
+              (e.currentTarget as HTMLElement).style.background = 'var(--color-elevated)';
+            }}
           >
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
-          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>or</span>
-          <div className="flex-1 h-px" style={{ background: 'var(--color-border)' }} />
+            <GoogleIcon />
+            Continue with Google
+          </a>
         </div>
-
-        <a
-          href={`${API}/auth/google`}
-          className="flex items-center justify-center gap-3 py-3 text-sm font-semibold transition-all hover:brightness-110"
-          style={{
-            background: 'var(--color-elevated)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-card)',
-            color: 'var(--color-text-primary)',
-          }}
-        >
-          <GoogleIcon />
-          Continue with Google
-        </a>
-        </div>{/* end form area */}
       </div>
     </div>
+  );
+}
+
+/* ── Icons ── */
+
+function ErrorIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" y1="8" x2="12" y2="12"/>
+      <line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
   );
 }
 

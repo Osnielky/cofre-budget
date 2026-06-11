@@ -5,6 +5,7 @@ import {
 } from 'typeorm';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Category } from '../categories/category.entity';
+import { ProjectCategory } from '../projects/project-category.entity';
 
 @Entity('transactions')
 export class Transaction {
@@ -69,6 +70,10 @@ export class Transaction {
   /* Project-level category (e.g. "Tires", "Mechanic") */
   @Column({ nullable: true })
   projectCategoryId: string;
+
+  @ManyToOne(() => ProjectCategory, { nullable: true, eager: false })
+  @JoinColumn({ name: 'projectCategoryId' })
+  projectCategoryRef: ProjectCategory;
 
   /* Plaid's category hierarchy, e.g. ["Food and Drink", "Restaurants"] */
   @Column({ type: 'simple-array', nullable: true })

@@ -3,8 +3,18 @@ interface Props { type: string; size?: number }
 export default function AccountTypeIcon({ type, size = 18 }: Props) {
   if (type === 'credit') return <CreditCardIcon size={size} />;
   if (type === 'checking') return <DebitCardIcon size={size} />;
-  const icons: Record<string, string> = { savings: '🏦', investment: '📈', cash: '💵', loan: '🤝' };
+  if (type === 'investment') return <InvestmentIcon size={size} />;
+  const icons: Record<string, string> = { savings: '🏦', cash: '💵', loan: '🤝' };
   return <span style={{ fontSize: size * 0.85, lineHeight: 1 }}>{icons[type] ?? '🏦'}</span>;
+}
+
+function InvestmentIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+      <polyline points="16 7 22 7 22 13" />
+    </svg>
+  );
 }
 
 function CreditCardIcon({ size }: { size: number }) {

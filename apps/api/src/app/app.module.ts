@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import databaseConfig from '../config/database.config';
 import { UsersModule } from '../users/users.module';
@@ -15,6 +17,8 @@ import { DataResetModule } from '../data-reset/data-reset.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [databaseConfig] }),
+    // Global rate limiting: 100 requests per minute per IP
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => config.get('database') as any,
@@ -28,6 +32,10 @@ import { DataResetModule } from '../data-reset/data-reset.module';
     BudgetsModule,
     ProjectsModule,
     DataResetModule,
+  ],
+  providers: [
+    // Apply ThrottlerGuard globally — all routes inherit the 100 req/min default
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

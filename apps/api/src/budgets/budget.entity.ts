@@ -6,7 +6,7 @@ import {
 import { Category } from '../categories/category.entity';
 
 @Entity('budgets')
-@Unique(['userId', 'categoryId'])
+@Unique(['userId', 'categoryId', 'month'])
 export class Budget {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -20,6 +20,9 @@ export class Budget {
 
   @Column()
   categoryId: string;
+
+  @Column({ default: '2026-06' })
+  month: string;
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   amount: number;

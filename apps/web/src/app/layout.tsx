@@ -1,9 +1,13 @@
-import { Inter } from 'next/font/google';
+import { IBM_Plex_Sans } from 'next/font/google';
 import './globals.css';
 import ThemeProvider from '@/components/ThemeProvider';
 import UserProvider from '@/components/UserProvider';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+const ibmPlexSans = IBM_Plex_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-sans',
+});
 
 export const metadata = {
   title: 'Cofre — Budget',
@@ -13,7 +17,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={inter.variable} data-theme="tropic" suppressHydrationWarning>
+    <html lang="en" className={ibmPlexSans.variable} data-theme="tropic" suppressHydrationWarning>
       <body className="text-text-primary antialiased" suppressHydrationWarning>
         <ThemeProvider>
           <UserProvider>

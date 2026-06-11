@@ -1,6 +1,7 @@
 import { Controller, Post, Get, UseGuards, Request, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -16,6 +17,8 @@ const COOKIE_OPTS = {
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  // 5 attempts per 15 minutes — brute-force protection
+  @Throttle({ default: { ttl: 900_000, limit: 5 } })
   @UseGuards(LocalAuthGuard)
   @Post('login')
   login(@Request() req: any, @Res() res: Response) {
@@ -24,6 +27,7 @@ export class AuthController {
     return res.json({ user: result.user });
   }
 
+  @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   logout(@Res() res: Response) {

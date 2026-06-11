@@ -182,10 +182,11 @@ export default function DashboardPage() {
   const monthlyChart = Array.from({ length: currentMoIdx + 1 }, (_,i) => {
     const key = `${currentYear}-${String(i+1).padStart(2,'0')}`;
     const txs = yearTx.filter(t => t.date.startsWith(key) && !isTransfer(t));
-    const rev = +txs.filter(t => Number(t.amount) > 0).reduce((s,t) => s + Number(t.amount), 0).toFixed(2);
-    const exp = +txs.filter(t => Number(t.amount) < 0).reduce((s,t) => s + Math.abs(Number(t.amount)), 0).toFixed(2);
-    cumulativeNet += (rev - exp);
-    return { month: MONTHS_SHORT[i], revenue: rev, expenses: exp, net: +cumulativeNet.toFixed(2) };
+    const rev      = +txs.filter(t => Number(t.amount) > 0).reduce((s,t) => s + Number(t.amount), 0).toFixed(2);
+    const regExp   = +txs.filter(t => Number(t.amount) < 0 && !t.projectId).reduce((s,t) => s + Math.abs(Number(t.amount)), 0).toFixed(2);
+    const projExp  = +txs.filter(t => Number(t.amount) < 0 && !!t.projectId).reduce((s,t) => s + Math.abs(Number(t.amount)), 0).toFixed(2);
+    cumulativeNet += (rev - regExp - projExp);
+    return { month: MONTHS_SHORT[i], revenue: rev, regularExp: regExp, projectExp: projExp, net: +cumulativeNet.toFixed(2) };
   });
 
   /* Revenue by category (donut) */
@@ -219,21 +220,36 @@ export default function DashboardPage() {
 
         {/* ── Sticky header ── */}
         <div className="sticky top-0 z-20 px-6 pt-5 pb-4 flex items-center justify-between gap-4"
-          style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
+          style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">
-              {greeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''} 👋
+            <h1 className="text-xl font-bold" style={{ letterSpacing: '-0.02em' }}>
+              {greeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
             </h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
-              Here's your financial snapshot
+            <p className="text-xs mt-0.5 font-medium" style={{ color: 'var(--color-text-secondary)' }}>
+              Financial snapshot
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {loading && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#4FBF7F' }} />}
-            <div className="flex items-center gap-1 px-1 py-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <button onClick={() => setMonth(prevMonth)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors" style={{ color: 'var(--color-text-muted)' }}>‹</button>
-              <span className="text-sm font-semibold px-2 min-w-32 text-center">{monthLabel(month)}</span>
-              <button onClick={() => setMonth(nextMonth)} disabled={isCurrentMonth} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors disabled:opacity-30" style={{ color: 'var(--color-text-muted)' }}>›</button>
+            {loading && (
+              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-green)' }} />
+            )}
+            <div className="flex items-center gap-0.5 px-1 py-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <button
+                onClick={() => setMonth(prevMonth)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors duration-150"
+                style={{ color: 'var(--color-text-muted)', cursor: 'pointer' }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >‹</button>
+              <span className="text-sm font-semibold px-2 min-w-36 text-center">{monthLabel(month)}</span>
+              <button
+                onClick={() => setMonth(nextMonth)}
+                disabled={isCurrentMonth}
+                className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors duration-150 disabled:opacity-30"
+                style={{ color: 'var(--color-text-muted)', cursor: isCurrentMonth ? 'default' : 'pointer' }}
+                onMouseEnter={e => { if (!isCurrentMonth) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >›</button>
             </div>
           </div>
         </div>
@@ -243,26 +259,29 @@ export default function DashboardPage() {
           {/* ── Row 1: Stat cards ── */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
             {[
-              { label: 'Net Worth',    value: `$${fmt(totalBalance)}`,                    sub: `${accounts.length} accounts`,              accent: '#9B6DFF', icon: '💎', delta: null,     inverseDelta: false },
-              { label: 'Income',       value: `$${fmt(income)}`,                          sub: `vs ${monthShort(prevM)}: $${fmt(prevInc)}`, accent: '#4FBF7F', icon: '📈', delta: incDelta, inverseDelta: false },
-              { label: 'Expenses',     value: `$${fmt(expenses)}`,                        sub: `vs ${monthShort(prevM)}: $${fmt(prevExp)}`, accent: '#F07A3E', icon: '📉', delta: expDelta, inverseDelta: true },
-              { label: 'Savings Rate', value: `${savingsRate >= 0 ? '' : '-'}${Math.abs(savingsRate).toFixed(1)}%`, sub: net >= 0 ? `$${fmt(net)} saved` : `$${fmt(Math.abs(net))} deficit`, accent: savingsRate >= 30 ? '#4FBF7F' : savingsRate >= 0 ? '#F5C842' : '#FF6B6B', icon: '🏦', delta: null, inverseDelta: false },
+              { label: 'Net Worth',    value: `$${fmt(totalBalance)}`,                    sub: `${accounts.length} account${accounts.length !== 1 ? 's' : ''}`,  accent: '#9B6DFF', Icon: NetWorthIcon,    delta: null,     inverseDelta: false },
+              { label: 'Income',       value: `$${fmt(income)}`,                          sub: `vs ${monthShort(prevM)}: $${fmt(prevInc)}`,                       accent: '#4FBF7F', Icon: IncomeIcon,      delta: incDelta, inverseDelta: false },
+              { label: 'Expenses',     value: `$${fmt(expenses)}`,                        sub: `vs ${monthShort(prevM)}: $${fmt(prevExp)}`,                       accent: '#F07A3E', Icon: ExpensesIcon,    delta: expDelta, inverseDelta: true  },
+              { label: 'Savings Rate', value: `${savingsRate >= 0 ? '' : '-'}${Math.abs(savingsRate).toFixed(1)}%`, sub: net >= 0 ? `$${fmt(net)} saved` : `$${fmt(Math.abs(net))} deficit`, accent: savingsRate >= 30 ? '#4FBF7F' : savingsRate >= 0 ? '#F5C842' : '#FF6B6B', Icon: SavingsIcon, delta: null, inverseDelta: false },
             ].map(c => (
-              <div key={c.label} className="p-5 flex flex-col gap-2 relative overflow-hidden rounded-2xl cursor-default select-none"
-                style={{ background: `rgba(${hexToRgb(c.accent)}, 0.08)`, border: `1px solid rgba(${hexToRgb(c.accent)}, 0.20)` }}>
-                <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full pointer-events-none"
-                  style={{ background: c.accent, opacity: 0.08, filter: 'blur(30px)' }} />
+              <div key={c.label} className="p-5 flex flex-col gap-2.5 relative overflow-hidden rounded-2xl select-none"
+                style={{ background: `rgba(${hexToRgb(c.accent)}, 0.08)`, border: `1px solid rgba(${hexToRgb(c.accent)}, 0.22)` }}>
+                <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full pointer-events-none"
+                  style={{ background: c.accent, opacity: 0.10, filter: 'blur(28px)' }} />
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: c.accent, opacity: 0.85 }}>{c.label}</span>
-                  <span className="text-lg">{c.icon}</span>
+                  <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: c.accent, opacity: 0.90 }}>{c.label}</span>
+                  <span className="w-7 h-7 rounded-lg flex items-center justify-center"
+                    style={{ background: `rgba(${hexToRgb(c.accent)}, 0.14)`, color: c.accent }}>
+                    <c.Icon />
+                  </span>
                 </div>
-                <div className="flex items-end gap-2 flex-wrap">
-                  <span className="text-2xl font-extrabold leading-none" style={{ color: 'var(--color-text-primary)' }}>
-                    {loading ? <span className="opacity-30">—</span> : c.value}
+                <div className="flex items-end gap-2 flex-wrap mt-0.5">
+                  <span className="text-[1.6rem] font-bold leading-none tabular" style={{ color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
+                    {loading ? <span className="opacity-25">—</span> : c.value}
                   </span>
                   {!loading && c.delta !== null && <TrendBadge delta={c.delta} inverse={c.inverseDelta} />}
                 </div>
-                <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>
+                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>
               </div>
             ))}
           </div>
@@ -274,12 +293,13 @@ export default function DashboardPage() {
             <div className="xl:col-span-3 flex flex-col gap-4 p-5 rounded-2xl" style={glass}>
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <p className="font-bold text-sm">Cash Flow</p>
-                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{currentYear} · year to date</p>
+                  <p className="font-semibold text-sm" style={{ letterSpacing: '-0.01em' }}>Cash Flow</p>
+                  <p className="text-xs mt-0.5 font-medium" style={{ color: 'var(--color-text-muted)' }}>{currentYear} · year to date</p>
                 </div>
                 <div className="flex items-center gap-4 text-[10px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: '#4FBF7F' }} />Revenue</span>
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: '#F07A3E' }} />Expenses</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: '#F5C842' }} />Investments</span>
                   <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 rounded-full" style={{ background: '#9B6DFF' }} />Net</span>
                 </div>
               </div>
@@ -298,10 +318,11 @@ export default function DashboardPage() {
                       cursor={{ fill: 'rgba(255,255,255,0.04)' }}
                       contentStyle={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 12, fontSize: 12 }}
                       labelStyle={{ color: 'white', fontWeight: 700, marginBottom: 4 }}
-                      formatter={(v: number, name: string) => [`$${fmt(v)}`, name === 'revenue' ? 'Revenue' : name === 'expenses' ? 'Expenses' : 'Cumulative Net']}
+                      formatter={(v: number, name: string) => [`$${fmt(v)}`, name === 'revenue' ? 'Revenue' : name === 'regularExp' ? 'Expenses' : name === 'projectExp' ? 'Investments' : 'Cumulative Net']}
                     />
-                    <Bar yAxisId="bar" dataKey="revenue"  fill="#4FBF7F" radius={[4,4,0,0]} fillOpacity={0.85} />
-                    <Bar yAxisId="bar" dataKey="expenses" fill="#F07A3E" radius={[4,4,0,0]} fillOpacity={0.85} />
+                    <Bar yAxisId="bar" dataKey="revenue"    fill="#4FBF7F" radius={[4,4,0,0]} fillOpacity={0.85} />
+                    <Bar yAxisId="bar" dataKey="regularExp" stackId="exp"  fill="#F07A3E" radius={[0,0,0,0]} fillOpacity={0.9} />
+                    <Bar yAxisId="bar" dataKey="projectExp" stackId="exp"  fill="#F5C842" radius={[4,4,0,0]} fillOpacity={0.85} />
                     <Line yAxisId="line" type="monotone" dataKey="net" stroke="#9B6DFF" strokeWidth={2} dot={{ fill: '#9B6DFF', r: 3, strokeWidth: 0 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -693,5 +714,43 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+/* ── Stat card icons ─────────────────────────────────────────── */
+
+function NetWorthIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="12" cy="5" rx="9" ry="3"/>
+      <path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/>
+      <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
+    </svg>
+  );
+}
+
+function IncomeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+      <polyline points="16 7 22 7 22 13"/>
+    </svg>
+  );
+}
+
+function ExpensesIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/>
+      <polyline points="16 17 22 17 22 11"/>
+    </svg>
+  );
+}
+
+function SavingsIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+    </svg>
   );
 }

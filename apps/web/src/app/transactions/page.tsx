@@ -14,7 +14,7 @@ interface Category { id: string; name: string; icon: string; color: string; type
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null }
 interface Budget { id: string; categoryId: string; category: Category; amount: string | number; spent: number }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
-interface Project { id: string; name: string; icon: string; color: string; status: string; categories?: ProjectCategory[] }
+interface Project { id: string; name: string; icon: string; color: string; status: string; imageUrl?: string | null; categories?: ProjectCategory[] }
 interface TransferMatch { id: string; name: string; amount: number; date: string; bankAccount: BankAccount | null }
 interface Transaction {
   id: string; name: string; amount: number; date: string; source: string; pending: boolean;
@@ -529,43 +529,43 @@ export default function TransactionsPage() {
 
         {/* ── Sticky header ── */}
         <div className="sticky top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-4"
-          style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
+          style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
 
           {/* Title + actions */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
+            <h1 className="text-xl font-bold" style={{ letterSpacing: '-0.02em' }}>Transactions</h1>
             <div className="flex items-center gap-2">
               {/* New manual transaction */}
               <button onClick={() => setShowManualTx(true)}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
-                style={{ background: 'rgba(79,191,127,0.15)', border: '1px solid rgba(79,191,127,0.28)', color: '#4FBF7F' }}>
+                className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all duration-150 hover:brightness-110"
+                style={{ background: 'rgba(34,197,94,0.13)', border: '1px solid rgba(34,197,94,0.28)', color: 'var(--color-green)', cursor: 'pointer' }}>
                 <PlusIcon /> New
               </button>
               {/* Import CSV */}
               <div className="relative" ref={importBtnRef}>
                 <button onClick={() => { setShowImportPicker((v) => !v); setShowAddAccForm(false); setAddAccError(''); }}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
-                  style={{ background: 'rgba(155,109,255,0.15)', border: '1px solid rgba(155,109,255,0.28)', color: '#9B6DFF' }}>
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all duration-150 hover:brightness-110"
+                  style={{ background: 'rgba(155,109,255,0.13)', border: '1px solid rgba(155,109,255,0.28)', color: '#9B6DFF', cursor: 'pointer' }}>
                   <UploadIcon /> Import Transactions (CSV)
                 </button>
                 {showImportPicker && (
                   <div className="absolute right-0 top-full mt-2 z-30 rounded-2xl overflow-hidden"
                     style={{
-                      background: 'var(--color-elevated)',
-                      border: 'var(--glass-border)',
-                      boxShadow: 'var(--glass-shadow)',
-                      backdropFilter: 'var(--glass-blur)',
-                      WebkitBackdropFilter: 'var(--glass-blur)',
-                      minWidth: '280px',
+                      background: 'rgba(6, 14, 40, 0.97)',
+                      border: '1px solid rgba(255,255,255,0.14)',
+                      boxShadow: '0 16px 48px rgba(0,0,0,0.70), inset 0 1px 0 rgba(255,255,255,0.08)',
+                      backdropFilter: 'blur(24px)',
+                      WebkitBackdropFilter: 'blur(24px)',
+                      minWidth: '300px',
                     }}>
 
                     {!showAddAccForm ? (
                       /* ── Account list ── */
                       <>
-                        <div className="px-4 pt-3.5 pb-2 flex items-center gap-2"
-                          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                        <div className="px-4 pt-3.5 pb-2.5 flex items-center gap-2"
+                          style={{ borderBottom: '1px solid rgba(255,255,255,0.12)' }}>
                           <span className="text-[10px] font-bold tracking-widest uppercase flex-1"
-                            style={{ color: 'rgba(155,109,255,0.8)' }}>Select account to import into</span>
+                            style={{ color: '#9B6DFF' }}>Select account to import into</span>
                         </div>
 
                         {(() => {
@@ -606,11 +606,11 @@ export default function TransactionsPage() {
                         );
                         })()}
 
-                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }} />
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)' }} />
                         <button
                           onClick={() => { setShowAddAccForm(true); setAddAccError(''); }}
-                          className="w-full flex items-center gap-2.5 px-4 py-3 text-xs font-semibold transition-colors hover:bg-white/5"
-                          style={{ color: '#9B6DFF' }}>
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-xs font-semibold transition-colors duration-150 hover:bg-white/5"
+                          style={{ color: '#9B6DFF', cursor: 'pointer' }}>
                           <span className="w-5 h-5 rounded-lg flex items-center justify-center text-sm"
                             style={{ background: 'rgba(155,109,255,0.15)' }}>+</span>
                           Create new account
@@ -763,16 +763,17 @@ export default function TransactionsPage() {
             {/* Summary chips */}
             {!loading && (
               <div className="flex items-center gap-2 ml-auto">
-                <span className="text-xs px-2.5 py-1 rounded-lg font-semibold"
-                  style={{ background: 'rgba(79,191,127,0.10)', color: '#4FBF7F' }}>
+                <span className="text-xs px-3 py-1.5 rounded-lg font-bold tabular-nums"
+                  style={{ background: 'rgba(34,197,94,0.14)', color: 'var(--color-green)', border: '1px solid rgba(34,197,94,0.28)' }}>
                   +${totalIncome.toFixed(2)}
                 </span>
-                <span className="text-xs px-2.5 py-1 rounded-lg font-semibold"
-                  style={{ background: 'rgba(240,122,62,0.10)', color: '#F07A3E' }}>
+                <span className="text-xs px-3 py-1.5 rounded-lg font-bold tabular-nums"
+                  style={{ background: 'rgba(244,63,94,0.14)', color: 'var(--color-rose)', border: '1px solid rgba(244,63,94,0.28)' }}>
                   -${Math.abs(totalExpense).toFixed(2)}
                 </span>
-                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  {transactions.length} transactions
+                <span className="text-xs font-semibold px-2.5 py-1.5 rounded-lg"
+                  style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                  {transactions.length} txn
                 </span>
               </div>
             )}
@@ -781,19 +782,19 @@ export default function TransactionsPage() {
           {/* ── Uncategorized alert ── */}
           {!loading && uncategorizedCount > 0 && (
             <button onClick={() => setFilter('uncategorized')}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-left w-full transition-opacity hover:opacity-80"
-              style={{ background: 'rgba(245,200,66,0.08)', border: '1px solid rgba(245,200,66,0.25)' }}>
-              <span className="text-lg">🏷️</span>
+              className="flex items-center gap-3 px-4 py-3.5 rounded-xl text-left w-full transition-all hover:brightness-105"
+              style={{ background: 'rgba(245,200,66,0.13)', border: '1px solid rgba(245,200,66,0.40)', boxShadow: '0 2px 12px rgba(245,200,66,0.08)' }}>
+              <span className="text-xl">🏷️</span>
               <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: '#F5C842' }}>
+                <p className="text-sm font-bold" style={{ color: '#F5C842' }}>
                   {uncategorizedCount} transaction{uncategorizedCount !== 1 ? 's' : ''} without a category
                 </p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
                   Assign categories so your budgets track spending correctly.
                 </p>
               </div>
-              <span className="text-xs font-bold px-2 py-1 rounded-lg shrink-0"
-                style={{ background: 'rgba(245,200,66,0.16)', color: '#F5C842' }}>
+              <span className="text-xs font-bold px-3 py-1.5 rounded-lg shrink-0"
+                style={{ background: 'rgba(245,200,66,0.25)', color: '#F5C842', border: '1px solid rgba(245,200,66,0.45)' }}>
                 Review →
               </span>
             </button>
@@ -805,26 +806,49 @@ export default function TransactionsPage() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                 style={{ color: 'var(--color-text-muted)' }}><SearchIcon /></span>
               <input value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name…"
-                className="w-full pl-9 pr-3 py-2 text-sm outline-none rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'var(--color-text-primary)' }} />
+                placeholder="Search transactions…"
+                className="w-full pl-9 pr-3 py-2 text-sm outline-none rounded-xl transition-all duration-150"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'var(--color-text-primary)' }}
+                onFocus={e => { e.currentTarget.style.border = '1px solid rgba(245,200,66,0.45)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245,200,66,0.10)'; }}
+                onBlur={e  => { e.currentTarget.style.border = '1px solid rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; }}
+              />
             </div>
-            <div className="flex gap-1 p-1 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <div className="flex gap-1.5">
               {([
-                { id: 'all',          label: 'All',           count: transactions.length },
-                { id: 'uncategorized',label: 'Uncategorized', count: uncategorizedCount, dot: true },
-                { id: 'expense',      label: 'Expenses',      count: transactions.filter((t) => Number(t.amount) < 0).length },
-                { id: 'income',       label: 'Income',        count: transactions.filter((t) => Number(t.amount) >= 0).length },
-              ] as { id: Filter; label: string; count: number; dot?: boolean }[]).map((f) => (
+                {
+                  id: 'all', label: 'All', count: transactions.length,
+                  icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="5" width="18" height="2" rx="1"/><rect x="3" y="11" width="18" height="2" rx="1"/><rect x="3" y="17" width="18" height="2" rx="1"/></svg>,
+                  activeStyle: { background: 'rgba(255,255,255,0.13)', color: '#fff', border: '1px solid rgba(255,255,255,0.28)', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' },
+                  inactiveStyle: { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.09)' },
+                },
+                {
+                  id: 'uncategorized', label: 'Unlabeled', count: uncategorizedCount,
+                  icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
+                  activeStyle: { background: 'rgba(245,200,66,0.18)', color: '#F5C842', border: '1px solid rgba(245,200,66,0.45)', boxShadow: '0 2px 10px rgba(245,200,66,0.15)' },
+                  inactiveStyle: { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.09)' },
+                },
+                {
+                  id: 'expense', label: 'Expenses', count: transactions.filter((t) => Number(t.amount) < 0).length,
+                  icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>,
+                  activeStyle: { background: 'rgba(244,63,94,0.18)', color: '#F43F5E', border: '1px solid rgba(244,63,94,0.45)', boxShadow: '0 2px 10px rgba(244,63,94,0.15)' },
+                  inactiveStyle: { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.09)' },
+                },
+                {
+                  id: 'income', label: 'Income', count: transactions.filter((t) => Number(t.amount) >= 0).length,
+                  icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>,
+                  activeStyle: { background: 'rgba(34,197,94,0.18)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.45)', boxShadow: '0 2px 10px rgba(34,197,94,0.15)' },
+                  inactiveStyle: { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.09)' },
+                },
+              ] as { id: Filter; label: string; count: number; icon: React.ReactNode; activeStyle: React.CSSProperties; inactiveStyle: React.CSSProperties }[]).map((f) => (
                 <button key={f.id} onClick={() => setFilter(f.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                  style={filter === f.id
-                    ? { background: 'rgba(155,109,255,0.22)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.40)' }
-                    : { color: 'rgba(255,255,255,0.70)', border: '1px solid transparent' }}>
-                  {f.dot && f.count > 0 && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#F5C842' }} />}
+                  className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-150"
+                  style={{ cursor: 'pointer', ...(filter === f.id ? f.activeStyle : f.inactiveStyle) }}>
+                  {f.icon}
                   {f.label}
-                  <span className="opacity-50">{f.count}</span>
+                  <span className="tabular-nums text-[11px] px-1.5 py-0.5 rounded-md font-bold"
+                    style={{ background: filter === f.id ? 'rgba(0,0,0,0.20)' : 'rgba(255,255,255,0.08)', opacity: filter === f.id ? 1 : 0.7 }}>
+                    {f.count}
+                  </span>
                 </button>
               ))}
             </div>
@@ -886,12 +910,15 @@ export default function TransactionsPage() {
                   {/* ── Account header ── */}
                   <button
                     onClick={() => toggleCollapse(accountId)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left transition-all hover:brightness-110"
+                    className="flex items-center gap-3 px-4 py-3.5 rounded-xl w-full text-left transition-all hover:brightness-110"
                     style={{
-                      background: `linear-gradient(135deg, ${accColor}14 0%, var(--color-surface) 100%)`,
+                      background: `linear-gradient(135deg, ${accColor}22 0%, var(--color-surface) 70%)`,
                       backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
-                      border: `1px solid ${accColor}35`,
-                      boxShadow: `0 4px 24px rgba(0,0,0,0.3), inset 0 0 0 1px ${accColor}10`,
+                      borderLeft: `3px solid ${accColor}`,
+                      borderTop: `1px solid ${accColor}55`,
+                      borderRight: `1px solid ${accColor}30`,
+                      borderBottom: `1px solid ${accColor}30`,
+                      boxShadow: `0 4px 20px ${accColor}18, inset 0 1px 0 rgba(255,255,255,0.08)`,
                     }}>
 
                     {/* Composite icon: bank logo + type badge */}
@@ -946,24 +973,26 @@ export default function TransactionsPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       {accIncome > 0 && (
-                        <span className="text-xs font-semibold hidden sm:block" style={{ color: '#4FBF7F' }}>
+                        <span className="text-xs font-bold hidden sm:block px-2 py-0.5 rounded-lg"
+                          style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--color-green)', border: '1px solid rgba(34,197,94,0.25)' }}>
                           +${accIncome.toFixed(2)}
                         </span>
                       )}
                       {accExpense < 0 && (
-                        <span className="text-xs font-semibold hidden sm:block" style={{ color: '#F07A3E' }}>
+                        <span className="text-xs font-bold hidden sm:block px-2 py-0.5 rounded-lg"
+                          style={{ background: 'rgba(244,63,94,0.15)', color: 'var(--color-rose)', border: '1px solid rgba(244,63,94,0.25)' }}>
                           -${Math.abs(accExpense).toFixed(2)}
                         </span>
                       )}
-                      <span className="text-xs px-2 py-0.5 rounded-full"
-                        style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-muted)' }}>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                        style={{ background: `${accColor}18`, color: accColor, border: `1px solid ${accColor}35` }}>
                         {txList.length}
                       </span>
                       {accUncategorized > 0 && (
-                        <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                          style={{ background: 'rgba(245,200,66,0.15)', color: '#F5C842' }}>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-bold"
+                          style={{ background: 'rgba(245,200,66,0.20)', color: '#F5C842', border: '1px solid rgba(245,200,66,0.35)' }}>
                           {accUncategorized} uncat.
                         </span>
                       )}
@@ -1033,7 +1062,7 @@ export default function TransactionsPage() {
 
                       {!dateCollapsed && (
                       <div className="flex flex-col overflow-hidden"
-                        style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
+                        style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)', borderRadius: 'var(--radius-card)' }}>
                         {dateMap[date].map((tx, i) => {
                         const amount       = Number(tx.amount);
                         const isIncome     = amount >= 0;
@@ -1047,20 +1076,20 @@ export default function TransactionsPage() {
                         const pickerCatsAlt = categories.filter((c) => c.type === secondaryType && (!searchQ || c.name.toLowerCase().includes(searchQ)));
 
                         return (
-                          <div key={tx.id} className="relative group"
-                            style={i > 0 ? { borderTop: '1px solid rgba(255,255,255,0.05)' } : {}}>
+                          <div key={tx.id} className="relative group transition-colors hover:bg-white/[0.03]"
+                            style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : {}}>
                             <div className="flex items-center gap-3 px-4 py-3">
 
                               {/* Income/expense/transfer bar */}
-                              <div className="w-1 h-8 rounded-full shrink-0"
-                                style={{ background: txIsTransfer ? '#6B6B8A' : isIncome ? '#4FBF7F' : '#F07A3E' }} />
+                              <div className="w-1.5 self-stretch rounded-full shrink-0 min-h-[32px]"
+                                style={{ background: txIsTransfer ? 'var(--color-text-muted)' : isIncome ? 'var(--color-green)' : 'var(--color-rose)' }} />
 
                               {/* Name + source */}
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate leading-snug">{tx.name}</p>
+                                <p className="text-sm font-semibold truncate leading-snug" style={{ color: 'var(--color-text-primary)' }}>{tx.name}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase"
-                                    style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)' }}>
+                                    style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
                                     {tx.source}
                                   </span>
                                   {tx.pending && (
@@ -1079,7 +1108,9 @@ export default function TransactionsPage() {
                                     return (
                                       <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md"
                                         style={{ background: `${c}18`, border: `1px solid ${c}35`, color: c }}>
-                                        <span>{proj.icon}</span>
+                                        {proj.imageUrl
+                                          ? <img src={proj.imageUrl} alt="" className="w-3.5 h-3.5 rounded object-cover shrink-0" />
+                                          : <span>{proj.icon}</span>}
                                         <span className="max-w-20 truncate">{proj.name}</span>
                                         {pCat && <><span className="opacity-40">·</span><span>{pCat.icon}</span><span className="max-w-16 truncate" style={{ color: pCat.color }}>{pCat.name}</span></>}
                                       </span>
@@ -1156,7 +1187,9 @@ export default function TransactionsPage() {
                                 title={`Link to ${proj.name} → ${ph.catName}`}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all hover:brightness-125 disabled:opacity-40"
                                 style={{ background: `${ph.catColor}14`, border: `1px solid ${ph.catColor}38`, color: ph.catColor }}>
-                                <span>{proj.icon}</span>
+                                {proj.imageUrl
+                                  ? <img src={proj.imageUrl} alt="" className="w-4 h-4 rounded object-cover shrink-0" />
+                                  : <span>{proj.icon}</span>}
                                 <span className="max-w-20 truncate">{proj.name}</span>
                                 <span className="opacity-50">·</span>
                                 <span className="max-w-16 truncate">{ph.catName}</span>
@@ -1195,7 +1228,7 @@ export default function TransactionsPage() {
                                   return { background: `${_c}18`, border: `1px solid ${_c}35`, color: _c };
                                 }
                                 if (cat) return { background: `${cat.color}18`, border: `1px solid ${cat.color}35`, color: cat.color };
-                                return { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-muted)' };
+                                return { background: 'rgba(245,200,66,0.08)', border: '1px solid rgba(245,200,66,0.28)', color: '#F5C842' };
                               })()}>
                               {updatingId === tx.id ? (
                                 <span>…</span>
@@ -1266,36 +1299,52 @@ export default function TransactionsPage() {
                                     {transferMatchesLoading && (
                                       <p className="px-3 py-2 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Finding matches…</p>
                                     )}
-                                    {/* No matches — show credit card accounts as quick suggestions */}
+                                    {/* No matches — show credit card and brokerage accounts as quick suggestions */}
                                     {!transferMatchesLoading && transferMatches.length === 0 && (() => {
                                       const creditAccs = accounts.filter((a) => ['credit', 'loan'].includes(a.accountType) && a.id !== tx.bankAccountId);
-                                      if (!creditAccs.length) return null;
+                                      const investAccs = accounts.filter((a) => a.accountType === 'investment' && a.id !== tx.bankAccountId);
+                                      if (!creditAccs.length && !investAccs.length) return null;
+                                      const AccRow = (a: typeof accounts[0]) => {
+                                        const c = a.color || '#9B6DFF';
+                                        const selected = tx.transferAccountId === a.id;
+                                        return (
+                                          <button key={a.id}
+                                            onClick={() => setTransferAccount(tx.id, a.id)}
+                                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10"
+                                            style={{ background: selected ? `${c}15` : `${c}06`, borderLeft: `2px solid ${c}50` }}>
+                                            <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                                              style={{ background: `${c}20`, color: c }}>
+                                              <AccountTypeIcon type={a.accountType} size={16} />
+                                            </span>
+                                            <div className="flex-1 text-left min-w-0">
+                                              <p className="font-semibold truncate" style={{ color: selected ? c : 'var(--color-text-primary)' }}>{a.accountName}</p>
+                                              <p className="truncate" style={{ color: 'var(--color-text-muted)' }}>{a.bankName}</p>
+                                            </div>
+                                            {selected && <span style={{ color: c }}>✓</span>}
+                                          </button>
+                                        );
+                                      };
                                       return (
                                         <>
-                                          <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase flex items-center gap-1"
-                                            style={{ color: '#9B6DFF' }}>
-                                            <span>💳</span> Credit Cards
-                                          </p>
-                                          {creditAccs.map((a) => {
-                                            const c = a.color || '#9B6DFF';
-                                            const selected = tx.transferAccountId === a.id;
-                                            return (
-                                              <button key={a.id}
-                                                onClick={() => setTransferAccount(tx.id, a.id)}
-                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10"
-                                                style={{ background: selected ? `${c}15` : `${c}06`, borderLeft: `2px solid ${c}50` }}>
-                                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                                  style={{ background: `${c}20` }}>
-                                                  <AccountTypeIcon type={a.accountType} size={16} />
-                                                </span>
-                                                <div className="flex-1 text-left min-w-0">
-                                                  <p className="font-semibold truncate" style={{ color: selected ? c : 'var(--color-text-primary)' }}>{a.accountName}</p>
-                                                  <p className="truncate" style={{ color: 'var(--color-text-muted)' }}>{a.bankName}</p>
-                                                </div>
-                                                {selected && <span style={{ color: c }}>✓</span>}
-                                              </button>
-                                            );
-                                          })}
+                                          {creditAccs.length > 0 && (
+                                            <>
+                                              <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase flex items-center gap-1"
+                                                style={{ color: '#9B6DFF' }}>
+                                                <span>💳</span> Credit Cards
+                                              </p>
+                                              {creditAccs.map(AccRow)}
+                                            </>
+                                          )}
+                                          {investAccs.length > 0 && (
+                                            <>
+                                              <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase flex items-center gap-1"
+                                                style={{ color: '#4FBF7F' }}>
+                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                                                Brokerage
+                                              </p>
+                                              {investAccs.map(AccRow)}
+                                            </>
+                                          )}
                                           <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0' }} />
                                           <p className="px-3 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
                                             style={{ color: 'var(--color-text-muted)' }}>All accounts</p>
@@ -1453,8 +1502,12 @@ export default function TransactionsPage() {
                                               onClick={() => setPickerProjectDrill(proj.id)}
                                               className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10"
                                               style={linked ? { background: `${c}12` } : {}}>
-                                              <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                                style={{ background: `${c}20` }}>{proj.icon}</span>
+                                              <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0 overflow-hidden"
+                                                style={{ background: `${c}20` }}>
+                                                {proj.imageUrl
+                                                  ? <img src={proj.imageUrl} alt="" className="w-full h-full object-cover" />
+                                                  : proj.icon}
+                                              </span>
                                               <span className="flex-1 font-medium text-left truncate"
                                                 style={{ color: linked ? c : 'var(--color-text-primary)' }}>
                                                 {proj.name}
@@ -1642,8 +1695,8 @@ export default function TransactionsPage() {
                           )}
 
                           {/* Amount */}
-                          <p className="text-sm font-bold tabular-nums w-24 text-right shrink-0"
-                            style={{ color: txIsTransfer ? '#6B6B8A' : isIncome ? '#4FBF7F' : 'white' }}>
+                          <p className="text-base font-black tabular-nums w-28 text-right shrink-0"
+                            style={{ color: txIsTransfer ? 'var(--color-text-muted)' : isIncome ? 'var(--color-green)' : 'var(--color-rose)' }}>
                             {formatAmount(amount)}
                           </p>
                         </div>

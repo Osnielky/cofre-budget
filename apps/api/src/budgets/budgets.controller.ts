@@ -7,15 +7,32 @@ import { BudgetsService } from './budgets.service';
 export class BudgetsController {
   constructor(private service: BudgetsService) {}
 
+  @Get('months')
+  months(@Request() req: any) {
+    return this.service.getMonthSummaries(req.user.id);
+  }
+
   @Get()
   list(@Request() req: any, @Query('month') month?: string) {
     const m = month ?? currentMonth();
     return this.service.findWithSpent(req.user.id, m);
   }
 
+  @Post('ensure-month')
+  @HttpCode(200)
+  ensureMonth(@Request() req: any, @Body() body: { month: string }) {
+    return this.service.ensureMonthBudgets(req.user.id, body.month ?? currentMonth());
+  }
+
+  @Post('copy')
+  @HttpCode(200)
+  copy(@Request() req: any, @Body() body: { fromMonth: string; toMonth: string }) {
+    return this.service.copyMonth(req.user.id, body.fromMonth, body.toMonth);
+  }
+
   @Post()
-  create(@Request() req: any, @Body() body: { categoryId: string; amount: number }) {
-    return this.service.create(req.user.id, body);
+  create(@Request() req: any, @Body() body: { categoryId: string; amount: number; month?: string }) {
+    return this.service.create(req.user.id, { ...body, month: body.month ?? currentMonth() });
   }
 
   @Patch(':id')

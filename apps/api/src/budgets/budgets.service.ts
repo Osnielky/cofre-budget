@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThan } from 'typeorm';
 import { Budget } from './budget.entity';
 import { Transaction } from '../transactions/transaction.entity';
 
@@ -18,7 +18,7 @@ export class BudgetsService {
   ) {}
 
   async findWithSpent(userId: string, month: string): Promise<BudgetWithSpent[]> {
-    const budgets = await this.repo.find({ where: { userId } });
+    const budgets = await this.repo.find({ where: { userId, month } });
     const startDate = `${month}-01`;
     const endDate   = lastDayOfMonth(month);
 
@@ -43,12 +43,72 @@ export class BudgetsService {
     );
   }
 
+  /** Copy budgets from the most recent prior month if none exist for the target month. */
+  async ensureMonthBudgets(userId: string, month: string): Promise<void> {
+    const existing = await this.repo.find({ where: { userId, month } });
+    if (existing.length > 0) return;
+
+    const priorAnchor = await this.repo
+      .createQueryBuilder('b')
+      .where('b.userId = :userId', { userId })
+      .andWhere('b.month < :month', { month })
+      .orderBy('b.month', 'DESC')
+      .getOne();
+
+    if (!priorAnchor) return;
+
+    const priorBudgets = await this.repo.find({ where: { userId, month: priorAnchor.month } });
+    await Promise.all(
+      priorBudgets.map(b =>
+        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month }))
+      ),
+    );
+  }
+
+  async copyMonth(userId: string, fromMonth: string, toMonth: string): Promise<void> {
+    const source = await this.repo.find({ where: { userId, month: fromMonth } });
+    if (source.length === 0) return;
+    const existing = await this.repo.find({ where: { userId, month: toMonth } });
+    if (existing.length > 0) await this.repo.remove(existing);
+    await Promise.all(
+      source.map(b =>
+        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month: toMonth }))
+      ),
+    );
+  }
+
+  async getMonthSummaries(userId: string): Promise<{ month: string; total: number; count: number }[]> {
+    const rows = await this.repo
+      .createQueryBuilder('b')
+      .select('b.month', 'month')
+      .addSelect('SUM(b.amount)', 'total')
+      .addSelect('COUNT(*)', 'count')
+      .where('b.userId = :userId', { userId })
+      .groupBy('b.month')
+      .orderBy('b.month', 'DESC')
+      .getRawMany<{ month: string; total: string; count: string }>();
+
+    return rows.map(r => ({ month: r.month, total: parseFloat(r.total), count: parseInt(r.count) }));
+  }
+
   countByUser(userId: string): Promise<number> {
     return this.repo.count({ where: { userId } });
   }
 
-  async create(userId: string, dto: { categoryId: string; amount: number }): Promise<Budget> {
-    return this.repo.save(this.repo.create({ ...dto, userId }));
+  async create(userId: string, dto: { categoryId: string; amount: number; month: string }): Promise<Budget> {
+    const existing = await this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } });
+    if (existing) {
+      existing.amount = dto.amount;
+      await this.repo.save(existing);
+    } else {
+      await this.repo.save(this.repo.create({ ...dto, userId }));
+    }
+    // Propagate the new amount to all future months that already have a record
+    await this.repo.update(
+      { userId, categoryId: dto.categoryId, month: MoreThan(dto.month) },
+      { amount: dto.amount },
+    );
+    return this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } }) as Promise<Budget>;
   }
 
   async update(id: string, userId: string, dto: { amount: number }): Promise<Budget> {
@@ -56,7 +116,13 @@ export class BudgetsService {
     if (!budget) throw new NotFoundException();
     if (budget.userId !== userId) throw new ForbiddenException();
     budget.amount = dto.amount;
-    return this.repo.save(budget);
+    await this.repo.save(budget);
+    // Propagate forward — past months are untouched
+    await this.repo.update(
+      { userId, categoryId: budget.categoryId, month: MoreThan(budget.month) },
+      { amount: dto.amount },
+    );
+    return budget;
   }
 
   async remove(id: string, userId: string): Promise<void> {

@@ -24,6 +24,9 @@ export class Project {
   @Column({ nullable: true })
   description: string;
 
+  @Column({ type: 'text', nullable: true })
+  imageUrl: string;
+
   /* Initial purchase / investment amount */
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   purchasePrice: number;

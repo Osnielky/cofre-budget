@@ -4,16 +4,25 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 export const BANKS: readonly { name: string; domain: string; color: string; abbr: string }[] = [
-  { name: 'Chase',           domain: 'chase.com',           color: '#117ACA', abbr: 'CH' },
-  { name: 'Bank of America', domain: 'bankofamerica.com',   color: '#E31837', abbr: 'BA' },
-  { name: 'Wells Fargo',     domain: 'wellsfargo.com',      color: '#CC0000', abbr: 'WF' },
-  { name: 'Citibank',        domain: 'citi.com',            color: '#003B70', abbr: 'CI' },
-  { name: 'U.S. Bank',       domain: 'usbank.com',          color: '#0C2074', abbr: 'US' },
-  { name: 'Truist',          domain: 'truist.com',          color: '#6B2C91', abbr: 'TR' },
-  { name: 'PNC Bank',        domain: 'pnc.com',             color: '#FF6600', abbr: 'PN' },
-  { name: 'Capital One',     domain: 'capitalone.com',      color: '#D03027', abbr: 'C1' },
-  { name: 'TD Bank',         domain: 'td.com',              color: '#34B233', abbr: 'TD' },
-  { name: 'Goldman Sachs',   domain: 'goldmansachs.com',    color: '#6B8D73', abbr: 'GS' },
+  { name: 'Chase',                domain: 'chase.com',              color: '#117ACA', abbr: 'CH' },
+  { name: 'Bank of America',      domain: 'bankofamerica.com',      color: '#E31837', abbr: 'BA' },
+  { name: 'Wells Fargo',          domain: 'wellsfargo.com',         color: '#CC0000', abbr: 'WF' },
+  { name: 'Citibank',             domain: 'citi.com',               color: '#003B70', abbr: 'CI' },
+  { name: 'U.S. Bank',            domain: 'usbank.com',             color: '#0C2074', abbr: 'US' },
+  { name: 'Truist',               domain: 'truist.com',             color: '#6B2C91', abbr: 'TR' },
+  { name: 'PNC Bank',             domain: 'pnc.com',                color: '#FF6600', abbr: 'PN' },
+  { name: 'Capital One',          domain: 'capitalone.com',         color: '#D03027', abbr: 'C1' },
+  { name: 'TD Bank',              domain: 'td.com',                 color: '#34B233', abbr: 'TD' },
+  { name: 'Goldman Sachs',        domain: 'goldmansachs.com',       color: '#6B8D73', abbr: 'GS' },
+  /* Brokerages */
+  { name: 'Fidelity',             domain: 'fidelity.com',           color: '#538234', abbr: 'FD' },
+  { name: 'Charles Schwab',       domain: 'schwab.com',             color: '#0090D4', abbr: 'SC' },
+  { name: 'Vanguard',             domain: 'vanguard.com',           color: '#8B0000', abbr: 'VG' },
+  { name: 'Robinhood',            domain: 'robinhood.com',          color: '#00C805', abbr: 'RH' },
+  { name: 'E*TRADE',              domain: 'etrade.com',             color: '#6633CC', abbr: 'ET' },
+  { name: 'Interactive Brokers',  domain: 'interactivebrokers.com', color: '#CE2629', abbr: 'IB' },
+  { name: 'Merrill Lynch',        domain: 'ml.com',                 color: '#C8102E', abbr: 'ML' },
+  { name: 'Webull',               domain: 'webull.com',             color: '#00B4D8', abbr: 'WB' },
 ] as const;
 
 type Bank = (typeof BANKS)[number];

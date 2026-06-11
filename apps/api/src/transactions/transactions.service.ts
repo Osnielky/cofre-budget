@@ -28,7 +28,7 @@ export class TransactionsService {
       .andWhere('tx.categoryId IS NOT NULL')
       .andWhere('categoryRef.type != :t', { t: 'transfer' })
       .orderBy('tx.date', 'DESC')
-      .limit(2000)
+      .limit(300)
       .getMany();
 
     const normalize = (n: string) => n.replace(/\s+(?:conf#\S+|[A-Z0-9]{6,})$/i, '').trim();
@@ -46,26 +46,22 @@ export class TransactionsService {
   }
 
   async getProjectHints(userId: string): Promise<Record<string, { projectId: string; projectCategoryId: string; catName: string; catIcon: string; catColor: string }>> {
+    // Single JOIN query — no N+1 loop
     const txs = await this.repo
       .createQueryBuilder('tx')
+      .leftJoinAndSelect('tx.projectCategoryRef', 'cat')
       .where('tx.userId = :userId', { userId })
       .andWhere('tx.projectId IS NOT NULL')
       .andWhere('tx.projectCategoryId IS NOT NULL')
       .orderBy('tx.date', 'DESC')
-      .limit(2000)
+      .limit(500)
       .getMany();
 
     const normalize = (n: string) => n.replace(/\s+(?:conf#\S+|[A-Z0-9]{6,})$/i, '').trim();
-    const catCache: Record<string, ProjectCategory> = {};
-
     const hints: Record<string, { projectId: string; projectCategoryId: string; catName: string; catIcon: string; catColor: string }> = {};
+
     for (const tx of txs) {
-      if (!tx.projectCategoryId) continue;
-      if (!catCache[tx.projectCategoryId]) {
-        const cat = await this.projCatRepo.findOneBy({ id: tx.projectCategoryId });
-        if (cat) catCache[tx.projectCategoryId] = cat;
-      }
-      const cat = catCache[tx.projectCategoryId];
+      const cat = (tx as any).projectCategoryRef;
       if (!cat) continue;
       const entry = { projectId: tx.projectId, projectCategoryId: tx.projectCategoryId, catName: cat.name, catIcon: cat.icon, catColor: cat.color };
       if (!hints[tx.name]) hints[tx.name] = entry;
