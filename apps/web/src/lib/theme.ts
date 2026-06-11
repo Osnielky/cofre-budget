@@ -1,4 +1,4 @@
-export type ThemeId = 'tropic' | 'meridian' | 'daylight' | 'linen';
+export type ThemeId = 'tropic' | 'meridian' | 'daylight' | 'linen' | 'creme';
 
 export interface Theme {
   id:          ThemeId;
@@ -75,6 +75,21 @@ export const THEMES: Theme[] = [
       text:    '#304251',
       textDim: '#6B8FA4',
       border:  'rgba(48,66,81,0.12)',
+    },
+  },
+  {
+    id: 'creme',
+    name: 'Crème Ledger',
+    description: 'Cream paper · espresso · brass',
+    dark: false,
+    preview: {
+      bg:      '#F6F1E7',
+      surface: '#FDFBF5',
+      accent:  '#B08D3E',
+      accent2: '#2E5944',
+      text:    '#2B2117',
+      textDim: '#6B5D4A',
+      border:  '#E3D9C4',
     },
   },
 ];
