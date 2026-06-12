@@ -149,6 +149,10 @@ export default function DashboardPage() {
   const expenses     = transactions.filter(t => Number(t.amount) < 0  && !isTransfer(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
   const net          = income - expenses;
   const savingsRate  = income > 0 ? (net / income * 100) : 0;
+  const spendingBudgets = budgets.filter(b => b.category?.type !== 'income');
+  const incomeTargets   = budgets.filter(b => b.category?.type === 'income');
+  const incomeTarget    = incomeTargets.reduce((s,b) => s + Number(b.amount), 0) || null;
+  const targetPct       = incomeTarget ? Math.round((income / incomeTarget) * 100) : null;
   const totalBalance = accounts.reduce((s,a) => s + (isDebtAcc(a) ? -Math.abs(Number(a.balance||0)) : Number(a.balance||0)), 0);
   const totalAssets  = accounts.filter(a => !isDebtAcc(a)).reduce((s,a) => s + Number(a.balance||0), 0);
   const totalDebt    = accounts.filter(a => isDebtAcc(a)).reduce((s,a) => s + Math.abs(Number(a.balance||0)), 0);
@@ -175,10 +179,10 @@ export default function DashboardPage() {
   const totalCatSpend = topCats.reduce((s,c) => s + c.total, 0);
 
   /* Budget health */
-  const overBudget     = budgets.filter(b => Number(b.spent) > Number(b.amount));
-  const nearBudget     = budgets.filter(b => Number(b.spent)/Number(b.amount) >= 0.8 && Number(b.spent) <= Number(b.amount));
-  const totalBudgeted  = budgets.reduce((s,b) => s + Number(b.amount), 0);
-  const totalSpent     = budgets.reduce((s,b) => s + Number(b.spent), 0);
+  const overBudget     = spendingBudgets.filter(b => Number(b.spent) > Number(b.amount));
+  const nearBudget     = spendingBudgets.filter(b => Number(b.spent)/Number(b.amount) >= 0.8 && Number(b.spent) <= Number(b.amount));
+  const totalBudgeted  = spendingBudgets.reduce((s,b) => s + Number(b.amount), 0);
+  const totalSpent     = spendingBudgets.reduce((s,b) => s + Number(b.spent), 0);
   const budgetPct      = totalBudgeted > 0 ? Math.min(100, totalSpent/totalBudgeted*100) : 0;
 
   /* Projects */
@@ -226,13 +230,13 @@ export default function DashboardPage() {
 
   /* ── Topbar summary line ── */
   const NUM_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
-  const budgetsOver = budgets.filter(b => Number(b.amount) > 0 && Number(b.spent) / Number(b.amount) >= 0.8).length;
+  const budgetsOver = spendingBudgets.filter(b => Number(b.amount) > 0 && Number(b.spent) / Number(b.amount) >= 0.8).length;
   const monthName   = monthLabel(month).split(' ')[0];
   const healthLine  = loading ? 'Loading your financial snapshot…'
     : net >= 0 ? 'Your portfolio of accounts is in excellent shape.'
     : 'Spending is running ahead of income this month.';
   const attentionLine = loading ? ''
-    : budgets.length === 0 ? 'Set up budgets to keep your spending on track.'
+    : spendingBudgets.length === 0 ? 'Set up budgets to keep your spending on track.'
     : budgetsOver === 0 ? `All budgets are on track for ${monthName}.`
     : `${NUM_WORDS[budgetsOver] ?? budgetsOver} budget${budgetsOver === 1 ? '' : 's'} need${budgetsOver === 1 ? 's' : ''} attention before the end of ${monthName}.`;
 
@@ -280,7 +284,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
             {[
               { label: 'Net Worth',    value: `$${fmt(totalBalance)}`,                    sub: `${accounts.length} accounts`,              accent: tc.violet, icon: ICON_WALLET,  delta: null,     inverseDelta: false },
-              { label: 'Income',       value: `$${fmt(income)}`,                          sub: `vs ${monthShort(prevM)}: $${fmt(prevInc)}`, accent: tc.green,  icon: ICON_TRENDUP, delta: incDelta, inverseDelta: false },
+              { label: 'Income',       value: `$${fmt(income)}`,                          sub: targetPct != null ? `${targetPct}% of $${fmt(incomeTarget!)} target` : `vs ${monthShort(prevM)}: $${fmt(prevInc)}`, accent: tc.green,  icon: ICON_TRENDUP, delta: incDelta, inverseDelta: false },
               { label: 'Expenses',     value: `$${fmt(expenses)}`,                        sub: `vs ${monthShort(prevM)}: $${fmt(prevExp)}`, accent: tc.orange, icon: ICON_TRENDDN, delta: expDelta, inverseDelta: true },
               { label: 'Savings Rate', value: `${savingsRate >= 0 ? '' : '-'}${Math.abs(savingsRate).toFixed(1)}%`, sub: net >= 0 ? `$${fmt(net)} saved` : `$${fmt(Math.abs(net))} deficit`, accent: savingsRate >= 30 ? tc.green : savingsRate >= 0 ? tc.amber : tc.rose, icon: ICON_SAVINGS, delta: null, inverseDelta: false },
             ].map(c => (
@@ -621,7 +625,7 @@ export default function DashboardPage() {
                   <Link href="/budgets" className="text-xs font-semibold hover:opacity-80" style={{ color: 'var(--color-primary)' }}>Manage →</Link>
                 </div>
                 {loading ? <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
-                : budgets.length === 0 ? (
+                : spendingBudgets.length === 0 ? (
                   <div className="text-center py-2">
                     <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No budgets set.</p>
                     <Link href="/budgets" className="text-xs font-semibold mt-1 block hover:opacity-80" style={{ color: 'var(--color-primary)' }}>Set budgets →</Link>

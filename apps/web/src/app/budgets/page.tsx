@@ -57,6 +57,7 @@ export default function BudgetsPage() {
   const [form, setForm]             = useState({ categoryId: '', amount: '' });
   const [sort, setSort]             = useState<'pct' | 'spent' | 'name'>('pct');
   const [catDropOpen, setCatDropOpen] = useState(false);
+  const [formKind, setFormKind]     = useState<'expense' | 'income'>('expense');
 
   /* Expanded budget detail */
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -88,23 +89,33 @@ export default function BudgetsPage() {
 
   useEffect(() => { if (expandedId) loadTxs(); }, [loadTxs, expandedId]);
 
-  /* Derived stats */
-  const totalBudget  = budgets.reduce((s, b) => s + Number(b.amount), 0);
-  const totalSpent   = budgets.reduce((s, b) => s + Number(b.spent), 0);
-  const overBudget   = budgets.filter(b => b.percentage >= 100);
-  const nearBudget   = budgets.filter(b => b.percentage >= 80 && b.percentage < 100);
-  const onTrack      = budgets.filter(b => b.percentage < 80);
+  /* Derived stats — spending budgets vs income targets */
+  const spending     = budgets.filter(b => b.category?.type !== 'income');
+  const targets      = budgets.filter(b => b.category?.type === 'income')
+    .sort((a, b) => b.percentage - a.percentage);
+  const totalBudget  = spending.reduce((s, b) => s + Number(b.amount), 0);
+  const totalSpent   = spending.reduce((s, b) => s + Number(b.spent), 0);
+  const overBudget   = spending.filter(b => b.percentage >= 100);
+  const nearBudget   = spending.filter(b => b.percentage >= 80 && b.percentage < 100);
+  const onTrack      = spending.filter(b => b.percentage < 80);
   const overallPct   = totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0;
+  const totalTarget  = targets.reduce((s, b) => s + Number(b.amount), 0);
+  const totalEarned  = targets.reduce((s, b) => s + Number(b.spent), 0);
+  const earnPct      = totalTarget > 0 ? Math.round((totalEarned / totalTarget) * 100) : 0;
+  const plannedNet   = totalTarget - totalBudget;
   const isCurrentMonth = month === new Date().toISOString().slice(0, 7);
 
-  const sorted = [...budgets].sort((a, b) => {
+  const sorted = [...spending].sort((a, b) => {
     if (sort === 'pct')   return b.percentage - a.percentage;
     if (sort === 'spent') return Number(b.spent) - Number(a.spent);
     return (a.category?.name ?? '').localeCompare(b.category?.name ?? '');
   });
 
   const usedIds   = new Set(budgets.map(b => b.categoryId));
-  const available = categories.filter(c => c.type !== 'transfer' && c.type !== 'income' && (!usedIds.has(c.id) || c.id === form.categoryId));
+  const available = categories.filter(c => (formKind === 'income'
+    ? c.type === 'income'
+    : c.type !== 'transfer' && c.type !== 'income')
+    && (!usedIds.has(c.id) || c.id === form.categoryId));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -149,8 +160,8 @@ export default function BudgetsPage() {
         <div className="sticky top-0 z-20 px-6 pt-5 pb-4 flex items-center justify-between gap-4 flex-wrap"
           style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">Budgets</h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Spending limits by category</p>
+            <h1 className="text-xl font-bold tracking-tight">Budgets &amp; Targets</h1>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Spending limits &amp; income goals by category</p>
           </div>
           <div className="flex items-center gap-2">
             {/* Month nav */}
@@ -159,7 +170,7 @@ export default function BudgetsPage() {
               <span className="text-sm font-semibold px-2 min-w-36 text-center">{monthLabel(month)}</span>
               <button onClick={() => setMonth(nextMonth(month))} disabled={isCurrentMonth} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors disabled:opacity-30" style={{ color: 'var(--color-text-muted)' }}>›</button>
             </div>
-            <button onClick={() => { setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '' }); }}
+            <button onClick={() => { setFormKind('expense'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '' }); }}
               className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5"
               style={{ background: 'var(--color-card-violet)' }}>
               <span className="text-base leading-none">+</span> Add Budget
@@ -169,14 +180,28 @@ export default function BudgetsPage() {
 
         <div className="p-6 flex flex-col gap-5">
 
-          {/* ── KPI cards ── */}
+          {/* ── KPI cards: the month plan at a glance ── */}
           {!loading && budgets.length > 0 && (
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
               {[
-                { label: 'Total Budget', value: `$${fmt(totalBudget)}`, sub: `${budgets.length} categories`, color: 'var(--color-card-violet)', icon: '🎯' },
-                { label: 'Total Spent',  value: `$${fmt(totalSpent)}`,  sub: `${Math.round(overallPct)}% used`, color: overallPct >= 100 ? 'var(--color-rose)' : 'var(--color-orange)', icon: '💸' },
-                { label: 'Remaining',    value: `${totalBudget - totalSpent < 0 ? '−' : '+'}$${fmt(Math.abs(totalBudget - totalSpent))}`, sub: totalBudget - totalSpent >= 0 ? 'available' : 'over budget', color: totalBudget - totalSpent < 0 ? 'var(--color-rose)' : 'var(--color-green)', icon: '💰' },
-                { label: 'Health',       value: `${onTrack.length}/${budgets.length}`, sub: `${overBudget.length} over · ${nearBudget.length} near limit`, color: overBudget.length > 0 ? 'var(--color-rose)' : nearBudget.length > 0 ? 'var(--color-amber)' : 'var(--color-green)', icon: overBudget.length > 0 ? '⚠️' : '✅' },
+                { label: 'Expected Income', value: totalTarget > 0 ? `$${fmt(totalTarget)}` : '—',
+                  sub: totalTarget > 0 ? `$${fmt(totalEarned)} earned` : 'no targets set',
+                  color: 'var(--color-green)', icon: '💵',
+                  bar: totalTarget > 0 ? { pct: earnPct, color: earnPct >= 100 ? 'var(--color-green)' : 'var(--color-amber)' } : null },
+                { label: 'Total Budget', value: spending.length > 0 ? `$${fmt(totalBudget)}` : '—',
+                  sub: spending.length > 0 ? `${spending.length} categor${spending.length === 1 ? 'y' : 'ies'}` : 'no budgets set',
+                  color: 'var(--color-card-violet)', icon: '🎯', bar: null },
+                { label: 'Total Spent',  value: `$${fmt(totalSpent)}`,  sub: `${Math.round(overallPct)}% of budget used`,
+                  color: overallPct >= 100 ? 'var(--color-rose)' : 'var(--color-orange)', icon: '💸',
+                  bar: spending.length > 0 ? { pct: overallPct, color: overallPct >= 100 ? 'var(--color-rose)' : overallPct >= 80 ? 'var(--color-amber)' : 'var(--color-orange)' } : null },
+                totalTarget > 0
+                  ? { label: 'Planned Savings', value: `${plannedNet < 0 ? '−' : '+'}$${fmt(Math.abs(plannedNet))}`,
+                      sub: 'expected income − budget',
+                      color: plannedNet >= 0 ? 'var(--color-card-sky)' : 'var(--color-rose)', icon: '🏦', bar: null }
+                  : { label: 'Health', value: `${onTrack.length}/${spending.length}`,
+                      sub: `${overBudget.length} over · ${nearBudget.length} near limit`,
+                      color: overBudget.length > 0 ? 'var(--color-rose)' : nearBudget.length > 0 ? 'var(--color-amber)' : 'var(--color-green)',
+                      icon: overBudget.length > 0 ? '⚠️' : '✅', bar: null },
               ].map(s => (
                 <div key={s.label} className="p-4 rounded-2xl flex flex-col gap-1.5 relative overflow-hidden"
                   style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
@@ -186,13 +211,19 @@ export default function BudgetsPage() {
                   </div>
                   <span className="text-xl font-extrabold leading-none tabular-nums" style={{ color: 'var(--color-text-primary)' }}>{s.value}</span>
                   <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{s.sub}</span>
+                  {s.bar && (
+                    <div className="h-1 rounded-full overflow-hidden mt-0.5" style={{ background: 'var(--color-border)' }}>
+                      <div className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${Math.min(s.bar.pct, 100)}%`, background: s.bar.color }} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
 
           {/* ── Overall progress bar ── */}
-          {!loading && budgets.length > 0 && (
+          {!loading && spending.length > 0 && (
             <div className="p-4 rounded-2xl flex flex-col gap-2.5"
               style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
               <div className="flex items-center justify-between text-xs">
@@ -228,10 +259,14 @@ export default function BudgetsPage() {
             </div>
           )}
 
-          {/* ── Budget list ── */}
+          {/* ── Budgets + Targets columns ── */}
+          <div className="grid lg:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
+
+          {/* ── Budgets column ── */}
+          <div className="flex flex-col gap-5 min-w-0">
           {loading ? (
             <p className="text-xs text-center py-12" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
-          ) : budgets.length === 0 ? (
+          ) : spending.length === 0 ? (
             <div className="py-16 flex flex-col items-center gap-4 text-center rounded-2xl"
               style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
               <span className="text-5xl opacity-30">🎯</span>
@@ -247,7 +282,13 @@ export default function BudgetsPage() {
             <div className="flex flex-col gap-3">
               {/* Sort controls */}
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>{budgets.length} budget{budgets.length !== 1 ? 's' : ''}</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-card-violet)' }}>Spending Budgets</span>
+                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums"
+                    style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+                    {spending.length}
+                  </span>
+                </div>
                 <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                   {([['pct','% Usage'],['spent','Amount'],['name','A–Z']] as const).map(([k,l]) => (
                     <button key={k} onClick={() => setSort(k)}
@@ -281,8 +322,15 @@ export default function BudgetsPage() {
                     }}>
 
                     {/* Card row */}
-                    <button type="button" className="w-full text-left p-5"
-                      onClick={() => setExpandedId(isExpanded ? null : b.id)}>
+                    <div role="button" tabIndex={0} aria-expanded={isExpanded}
+                      className="w-full text-left p-5 cursor-pointer"
+                      onClick={() => setExpandedId(isExpanded ? null : b.id)}
+                      onKeyDown={e => {
+                        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault();
+                          setExpandedId(isExpanded ? null : b.id);
+                        }
+                      }}>
 
                       <div className="flex items-center gap-4">
                         {/* Icon */}
@@ -340,7 +388,7 @@ export default function BudgetsPage() {
 
                         {/* Edit/delete + chevron */}
                         <div className="flex items-center gap-1 shrink-0">
-                          <button type="button" onClick={e => { e.stopPropagation(); setEditingId(b.id); setForm({ categoryId: b.categoryId, amount: String(b.amount) }); setShowForm(true); }}
+                          <button type="button" onClick={e => { e.stopPropagation(); setFormKind('expense'); setEditingId(b.id); setForm({ categoryId: b.categoryId, amount: String(b.amount) }); setShowForm(true); }}
                             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors text-xs"
                             style={{ color: 'var(--color-text-muted)' }}>✏️</button>
                           <button type="button" onClick={e => { e.stopPropagation(); handleDelete(b.id); }} disabled={deletingId === b.id}
@@ -354,7 +402,7 @@ export default function BudgetsPage() {
                           </div>
                         </div>
                       </div>
-                    </button>
+                    </div>
 
                     {/* ── Expanded: transaction detail ── */}
                     {isExpanded && (
@@ -439,6 +487,114 @@ export default function BudgetsPage() {
               })}
             </div>
           )}
+          </div>{/* end budgets column */}
+
+          {/* ── Targets column ── */}
+          <div className="flex flex-col gap-3 order-first lg:order-none">
+            {!loading && (
+              <>
+                <div className="flex items-center justify-between gap-2 min-h-[30px]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-green)' }}>Income Targets</span>
+                    {targets.length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums"
+                        style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+                        {targets.length}
+                      </span>
+                    )}
+                  </div>
+                  {targets.length > 0 && (
+                    <button type="button"
+                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '' }); }}
+                      className="px-3 py-1.5 text-[11px] font-semibold rounded-xl hover:brightness-110 transition-all text-white flex items-center gap-1"
+                      style={{ background: 'var(--color-green)' }}>
+                      <span className="text-sm leading-none">+</span> Add Target
+                    </button>
+                  )}
+                </div>
+
+                {targets.length === 0 ? (
+                  <div className="px-6 py-8 rounded-2xl flex flex-col items-center text-center gap-3"
+                    style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px dashed var(--color-border)' }}>
+                    <span className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
+                      style={{
+                        background: 'color-mix(in srgb, var(--color-green) 12%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--color-green) 30%, transparent)',
+                      }}>💵</span>
+                    <div>
+                      <p className="text-sm font-semibold">No income targets yet</p>
+                      <p className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+                        Forecast what each income category should bring in, and watch it fill as the month unfolds.
+                      </p>
+                    </div>
+                    <button type="button"
+                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '' }); }}
+                      className="mt-1 px-4 py-2 text-xs font-semibold text-white rounded-xl hover:brightness-110 transition-all"
+                      style={{ background: 'var(--color-green)' }}>
+                      + Set your first target
+                    </button>
+                  </div>
+                ) : targets.map(t => {
+                  const earned  = Number(t.spent);
+                  const goal    = Number(t.amount);
+                  const pct     = t.percentage;
+                  const reached = pct >= 100;
+                  const tColor  = t.category?.color ?? 'var(--color-green)';
+                  return (
+                    <div key={t.id} className="p-4 rounded-2xl flex flex-col gap-2.5 relative overflow-hidden"
+                      style={{
+                        background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
+                        border: reached ? '1px solid color-mix(in srgb, var(--color-green) 35%, transparent)' : '1px solid var(--color-border)',
+                      }}>
+                      <span className="absolute top-0 left-4 w-10 h-0.5 pointer-events-none"
+                        style={{ background: reached ? 'var(--color-green)' : tColor, opacity: 0.9 }} />
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
+                            style={{ background: `${tColor}20`, border: `1px solid ${tColor}30` }}>
+                            {t.category?.icon ?? '💼'}
+                          </span>
+                          <span className="text-sm font-semibold truncate">{t.category?.name ?? 'Unknown'}</span>
+                          {reached && (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                              style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>
+                              GOAL MET
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button type="button"
+                            onClick={() => { setFormKind('income'); setEditingId(t.id); setForm({ categoryId: t.categoryId, amount: String(t.amount) }); setShowForm(true); }}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors text-xs"
+                            style={{ color: 'var(--color-text-muted)' }}>✏️</button>
+                          <button type="button" onClick={() => handleDelete(t.id)} disabled={deletingId === t.id}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-500/20 transition-colors text-xs disabled:opacity-40"
+                            style={{ color: 'var(--color-text-muted)' }}>{deletingId === t.id ? '…' : '🗑️'}</button>
+                        </div>
+                      </div>
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-lg font-extrabold leading-none tabular-nums"
+                          style={{ color: reached ? 'var(--color-green)' : 'var(--color-text-primary)' }}>${fmt(earned)}</span>
+                        <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>of ${fmt(goal)} expected</span>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                        <div className="h-full rounded-full transition-all duration-700"
+                          style={{ width: `${Math.min(pct, 100)}%`, background: reached ? 'var(--color-green)' : tColor }} />
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-semibold" style={{ color: reached ? 'var(--color-green)' : 'var(--color-text-muted)' }}>
+                          {reached ? `+$${fmt(earned - goal)} above goal` : `$${fmt(goal - earned)} to go`}
+                        </span>
+                        <span className="text-[10px] font-bold tabular-nums" style={{ color: reached ? 'var(--color-green)' : 'var(--color-text-secondary)' }}>{pct}%</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>{/* end targets column */}
+
+          </div>{/* end columns grid */}
         </div>
 
         {/* ── Add / Edit modal ── */}
@@ -453,18 +609,20 @@ export default function BudgetsPage() {
               const amt    = parseFloat(form.amount) || 0;
               return (
                 <form onSubmit={handleSubmit}
-                  className="w-full max-w-sm flex flex-col rounded-2xl overflow-hidden"
+                  className="w-full max-w-sm flex flex-col rounded-2xl"
                   style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)' }}>
 
                   {/* Form header */}
-                  <div className="px-5 py-4 flex items-center justify-between gap-3"
+                  <div className="px-5 py-4 flex items-center justify-between gap-3 rounded-t-2xl"
                     style={{ borderBottom: '1px solid var(--color-border)', background: `linear-gradient(135deg, ${accentHex}12 0%, transparent 60%)` }}>
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0" style={{ background: `${accentHex}22` }}>
                         {selCat?.icon ?? '🎯'}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-sm">{selCat?.name ?? (editingId ? 'Edit Budget' : 'New Budget')}</p>
+                        <p className="font-bold text-sm">{selCat?.name ?? (editingId
+                          ? (formKind === 'income' ? 'Edit Income Target' : 'Edit Budget')
+                          : (formKind === 'income' ? 'New Income Target' : 'New Budget'))}</p>
                         <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
                           {amt > 0 ? `$${amt.toLocaleString()} / month` : monthLabel(month)}
                         </p>
@@ -512,7 +670,9 @@ export default function BudgetsPage() {
 
                     {/* Amount */}
                     <div className="flex flex-col gap-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Monthly Limit</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                        {formKind === 'income' ? 'Expected Income' : 'Monthly Limit'}
+                      </span>
                       <div className="flex rounded-xl overflow-hidden" style={{ border: `1px solid ${amt > 0 ? accentHex + '55' : 'var(--color-border)'}` }}>
                         <span className="flex items-center px-3 text-sm font-semibold shrink-0"
                           style={{ background: 'var(--color-surface)', color: amt > 0 ? accentHex : 'var(--color-text-muted)', borderRight: '1px solid var(--color-border)' }}>$</span>
@@ -544,7 +704,7 @@ export default function BudgetsPage() {
                     <button type="submit"
                       className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all"
                       style={{ background: accent }}>
-                      {editingId ? 'Save Changes' : 'Create Budget'}
+                      {editingId ? 'Save Changes' : (formKind === 'income' ? 'Create Target' : 'Create Budget')}
                     </button>
                   </div>
                 </form>
