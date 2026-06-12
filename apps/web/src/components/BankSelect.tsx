@@ -28,10 +28,10 @@ export const BANKS: readonly { name: string; domain: string; color: string; abbr
 type Bank = (typeof BANKS)[number];
 
 const glass: React.CSSProperties = {
-  background: 'rgba(25,25,40,0.97)',
+  background: 'var(--popover-bg)',
   backdropFilter: 'blur(24px)',
   WebkitBackdropFilter: 'blur(24px)',
-  border: '1px solid rgba(255,255,255,0.12)',
+  border: '1px solid var(--color-border)',
   boxShadow: '0 12px 40px rgba(0,0,0,0.6)',
 };
 
@@ -120,8 +120,8 @@ export default function BankSelect({ value, onChange, inputStyle, compact = fals
           style={inputStyle}
         />
         <button type="button" onClick={backToList}
-          className={`px-2.5 ${py} ${sz} rounded-xl flex items-center gap-1 transition-colors hover:bg-white/10 shrink-0`}
-          style={{ color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          className={`px-2.5 ${py} ${sz} rounded-xl flex items-center gap-1 transition-colors hover:bg-[var(--color-elevated)] shrink-0`}
+          style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
           ← List
         </button>
       </div>
@@ -170,7 +170,7 @@ export default function BankSelect({ value, onChange, inputStyle, compact = fals
             const active = value === bank.name;
             return (
               <button key={bank.name} type="button" onClick={() => pickBank(bank)}
-                className={`w-full flex items-center gap-3 px-3 ${compact ? 'py-2' : 'py-2.5'} text-left transition-colors hover:bg-white/10`}
+                className={`w-full flex items-center gap-3 px-3 ${compact ? 'py-2' : 'py-2.5'} text-left transition-colors hover:bg-[var(--color-elevated)]`}
                 style={active ? { background: `${bank.color}20` } : {}}>
                 <BankLogo bank={bank} size={compact ? 20 : 26} imgErrors={imgErrors} onError={(d) => setImgErrors((p) => ({ ...p, [d]: true }))} />
                 <span className={`flex-1 ${sz} font-medium`} style={{ color: active ? bank.color : 'var(--color-text-primary)' }}>
@@ -180,12 +180,12 @@ export default function BankSelect({ value, onChange, inputStyle, compact = fals
               </button>
             );
           })}
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
+          <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
           <button type="button" onClick={enterCustom}
-            className={`w-full flex items-center gap-2.5 px-3 ${compact ? 'py-2' : 'py-2.5'} ${sz} transition-colors hover:bg-white/10`}
+            className={`w-full flex items-center gap-2.5 px-3 ${compact ? 'py-2' : 'py-2.5'} ${sz} transition-colors hover:bg-[var(--color-elevated)]`}
             style={{ color: 'var(--color-text-muted)' }}>
             <span className="w-5 h-5 rounded-lg flex items-center justify-center text-xs shrink-0"
-              style={{ background: 'rgba(255,255,255,0.08)' }}>✏️</span>
+              style={{ background: 'var(--color-elevated)' }}>✏️</span>
             Other bank…
           </button>
         </div>,

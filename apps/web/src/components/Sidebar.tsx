@@ -31,38 +31,53 @@ export default function Sidebar() {
   const initials    = displayName.slice(0, 2).toUpperCase();
 
   return (
-    <aside className="w-56 shrink-0 flex flex-col" style={{
+    <aside className="w-64 shrink-0 flex flex-col" style={{
       background: 'var(--color-surface)',
       backdropFilter: 'var(--glass-blur)',
       WebkitBackdropFilter: 'var(--glass-blur)',
       borderRight: '1px solid var(--color-border)',
     }}>
 
-      {/* ── Logo ── */}
-      <div className="px-5 pt-6 pb-4">
-        <Link href="/dashboard" className="flex items-center gap-3 no-underline group">
-          <Logo size={52} />
-          <div>
-            <p className="font-black text-sm tracking-widest uppercase leading-none"
-              style={{ color: 'var(--color-text-primary)' }}>Cofre</p>
-            <p className="text-[9px] font-bold tracking-widest uppercase leading-none mt-0.5"
-              style={{ color: 'var(--color-primary)', opacity: 0.6 }}>Budget</p>
+      {/* ── Brand ── */}
+      <div className="px-6 pt-7 pb-6 mb-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
+        <Link href="/dashboard" className="flex items-center gap-3.5 no-underline">
+          <span className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 overflow-hidden"
+            style={{
+              color: 'var(--color-primary)',
+              border: '1px solid color-mix(in srgb, var(--color-primary) 45%, transparent)',
+              boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent)',
+            }}>
+            <Logo size={30} className="block" />
+          </span>
+          <div className="flex flex-col gap-1.5">
+            <span className="brand-name" style={{ color: 'var(--color-text-primary)' }}>
+              Cofre
+            </span>
+            <span className="text-[9.5px] uppercase leading-none"
+              style={{ color: 'var(--color-text-muted)', letterSpacing: '0.32em' }}>
+              Wealth &amp; Budget
+            </span>
           </div>
         </Link>
       </div>
 
       {/* ── Nav ── */}
-      <nav className="flex flex-col gap-0.5 px-3 flex-1 pt-2">
+      <nav className="flex flex-col gap-1.5 px-4 flex-1 pt-2">
+        <p className="text-[10.5px] font-semibold uppercase pl-3 mb-1.5 mt-1"
+          style={{ color: 'var(--color-text-muted)', letterSpacing: '0.28em' }}>Overview</p>
         {NAV.map(({ label, href, icon: Icon }) => {
           const active = pathname === href;
           return (
             <Link key={href} href={href}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all group relative"
+              className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] transition-all group relative"
               style={{
                 color: active ? 'var(--nav-active-fg, var(--color-text-primary))' : 'var(--color-text-secondary)',
                 background: active ? 'var(--nav-active-bg)' : 'transparent',
+                border: active ? 'var(--nav-active-border, 1px solid transparent)' : '1px solid transparent',
+                letterSpacing: '0.03em',
+                fontWeight: active ? 500 : 400,
               }}
-              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(128,128,128,0.08)'; }}
+              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--color-elevated)'; }}
               onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
               {active && (
@@ -79,17 +94,22 @@ export default function Sidebar() {
       </nav>
 
       {/* ── Settings ── */}
-      <div className="px-3 pb-2">
+      <div className="px-4 pb-2 flex flex-col gap-1.5">
+        <p className="text-[10.5px] font-semibold uppercase pl-3 mb-1.5"
+          style={{ color: 'var(--color-text-muted)', letterSpacing: '0.28em' }}>Account</p>
         {(() => {
           const active = pathname === '/settings';
           return (
             <Link href="/settings"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all"
+              className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] transition-all relative"
               style={{
                 color: active ? 'var(--nav-active-fg, var(--color-text-primary))' : 'var(--color-text-secondary)',
                 background: active ? 'var(--nav-active-bg)' : 'transparent',
+                border: active ? 'var(--nav-active-border, 1px solid transparent)' : '1px solid transparent',
+                letterSpacing: '0.03em',
+                fontWeight: active ? 500 : 400,
               }}
-              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(128,128,128,0.08)'; }}
+              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--color-elevated)'; }}
               onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
             >
               {active && (
@@ -107,7 +127,7 @@ export default function Sidebar() {
       <div className="mx-3 mb-4 p-3 rounded-2xl flex items-center gap-2.5"
         style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)' }}>
         <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0"
-          style={{ background: 'linear-gradient(135deg, #9B6DFF 0%, #E879A0 100%)', color: 'white' }}>
+          style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-violet) 100%)', color: '#fff' }}>
           {initials}
         </div>
         <div className="flex-1 min-w-0">
@@ -133,33 +153,32 @@ export default function Sidebar() {
 
 function DashboardIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-      <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>
     </svg>
   );
 }
 
 function TransactionsIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M7 16V4m0 0L3 8m4-4 4 4"/><path d="M17 8v12m0 0 4-4m-4 4-4-4"/>
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18M3 12h18M3 18h12"/>
     </svg>
   );
 }
 
 function BudgetsIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2a10 10 0 1 0 10 10H12V2z"/><path d="M12 2a10 10 0 0 1 10 10"/>
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
     </svg>
   );
 }
 
 function ProjectsIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19V5M9.3 19V9m5.4 10v-7M20 19V7"/>
     </svg>
   );
 }
@@ -174,7 +193,7 @@ function ReportsIcon() {
 
 function SettingsIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="3"/>
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
     </svg>

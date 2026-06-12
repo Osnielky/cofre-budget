@@ -28,9 +28,9 @@ const EMOJI_OPTIONS = [
 ];
 
 const TYPE_META: Record<string, { label: string; color: string }> = {
-  expense:  { label: 'Expense',  color: '#F07A3E' },
-  income:   { label: 'Income',   color: '#4FBF7F' },
-  both:     { label: 'Both',     color: '#9B6DFF' },
+  expense:  { label: 'Expense',  color: 'var(--color-orange)' },
+  income:   { label: 'Income',   color: 'var(--color-green)' },
+  both:     { label: 'Both',     color: 'var(--color-primary)' },
   transfer: { label: 'Transfer', color: '#6B6B8A' },
 };
 
@@ -42,8 +42,8 @@ const TYPE_TIPS: Record<string, string> = {
 };
 
 const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.10)',
+  background: 'var(--color-elevated)',
+  border: '1px solid var(--color-border)',
   borderRadius: '10px',
   color: 'var(--color-text-primary)',
 };
@@ -64,14 +64,10 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
     description: editing?.description ?? '',
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [emojiSearch, setEmojiSearch] = useState('');
   const [emojiPos, setEmojiPos] = useState<{ top: number; left: number } | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
   const emojiPickerRef  = useRef<HTMLDivElement>(null);
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
 
   useEffect(() => {
     if (!showEmojiPicker) return;
@@ -80,31 +76,13 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
       if (!emojiPickerRef.current?.contains(t) && !emojiTriggerRef.current?.contains(t))
         setShowEmojiPicker(false);
     }
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setShowEmojiPicker(false);
-    }
     document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
+    return () => document.removeEventListener('mousedown', onDown);
   }, [showEmojiPicker]);
-
-  const handleFormChange = (updates: Partial<typeof form>) => {
-    setForm(f => ({ ...f, ...updates }));
-    setIsDirty(true);
-    setError(null);
-  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) {
-      setError('Category name is required');
-      return;
-    }
     setSaving(true);
-    setError(null);
     try {
       const url = editing ? `${API}/categories/${editing.id}` : `${API}/categories`;
       const res = await fetch(url, {
@@ -113,23 +91,12 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
         credentials: 'include',
         body: JSON.stringify(form),
       });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || `Failed to ${editing ? 'update' : 'create'} category`);
-      }
+      if (!res.ok) return;
       const saved: Category = await res.json();
-      setIsDirty(false);
       onSaved(saved);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setSaving(false);
     }
-  }
-
-  function handleClose() {
-    if (isDirty && !confirm('Discard unsaved changes?')) return;
-    onClose();
   }
 
   const typeMeta = TYPE_META[form.type] ?? TYPE_META.expense;
@@ -137,10 +104,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
   return createPortal(
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
-      role="dialog"
-      aria-labelledby="modal-title"
-      aria-modal="true">
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
 
       <form onSubmit={handleSubmit}
         className="w-full max-w-sm flex flex-col rounded-2xl overflow-hidden"
@@ -148,15 +112,14 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
 
         {/* Live preview header */}
         <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          style={{ borderBottom: '1px solid var(--color-border)' }}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
-              style={{ background: `${form.color}22`, boxShadow: `0 0 0 1px ${form.color}44` }}
-              aria-hidden="true">
+              style={{ background: `${form.color}22`, boxShadow: `0 0 0 1px ${form.color}44` }}>
               {form.icon}
             </div>
             <div className="min-w-0">
-              <p id="modal-title" className="font-bold text-sm truncate" style={{ color: form.name ? form.color : 'var(--color-text-muted)' }}>
+              <p className="font-bold text-sm truncate" style={{ color: form.name ? form.color : 'var(--color-text-muted)' }}>
                 {form.name || 'Category name'}
               </p>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
@@ -165,43 +128,28 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
               </span>
             </div>
           </div>
-          <button type="button" onClick={handleClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 shrink-0 transition-colors"
-            style={{ color: 'var(--color-text-muted)' }}
-            aria-label="Close dialog">
+          <button type="button" onClick={onClose}
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] shrink-0"
+            style={{ color: 'var(--color-text-muted)' }}>
             <CloseIcon />
           </button>
         </div>
 
         <div className="flex flex-col gap-4 px-5 py-4">
 
-          {/* Error display */}
-          {error && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-              style={{ background: 'rgba(255,107,107,0.15)', border: '1px solid rgba(255,107,107,0.3)', color: '#FF6B6B' }}
-              role="alert">
-              <span>⚠️</span>
-              <span>{error}</span>
-            </div>
-          )}
-
           {/* Type pill group */}
           <div className="flex flex-col gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-              <label htmlFor="type-expense">Type</label>
-            </span>
-            <div className="grid grid-cols-4 gap-1.5 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</span>
+            <div className="grid grid-cols-4 gap-1.5 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               {Object.entries(TYPE_META).map(([val, meta]) => (
                 <button key={val} type="button"
-                  id={`type-${val}`}
-                  onClick={() => handleFormChange({ type: val })}
-                  className="py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110"
+                  onClick={() => setForm((f) => ({ ...f, type: val }))}
+                  className="py-1.5 rounded-lg text-xs font-semibold transition-all"
                   style={{
                     background: form.type === val ? `${meta.color}22` : 'transparent',
                     color: form.type === val ? meta.color : 'var(--color-text-muted)',
                     border: form.type === val ? `1px solid ${meta.color}44` : '1px solid transparent',
-                  }}
-                  aria-pressed={form.type === val}>
+                  }}>
                   {meta.label}
                 </button>
               ))}
@@ -211,38 +159,27 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
 
           {/* Name */}
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="category-name" className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Name</label>
-            <input id="category-name" required autoFocus placeholder="e.g. Groceries" value={form.name} maxLength={50}
-              onChange={(e) => handleFormChange({ name: e.target.value })}
-              className="px-3 py-2.5 text-sm outline-none rounded-xl" 
-              style={inputStyle}
-              aria-describedby="name-hint" />
-            <span id="name-hint" className="text-xs px-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              {form.name.length}/50
-            </span>
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Name</span>
+            <input required autoFocus placeholder="e.g. Groceries" value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
           </div>
 
           {/* Icon + Color */}
           <div className="flex gap-3">
             <div className="flex flex-col gap-1.5 shrink-0">
-              <label htmlFor="icon-picker" className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Icon</label>
-              <button ref={emojiTriggerRef} id="icon-picker" type="button"
+              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Icon</span>
+              <button ref={emojiTriggerRef} type="button"
                 onClick={() => {
                   if (!showEmojiPicker && emojiTriggerRef.current) {
                     const r = emojiTriggerRef.current.getBoundingClientRect();
                     const spaceBelow = window.innerHeight - r.bottom - 8;
-                    const pickerHeight = isMobile ? 180 : 340;
-                    setEmojiPos({ 
-                      top: spaceBelow > pickerHeight ? r.bottom + 4 : Math.max(8, r.top - pickerHeight - 4), 
-                      left: isMobile ? Math.max(8, r.left - 160) : r.left 
-                    });
+                    setEmojiPos({ top: spaceBelow > 260 ? r.bottom + 4 : r.top - 264, left: r.left });
                   }
                   setShowEmojiPicker((v) => !v);
                 }}
-                className="w-16 h-10 rounded-xl flex items-center justify-center gap-1.5 text-xl transition-colors hover:bg-white/10"
-                style={inputStyle}
-                aria-expanded={showEmojiPicker}
-                aria-haspopup="dialog">
+                className="w-16 h-10 rounded-xl flex items-center justify-center gap-1.5 text-xl transition-colors hover:bg-[var(--color-elevated)]"
+                style={inputStyle}>
                 {form.icon}
                 <svg width="8" height="8" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
                   <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -250,47 +187,38 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
               </button>
             </div>
             <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-              <fieldset>
-                <legend className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</legend>
-                <div className="flex flex-wrap items-center gap-2 px-3 h-10 rounded-xl mt-1.5" style={inputStyle}>
-                  {PRESET_COLORS.map((c) => (
-                    <button key={c} type="button" onClick={() => handleFormChange({ color: c })}
-                      className="w-4 h-4 rounded-full transition-all hover:scale-110 shrink-0"
-                      style={{ background: c, boxShadow: form.color === c ? `0 0 0 2px rgba(0,0,0,0.6), 0 0 0 4px ${c}` : 'none' }}
-                      aria-label={`Color ${c}`}
-                      aria-pressed={form.color === c} />
-                  ))}
-                </div>
-              </fieldset>
+              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</span>
+              <div className="flex flex-wrap items-center gap-2 px-3 h-10 rounded-xl" style={inputStyle}>
+                {PRESET_COLORS.map((c) => (
+                  <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
+                    className="w-4 h-4 rounded-full transition-all hover:scale-110 shrink-0"
+                    style={{ background: c, boxShadow: form.color === c ? `0 0 0 2px rgba(0,0,0,0.6), 0 0 0 4px ${c}` : 'none' }} />
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Description */}
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="category-desc" className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
               Description <span style={{ opacity: 0.5, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-            </label>
-            <input id="category-desc" placeholder="e.g. Restaurants, groceries…" value={form.description}
-              onChange={(e) => handleFormChange({ description: e.target.value })}
-              maxLength={100} className="px-3 py-2.5 text-sm outline-none rounded-xl" 
-              style={inputStyle}
-              aria-describedby="desc-hint" />
-            <span id="desc-hint" className="text-xs px-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              {form.description.length}/100
             </span>
+            <input placeholder="e.g. Restaurants, groceries…" value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              maxLength={100} className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
           </div>
 
         </div>
 
         {/* Footer */}
         <div className="flex gap-2 justify-end px-5 py-4"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-          <button type="button" onClick={handleClose}
-            className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+          style={{ borderTop: '1px solid var(--color-border)' }}>
+          <button type="button" onClick={onClose}
+            className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
             style={{ color: 'var(--color-text-secondary)' }}>
             Cancel
           </button>
-          <button type="submit" disabled={saving || !form.name.trim()}
+          <button type="submit" disabled={saving}
             className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
             style={{ background: typeMeta.color }}>
             {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Category'}
@@ -300,29 +228,16 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
 
       {/* Emoji picker */}
       {showEmojiPicker && emojiPos && (
-        <div ref={emojiPickerRef} 
-          className={`p-3 rounded-xl grid gap-1 ${isMobile ? 'grid-cols-8' : 'grid-cols-10'}`}
-          style={{ position: 'fixed', top: emojiPos.top, left: emojiPos.left, 
-                   width: isMobile ? 300 : 360, maxHeight: isMobile ? 180 : 340,
+        <div ref={emojiPickerRef} className="p-3 rounded-xl grid grid-cols-10 gap-1"
+          style={{ position: 'fixed', top: emojiPos.top, left: emojiPos.left, width: 360, maxHeight: 340,
                    overflowY: 'auto', zIndex: 9999, background: 'var(--color-elevated)',
                    backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
-                   border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}
-          role="dialog"
-          aria-label="Emoji picker">
-          {emojiSearch && (
-            <input type="text" placeholder="Search emojis…" value={emojiSearch}
-              onChange={(e) => setEmojiSearch(e.target.value)}
-              className="col-span-full px-2 py-1.5 text-xs rounded-lg outline-none mb-1"
-              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
-              autoFocus />
-          )}
+                   border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
           {EMOJI_OPTIONS.map((em) => (
             <button key={em} type="button"
-              onClick={() => { handleFormChange({ icon: em }); setShowEmojiPicker(false); setEmojiSearch(''); }}
-              className="w-8 h-8 rounded-lg text-lg flex items-center justify-center hover:bg-white/10 transition-colors"
-              style={{ background: form.icon === em ? 'rgba(155,109,255,0.25)' : 'transparent' }}
-              aria-label={`Select emoji ${em}`}
-              aria-pressed={form.icon === em}>
+              onClick={() => { setForm((f) => ({ ...f, icon: em })); setShowEmojiPicker(false); }}
+              className="w-8 h-8 rounded-lg text-lg flex items-center justify-center hover:bg-[var(--color-elevated)]"
+              style={{ background: form.icon === em ? 'color-mix(in srgb, var(--color-primary) 25%, transparent)' : 'transparent' }}>
               {em}
             </button>
           ))}

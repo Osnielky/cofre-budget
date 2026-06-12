@@ -24,12 +24,14 @@ export class BudgetsService {
 
     return Promise.all(
       budgets.map(async (b) => {
+        // Income categories track earnings (positive amounts); the rest track spending.
+        const isIncome = b.category?.type === 'income';
         const raw = await this.txRepo
           .createQueryBuilder('tx')
-          .select('COALESCE(SUM(ABS(tx.amount)), 0)', 'spent')
+          .select(isIncome ? 'COALESCE(SUM(tx.amount), 0)' : 'COALESCE(SUM(ABS(tx.amount)), 0)', 'spent')
           .where('tx.userId = :userId', { userId })
           .andWhere('tx.categoryId = :categoryId', { categoryId: b.categoryId })
-          .andWhere('tx.amount < 0')
+          .andWhere(isIncome ? 'tx.amount > 0' : 'tx.amount < 0')
           .andWhere('tx.date >= :startDate AND tx.date <= :endDate', { startDate, endDate })
           .getRawOne<{ spent: string }>();
 

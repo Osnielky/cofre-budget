@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { useUser } from '@/components/UserProvider';
+import { useThemeColors } from '@/components/ThemeProvider';
 import { BANKS } from '@/components/BankSelect';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -21,10 +22,6 @@ interface Transaction {
 interface Budget { id: string; amount: number; spent: number; category: Category }
 interface Project { id: string; name: string; icon: string; color: string; type: string; status: string; expenses: number; income: number; costBasis: number; netGain: number | null; roi: number | null; purchasePrice: number }
 
-function hexToRgb(hex: string) {
-  const n = parseInt(hex.replace('#',''), 16);
-  return `${(n>>16)&255}, ${(n>>8)&255}, ${n&255}`;
-}
 function currentMonth() { return new Date().toISOString().slice(0,7); }
 function monthFrom(m: string) { return `${m}-01`; }
 function monthTo(m: string) {
@@ -72,13 +69,27 @@ const glass: React.CSSProperties = {
 function TrendBadge({ delta, inverse = false }: { delta: number; inverse?: boolean }) {
   if (Math.abs(delta) < 0.5) return null;
   const good = inverse ? delta < 0 : delta > 0;
+  const tone = good ? 'var(--color-green)' : 'var(--color-rose)';
   return (
     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
-      style={{ background: good ? 'rgba(79,191,127,0.15)' : 'rgba(255,107,107,0.15)', color: good ? '#4FBF7F' : '#FF6B6B' }}>
+      style={{ background: `color-mix(in srgb, ${tone} 14%, transparent)`, color: tone }}>
       {delta > 0 ? '↑' : '↓'}{Math.abs(delta).toFixed(1)}%
     </span>
   );
 }
+
+function StatIcon({ d }: { d: string }) {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
+  );
+}
+const ICON_WALLET   = 'M21 12V7H5a2 2 0 0 1 0-4h14v4 M3 5v14a2 2 0 0 0 2 2h16v-5 M18 12a2 2 0 0 0 0 4h4v-4Z';
+const ICON_TRENDUP  = 'M22 7l-8.5 8.5-5-5L2 17 M16 7h6v6';
+const ICON_TRENDDN  = 'M22 17l-8.5-8.5-5 5L2 7 M16 17h6v-6';
+const ICON_SAVINGS  = 'M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z M2 9v1c0 1.1.9 2 2 2h1';
 
 function BankLogo({ bankName, size = 28 }: { bankName: string; size?: number }) {
   const [err, setErr] = useState(false);
@@ -106,6 +117,7 @@ export default function DashboardPage() {
   const [projects, setProjects]    = useState<Project[]>([]);
   const [loading, setLoading]      = useState(true);
   const { user } = useUser();
+  const tc = useThemeColors();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,6 +149,10 @@ export default function DashboardPage() {
   const expenses     = transactions.filter(t => Number(t.amount) < 0  && !isTransfer(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
   const net          = income - expenses;
   const savingsRate  = income > 0 ? (net / income * 100) : 0;
+  const spendingBudgets = budgets.filter(b => b.category?.type !== 'income');
+  const incomeTargets   = budgets.filter(b => b.category?.type === 'income');
+  const incomeTarget    = incomeTargets.reduce((s,b) => s + Number(b.amount), 0) || null;
+  const targetPct       = incomeTarget ? Math.round((income / incomeTarget) * 100) : null;
   const totalBalance = accounts.reduce((s,a) => s + (isDebtAcc(a) ? -Math.abs(Number(a.balance||0)) : Number(a.balance||0)), 0);
   const totalAssets  = accounts.filter(a => !isDebtAcc(a)).reduce((s,a) => s + Number(a.balance||0), 0);
   const totalDebt    = accounts.filter(a => isDebtAcc(a)).reduce((s,a) => s + Math.abs(Number(a.balance||0)), 0);
@@ -163,10 +179,10 @@ export default function DashboardPage() {
   const totalCatSpend = topCats.reduce((s,c) => s + c.total, 0);
 
   /* Budget health */
-  const overBudget     = budgets.filter(b => Number(b.spent) > Number(b.amount));
-  const nearBudget     = budgets.filter(b => Number(b.spent)/Number(b.amount) >= 0.8 && Number(b.spent) <= Number(b.amount));
-  const totalBudgeted  = budgets.reduce((s,b) => s + Number(b.amount), 0);
-  const totalSpent     = budgets.reduce((s,b) => s + Number(b.spent), 0);
+  const overBudget     = spendingBudgets.filter(b => Number(b.spent) > Number(b.amount));
+  const nearBudget     = spendingBudgets.filter(b => Number(b.spent)/Number(b.amount) >= 0.8 && Number(b.spent) <= Number(b.amount));
+  const totalBudgeted  = spendingBudgets.reduce((s,b) => s + Number(b.amount), 0);
+  const totalSpent     = spendingBudgets.reduce((s,b) => s + Number(b.spent), 0);
   const budgetPct      = totalBudgeted > 0 ? Math.min(100, totalSpent/totalBudgeted*100) : 0;
 
   /* Projects */
@@ -182,11 +198,10 @@ export default function DashboardPage() {
   const monthlyChart = Array.from({ length: currentMoIdx + 1 }, (_,i) => {
     const key = `${currentYear}-${String(i+1).padStart(2,'0')}`;
     const txs = yearTx.filter(t => t.date.startsWith(key) && !isTransfer(t));
-    const rev      = +txs.filter(t => Number(t.amount) > 0).reduce((s,t) => s + Number(t.amount), 0).toFixed(2);
-    const regExp   = +txs.filter(t => Number(t.amount) < 0 && !t.projectId).reduce((s,t) => s + Math.abs(Number(t.amount)), 0).toFixed(2);
-    const projExp  = +txs.filter(t => Number(t.amount) < 0 && !!t.projectId).reduce((s,t) => s + Math.abs(Number(t.amount)), 0).toFixed(2);
-    cumulativeNet += (rev - regExp - projExp);
-    return { month: MONTHS_SHORT[i], revenue: rev, regularExp: regExp, projectExp: projExp, net: +cumulativeNet.toFixed(2) };
+    const rev = +txs.filter(t => Number(t.amount) > 0).reduce((s,t) => s + Number(t.amount), 0).toFixed(2);
+    const exp = +txs.filter(t => Number(t.amount) < 0).reduce((s,t) => s + Math.abs(Number(t.amount)), 0).toFixed(2);
+    cumulativeNet += (rev - exp);
+    return { month: MONTHS_SHORT[i], revenue: rev, expenses: exp, net: +cumulativeNet.toFixed(2) };
   });
 
   /* Revenue by category (donut) */
@@ -213,75 +228,80 @@ export default function DashboardPage() {
     date: formatDate(date), total: +total.toFixed(2),
   }));
 
+  /* ── Topbar summary line ── */
+  const NUM_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
+  const budgetsOver = spendingBudgets.filter(b => Number(b.amount) > 0 && Number(b.spent) / Number(b.amount) >= 0.8).length;
+  const monthName   = monthLabel(month).split(' ')[0];
+  const healthLine  = loading ? 'Loading your financial snapshot…'
+    : net >= 0 ? 'Your portfolio of accounts is in excellent shape.'
+    : 'Spending is running ahead of income this month.';
+  const attentionLine = loading ? ''
+    : spendingBudgets.length === 0 ? 'Set up budgets to keep your spending on track.'
+    : budgetsOver === 0 ? `All budgets are on track for ${monthName}.`
+    : `${NUM_WORDS[budgetsOver] ?? budgetsOver} budget${budgetsOver === 1 ? '' : 's'} need${budgetsOver === 1 ? 's' : ''} attention before the end of ${monthName}.`;
+
+  const pillBase: React.CSSProperties = { padding: '14px 26px', letterSpacing: '0.18em' };
+
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
 
-        {/* ── Sticky header ── */}
-        <div className="sticky top-0 z-20 px-6 pt-5 pb-4 flex items-center justify-between gap-4"
-          style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
+        {/* ── Topbar ── */}
+        <div className="px-8 pt-9 flex items-end justify-between gap-6 flex-wrap">
           <div>
-            <h1 className="text-xl font-bold" style={{ letterSpacing: '-0.02em' }}>
-              {greeting()}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
+            <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(36px, 3.6vw, 48px)', lineHeight: 1.08 }}>
+              {greeting()}{user?.name ? <>, <span style={{ color: 'var(--color-primary)' }}>{user.name.split(' ')[0]}</span></> : ''}
             </h1>
-            <p className="text-xs mt-0.5 font-medium" style={{ color: 'var(--color-text-secondary)' }}>
-              Financial snapshot
+            <div className="rounded-full" style={{ width: 56, height: 3, background: 'var(--color-primary)', margin: '18px 0 14px' }} />
+            <p style={{ fontSize: 17, fontWeight: 300, color: 'var(--color-text-secondary)', maxWidth: 520, lineHeight: 1.65 }}>
+              {healthLine} {attentionLine}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {loading && (
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-green)' }} />
-            )}
-            <div className="flex items-center gap-0.5 px-1 py-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <button
-                onClick={() => setMonth(prevMonth)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors duration-150"
-                style={{ color: 'var(--color-text-muted)', cursor: 'pointer' }}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-              >‹</button>
-              <span className="text-sm font-semibold px-2 min-w-36 text-center">{monthLabel(month)}</span>
-              <button
-                onClick={() => setMonth(nextMonth)}
-                disabled={isCurrentMonth}
-                className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors duration-150 disabled:opacity-30"
-                style={{ color: 'var(--color-text-muted)', cursor: isCurrentMonth ? 'default' : 'pointer' }}
-                onMouseEnter={e => { if (!isCurrentMonth) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-              >›</button>
+          <div className="flex items-center gap-3.5 pb-2 flex-wrap">
+            {loading && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-green)' }} />}
+            <div className="flex items-center gap-0.5 rounded-full px-1.5 py-1.5" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+              <button onClick={() => setMonth(prevMonth)} aria-label="Previous month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)]" style={{ color: 'var(--color-text-secondary)' }}>‹</button>
+              <span className="text-[12.5px] font-semibold uppercase px-1 min-w-28 text-center" style={{ letterSpacing: '0.12em' }}>{monthLabel(month)}</span>
+              <button onClick={() => setMonth(nextMonth)} disabled={isCurrentMonth} aria-label="Next month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-default" style={{ color: 'var(--color-text-secondary)' }}>›</button>
             </div>
+            <Link href="/budgets"
+              className="inline-flex items-center justify-center rounded-full text-[12.5px] font-semibold uppercase no-underline transition-all hover:brightness-125"
+              style={{ ...pillBase, background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
+              View Reports
+            </Link>
+            <Link href="/transactions"
+              className="btn-gold inline-flex items-center justify-center rounded-full text-[12.5px] font-semibold uppercase no-underline transition-all"
+              style={pillBase}>
+              Add Transaction
+            </Link>
           </div>
         </div>
 
-        <div className="p-6 flex flex-col gap-5">
+        <div className="px-8 pt-7 pb-10 flex flex-col gap-5">
 
           {/* ── Row 1: Stat cards ── */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
             {[
-              { label: 'Net Worth',    value: `$${fmt(totalBalance)}`,                    sub: `${accounts.length} account${accounts.length !== 1 ? 's' : ''}`,  accent: '#9B6DFF', Icon: NetWorthIcon,    delta: null,     inverseDelta: false },
-              { label: 'Income',       value: `$${fmt(income)}`,                          sub: `vs ${monthShort(prevM)}: $${fmt(prevInc)}`,                       accent: '#4FBF7F', Icon: IncomeIcon,      delta: incDelta, inverseDelta: false },
-              { label: 'Expenses',     value: `$${fmt(expenses)}`,                        sub: `vs ${monthShort(prevM)}: $${fmt(prevExp)}`,                       accent: '#F07A3E', Icon: ExpensesIcon,    delta: expDelta, inverseDelta: true  },
-              { label: 'Savings Rate', value: `${savingsRate >= 0 ? '' : '-'}${Math.abs(savingsRate).toFixed(1)}%`, sub: net >= 0 ? `$${fmt(net)} saved` : `$${fmt(Math.abs(net))} deficit`, accent: savingsRate >= 30 ? '#4FBF7F' : savingsRate >= 0 ? '#F5C842' : '#FF6B6B', Icon: SavingsIcon, delta: null, inverseDelta: false },
+              { label: 'Net Worth',    value: `$${fmt(totalBalance)}`,                    sub: `${accounts.length} accounts`,              accent: tc.violet, icon: ICON_WALLET,  delta: null,     inverseDelta: false },
+              { label: 'Income',       value: `$${fmt(income)}`,                          sub: targetPct != null ? `${targetPct}% of $${fmt(incomeTarget!)} target` : `vs ${monthShort(prevM)}: $${fmt(prevInc)}`, accent: tc.green,  icon: ICON_TRENDUP, delta: incDelta, inverseDelta: false },
+              { label: 'Expenses',     value: `$${fmt(expenses)}`,                        sub: `vs ${monthShort(prevM)}: $${fmt(prevExp)}`, accent: tc.orange, icon: ICON_TRENDDN, delta: expDelta, inverseDelta: true },
+              { label: 'Savings Rate', value: `${savingsRate >= 0 ? '' : '-'}${Math.abs(savingsRate).toFixed(1)}%`, sub: net >= 0 ? `$${fmt(net)} saved` : `$${fmt(Math.abs(net))} deficit`, accent: savingsRate >= 30 ? tc.green : savingsRate >= 0 ? tc.amber : tc.rose, icon: ICON_SAVINGS, delta: null, inverseDelta: false },
             ].map(c => (
-              <div key={c.label} className="p-5 flex flex-col gap-2.5 relative overflow-hidden rounded-2xl select-none"
-                style={{ background: `rgba(${hexToRgb(c.accent)}, 0.08)`, border: `1px solid rgba(${hexToRgb(c.accent)}, 0.22)` }}>
-                <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full pointer-events-none"
-                  style={{ background: c.accent, opacity: 0.10, filter: 'blur(28px)' }} />
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: c.accent, opacity: 0.90 }}>{c.label}</span>
-                  <span className="w-7 h-7 rounded-lg flex items-center justify-center"
-                    style={{ background: `rgba(${hexToRgb(c.accent)}, 0.14)`, color: c.accent }}>
-                    <c.Icon />
-                  </span>
+              <div key={c.label} className="p-6 pt-7 flex flex-col gap-3 relative overflow-hidden rounded-2xl cursor-default select-none"
+                style={glass}>
+                <span className="absolute top-0 left-6 w-11 h-0.5 pointer-events-none" style={{ background: 'var(--color-primary)', opacity: 0.85 }} />
+                <div className="flex items-center gap-2.5">
+                  <span style={{ color: 'var(--color-primary)' }}><StatIcon d={c.icon} /></span>
+                  <span className="text-[11px] font-semibold uppercase" style={{ color: 'var(--color-text-muted)', letterSpacing: '0.26em' }}>{c.label}</span>
                 </div>
-                <div className="flex items-end gap-2 flex-wrap mt-0.5">
-                  <span className="text-[1.6rem] font-bold leading-none tabular" style={{ color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
-                    {loading ? <span className="opacity-25">—</span> : c.value}
+                <div className="flex items-end gap-2 flex-wrap">
+                  <span className="stat-value" style={{ color: 'var(--color-text-primary)' }}>
+                    {loading ? <span className="opacity-30">—</span> : c.value}
                   </span>
                   {!loading && c.delta !== null && <TrendBadge delta={c.delta} inverse={c.inverseDelta} />}
                 </div>
-                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>
+                <span className="text-[13px]" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>
               </div>
             ))}
           </div>
@@ -290,17 +310,16 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
 
             {/* Revenue vs Expenses + cumulative net */}
-            <div className="xl:col-span-3 flex flex-col gap-4 p-5 rounded-2xl" style={glass}>
+            <div className="xl:col-span-3 flex flex-col gap-4 p-7 rounded-2xl" style={glass}>
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <p className="font-semibold text-sm" style={{ letterSpacing: '-0.01em' }}>Cash Flow</p>
-                  <p className="text-xs mt-0.5 font-medium" style={{ color: 'var(--color-text-muted)' }}>{currentYear} · year to date</p>
+                  <p className="card-title">Cash Flow</p>
+                  <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{currentYear} · year to date</p>
                 </div>
-                <div className="flex items-center gap-4 text-[10px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: '#4FBF7F' }} />Revenue</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: '#F07A3E' }} />Expenses</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: '#F5C842' }} />Investments</span>
-                  <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 rounded-full" style={{ background: '#9B6DFF' }} />Net</span>
+                <div className="flex items-center gap-4 text-[10px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: tc.green }} />Revenue</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: tc.orange }} />Expenses</span>
+                  <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 rounded-full" style={{ background: tc.violet }} />Net</span>
                 </div>
               </div>
               {loading ? (
@@ -308,38 +327,39 @@ export default function DashboardPage() {
               ) : (
                 <ResponsiveContainer width="100%" height={220}>
                   <ComposedChart data={monthlyChart} barCategoryGap="30%" barGap={3}>
-                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="month" tick={{ fill: '#6B6B8A', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <CartesianGrid vertical={false} stroke={tc.border} />
+                    <XAxis dataKey="month" tick={{ fill: tc.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis yAxisId="bar" tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`}
-                      tick={{ fill: '#6B6B8A', fontSize: 10 }} axisLine={false} tickLine={false} width={46} />
+                      tick={{ fill: tc.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} width={46} />
                     <YAxis yAxisId="line" orientation="right" tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`}
-                      tick={{ fill: '#6B6B8A', fontSize: 10 }} axisLine={false} tickLine={false} width={46} />
+                      tick={{ fill: tc.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} width={46} />
                     <Tooltip
-                      cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                      cursor={{ fill: 'color-mix(in srgb, currentColor 5%, transparent)' }}
                       contentStyle={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 12, fontSize: 12 }}
-                      labelStyle={{ color: 'white', fontWeight: 700, marginBottom: 4 }}
-                      formatter={(v: number, name: string) => [`$${fmt(v)}`, name === 'revenue' ? 'Revenue' : name === 'regularExp' ? 'Expenses' : name === 'projectExp' ? 'Investments' : 'Cumulative Net']}
+                      labelStyle={{ color: tc.textPrimary, fontWeight: 700, marginBottom: 4 }}
+                      formatter={(v: unknown, name: unknown) => [`$${fmt(Number(v))}`, name === 'revenue' ? 'Revenue' : name === 'expenses' ? 'Expenses' : 'Cumulative Net']}
                     />
-                    <Bar yAxisId="bar" dataKey="revenue"    fill="#4FBF7F" radius={[4,4,0,0]} fillOpacity={0.85} />
-                    <Bar yAxisId="bar" dataKey="regularExp" stackId="exp"  fill="#F07A3E" radius={[0,0,0,0]} fillOpacity={0.9} />
-                    <Bar yAxisId="bar" dataKey="projectExp" stackId="exp"  fill="#F5C842" radius={[4,4,0,0]} fillOpacity={0.85} />
-                    <Line yAxisId="line" type="monotone" dataKey="net" stroke="#9B6DFF" strokeWidth={2} dot={{ fill: '#9B6DFF', r: 3, strokeWidth: 0 }} />
+                    <Bar yAxisId="bar" dataKey="revenue"  fill={tc.green}  radius={[4,4,0,0]} fillOpacity={0.85} />
+                    <Bar yAxisId="bar" dataKey="expenses" fill={tc.orange} radius={[4,4,0,0]} fillOpacity={0.85} />
+                    <Line yAxisId="line" type="monotone" dataKey="net" stroke={tc.violet} strokeWidth={2} dot={{ fill: tc.violet, r: 3, strokeWidth: 0 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
             </div>
 
             {/* Revenue by category donut */}
-            <div className="xl:col-span-2 flex flex-col gap-4 p-5 rounded-2xl" style={glass}>
+            <div className="xl:col-span-2 flex flex-col gap-4 p-7 rounded-2xl" style={glass}>
               <div>
-                <p className="font-bold text-sm">Revenue Sources</p>
-                <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{currentYear} · year to date</p>
+                <p className="card-title">Revenue Sources</p>
+                <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{currentYear} · year to date</p>
               </div>
               {loading ? (
                 <div className="h-48 flex items-center justify-center text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</div>
               ) : revPieData.length === 0 ? (
                 <div className="h-48 flex flex-col items-center justify-center gap-2 text-center">
-                  <span className="text-3xl opacity-30">📭</span>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-50" aria-hidden="true">
+                    <path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>
+                  </svg>
                   <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No income yet this year.</p>
                 </div>
               ) : (
@@ -352,12 +372,12 @@ export default function DashboardPage() {
                           {revPieData.map((e,i) => <Cell key={i} fill={e.color} />)}
                         </Pie>
                         <Tooltip contentStyle={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 10, fontSize: 11 }}
-                          formatter={(v: number) => [`$${fmt(v)}`]} />
+                          formatter={(v: unknown) => [`$${fmt(Number(v))}`]} />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                       <p className="text-[10px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>Total</p>
-                      <p className="text-sm font-black" style={{ color: '#4FBF7F' }}>{fmtK(totalRevYTD)}</p>
+                      <p className="text-sm font-black" style={{ color: 'var(--color-green)' }}>{fmtK(totalRevYTD)}</p>
                     </div>
                   </div>
                   <div className="flex flex-col gap-1.5">
@@ -381,14 +401,14 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
 
             {/* Daily spending area chart */}
-            <div className="flex flex-col gap-4 p-5 rounded-2xl" style={glass}>
+            <div className="flex flex-col gap-4 p-7 rounded-2xl" style={glass}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-sm">Daily Spending</p>
-                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{monthLabel(month)}</p>
+                  <p className="card-title">Daily Spending</p>
+                  <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{monthLabel(month)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-bold" style={{ color: '#F07A3E' }}>${fmt(expenses)}</p>
+                  <p className="text-xs font-bold" style={{ color: 'var(--color-orange)' }}>${fmt(expenses)}</p>
                   <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>total spent</p>
                 </div>
               </div>
@@ -401,33 +421,34 @@ export default function DashboardPage() {
                   <AreaChart data={spendTrendData}>
                     <defs>
                       <linearGradient id="spendGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#F07A3E" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="#F07A3E" stopOpacity={0}/>
+                        <stop offset="5%" stopColor={tc.orange} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={tc.orange} stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.04)" />
-                    <XAxis dataKey="date" tick={{ fill: '#6B6B8A', fontSize: 9 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                    <YAxis tickFormatter={v => `$${v}`} tick={{ fill: '#6B6B8A', fontSize: 9 }} axisLine={false} tickLine={false} width={36} />
+                    <CartesianGrid vertical={false} stroke={tc.border} />
+                    <XAxis dataKey="date" tick={{ fill: tc.textMuted, fontSize: 9 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis tickFormatter={v => `$${v}`} tick={{ fill: tc.textMuted, fontSize: 9 }} axisLine={false} tickLine={false} width={36} />
                     <Tooltip contentStyle={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 10, fontSize: 11 }}
-                      formatter={(v: number) => [`$${fmt(v)}`, 'Spent']} />
-                    <Area type="monotone" dataKey="total" stroke="#F07A3E" strokeWidth={2} fill="url(#spendGrad)" dot={false} />
+                      labelStyle={{ color: tc.textPrimary, fontWeight: 700 }}
+                      formatter={(v: unknown) => [`$${fmt(Number(v))}`, 'Spent']} />
+                    <Area type="monotone" dataKey="total" stroke={tc.orange} strokeWidth={2} fill="url(#spendGrad)" dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>
               )}
             </div>
 
             {/* Spending by Category — donut */}
-            <div className="flex flex-col gap-4 p-5 rounded-2xl" style={glass}>
+            <div className="flex flex-col gap-4 p-7 rounded-2xl" style={glass}>
               {/* Header */}
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-sm">Spending by Category</p>
+                  <p className="card-title">Spending by Category</p>
                   <p className="text-2xl font-extrabold mt-0.5 tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
                     {loading ? '—' : `$${fmt(expenses)}`}
                   </p>
                 </div>
                 <span className="text-[10px] font-semibold px-2.5 py-1 rounded-lg"
-                  style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  style={{ background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
                   {monthLabel(month)}
                 </span>
               </div>
@@ -436,7 +457,9 @@ export default function DashboardPage() {
                 <div className="h-40 flex items-center justify-center text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</div>
               ) : topCats.length === 0 ? (
                 <div className="h-40 flex flex-col items-center justify-center gap-2">
-                  <span className="text-3xl opacity-25">🧾</span>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-50" aria-hidden="true">
+                    <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>
+                  </svg>
                   <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No categorized expenses.</p>
                 </div>
               ) : (
@@ -455,7 +478,7 @@ export default function DashboardPage() {
                         </Pie>
                         <Tooltip
                           contentStyle={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 10, fontSize: 11 }}
-                          formatter={(v: number, name: string) => [`$${fmt(v)}`, name]}
+                          formatter={(v: unknown, name: unknown) => [`$${fmt(Number(v))}`, String(name)]}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -494,10 +517,10 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
 
             {/* Recent transactions */}
-            <div className="xl:col-span-3 flex flex-col gap-3 p-5 rounded-2xl" style={glass}>
+            <div className="xl:col-span-3 flex flex-col gap-3 p-7 rounded-2xl" style={glass}>
               <div className="flex items-center justify-between">
-                <p className="font-bold text-sm">Recent Transactions</p>
-                <Link href="/transactions" className="text-xs font-semibold hover:opacity-80 transition-opacity" style={{ color: '#9B6DFF' }}>View all →</Link>
+                <p className="card-title">Recent Transactions</p>
+                <Link href="/transactions" className="text-xs font-semibold hover:opacity-80 transition-opacity" style={{ color: 'var(--color-primary)' }}>View all →</Link>
               </div>
               {loading ? (
                 <p className="text-xs py-4 text-center" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
@@ -511,9 +534,9 @@ export default function DashboardPage() {
                     const cat   = tx.categoryRef;
                     return (
                       <div key={tx.id} className="flex items-center gap-3 py-2.5 group"
-                        style={i > 0 ? { borderTop: '1px solid rgba(255,255,255,0.05)' } : {}}>
+                        style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : {}}>
                         <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0 relative"
-                          style={{ background: cat ? `${cat.color}18` : 'rgba(255,255,255,0.06)' }}>
+                          style={{ background: cat ? `${cat.color}18` : 'var(--color-elevated)' }}>
                           {cat ? cat.icon : (isInc ? '↓' : '↑')}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -530,7 +553,7 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <span className="text-sm font-bold tabular-nums shrink-0"
-                          style={{ color: isInc ? '#4FBF7F' : 'var(--color-text-primary)' }}>
+                          style={{ color: isInc ? 'var(--color-green)' : 'var(--color-text-primary)' }}>
                           {isInc ? '+' : '−'}${Math.abs(amt).toFixed(2)}
                         </span>
                       </div>
@@ -544,11 +567,11 @@ export default function DashboardPage() {
             <div className="xl:col-span-2 flex flex-col gap-4">
 
               {/* Accounts */}
-              <div className="flex flex-col gap-3 p-5 rounded-2xl" style={glass}>
+              <div className="flex flex-col gap-3 p-7 rounded-2xl" style={glass}>
                 <div className="flex items-center justify-between">
-                  <p className="font-bold text-sm">Accounts</p>
+                  <p className="card-title">Accounts</p>
                   <div className="text-right">
-                    <p className="text-xs font-black tabular-nums" style={{ color: '#9B6DFF' }}>${fmt(totalBalance)}</p>
+                    <p className="text-xs font-black tabular-nums" style={{ color: 'var(--color-primary)' }}>${fmt(totalBalance)}</p>
                     <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>net worth</p>
                   </div>
                 </div>
@@ -556,12 +579,12 @@ export default function DashboardPage() {
                 {(totalAssets > 0 || totalDebt > 0) && (
                   <div>
                     <div className="flex h-1.5 rounded-full overflow-hidden gap-px">
-                      <div style={{ width: `${totalAssets/(totalAssets+totalDebt)*100}%`, background: '#4FBF7F' }} />
-                      <div style={{ width: `${totalDebt/(totalAssets+totalDebt)*100}%`, background: '#FF6B6B' }} />
+                      <div style={{ width: `${totalAssets/(totalAssets+totalDebt)*100}%`, background: 'var(--color-green)' }} />
+                      <div style={{ width: `${totalDebt/(totalAssets+totalDebt)*100}%`, background: 'var(--color-rose)' }} />
                     </div>
                     <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                      <span style={{ color: '#4FBF7F' }}>Assets ${fmtK(totalAssets)}</span>
-                      <span style={{ color: '#FF6B6B' }}>Debt ${fmtK(totalDebt)}</span>
+                      <span style={{ color: 'var(--color-green)' }}>Assets ${fmtK(totalAssets)}</span>
+                      <span style={{ color: 'var(--color-rose)' }}>Debt ${fmtK(totalDebt)}</span>
                     </div>
                   </div>
                 )}
@@ -582,7 +605,7 @@ export default function DashboardPage() {
                         </p>
                       </div>
                       <span className="text-xs font-bold tabular-nums shrink-0"
-                        style={{ color: isDebt ? '#FF6B6B' : 'var(--color-text-primary)' }}>
+                        style={{ color: isDebt ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>
                         {isDebt ? '−' : ''}${Math.abs(bal).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </span>
                     </div>
@@ -596,31 +619,31 @@ export default function DashboardPage() {
               </div>
 
               {/* Budget health */}
-              <div className="flex flex-col gap-3 p-5 rounded-2xl" style={glass}>
+              <div className="flex flex-col gap-3 p-7 rounded-2xl" style={glass}>
                 <div className="flex items-center justify-between">
-                  <p className="font-bold text-sm">Budget</p>
-                  <Link href="/budgets" className="text-xs font-semibold hover:opacity-80" style={{ color: '#9B6DFF' }}>Manage →</Link>
+                  <p className="card-title">Budget</p>
+                  <Link href="/budgets" className="text-xs font-semibold hover:opacity-80" style={{ color: 'var(--color-primary)' }}>Manage →</Link>
                 </div>
                 {loading ? <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
-                : budgets.length === 0 ? (
+                : spendingBudgets.length === 0 ? (
                   <div className="text-center py-2">
                     <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No budgets set.</p>
-                    <Link href="/budgets" className="text-xs font-semibold mt-1 block hover:opacity-80" style={{ color: '#9B6DFF' }}>Set budgets →</Link>
+                    <Link href="/budgets" className="text-xs font-semibold mt-1 block hover:opacity-80" style={{ color: 'var(--color-primary)' }}>Set budgets →</Link>
                   </div>
                 ) : (
                   <>
                     <div>
                       <div className="flex justify-between text-[10px] mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
                         <span>Spent ${fmt(Math.min(totalSpent, totalBudgeted))} of ${fmt(totalBudgeted)}</span>
-                        <span style={{ color: budgetPct >= 100 ? '#FF6B6B' : budgetPct >= 80 ? '#F5C842' : '#4FBF7F' }}>{budgetPct.toFixed(0)}%</span>
+                        <span style={{ color: budgetPct >= 100 ? 'var(--color-rose)' : budgetPct >= 80 ? 'var(--color-amber)' : 'var(--color-green)' }}>{budgetPct.toFixed(0)}%</span>
                       </div>
-                      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                         <div className="h-full rounded-full transition-all duration-700"
-                          style={{ width: `${budgetPct}%`, background: budgetPct >= 100 ? '#FF6B6B' : budgetPct >= 80 ? '#F5C842' : '#4FBF7F' }} />
+                          style={{ width: `${budgetPct}%`, background: budgetPct >= 100 ? 'var(--color-rose)' : budgetPct >= 80 ? 'var(--color-amber)' : 'var(--color-green)' }} />
                       </div>
                     </div>
                     {overBudget.length > 0 && (
-                      <p className="text-[10px] font-bold px-2 py-1.5 rounded-lg" style={{ background: 'rgba(255,107,107,0.1)', color: '#FF6B6B' }}>
+                      <p className="text-[10px] font-bold px-2 py-1.5 rounded-lg" style={{ background: 'color-mix(in srgb, var(--color-rose) 10%, transparent)', color: 'var(--color-rose)' }}>
                         ⚠ {overBudget.length} categor{overBudget.length > 1 ? 'ies' : 'y'} over budget
                       </p>
                     )}
@@ -633,11 +656,11 @@ export default function DashboardPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between text-[10px] mb-0.5">
                               <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{b.category.name}</span>
-                              <span style={{ color: over ? '#FF6B6B' : '#F5C842' }}>{pct}%</span>
+                              <span style={{ color: over ? 'var(--color-rose)' : 'var(--color-amber)' }}>{pct}%</span>
                             </div>
-                            <div className="h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                            <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-elevated)' }}>
                               <div className="h-full rounded-full"
-                                style={{ width: `${Math.min(100,pct)}%`, background: over ? '#FF6B6B' : '#F5C842' }} />
+                                style={{ width: `${Math.min(100,pct)}%`, background: over ? 'var(--color-rose)' : 'var(--color-amber)' }} />
                             </div>
                           </div>
                         </div>
@@ -651,25 +674,25 @@ export default function DashboardPage() {
 
           {/* ── Row 5: Projects ── */}
           {(projects.length > 0 || loading) && (
-            <div className="flex flex-col gap-4 p-5 rounded-2xl" style={glass}>
+            <div className="flex flex-col gap-4 p-7 rounded-2xl" style={glass}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-sm">Projects</p>
+                  <p className="card-title">Projects</p>
                   <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                     {activeProjects.length} active · ${fmt(totalInvested)} invested · Net P&L{' '}
-                    <span style={{ color: totalNetGain >= 0 ? '#4FBF7F' : '#FF6B6B' }}>
+                    <span style={{ color: totalNetGain >= 0 ? 'var(--color-green)' : 'var(--color-rose)' }}>
                       {totalNetGain >= 0 ? '+' : '−'}${fmt(Math.abs(totalNetGain))}
                     </span>
                   </p>
                 </div>
-                <Link href="/projects" className="text-xs font-semibold hover:opacity-80" style={{ color: '#9B6DFF' }}>View all →</Link>
+                <Link href="/projects" className="text-xs font-semibold hover:opacity-80" style={{ color: 'var(--color-primary)' }}>View all →</Link>
               </div>
               {loading ? (
                 <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
               ) : (
                 <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
                   {activeProjects.slice(0, 4).map(p => {
-                    const c    = p.color || '#9B6DFF';
+                    const c    = p.color || tc.violet;
                     const gain = p.netGain;
                     const roi  = p.roi;
                     return (
@@ -684,13 +707,13 @@ export default function DashboardPage() {
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-center">
-                          <div className="rounded-lg py-1.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                          <div className="rounded-lg py-1.5" style={{ background: 'var(--color-elevated)' }}>
                             <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Invested</p>
                             <p className="text-xs font-bold mt-0.5" style={{ color: c }}>${fmt(Number(p.costBasis))}</p>
                           </div>
-                          <div className="rounded-lg py-1.5" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                          <div className="rounded-lg py-1.5" style={{ background: 'var(--color-elevated)' }}>
                             <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>P&L</p>
-                            <p className="text-xs font-bold mt-0.5" style={{ color: gain != null ? (gain >= 0 ? '#4FBF7F' : '#FF6B6B') : 'var(--color-text-muted)' }}>
+                            <p className="text-xs font-bold mt-0.5" style={{ color: gain != null ? (gain >= 0 ? 'var(--color-green)' : 'var(--color-rose)') : 'var(--color-text-muted)' }}>
                               {gain != null ? `${gain >= 0 ? '+' : '−'}$${Math.abs(gain).toFixed(0)}` : '—'}
                             </p>
                           </div>
@@ -698,7 +721,7 @@ export default function DashboardPage() {
                         {roi != null && (
                           <div className="flex items-center justify-between text-[10px]">
                             <span style={{ color: 'var(--color-text-muted)' }}>ROI</span>
-                            <span className="font-bold" style={{ color: roi >= 0 ? '#4FBF7F' : '#FF6B6B' }}>
+                            <span className="font-bold" style={{ color: roi >= 0 ? 'var(--color-green)' : 'var(--color-rose)' }}>
                               {roi >= 0 ? '+' : ''}{roi.toFixed(1)}%
                             </span>
                           </div>
@@ -714,43 +737,5 @@ export default function DashboardPage() {
         </div>
       </main>
     </div>
-  );
-}
-
-/* ── Stat card icons ─────────────────────────────────────────── */
-
-function NetWorthIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <ellipse cx="12" cy="5" rx="9" ry="3"/>
-      <path d="M21 12c0 1.66-4.03 3-9 3S3 13.66 3 12"/>
-      <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/>
-    </svg>
-  );
-}
-
-function IncomeIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
-      <polyline points="16 7 22 7 22 13"/>
-    </svg>
-  );
-}
-
-function ExpensesIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/>
-      <polyline points="16 17 22 17 22 11"/>
-    </svg>
-  );
-}
-
-function SavingsIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-    </svg>
   );
 }

@@ -32,12 +32,12 @@ interface BankAccount {
 }
 
 const TYPE_META: Record<AccountType, { label: string; accent: string; icon: string }> = {
-  checking:   { label: 'Checking',    accent: '#9B6DFF', icon: '💳' },
-  savings:    { label: 'Savings',     accent: '#4FBF7F', icon: '🏦' },
-  credit:     { label: 'Credit',      accent: '#F07A3E', icon: '💰' },
-  investment: { label: 'Investment',  accent: '#4BA8D8', icon: '📈' },
-  cash:       { label: 'Cash',        accent: '#4FBF7F', icon: '💵' },
-  loan:       { label: 'Loan',        accent: '#F5C842', icon: '🤝' },
+  checking:   { label: 'Checking',    accent: 'var(--color-primary)', icon: '💳' },
+  savings:    { label: 'Savings',     accent: 'var(--color-green)', icon: '🏦' },
+  credit:     { label: 'Credit',      accent: 'var(--color-orange)', icon: '💰' },
+  investment: { label: 'Investment',  accent: 'var(--color-sky)', icon: '📈' },
+  cash:       { label: 'Cash',        accent: 'var(--color-green)', icon: '💵' },
+  loan:       { label: 'Loan',        accent: 'var(--color-amber)', icon: '🤝' },
 };
 
 const PRESET_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0'];
@@ -329,15 +329,15 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-bold tracking-tight mb-4">Settings</h1>
 
           {/* Tab bar */}
-          <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
             {TABS.map((tab) => (
               <button key={tab.id}
                 onClick={() => tab.id === 'data' ? setShowResetModal(true) : setActiveTab(tab.id)}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
                 style={tab.id === 'data'
-                  ? { color: '#FF6B6B', border: '1px solid rgba(255,80,80,0.28)', background: 'rgba(255,80,80,0.08)' }
+                  ? { color: 'var(--color-rose)', border: '1px solid rgba(255,80,80,0.28)', background: 'rgba(255,80,80,0.08)' }
                   : activeTab === tab.id
-                    ? { background: 'rgba(155,109,255,0.18)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.30)' }
+                    ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }
                     : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
                 {tab.icon}
                 {tab.label}
@@ -363,8 +363,8 @@ export default function SettingsPage() {
                     {connecting ? 'Connecting…' : 'Connect Bank'}
                   </button>
                   <button onClick={() => setShowManualForm(true)}
-                    className="px-4 py-2 text-sm font-semibold rounded-xl transition-all hover:text-white"
-                    style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                    className="px-4 py-2 text-sm font-semibold rounded-xl transition-all hover:text-[var(--color-text-primary)]"
+                    style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
                     + Manual
                   </button>
                 </div>
@@ -372,10 +372,10 @@ export default function SettingsPage() {
 
               {/* Plaid info banner */}
               <div className="px-4 py-3 rounded-xl flex items-start gap-3 text-sm"
-                style={{ background: 'rgba(79,191,127,0.08)', border: '1px solid rgba(79,191,127,0.18)' }}>
+                style={{ background: 'color-mix(in srgb, var(--color-green) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 18%, transparent)' }}>
                 <span className="mt-0.5">🔒</span>
                 <p style={{ color: 'var(--color-text-secondary)' }}>
-                  Bank connections use <span className="font-semibold text-white">Plaid</span> — a read-only, bank-grade secure link. Cofre never stores your bank credentials.
+                  Bank connections use <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>Plaid</span> — a read-only, bank-grade secure link. Cofre never stores your bank credentials.
                 </p>
               </div>
 
@@ -391,10 +391,10 @@ export default function SettingsPage() {
 
                     {/* Header */}
                     <div className="flex items-center justify-between px-6 py-5"
-                      style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                      style={{ borderBottom: '1px solid var(--color-border)' }}>
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
-                          style={{ background: `${TYPE_META[form.accountType]?.accent ?? '#9B6DFF'}22`, color: TYPE_META[form.accountType]?.accent ?? '#9B6DFF' }}>
+                          style={{ background: `${TYPE_META[form.accountType]?.accent ?? 'var(--color-primary)'}22`, color: TYPE_META[form.accountType]?.accent ?? 'var(--color-primary)' }}>
                           {TYPE_META[form.accountType]?.icon}
                         </div>
                         <div>
@@ -407,7 +407,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <button type="button" onClick={() => { setShowManualForm(false); setEditingAccount(null); setError(''); }}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
                         style={{ color: 'var(--color-text-muted)' }}>
                         <CloseIcon />
                       </button>
@@ -506,7 +506,7 @@ export default function SettingsPage() {
                               <span className="absolute bottom-full right-0 mb-2 w-48 text-[11px] leading-relaxed font-normal normal-case tracking-normal rounded-lg px-3 py-2.5 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
                                 style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', color: 'var(--color-text-secondary)', boxShadow: 'var(--glass-shadow)', whiteSpace: 'normal' }}>
                                 Last 4 digits of your card or account number. Used to detect if a CSV file belongs to this account on import.
-                                <span className="absolute top-full right-2 -mt-px" style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid rgba(255,255,255,0.12)' }} />
+                                <span className="absolute top-full right-2 -mt-px" style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--color-border)' }} />
                               </span>
                             </span>
                           </label>
@@ -556,7 +556,7 @@ export default function SettingsPage() {
                                         style={{
                                           width: 72, height: 45, borderRadius: 6,
                                           background: design.gradient,
-                                          border: sel ? '2px solid rgba(255,255,255,0.9)' : '2px solid transparent',
+                                          border: sel ? '2px solid var(--color-text-primary)' : '2px solid transparent',
                                           boxShadow: sel
                                             ? `0 0 0 2px ${design.color}, 0 6px 20px rgba(0,0,0,0.4)`
                                             : '0 2px 8px rgba(0,0,0,0.25)',
@@ -567,7 +567,7 @@ export default function SettingsPage() {
                                         <div className="absolute" style={{ top: 7, left: 8, width: 20, height: 14, borderRadius: 3, background: 'linear-gradient(135deg,#D4AF37 0%,#F5E06B 50%,#D4AF37 100%)' }} />
                                         {/* Brand mark */}
                                         {design.brand === 'VISA' && (
-                                          <span className="absolute font-black italic" style={{ bottom: 4, right: 5, fontSize: 8, color: 'rgba(255,255,255,0.85)', letterSpacing: 0.5 }}>VISA</span>
+                                          <span className="absolute font-black italic" style={{ bottom: 4, right: 5, fontSize: 8, color: 'var(--color-text-primary)', letterSpacing: 0.5 }}>VISA</span>
                                         )}
                                         {design.brand === 'MC' && (
                                           <div className="absolute flex" style={{ bottom: 4, right: 5 }}>
@@ -576,7 +576,7 @@ export default function SettingsPage() {
                                           </div>
                                         )}
                                         {design.brand === 'AMEX' && (
-                                          <span className="absolute font-black" style={{ bottom: 4, right: 5, fontSize: 7, color: 'rgba(255,255,255,0.85)' }}>AMEX</span>
+                                          <span className="absolute font-black" style={{ bottom: 4, right: 5, fontSize: 7, color: 'var(--color-text-primary)' }}>AMEX</span>
                                         )}
                                         {/* Shimmer */}
                                         <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.25) 0%,transparent 50%)', pointerEvents: 'none' }} />
@@ -610,13 +610,13 @@ export default function SettingsPage() {
 
                     {/* Footer */}
                     <div className="flex items-center justify-between px-6 py-4"
-                      style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                      style={{ borderTop: '1px solid var(--color-border)' }}>
                       {error
                         ? <p className="text-xs" style={{ color: 'var(--color-card-orange)' }}>{error}</p>
                         : <span />}
                       <div className="flex gap-2">
                         <button type="button" onClick={() => { setShowManualForm(false); setEditingAccount(null); setError(''); }}
-                          className="px-4 py-2 text-sm font-medium rounded-xl transition-colors hover:bg-white/10"
+                          className="px-4 py-2 text-sm font-medium rounded-xl transition-colors hover:bg-[var(--color-elevated)]"
                           style={{ color: 'var(--color-text-secondary)' }}>
                           Cancel
                         </button>
@@ -657,7 +657,7 @@ export default function SettingsPage() {
                     return (
                       <div key={account.id}
                         className="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all hover:brightness-110"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${color}28`, borderLeft: `3px solid ${color}` }}>
+                        style={{ background: 'var(--color-elevated)', border: `1px solid ${color}28`, borderLeft: `3px solid ${color}` }}>
 
                         {/* Mini card visual */}
                         <div className="shrink-0 w-14 h-10 rounded-xl flex flex-col items-center justify-center relative overflow-hidden"
@@ -679,7 +679,7 @@ export default function SettingsPage() {
                           )}
                           {account.last4 && (
                             <span className="text-[8px] font-bold tracking-widest leading-none mt-0.5"
-                              style={{ color: 'rgba(255,255,255,0.7)' }}>
+                              style={{ color: 'var(--color-text-secondary)' }}>
                               ···{account.last4}
                             </span>
                           )}
@@ -697,8 +697,8 @@ export default function SettingsPage() {
                             </span>
                             {isConnected && (
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1"
-                                style={{ background: 'rgba(79,191,127,0.12)', color: '#4FBF7F' }}>
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#4FBF7F' }} />
+                                style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)' }}>
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-green)' }} />
                                 Synced
                               </span>
                             )}
@@ -711,29 +711,29 @@ export default function SettingsPage() {
                         {/* Balance */}
                         <div className="text-right shrink-0">
                           <p className="font-black text-base tabular-nums"
-                            style={{ color: isDebt && balance > 0 ? '#FF6B6B' : 'var(--color-text-primary)' }}>
+                            style={{ color: isDebt && balance > 0 ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>
                             {isDebt && balance > 0 ? '−' : ''}{account.currency} {Math.abs(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </p>
                           {isDebt && balance > 0 && (
-                            <p className="text-[10px] font-semibold" style={{ color: 'rgba(255,107,107,0.6)' }}>owed</p>
+                            <p className="text-[10px] font-semibold" style={{ color: 'color-mix(in srgb, var(--color-rose) 60%, transparent)' }}>owed</p>
                           )}
                         </div>
 
                         <div className="flex items-center gap-1 ml-1">
                           <button onClick={() => openEdit(account)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
                             title="Edit account" style={{ color: 'var(--color-text-secondary)' }}>
                             <EditIcon />
                           </button>
                           <button onClick={() => setImportAccount(account)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
                             title="Import CSV" style={{ color: 'var(--color-text-secondary)' }}>
                             <UploadIcon />
                           </button>
                           {isConnected && (
                             <button onClick={() => handleSync(account)} disabled={syncingId === account.id}
                               className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40"
-                              style={{ color: syncingId === account.id ? 'var(--color-text-muted)' : '#4FBF7F' }}
+                              style={{ color: syncingId === account.id ? 'var(--color-text-muted)' : 'var(--color-green)' }}
                               title="Sync now">
                               <SyncIcon spinning={syncingId === account.id} />
                             </button>
