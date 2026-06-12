@@ -23,8 +23,8 @@ export const THEMES: Theme[] = [
     description: 'Dark ocean · gold · emerald',
     dark: true,
     preview: {
-      bg:      '#06101E',
-      surface: 'rgba(8,22,55,0.60)',
+      bg:      '#050D1A',
+      surface: 'rgba(10,25,60,0.55)',
       accent:  '#F5C842',
       accent2: '#22C55E',
       text:    '#F0F4FF',

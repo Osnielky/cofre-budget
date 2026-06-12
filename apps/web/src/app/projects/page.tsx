@@ -74,7 +74,7 @@ const glass: React.CSSProperties = {
 };
 
 const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.13)',
+  background: 'color-mix(in srgb, var(--color-text-primary) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 14%, transparent)',
   borderRadius: '10px', color: 'var(--color-text-primary)',
 };
 
@@ -83,7 +83,7 @@ function focusInput(e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) {
   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245,200,66,0.12)';
 }
 function blurInput(e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) {
-  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.13)';
+  e.currentTarget.style.border = '1px solid color-mix(in srgb, var(--color-text-primary) 14%, transparent)';
   e.currentTarget.style.boxShadow = 'none';
 }
 
@@ -403,8 +403,8 @@ export default function ProjectsPage() {
                     cursor: 'pointer',
                     background: isSelected
                       ? `linear-gradient(135deg, ${color}22 0%, ${color}0a 100%)`
-                      : 'rgba(255,255,255,0.03)',
-                    border: isSelected ? `1px solid ${color}55` : '1px solid rgba(255,255,255,0.07)',
+                      : 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)',
+                    border: isSelected ? `1px solid ${color}55` : '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)',
                     boxShadow: isSelected ? `0 2px 16px ${color}15` : 'none',
                   }}>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 overflow-hidden"
@@ -414,14 +414,14 @@ export default function ProjectsPage() {
                       : p.icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate text-white">{p.name}</p>
+                    <p className="font-semibold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{p.name}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
                         style={{ background: `${color}20`, color, border: `1px solid ${color}35` }}>
                         {PROJECT_TYPES.find((t) => t.value === p.type)?.label ?? p.type}
                       </span>
                       <span className="text-[10px] font-semibold"
-                        style={{ color: sold ? '#4FBF7F' : 'rgba(245,200,66,0.75)' }}>
+                        style={{ color: sold ? 'var(--color-green)' : 'var(--color-amber)' }}>
                         {sold ? '✓ Sold' : '● Active'}
                       </span>
                     </div>
@@ -467,7 +467,7 @@ export default function ProjectsPage() {
                   <div className="flex items-center gap-4 px-5 py-4 shrink-0"
                     style={{
                       background: `linear-gradient(135deg, ${color}18 0%, transparent 70%)`,
-                      borderBottom: '1px solid rgba(255,255,255,0.07)',
+                      borderBottom: '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)',
                     }}>
                     {/* Image / icon box */}
                     <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center text-4xl"
@@ -482,7 +482,7 @@ export default function ProjectsPage() {
                     </div>
                     {/* Name + badges */}
                     <div className="flex-1 min-w-0">
-                      <h2 className="font-bold text-xl text-white leading-tight">{sel.name}</h2>
+                      <h2 className="font-bold text-xl leading-tight" style={{ color: 'var(--color-text-primary)' }}>{sel.name}</h2>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md"
                           style={{ background: `${color}25`, color, border: `1px solid ${color}45` }}>
@@ -490,13 +490,13 @@ export default function ProjectsPage() {
                         </span>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md"
                           style={sold
-                            ? { background: 'rgba(79,191,127,0.20)', color: '#4FBF7F', border: '1px solid rgba(79,191,127,0.40)' }
-                            : { background: 'rgba(245,200,66,0.18)', color: '#F5C842', border: '1px solid rgba(245,200,66,0.40)' }}>
+                            ? { background: 'color-mix(in srgb, var(--color-green) 18%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 40%, transparent)' }
+                            : { background: 'color-mix(in srgb, var(--color-amber) 16%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 40%, transparent)' }}>
                           {sold ? '✓ Sold' : '● Active'}
                         </span>
                       </div>
                       {sel.description && (
-                        <p className="text-xs mt-1 truncate" style={{ color: 'rgba(255,255,255,0.45)' }}>{sel.description}</p>
+                        <p className="text-xs mt-1 truncate" style={{ color: 'var(--color-text-secondary)' }}>{sel.description}</p>
                       )}
                     </div>
                     {/* Actions */}
@@ -509,13 +509,13 @@ export default function ProjectsPage() {
                         </button>
                       )}
                       <button onClick={() => openEdit(sel)}
-                        className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-white/10"
-                        style={{ color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                        className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)]"
+                        style={{ color: 'var(--color-text-muted)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 11%, transparent)' }}>
                         <EditIcon />
                       </button>
                       <button onClick={() => setConfirmDelete(sel)} disabled={deleting === sel.id}
                         className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-red-500/20"
-                        style={{ border: '1px solid rgba(255,255,255,0.10)' }}>
+                        style={{ border: '1px solid color-mix(in srgb, var(--color-text-primary) 11%, transparent)' }}>
                         {deleting === sel.id ? <span className="text-xs">…</span> : <TrashIcon />}
                       </button>
                     </div>
@@ -535,7 +535,7 @@ export default function ProjectsPage() {
                           : { label: 'Cost Basis', value: `$${sel.costBasis.toFixed(2)}`,             clr: '#9B6DFF' },
                       ].filter(Boolean).map((s: any) => (
                         <div key={s.label} className="p-3 rounded-xl"
-                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                          style={{ background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)' }}>
                           <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
                           <p className="font-bold text-base mt-1" style={{ color: s.clr }}>{s.value}</p>
                         </div>
@@ -573,13 +573,13 @@ export default function ProjectsPage() {
                         .sort((a, b) => b.total - a.total).slice(0, 7);
                       const catMax  = catData[0]?.total ?? 1;
 
-                      const chartBg  = 'rgba(255,255,255,0.03)';
-                      const chartBdr = '1px solid rgba(255,255,255,0.07)';
+                      const chartBg  = 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)';
+                      const chartBdr = '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)';
 
                       const LineTip = ({ active, payload }: any) => active && payload?.length ? (
                         <div className="px-3 py-2 rounded-xl text-xs"
-                          style={{ background: 'rgba(6,12,38,0.97)', border: '1px solid rgba(255,255,255,0.14)', boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }}>
-                          <p className="font-semibold mb-1" style={{ color: 'rgba(255,255,255,0.45)' }}>{fmtDate(payload[0].payload.date)}</p>
+                          style={{ background: 'rgba(6,12,38,0.97)', border: '1px solid rgba(120,135,170,0.40)', boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }}>
+                          <p className="font-semibold mb-1" style={{ color: '#9AA5BC' }}>{fmtDate(payload[0].payload.date)}</p>
                           {payload.map((p: any) => (
                             <p key={p.dataKey} className="font-bold" style={{ color: p.color }}>
                               {p.dataKey === 'income' ? '+' : '-'}${Number(p.value).toFixed(2)} {p.dataKey}
@@ -637,11 +637,11 @@ export default function ProjectsPage() {
                                       <stop offset="95%" stopColor="#4FBF7F" stopOpacity={0.02} />
                                     </linearGradient>
                                   </defs>
-                                  <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                  <CartesianGrid vertical={false} stroke="rgba(138,147,166,0.18)" />
                                   <XAxis dataKey="date" tickFormatter={(d) => d.slice(5).replace('-', '/')}
-                                    tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.30)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                                  <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.22)' }} axisLine={false} tickLine={false} />
-                                  <Tooltip content={<LineTip />} cursor={{ stroke: 'rgba(255,255,255,0.10)', strokeWidth: 1 }} />
+                                    tick={{ fontSize: 9, fill: '#8A93A6' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                                  <YAxis tick={{ fontSize: 9, fill: 'rgba(138,147,166,0.70)' }} axisLine={false} tickLine={false} />
+                                  <Tooltip content={<LineTip />} cursor={{ stroke: 'rgba(138,147,166,0.35)', strokeWidth: 1 }} />
                                   <Area type="monotone" dataKey="expenses" stroke="#F07A3E" strokeWidth={2}
                                     fill={`url(#expGrad-${sel.id})`} dot={false} activeDot={{ r: 4, fill: '#F07A3E', strokeWidth: 0 }} />
                                   {isBusiness && (
@@ -671,9 +671,9 @@ export default function ProjectsPage() {
                                     <div className="flex-1 flex flex-col gap-0.5">
                                       <div className="flex items-center justify-between">
                                         <span className="text-[10px] font-semibold truncate" style={{ color: cat.color }}>{cat.name}</span>
-                                        <span className="text-[10px] tabular-nums font-bold" style={{ color: 'rgba(255,255,255,0.55)' }}>${cat.total.toFixed(2)}</span>
+                                        <span className="text-[10px] tabular-nums font-bold" style={{ color: 'var(--color-text-secondary)' }}>${cat.total.toFixed(2)}</span>
                                       </div>
-                                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.07)' }}>
+                                      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'color-mix(in srgb, var(--color-text-primary) 8%, transparent)' }}>
                                         <div className="h-full rounded-full transition-all duration-700"
                                           style={{ width: `${(cat.total / catMax) * 100}%`, background: `linear-gradient(90deg, ${cat.color}, ${cat.color}66)` }} />
                                       </div>
@@ -716,13 +716,13 @@ export default function ProjectsPage() {
                     <div className="flex flex-col gap-2">
                       {/* Toggle bar */}
                       <div className="flex items-center gap-2 rounded-xl overflow-hidden"
-                        style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                        style={{ border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                         <button onClick={() => toggleCats(sel.id)}
-                          className="flex-1 flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"
+                          className="flex-1 flex items-center gap-2.5 px-3 py-2.5 hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] transition-colors text-left"
                           style={{ cursor: 'pointer' }}>
                           <span className="flex items-center justify-center w-5 h-5 rounded-md transition-transform duration-200"
                             style={{
-                              background: collapsedCats[sel.id] ? 'rgba(255,255,255,0.07)' : `${color}20`,
+                              background: collapsedCats[sel.id] ? 'color-mix(in srgb, var(--color-text-primary) 8%, transparent)' : `${color}20`,
                               transform: collapsedCats[sel.id] ? 'rotate(-90deg)' : 'rotate(0deg)',
                               color: collapsedCats[sel.id] ? 'var(--color-text-muted)' : color,
                             }}>
@@ -738,15 +738,15 @@ export default function ProjectsPage() {
                           </span>
                         </button>
                         <div className="flex items-center gap-1 px-2 shrink-0"
-                          style={{ borderLeft: '1px solid rgba(255,255,255,0.08)' }}>
+                          style={{ borderLeft: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                           <button onClick={() => handleSeedCats(sel.id)} disabled={seedingCat === sel.id}
                             className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1.5 rounded-lg hover:brightness-110 disabled:opacity-50 whitespace-nowrap"
                             style={{ background: 'rgba(155,109,255,0.15)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.28)' }}>
                             {seedingCat === sel.id ? '…' : '✦ Restore'}
                           </button>
                           <button onClick={() => { setShowCatForm(showCatForm === sel.id ? null : sel.id); setCatForm({ name: '', icon: '📦', color: '#9B6DFF' }); }}
-                            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1.5 rounded-lg hover:bg-white/10 whitespace-nowrap"
-                            style={{ color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1.5 rounded-lg hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] whitespace-nowrap"
+                            style={{ color: 'var(--color-text-muted)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                             <PlusIcon /> Add
                           </button>
                         </div>
@@ -755,7 +755,7 @@ export default function ProjectsPage() {
                       {!collapsedCats[sel.id] && showCatForm === sel.id && (
                         <form onSubmit={(e) => handleAddCat(e, sel.id)}
                           className="flex items-center gap-2 p-2 rounded-xl"
-                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                          style={{ background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent)' }}>
                           <input value={catForm.icon} onChange={(e) => setCatForm((f) => ({ ...f, icon: e.target.value }))}
                             className="w-9 px-1 py-1.5 text-center text-sm outline-none rounded-lg"
                             style={inputStyle} maxLength={2} placeholder="📦" />
@@ -818,10 +818,10 @@ export default function ProjectsPage() {
                       </div>
 
                       {sel.transactions && sel.transactions.length > 0 ? (
-                        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
+                        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)' }}>
                           {sel.transactions.map((tx) => (
                             <div key={tx.id} className="flex items-center gap-3 px-3 py-2.5"
-                              style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+                              style={{ borderTop: '1px solid color-mix(in srgb, var(--color-text-primary) 5%, transparent)' }}>
                               <div className="w-1.5 self-stretch rounded-full shrink-0"
                                 style={{ background: Number(tx.amount) >= 0 ? '#4FBF7F' : '#F07A3E', minHeight: 28 }} />
                               <div className="flex-1 min-w-0">
@@ -850,7 +850,7 @@ export default function ProjectsPage() {
                         </div>
                       ) : (
                         <div className="flex flex-col items-center gap-2 py-8 text-center rounded-xl"
-                          style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.08)' }}>
+                          style={{ background: 'color-mix(in srgb, var(--color-text-primary) 3%, transparent)', border: '1px dashed color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                           <p className="text-sm font-medium" style={{ color: 'var(--color-text-muted)' }}>No transactions linked yet</p>
                           <button onClick={() => openLinkPicker(sel.id)}
                             className="text-xs font-semibold px-3 py-1.5 rounded-lg hover:brightness-110"
@@ -877,9 +877,11 @@ export default function ProjectsPage() {
             <form onSubmit={handleSave}
               className="w-full max-w-lg flex flex-col rounded-2xl overflow-hidden"
               style={{
-                background: 'rgba(6, 12, 38, 0.98)',
-                border: '1px solid rgba(255,255,255,0.14)',
-                boxShadow: '0 32px 80px rgba(0,0,0,0.75), inset 0 1px 0 rgba(255,255,255,0.09)',
+                background: 'var(--color-elevated)',
+                backdropFilter: 'var(--glass-blur)',
+                WebkitBackdropFilter: 'var(--glass-blur)',
+                border: 'var(--glass-border)',
+                boxShadow: '0 32px 80px rgba(0,0,0,0.45), var(--glass-shadow)',
               }}>
 
               {/* ── Live preview header ── */}
@@ -888,7 +890,7 @@ export default function ProjectsPage() {
                 return (
                   <div className="flex items-center justify-between gap-4 px-6 py-5"
                     style={{
-                      borderBottom: '1px solid rgba(255,255,255,0.10)',
+                      borderBottom: '1px solid color-mix(in srgb, var(--color-text-primary) 11%, transparent)',
                       background: `linear-gradient(135deg, ${form.color}18 0%, transparent 55%)`,
                     }}>
                     <div className="flex items-center gap-4">
@@ -912,7 +914,7 @@ export default function ProjectsPage() {
                     <button type="button" onClick={closeForm}
                       className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors duration-150 shrink-0"
                       style={{ color: 'var(--color-text-muted)', cursor: 'pointer' }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--color-text-primary) 11%, transparent)'; }}
                       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
                     </button>
@@ -936,7 +938,7 @@ export default function ProjectsPage() {
                             cursor: 'pointer',
                             ...(active
                               ? { background: `${form.color}22`, border: `1.5px solid ${form.color}66`, color: form.color, boxShadow: `0 0 16px ${form.color}22` }
-                              : { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-secondary)' }),
+                              : { background: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 11%, transparent)', color: 'var(--color-text-secondary)' }),
                           }}>
                           <span className="text-2xl">{t.icon}</span>
                           <span>{t.label}</span>
@@ -955,7 +957,7 @@ export default function ProjectsPage() {
                             cursor: 'pointer',
                             ...(form.type === s.value
                               ? { background: `${form.color}18`, border: `1px solid ${form.color}44`, color: form.color }
-                              : { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: 'var(--color-text-muted)' }),
+                              : { background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent)', color: 'var(--color-text-muted)' }),
                           }}>
                           <span className="text-lg">{s.icon}</span>
                           <div className="text-left">
@@ -1002,16 +1004,16 @@ export default function ProjectsPage() {
                       <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                         {form.type === 'property' || form.type === 'vehicle' ? 'Purchase Price' : 'Initial Investment'}
                       </span>
-                      <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.13)' }}>
+                      <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid color-mix(in srgb, var(--color-text-primary) 14%, transparent)' }}>
                         <span className="flex items-center px-3 text-sm font-semibold shrink-0"
-                          style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-secondary)', borderRight: '1px solid rgba(255,255,255,0.10)' }}>$</span>
+                          style={{ background: 'color-mix(in srgb, var(--color-text-primary) 8%, transparent)', color: 'var(--color-text-secondary)', borderRight: '1px solid color-mix(in srgb, var(--color-text-primary) 11%, transparent)' }}>$</span>
                         <input type="number" step="0.01" min="0" placeholder="0.00" value={form.purchasePrice}
                           onChange={(e) => setForm((f) => ({ ...f, purchasePrice: e.target.value }))}
                           className="flex-1 px-4 py-3 text-sm outline-none min-w-0 transition-all duration-150"
-                          style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-primary)' }} />
+                          style={{ background: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)', color: 'var(--color-text-primary)' }} />
                       </div>
                       <p className="text-[10px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
-                        💡 Use <strong style={{ color: 'rgba(255,255,255,0.45)' }}>one method only</strong> to avoid double-counting:{' '}
+                        💡 Use <strong style={{ color: 'var(--color-text-secondary)' }}>one method only</strong> to avoid double-counting:{' '}
                         enter the price here <em>or</em> link the payment transaction later — not both.
                       </p>
                     </div>
@@ -1067,7 +1069,7 @@ export default function ProjectsPage() {
                   />
                   {form.imageUrl ? (
                     <div className="flex items-center gap-3 p-3 rounded-xl"
-                      style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                      style={{ background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 11%, transparent)' }}>
                       <img src={form.imageUrl} alt="Project" className="w-14 h-14 rounded-xl object-cover shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Image selected</p>
@@ -1076,7 +1078,7 @@ export default function ProjectsPage() {
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button type="button" onClick={() => fileInputRef.current?.click()}
                           className="px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:brightness-110"
-                          style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.12)', cursor: 'pointer' }}>
+                          style={{ background: 'color-mix(in srgb, var(--color-text-primary) 9%, transparent)', color: 'var(--color-text-secondary)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 13%, transparent)', cursor: 'pointer' }}>
                           Change
                         </button>
                         <button type="button" onClick={() => { setForm((f) => ({ ...f, imageUrl: '' })); if (fileInputRef.current) fileInputRef.current.value = ''; }}
@@ -1088,10 +1090,10 @@ export default function ProjectsPage() {
                     </div>
                   ) : (
                     <button type="button" onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-3 p-3 rounded-xl transition-all duration-150 hover:bg-white/5"
-                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.15)', cursor: 'pointer' }}>
+                      className="flex items-center gap-3 p-3 rounded-xl transition-all duration-150 hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)]"
+                      style={{ background: 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)', border: '1px dashed color-mix(in srgb, var(--color-text-primary) 16%, transparent)', cursor: 'pointer' }}>
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)' }}>
+                        style={{ background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 11%, transparent)' }}>
                         <ImageIcon />
                       </div>
                       <div className="text-left">
@@ -1106,12 +1108,12 @@ export default function ProjectsPage() {
 
               {/* ── Footer ── */}
               <div className="flex gap-3 justify-end px-6 py-5"
-                style={{ borderTop: '1px solid rgba(255,255,255,0.10)' }}>
+                style={{ borderTop: '1px solid color-mix(in srgb, var(--color-text-primary) 11%, transparent)' }}>
                 <button type="button" onClick={closeForm}
                   className="px-5 py-2.5 text-sm font-semibold rounded-xl transition-all duration-150"
-                  style={{ color: 'var(--color-text-secondary)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', cursor: 'pointer' }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.10)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}>
+                  style={{ color: 'var(--color-text-secondary)', background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 11%, transparent)', cursor: 'pointer' }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--color-text-primary) 11%, transparent)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)'; }}>
                   Cancel
                 </button>
                 <button type="submit" disabled={saving}
@@ -1149,12 +1151,12 @@ export default function ProjectsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-base">{showSell.name}</p>
                   <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    Cost basis <span className="font-semibold text-white">${showSell.costBasis.toFixed(2)}</span>
+                    Cost basis <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>${showSell.costBasis.toFixed(2)}</span>
                     <span className="opacity-50"> = ${Number(showSell.purchasePrice).toFixed(2)} purchase + ${showSell.expenses.toFixed(2)} expenses</span>
                   </p>
                 </div>
                 <button type="button" onClick={() => setShowSell(null)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 shrink-0"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] shrink-0"
                   style={{ color: 'var(--color-text-muted)' }}>✕</button>
               </div>
 
@@ -1166,7 +1168,7 @@ export default function ProjectsPage() {
                     className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium transition-all"
                     style={sellMode === 'bank'
                       ? { background: 'rgba(75,168,216,0.18)', color: '#4BA8D8', border: '1px solid rgba(75,168,216,0.40)' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      : { background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)', color: 'var(--color-text-secondary)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                     <span className="text-xl">🏦</span>
                     <span>Bank Deposit</span>
                   </button>
@@ -1174,7 +1176,7 @@ export default function ProjectsPage() {
                     className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-medium transition-all"
                     style={sellMode === 'cash'
                       ? { background: 'rgba(79,191,127,0.18)', color: '#4FBF7F', border: '1px solid rgba(79,191,127,0.40)' }
-                      : { background: 'rgba(255,255,255,0.04)', color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      : { background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)', color: 'var(--color-text-secondary)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                     <span className="text-xl">💵</span>
                     <span>Cash</span>
                   </button>
@@ -1198,7 +1200,7 @@ export default function ProjectsPage() {
                         +${Number(sellLinkedTx.amount).toFixed(2)}
                       </span>
                       <button type="button" onClick={() => { setSellLinkedTx(null); setSellForm(f => ({ ...f, salePrice: '' })); }}
-                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-white/10 shrink-0 text-xs"
+                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] shrink-0 text-xs"
                         style={{ color: 'var(--color-text-muted)' }}>✕</button>
                     </div>
                   ) : (
@@ -1217,7 +1219,7 @@ export default function ProjectsPage() {
                         ) : filteredSellTx.map((tx) => (
                           <button key={tx.id} type="button"
                             onClick={() => { setSellLinkedTx(tx); setSellForm(f => ({ ...f, salePrice: String(Number(tx.amount).toFixed(2)), saleDate: tx.date })); }}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-white/5 transition-colors">
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] transition-colors">
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{tx.name}</p>
                               <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
@@ -1252,7 +1254,7 @@ export default function ProjectsPage() {
                         +${Number(sellLinkedTx.amount).toFixed(2)}
                       </span>
                       <button type="button" onClick={() => { setSellLinkedTx(null); setSellForm(f => ({ ...f, salePrice: '' })); }}
-                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-white/10 shrink-0 text-xs"
+                        className="w-6 h-6 rounded flex items-center justify-center hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] shrink-0 text-xs"
                         style={{ color: 'var(--color-text-muted)' }}>✕</button>
                     </div>
                   ) : (
@@ -1276,7 +1278,7 @@ export default function ProjectsPage() {
                         ) : filteredSellTx.map((tx) => (
                           <button key={tx.id} type="button"
                             onClick={() => { setSellLinkedTx(tx); setSellForm(f => ({ ...f, salePrice: String(Number(tx.amount).toFixed(2)), saleDate: tx.date })); }}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-white/5 transition-colors">
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] transition-colors">
                             <span className="text-lg shrink-0">💵</span>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium truncate">{tx.name}</p>
@@ -1305,7 +1307,7 @@ export default function ProjectsPage() {
 
               {/* P&L preview */}
               {sellForm.salePrice && (
-                <div className="p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                   {(() => {
                     const sale = parseFloat(sellForm.salePrice) || 0;
                     const net  = sale - showSell.costBasis + showSell.income;
@@ -1333,8 +1335,8 @@ export default function ProjectsPage() {
 
               <div className="flex gap-2 justify-end">
                 <button type="button" onClick={() => setShowSell(null)}
-                  className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10"
-                  style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)]"
+                  style={{ color: 'var(--color-text-secondary)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                   Cancel
                 </button>
                 <button type="submit" disabled={selling || (!sellForm.salePrice && !sellLinkedTx)}
@@ -1362,7 +1364,7 @@ export default function ProjectsPage() {
                   <div className="flex items-center justify-between shrink-0">
                     <p className="font-bold text-base">Link Transactions</p>
                     <button onClick={() => setShowLinkPicker(null)}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)]"
                       style={{ color: 'var(--color-text-muted)' }}>✕</button>
                   </div>
 
@@ -1378,7 +1380,7 @@ export default function ProjectsPage() {
                         <button key={tx.id}
                           onClick={() => !otherProject && selectTxForLink(tx, showLinkPicker!)}
                           disabled={linking || !!otherProject}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5 disabled:opacity-40"
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)] disabled:opacity-40"
                           style={linked ? { background: 'rgba(155,109,255,0.12)', border: '1px solid rgba(155,109,255,0.25)' } : {}}>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{tx.name}</p>
@@ -1397,7 +1399,7 @@ export default function ProjectsPage() {
                           <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
                             style={linked
                               ? { background: '#9B6DFF', color: 'white' }
-                              : { border: '1.5px solid rgba(255,255,255,0.20)' }}>
+                              : { border: '1.5px solid color-mix(in srgb, var(--color-text-primary) 22%, transparent)' }}>
                             {linked && <span className="text-xs">✓</span>}
                           </div>
                         </button>
@@ -1421,17 +1423,17 @@ export default function ProjectsPage() {
                 <>
                   <div className="flex items-center gap-3 shrink-0">
                     <button onClick={() => setPendingLinkTx(null)}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 text-lg"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] text-lg"
                       style={{ color: 'var(--color-text-muted)' }}>←</button>
                     <p className="font-bold text-base flex-1">Categorize for this project</p>
                     <button onClick={() => { setShowLinkPicker(null); setPendingLinkTx(null); }}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)]"
                       style={{ color: 'var(--color-text-muted)' }}>✕</button>
                   </div>
 
                   {/* Transaction summary */}
                   <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl shrink-0"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                    style={{ background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{pendingLinkTx.name}</p>
                       <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{pendingLinkTx.date}</p>
@@ -1454,10 +1456,10 @@ export default function ProjectsPage() {
                     const CatBtn = (cat: ProjectCategory) => (
                       <button key={cat.id}
                         onClick={() => setPendingCatId(cat.id)}
-                        className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5"
+                        className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)]"
                         style={pendingCatId === cat.id
                           ? { background: `${cat.color}18`, border: `1px solid ${cat.color}40` }
-                          : { border: '1px solid rgba(255,255,255,0.08)' }}>
+                          : { border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                         <span className="text-lg shrink-0">{cat.icon}</span>
                         <span className="text-xs font-medium truncate" style={{ color: pendingCatId === cat.id ? cat.color : 'var(--color-text-secondary)' }}>
                           {cat.name}
@@ -1470,10 +1472,10 @@ export default function ProjectsPage() {
                         <div className="grid grid-cols-2 gap-2">
                           <button
                             onClick={() => setPendingCatId('')}
-                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-white/5"
+                            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)]"
                             style={pendingCatId === ''
                               ? { background: 'rgba(155,109,255,0.12)', border: '1px solid rgba(155,109,255,0.30)' }
-                              : { border: '1px solid rgba(255,255,255,0.08)' }}>
+                              : { border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                             <span className="text-lg">🏷️</span>
                             <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>No category</span>
                           </button>
@@ -1496,8 +1498,8 @@ export default function ProjectsPage() {
 
                   <div className="flex gap-2 justify-end shrink-0 pt-1">
                     <button onClick={() => setPendingLinkTx(null)}
-                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10"
-                      style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)]"
+                      style={{ color: 'var(--color-text-secondary)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                       Back
                     </button>
                     <button onClick={() => confirmLink(showLinkPicker!)} disabled={linking}
@@ -1530,7 +1532,7 @@ export default function ProjectsPage() {
                   <p className="font-bold text-base">Delete "{confirmDelete.name}"?</p>
                   <p className="text-xs mt-1 leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
                     This will permanently delete the project. All{' '}
-                    <span className="font-semibold" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                    <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                       {confirmDelete.txCount} linked transaction{confirmDelete.txCount !== 1 ? 's' : ''}
                     </span>{' '}
                     will be unlinked and left uncategorized from this project.
@@ -1546,8 +1548,8 @@ export default function ProjectsPage() {
 
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setConfirmDelete(null)}
-                  className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10"
-                  style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)]"
+                  style={{ color: 'var(--color-text-secondary)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                   Cancel
                 </button>
                 <button onClick={() => handleDelete(confirmDelete)} disabled={deleting === confirmDelete.id}
@@ -1585,7 +1587,7 @@ function ProjectCategoryPicker({
         className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md hover:brightness-125 transition-all"
         style={current
           ? { background: `${current.color}18`, border: `1px solid ${current.color}35`, color: current.color }
-          : { background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--color-text-muted)' }}>
+          : { background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 13%, transparent)', color: 'var(--color-text-muted)' }}>
         {current ? <><span>{current.icon}</span><span>{current.name}</span></> : <span>+ Tag</span>}
       </button>
       {open && (
@@ -1594,7 +1596,7 @@ function ProjectCategoryPicker({
           {current && (
             <button
               onClick={() => { onAssign(null); setOpen(false); }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 text-left"
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] text-left"
               style={{ color: '#FF6B6B' }}>
               <span>✕</span><span>Remove tag</span>
             </button>
@@ -1606,7 +1608,7 @@ function ProjectCategoryPicker({
             const CatBtn = (cat: ProjectCategory) => (
               <button key={cat.id}
                 onClick={() => { onAssign(cat.id); setOpen(false); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 text-left"
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] text-left"
                 style={tx.projectCategoryId === cat.id ? { background: `${cat.color}15` } : {}}>
                 <span>{cat.icon}</span>
                 <span style={{ color: tx.projectCategoryId === cat.id ? cat.color : 'var(--color-text-secondary)' }}>{cat.name}</span>
@@ -1619,7 +1621,7 @@ function ProjectCategoryPicker({
                 {refund.length > 0 && (
                   <>
                     <div className="px-3 pt-1 pb-0.5 text-[9px] font-bold tracking-widest uppercase"
-                      style={{ color: 'var(--color-text-muted)', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                      style={{ color: 'var(--color-text-muted)', borderTop: '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)' }}>
                       {isIncome ? '↩ Return / Refund' : '↩ Adjustment'}
                     </div>
                     {refund.map(CatBtn)}
@@ -1637,7 +1639,7 @@ function ProjectCategoryPicker({
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="text-right">
-      <p className="text-[10px] font-medium" style={{ color: 'rgba(255,255,255,0.35)' }}>{label}</p>
+      <p className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
       <p className="text-sm font-bold" style={{ color }}>{value}</p>
     </div>
   );

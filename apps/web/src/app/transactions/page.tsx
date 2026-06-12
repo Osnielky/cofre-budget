@@ -808,9 +808,9 @@ export default function TransactionsPage() {
               <input value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search transactions…"
                 className="w-full pl-9 pr-3 py-2 text-sm outline-none rounded-xl transition-all duration-150"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'var(--color-text-primary)' }}
-                onFocus={e => { e.currentTarget.style.border = '1px solid rgba(245,200,66,0.45)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(245,200,66,0.10)'; }}
-                onBlur={e  => { e.currentTarget.style.border = '1px solid rgba(255,255,255,0.09)'; e.currentTarget.style.boxShadow = 'none'; }}
+                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                onFocus={e => { e.currentTarget.style.border = '1px solid color-mix(in srgb, var(--color-primary) 45%, transparent)'; e.currentTarget.style.boxShadow = '0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent)'; }}
+                onBlur={e  => { e.currentTarget.style.border = '1px solid var(--color-border)'; e.currentTarget.style.boxShadow = 'none'; }}
               />
             </div>
             <div className="flex gap-1.5">
@@ -818,26 +818,26 @@ export default function TransactionsPage() {
                 {
                   id: 'all', label: 'All', count: transactions.length,
                   icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="3" y="5" width="18" height="2" rx="1"/><rect x="3" y="11" width="18" height="2" rx="1"/><rect x="3" y="17" width="18" height="2" rx="1"/></svg>,
-                  activeStyle: { background: 'rgba(255,255,255,0.13)', color: '#fff', border: '1px solid rgba(255,255,255,0.28)', boxShadow: '0 2px 8px rgba(0,0,0,0.25)' },
-                  inactiveStyle: { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.09)' },
+                  activeStyle: { background: 'var(--color-text-primary)', color: 'var(--color-base)', border: '1px solid transparent', boxShadow: '0 2px 8px rgba(0,0,0,0.18)' },
+                  inactiveStyle: { background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' },
                 },
                 {
                   id: 'uncategorized', label: 'Unlabeled', count: uncategorizedCount,
                   icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>,
-                  activeStyle: { background: 'rgba(245,200,66,0.18)', color: '#F5C842', border: '1px solid rgba(245,200,66,0.45)', boxShadow: '0 2px 10px rgba(245,200,66,0.15)' },
-                  inactiveStyle: { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.09)' },
+                  activeStyle: { background: 'color-mix(in srgb, var(--color-amber) 18%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 45%, transparent)', boxShadow: '0 2px 10px color-mix(in srgb, var(--color-amber) 15%, transparent)' },
+                  inactiveStyle: { background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' },
                 },
                 {
                   id: 'expense', label: 'Expenses', count: transactions.filter((t) => Number(t.amount) < 0).length,
                   icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>,
-                  activeStyle: { background: 'rgba(244,63,94,0.18)', color: '#F43F5E', border: '1px solid rgba(244,63,94,0.45)', boxShadow: '0 2px 10px rgba(244,63,94,0.15)' },
-                  inactiveStyle: { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.09)' },
+                  activeStyle: { background: 'color-mix(in srgb, var(--color-rose) 18%, transparent)', color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 45%, transparent)', boxShadow: '0 2px 10px color-mix(in srgb, var(--color-rose) 15%, transparent)' },
+                  inactiveStyle: { background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' },
                 },
                 {
                   id: 'income', label: 'Income', count: transactions.filter((t) => Number(t.amount) >= 0).length,
                   icon: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>,
-                  activeStyle: { background: 'rgba(34,197,94,0.18)', color: '#22C55E', border: '1px solid rgba(34,197,94,0.45)', boxShadow: '0 2px 10px rgba(34,197,94,0.15)' },
-                  inactiveStyle: { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(255,255,255,0.09)' },
+                  activeStyle: { background: 'color-mix(in srgb, var(--color-green) 18%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 45%, transparent)', boxShadow: '0 2px 10px color-mix(in srgb, var(--color-green) 15%, transparent)' },
+                  inactiveStyle: { background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' },
                 },
               ] as { id: Filter; label: string; count: number; icon: React.ReactNode; activeStyle: React.CSSProperties; inactiveStyle: React.CSSProperties }[]).map((f) => (
                 <button key={f.id} onClick={() => setFilter(f.id)}
@@ -846,7 +846,7 @@ export default function TransactionsPage() {
                   {f.icon}
                   {f.label}
                   <span className="tabular-nums text-[11px] px-1.5 py-0.5 rounded-md font-bold"
-                    style={{ background: filter === f.id ? 'rgba(0,0,0,0.20)' : 'rgba(255,255,255,0.08)', opacity: filter === f.id ? 1 : 0.7 }}>
+                    style={{ background: 'color-mix(in srgb, currentColor 14%, transparent)', opacity: filter === f.id ? 1 : 0.75 }}>
                     {f.count}
                   </span>
                 </button>
