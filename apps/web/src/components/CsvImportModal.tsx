@@ -139,7 +139,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: `linear-gradient(135deg, ${account.color}10 0%, transparent 50%)` }}>
+          style={{ borderBottom: '1px solid var(--color-border)', background: `linear-gradient(135deg, ${account.color}10 0%, transparent 50%)` }}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
               style={{ background: `${account.color}22`, boxShadow: `0 0 0 1px ${account.color}44` }}>
@@ -155,7 +155,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
             </span>
           </div>
           <button onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors shrink-0"
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors shrink-0"
             style={{ color: 'var(--color-text-muted)' }}>✕</button>
         </div>
 
@@ -168,12 +168,12 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
               <button onClick={() => inputRef.current?.click()} type="button"
                 className="w-full py-6 rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all"
                 style={{
-                  borderColor: dragging ? account.color : rows.length ? 'rgba(79,191,127,0.35)' : 'rgba(255,255,255,0.10)',
-                  background: dragging ? `${account.color}08` : rows.length ? 'rgba(79,191,127,0.05)' : 'rgba(255,255,255,0.02)',
+                  borderColor: dragging ? account.color : rows.length ? 'color-mix(in srgb, var(--color-green) 35%, transparent)' : 'var(--color-elevated)',
+                  background: dragging ? `${account.color}08` : rows.length ? 'color-mix(in srgb, var(--color-green) 5%, transparent)' : 'var(--color-elevated)',
                 }}>
                 <span className="text-xl">{dragging ? '📥' : rows.length ? '✅' : '📂'}</span>
                 <div className="text-left">
-                  <p className="text-sm font-semibold" style={{ color: rows.length ? '#4FBF7F' : 'var(--color-text-secondary)' }}>
+                  <p className="text-sm font-semibold" style={{ color: rows.length ? 'var(--color-green)' : 'var(--color-text-secondary)' }}>
                     {dragging ? 'Drop to import' : rows.length ? `${rows.length} transactions — ${fileName}` : 'Click to select or drag & drop'}
                   </p>
                   {!rows.length && !dragging && (
@@ -190,9 +190,9 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
           {warnings.length > 0 && !result && warnings.map((w, i) => (
             <div key={i} className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-xs"
               style={{
-                background: w.level === 'error' ? 'rgba(255,107,107,0.08)' : 'rgba(245,200,66,0.08)',
-                border: `1px solid ${w.level === 'error' ? 'rgba(255,107,107,0.25)' : 'rgba(245,200,66,0.20)'}`,
-                color: w.level === 'error' ? '#FF6B6B' : '#F5C842',
+                background: w.level === 'error' ? 'color-mix(in srgb, var(--color-rose) 8%, transparent)' : 'color-mix(in srgb, var(--color-amber) 8%, transparent)',
+                border: `1px solid ${w.level === 'error' ? 'color-mix(in srgb, var(--color-rose) 25%, transparent)' : 'color-mix(in srgb, var(--color-amber) 20%, transparent)'}`,
+                color: w.level === 'error' ? 'var(--color-rose)' : 'var(--color-amber)',
               }}>
               <span className="shrink-0 mt-0.5">{w.level === 'error' ? '✕' : '⚠'}</span>
               <span className="leading-relaxed">{w.message}</span>
@@ -205,13 +205,13 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
               {/* Stats bar */}
               <div className="grid grid-cols-4 gap-2">
                 {[
-                  { label: 'Total',   value: rows.length,                                               color: '#9B6DFF' },
-                  { label: 'New',     value: dupChecking ? '…' : newCount,                             color: '#4FBF7F' },
-                  { label: 'Skipped', value: dupChecking ? '…' : (dupCheck?.duplicateCount ?? 0),      color: dupCheck?.duplicateCount ? '#F5C842' : 'rgba(255,255,255,0.2)' },
-                  { label: 'Income',  value: income > 0 ? `+$${income.toFixed(2)}` : '$0.00',          color: income > 0 ? '#4FBF7F' : 'rgba(255,255,255,0.2)' },
+                  { label: 'Total',   value: rows.length,                                               color: 'var(--color-primary)' },
+                  { label: 'New',     value: dupChecking ? '…' : newCount,                             color: 'var(--color-green)' },
+                  { label: 'Skipped', value: dupChecking ? '…' : (dupCheck?.duplicateCount ?? 0),      color: dupCheck?.duplicateCount ? 'var(--color-amber)' : 'var(--color-text-muted)' },
+                  { label: 'Income',  value: income > 0 ? `+$${income.toFixed(2)}` : '$0.00',          color: income > 0 ? 'var(--color-green)' : 'var(--color-text-muted)' },
                 ].map((s) => (
                   <div key={s.label} className="flex flex-col items-center py-2.5 rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                    style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                     <p className="text-[9px] uppercase tracking-widest font-bold" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
                     <p className="font-black text-base mt-0.5 tabular-nums" style={{ color: s.color }}>{s.value}</p>
                   </div>
@@ -221,9 +221,9 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
               {/* Duplicate notice */}
               {dupCheck && dupCheck.duplicateCount > 0 && (
                 <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
-                  style={{ background: 'rgba(245,200,66,0.07)', border: '1px solid rgba(245,200,66,0.18)' }}>
-                  <span style={{ color: '#F5C842' }}>⟳</span>
-                  <span style={{ color: '#F5C842' }}>
+                  style={{ background: 'color-mix(in srgb, var(--color-amber) 7%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 18%, transparent)' }}>
+                  <span style={{ color: 'var(--color-amber)' }}>⟳</span>
+                  <span style={{ color: 'var(--color-amber)' }}>
                     <strong>{dupCheck.duplicateCount} already imported</strong> — skipped automatically.
                     Only <strong>{dupCheck.newCount} new</strong> will be added.
                   </span>
@@ -231,7 +231,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
               )}
 
               {/* Table */}
-              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
                 <div className="max-h-52 overflow-y-auto">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0">
@@ -249,11 +249,11 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
                           ? (extId ? dupCheck.duplicateIds.has(extId) : false) || dupCheck.duplicateIds.has(compositeKey)
                           : false;
                         return (
-                          <tr key={i} style={{ borderTop: '1px solid rgba(255,255,255,0.04)', opacity: isDup ? 0.35 : 1 }}>
+                          <tr key={i} style={{ borderTop: '1px solid var(--color-border)', opacity: isDup ? 0.35 : 1 }}>
                             <td className="px-3 py-2 tabular-nums whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{row.date}</td>
                             <td className="px-3 py-2 truncate max-w-xs" style={{ color: isDup ? 'var(--color-text-muted)' : 'var(--color-text-primary)', textDecoration: isDup ? 'line-through' : 'none' }}>{row.name}</td>
                             <td className="px-3 py-2 text-right tabular-nums font-semibold whitespace-nowrap"
-                              style={{ color: isDup ? 'var(--color-text-muted)' : row.amount >= 0 ? '#4FBF7F' : 'var(--color-text-primary)' }}>
+                              style={{ color: isDup ? 'var(--color-text-muted)' : row.amount >= 0 ? 'var(--color-green)' : 'var(--color-text-primary)' }}>
                               {row.amount >= 0 ? '+' : ''}${Math.abs(row.amount).toFixed(2)}
                             </td>
                           </tr>
@@ -275,9 +275,9 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
           {result && (
             <div className="py-8 flex flex-col items-center gap-3 text-center">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-                style={{ background: 'rgba(79,191,127,0.15)', border: '1px solid rgba(79,191,127,0.3)' }}>🎉</div>
+                style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 30%, transparent)' }}>🎉</div>
               <div>
-                <p className="font-bold text-lg" style={{ color: '#4FBF7F' }}>{result.imported} transactions imported</p>
+                <p className="font-bold text-lg" style={{ color: 'var(--color-green)' }}>{result.imported} transactions imported</p>
                 {result.skipped > 0 && (
                   <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>{result.skipped} duplicates skipped</p>
                 )}
@@ -290,11 +290,11 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
 
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-4"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          style={{ borderTop: '1px solid var(--color-border)' }}>
           <span />
           <div className="flex gap-2">
             <button onClick={onClose}
-              className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+              className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
               style={{ color: 'var(--color-text-secondary)' }}>
               {result ? 'Close' : 'Cancel'}
             </button>
@@ -302,14 +302,14 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
               const nothingNew = dupCheck && dupCheck.newCount === 0;
               if (nothingNew) return (
                 <span className="text-xs font-semibold px-3 py-2 rounded-xl"
-                  style={{ background: 'rgba(79,191,127,0.12)', color: '#4FBF7F', border: '1px solid rgba(79,191,127,0.25)' }}>
+                  style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 25%, transparent)' }}>
                   ✓ All already imported
                 </span>
               );
               return (
                 <button onClick={handleImport} disabled={importing || hasErrors || dupChecking}
                   className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50 transition-all"
-                  style={{ background: hasErrors ? 'rgba(255,107,107,0.3)' : account.color }}>
+                  style={{ background: hasErrors ? 'color-mix(in srgb, var(--color-rose) 30%, transparent)' : account.color }}>
                   {importing ? 'Importing…' : dupChecking ? 'Checking…'
                     : dupCheck ? `Import ${dupCheck.newCount} transaction${dupCheck.newCount !== 1 ? 's' : ''}`
                     : `Import ${rows.length} transactions`}

@@ -1,4 +1,4 @@
-export type ThemeId = 'tropic' | 'meridian' | 'daylight' | 'linen' | 'creme';
+export type ThemeId = 'tropic' | 'meridian' | 'daylight' | 'linen' | 'creme' | 'noir';
 
 export interface Theme {
   id:          ThemeId;
@@ -90,6 +90,21 @@ export const THEMES: Theme[] = [
       text:    '#2B2117',
       textDim: '#6B5D4A',
       border:  '#E3D9C4',
+    },
+  },
+  {
+    id: 'noir',
+    name: 'Gilded Noir',
+    description: 'Midnight navy · champagne gold · glass',
+    dark: true,
+    preview: {
+      bg:      '#0D1526',
+      surface: 'rgba(255,255,255,0.07)',
+      accent:  '#C9A05C',
+      accent2: '#8FBE9B',
+      text:    '#F2F1EA',
+      textDim: 'rgba(242,241,234,0.66)',
+      border:  'rgba(255,255,255,0.14)',
     },
   },
 ];

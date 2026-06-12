@@ -28,9 +28,9 @@ const EMOJI_OPTIONS = [
 ];
 
 const TYPE_META: Record<string, { label: string; color: string }> = {
-  expense:  { label: 'Expense',  color: '#F07A3E' },
-  income:   { label: 'Income',   color: '#4FBF7F' },
-  both:     { label: 'Both',     color: '#9B6DFF' },
+  expense:  { label: 'Expense',  color: 'var(--color-orange)' },
+  income:   { label: 'Income',   color: 'var(--color-green)' },
+  both:     { label: 'Both',     color: 'var(--color-primary)' },
   transfer: { label: 'Transfer', color: '#6B6B8A' },
 };
 
@@ -42,8 +42,8 @@ const TYPE_TIPS: Record<string, string> = {
 };
 
 const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.05)',
-  border: '1px solid rgba(255,255,255,0.10)',
+  background: 'var(--color-elevated)',
+  border: '1px solid var(--color-border)',
   borderRadius: '10px',
   color: 'var(--color-text-primary)',
 };
@@ -112,7 +112,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
 
         {/* Live preview header */}
         <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3"
-          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          style={{ borderBottom: '1px solid var(--color-border)' }}>
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0"
               style={{ background: `${form.color}22`, boxShadow: `0 0 0 1px ${form.color}44` }}>
@@ -129,7 +129,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
             </div>
           </div>
           <button type="button" onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 shrink-0"
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] shrink-0"
             style={{ color: 'var(--color-text-muted)' }}>
             <CloseIcon />
           </button>
@@ -140,7 +140,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
           {/* Type pill group */}
           <div className="flex flex-col gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</span>
-            <div className="grid grid-cols-4 gap-1.5 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="grid grid-cols-4 gap-1.5 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               {Object.entries(TYPE_META).map(([val, meta]) => (
                 <button key={val} type="button"
                   onClick={() => setForm((f) => ({ ...f, type: val }))}
@@ -178,7 +178,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
                   }
                   setShowEmojiPicker((v) => !v);
                 }}
-                className="w-16 h-10 rounded-xl flex items-center justify-center gap-1.5 text-xl transition-colors hover:bg-white/10"
+                className="w-16 h-10 rounded-xl flex items-center justify-center gap-1.5 text-xl transition-colors hover:bg-[var(--color-elevated)]"
                 style={inputStyle}>
                 {form.icon}
                 <svg width="8" height="8" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
@@ -212,9 +212,9 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
 
         {/* Footer */}
         <div className="flex gap-2 justify-end px-5 py-4"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          style={{ borderTop: '1px solid var(--color-border)' }}>
           <button type="button" onClick={onClose}
-            className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+            className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
             style={{ color: 'var(--color-text-secondary)' }}>
             Cancel
           </button>
@@ -236,8 +236,8 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
           {EMOJI_OPTIONS.map((em) => (
             <button key={em} type="button"
               onClick={() => { setForm((f) => ({ ...f, icon: em })); setShowEmojiPicker(false); }}
-              className="w-8 h-8 rounded-lg text-lg flex items-center justify-center hover:bg-white/10"
-              style={{ background: form.icon === em ? 'rgba(155,109,255,0.25)' : 'transparent' }}>
+              className="w-8 h-8 rounded-lg text-lg flex items-center justify-center hover:bg-[var(--color-elevated)]"
+              style={{ background: form.icon === em ? 'color-mix(in srgb, var(--color-primary) 25%, transparent)' : 'transparent' }}>
               {em}
             </button>
           ))}

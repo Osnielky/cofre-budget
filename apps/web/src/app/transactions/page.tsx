@@ -538,24 +538,22 @@ export default function TransactionsPage() {
               {/* New manual transaction */}
               <button onClick={() => setShowManualTx(true)}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
-                style={{ background: 'rgba(79,191,127,0.15)', border: '1px solid rgba(79,191,127,0.28)', color: '#4FBF7F' }}>
+                style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 28%, transparent)', color: 'var(--color-green)' }}>
                 <PlusIcon /> New
               </button>
               {/* Import CSV */}
               <div className="relative" ref={importBtnRef}>
                 <button onClick={() => { setShowImportPicker((v) => !v); setShowAddAccForm(false); setAddAccError(''); }}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
-                  style={{ background: 'rgba(155,109,255,0.15)', border: '1px solid rgba(155,109,255,0.28)', color: '#9B6DFF' }}>
+                  style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 28%, transparent)', color: 'var(--color-primary)' }}>
                   <UploadIcon /> Import Transactions (CSV)
                 </button>
                 {showImportPicker && (
                   <div className="absolute right-0 top-full mt-2 z-30 rounded-2xl overflow-hidden"
                     style={{
-                      background: 'var(--color-elevated)',
+                      background: 'var(--popover-bg)',
                       border: 'var(--glass-border)',
                       boxShadow: 'var(--glass-shadow)',
-                      backdropFilter: 'var(--glass-blur)',
-                      WebkitBackdropFilter: 'var(--glass-blur)',
                       minWidth: '280px',
                     }}>
 
@@ -563,9 +561,9 @@ export default function TransactionsPage() {
                       /* ── Account list ── */
                       <>
                         <div className="px-4 pt-3.5 pb-2 flex items-center gap-2"
-                          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                          style={{ borderBottom: '1px solid var(--color-border)' }}>
                           <span className="text-[10px] font-bold tracking-widest uppercase flex-1"
-                            style={{ color: 'rgba(155,109,255,0.8)' }}>Select account to import into</span>
+                            style={{ color: 'color-mix(in srgb, var(--color-primary) 80%, transparent)' }}>Select account to import into</span>
                         </div>
 
                         {(() => {
@@ -606,13 +604,13 @@ export default function TransactionsPage() {
                         );
                         })()}
 
-                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }} />
+                        <div style={{ borderTop: '1px solid var(--color-border)' }} />
                         <button
                           onClick={() => { setShowAddAccForm(true); setAddAccError(''); }}
                           className="w-full flex items-center gap-2.5 px-4 py-3 text-xs font-semibold transition-colors hover:bg-white/5"
-                          style={{ color: '#9B6DFF' }}>
+                          style={{ color: 'var(--color-primary)' }}>
                           <span className="w-5 h-5 rounded-lg flex items-center justify-center text-sm"
-                            style={{ background: 'rgba(155,109,255,0.15)' }}>+</span>
+                            style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)' }}>+</span>
                           Create new account
                         </button>
                       </>
@@ -620,9 +618,9 @@ export default function TransactionsPage() {
                       /* ── Inline add account form ── */
                       <form onSubmit={handleAddAccount} className="flex flex-col gap-3">
                         <div className="flex items-center gap-2 px-4 py-3"
-                          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                          style={{ borderBottom: '1px solid var(--color-border)' }}>
                           <button type="button" onClick={() => { setShowAddAccForm(false); setAddAccError(''); }}
-                            className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-white/10"
+                            className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)]"
                             style={{ color: 'var(--color-text-muted)', fontSize: '14px' }}>
                             ←
                           </button>
@@ -634,20 +632,20 @@ export default function TransactionsPage() {
                           value={newAcc.bankName}
                           onChange={(v: string) => setNewAcc((f) => ({ ...f, bankName: v }))}
                           compact
-                          inputStyle={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
+                          inputStyle={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', borderRadius: '8px', color: 'var(--color-text-primary)' }}
                         />
 
                         <input required placeholder="Account name (e.g. Checking)" value={newAcc.accountName}
                           onChange={(e) => setNewAcc((f) => ({ ...f, accountName: e.target.value }))}
                           className="w-full px-3 py-2 text-xs rounded-lg outline-none"
-                          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }} />
+                          style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
 
                         <div className="flex gap-2">
                           {/* Custom account type dropdown */}
                           <div className="flex-1 relative">
                             <button type="button" onClick={() => setNewAccTypeOpen((o) => !o)}
                               className="w-full px-2 py-2 text-xs rounded-lg flex items-center justify-between gap-1"
-                              style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }}>
+                              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
                               <span className="capitalize">{newAcc.accountType === 'credit' ? 'Credit Card' : newAcc.accountType === 'loan' ? 'Loan' : newAcc.accountType.charAt(0).toUpperCase() + newAcc.accountType.slice(1)}</span>
                               <svg width="8" height="8" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
                                 <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -655,14 +653,14 @@ export default function TransactionsPage() {
                             </button>
                             {newAccTypeOpen && (
                               <div className="absolute top-full left-0 right-0 mt-1 rounded-lg overflow-hidden z-50"
-                                style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
+                                style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
                                 {[['checking','Checking'],['savings','Savings'],['credit','Credit Card'],['investment','Investment'],['cash','Cash'],['loan','Loan']].map(([val, label]) => (
                                   <button key={val} type="button"
                                     onClick={() => { setNewAcc((f) => ({ ...f, accountType: val })); setNewAccTypeOpen(false); }}
                                     className="w-full px-3 py-2 text-xs text-left transition-colors"
-                                    style={{ background: newAcc.accountType === val ? 'rgba(155,109,255,0.15)' : 'transparent', color: newAcc.accountType === val ? '#9B6DFF' : 'var(--color-text-primary)' }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.background = newAcc.accountType === val ? 'rgba(155,109,255,0.15)' : 'transparent')}>
+                                    style={{ background: newAcc.accountType === val ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'transparent', color: newAcc.accountType === val ? 'var(--color-primary)' : 'var(--color-text-primary)' }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-elevated)')}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = newAcc.accountType === val ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'transparent')}>
                                     {label}
                                   </button>
                                 ))}
@@ -671,7 +669,7 @@ export default function TransactionsPage() {
                           </div>
                           <select value={newAcc.currency} onChange={(e) => setNewAcc((f) => ({ ...f, currency: e.target.value }))}
                             className="px-2 py-2 text-xs rounded-lg outline-none appearance-none"
-                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }}>
+                            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
                             {['USD','EUR','GBP','MXN','BRL','CAD'].map((c) => <option key={c}>{c}</option>)}
                           </select>
                         </div>
@@ -697,11 +695,11 @@ export default function TransactionsPage() {
                             value={newAcc.openingBalance}
                             onChange={(e) => setNewAcc((f) => ({ ...f, openingBalance: e.target.value }))}
                             className="w-full px-3 py-2 text-xs rounded-lg outline-none"
-                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)', color: 'var(--color-text-primary)' }} />
+                            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
                         </div>
 
                         {addAccError && (
-                          <p className="text-[10px]" style={{ color: '#FF6B6B' }}>{addAccError}</p>
+                          <p className="text-[10px]" style={{ color: 'var(--color-rose)' }}>{addAccError}</p>
                         )}
 
                         <button type="submit" disabled={addingAcc}
@@ -720,7 +718,7 @@ export default function TransactionsPage() {
               {hasPlaid && (
                 <button onClick={syncAll} disabled={syncing}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110 disabled:opacity-50"
-                  style={{ background: 'rgba(79,191,127,0.12)', border: '1px solid rgba(79,191,127,0.25)', color: '#4FBF7F' }}>
+                  style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 25%, transparent)', color: 'var(--color-green)' }}>
                   <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none' }}>
                     <SyncIcon />
                   </span>
@@ -734,29 +732,29 @@ export default function TransactionsPage() {
           <div className="flex items-center gap-3 flex-wrap">
             {rangeMode === 'month' ? (
               <div className="flex items-center gap-1 p-1 rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                 <button onClick={() => setMonth(prevMonth(month))}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10 text-lg leading-none"
+                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] text-lg leading-none"
                   style={{ color: 'var(--color-text-secondary)' }}>‹</button>
                 <span className="px-3 text-sm font-semibold min-w-36 text-center">{monthLabel(month)}</span>
                 <button onClick={() => setMonth(nextMonth(month))}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10 text-lg leading-none"
+                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] text-lg leading-none"
                   style={{ color: 'var(--color-text-secondary)' }}>›</button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
                   className="px-3 py-1.5 text-sm rounded-xl outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)' }} />
+                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
                 <span style={{ color: 'var(--color-text-muted)' }}>→</span>
                 <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
                   className="px-3 py-1.5 text-sm rounded-xl outline-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)' }} />
+                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
               </div>
             )}
             <button onClick={() => setRangeMode((m) => m === 'month' ? 'custom' : 'month')}
-              className="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-white/10"
-              style={{ color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)]"
+              style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
               {rangeMode === 'month' ? '📅 Custom range' : '← Month view'}
             </button>
 
@@ -764,11 +762,11 @@ export default function TransactionsPage() {
             {!loading && (
               <div className="flex items-center gap-2 ml-auto">
                 <span className="text-xs px-2.5 py-1 rounded-lg font-semibold"
-                  style={{ background: 'rgba(79,191,127,0.10)', color: '#4FBF7F' }}>
+                  style={{ background: 'color-mix(in srgb, var(--color-green) 10%, transparent)', color: 'var(--color-green)' }}>
                   +${totalIncome.toFixed(2)}
                 </span>
                 <span className="text-xs px-2.5 py-1 rounded-lg font-semibold"
-                  style={{ background: 'rgba(240,122,62,0.10)', color: '#F07A3E' }}>
+                  style={{ background: 'color-mix(in srgb, var(--color-orange) 10%, transparent)', color: 'var(--color-orange)' }}>
                   -${Math.abs(totalExpense).toFixed(2)}
                 </span>
                 <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
@@ -782,10 +780,10 @@ export default function TransactionsPage() {
           {!loading && uncategorizedCount > 0 && (
             <button onClick={() => setFilter('uncategorized')}
               className="flex items-center gap-3 px-4 py-3 rounded-xl text-left w-full transition-opacity hover:opacity-80"
-              style={{ background: 'rgba(245,200,66,0.08)', border: '1px solid rgba(245,200,66,0.25)' }}>
+              style={{ background: 'color-mix(in srgb, var(--color-amber) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 25%, transparent)' }}>
               <span className="text-lg">🏷️</span>
               <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: '#F5C842' }}>
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-amber)' }}>
                   {uncategorizedCount} transaction{uncategorizedCount !== 1 ? 's' : ''} without a category
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
@@ -793,7 +791,7 @@ export default function TransactionsPage() {
                 </p>
               </div>
               <span className="text-xs font-bold px-2 py-1 rounded-lg shrink-0"
-                style={{ background: 'rgba(245,200,66,0.16)', color: '#F5C842' }}>
+                style={{ background: 'color-mix(in srgb, var(--color-amber) 16%, transparent)', color: 'var(--color-amber)' }}>
                 Review →
               </span>
             </button>
@@ -807,10 +805,10 @@ export default function TransactionsPage() {
               <input value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name…"
                 className="w-full pl-9 pr-3 py-2 text-sm outline-none rounded-xl"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', color: 'var(--color-text-primary)' }} />
+                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
             </div>
             <div className="flex gap-1 p-1 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
+              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               {([
                 { id: 'all',          label: 'All',           count: transactions.length },
                 { id: 'uncategorized',label: 'Uncategorized', count: uncategorizedCount, dot: true },
@@ -820,9 +818,9 @@ export default function TransactionsPage() {
                 <button key={f.id} onClick={() => setFilter(f.id)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
                   style={filter === f.id
-                    ? { background: 'rgba(155,109,255,0.22)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.40)' }
-                    : { color: 'rgba(255,255,255,0.70)', border: '1px solid transparent' }}>
-                  {f.dot && f.count > 0 && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: '#F5C842' }} />}
+                    ? { background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
+                    : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
+                  {f.dot && f.count > 0 && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--color-amber)' }} />}
                   {f.label}
                   <span className="opacity-50">{f.count}</span>
                 </button>
@@ -839,8 +837,8 @@ export default function TransactionsPage() {
             <div className="flex justify-end">
               <button
                 onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(accountGroups.map(([id]) => id)))}
-                className="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-white/10"
-                style={{ color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                className="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)]"
+                style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
                 {allCollapsed ? '↓ Expand all' : '↑ Collapse all'}
               </button>
             </div>
@@ -861,7 +859,7 @@ export default function TransactionsPage() {
               {filter !== 'all' && (
                 <button onClick={() => setFilter('all')}
                   className="mt-1 text-sm px-3 py-1.5 rounded-lg"
-                  style={{ color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.25)' }}>
+                  style={{ color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)' }}>
                   Clear filter
                 </button>
               )}
@@ -948,22 +946,22 @@ export default function TransactionsPage() {
 
                     <div className="flex items-center gap-3 shrink-0">
                       {accIncome > 0 && (
-                        <span className="text-xs font-semibold hidden sm:block" style={{ color: '#4FBF7F' }}>
+                        <span className="text-xs font-semibold hidden sm:block" style={{ color: 'var(--color-green)' }}>
                           +${accIncome.toFixed(2)}
                         </span>
                       )}
                       {accExpense < 0 && (
-                        <span className="text-xs font-semibold hidden sm:block" style={{ color: '#F07A3E' }}>
+                        <span className="text-xs font-semibold hidden sm:block" style={{ color: 'var(--color-orange)' }}>
                           -${Math.abs(accExpense).toFixed(2)}
                         </span>
                       )}
                       <span className="text-xs px-2 py-0.5 rounded-full"
-                        style={{ background: 'rgba(255,255,255,0.07)', color: 'var(--color-text-muted)' }}>
+                        style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
                         {txList.length}
                       </span>
                       {accUncategorized > 0 && (
                         <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                          style={{ background: 'rgba(245,200,66,0.15)', color: '#F5C842' }}>
+                          style={{ background: 'color-mix(in srgb, var(--color-amber) 15%, transparent)', color: 'var(--color-amber)' }}>
                           {accUncategorized} uncat.
                         </span>
                       )}
@@ -1016,12 +1014,12 @@ export default function TransactionsPage() {
                         </span>
                         {dayUncategorized > 0 && (
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
-                            style={{ background: 'rgba(245,200,66,0.12)', color: '#F5C842' }}>
+                            style={{ background: 'color-mix(in srgb, var(--color-amber) 12%, transparent)', color: 'var(--color-amber)' }}>
                             {dayUncategorized} uncat.
                           </span>
                         )}
                         <span className="text-[10px] px-1.5 py-0.5 rounded-md"
-                          style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)' }}>
+                          style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
                           {dateMap[date].length}
                         </span>
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
@@ -1048,24 +1046,24 @@ export default function TransactionsPage() {
 
                         return (
                           <div key={tx.id} className="relative group"
-                            style={i > 0 ? { borderTop: '1px solid rgba(255,255,255,0.05)' } : {}}>
+                            style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : {}}>
                             <div className="flex items-center gap-3 px-4 py-3">
 
                               {/* Income/expense/transfer bar */}
                               <div className="w-1 h-8 rounded-full shrink-0"
-                                style={{ background: txIsTransfer ? '#6B6B8A' : isIncome ? '#4FBF7F' : '#F07A3E' }} />
+                                style={{ background: txIsTransfer ? '#6B6B8A' : isIncome ? 'var(--color-green)' : 'var(--color-orange)' }} />
 
                               {/* Name + source */}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate leading-snug">{tx.name}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase"
-                                    style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--color-text-muted)' }}>
+                                    style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
                                     {tx.source}
                                   </span>
                                   {tx.pending && (
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                                      style={{ background: 'rgba(245,200,66,0.12)', color: '#F5C842' }}>
+                                      style={{ background: 'color-mix(in srgb, var(--color-amber) 12%, transparent)', color: 'var(--color-amber)' }}>
                                       Pending
                                     </span>
                                   )}
@@ -1195,7 +1193,7 @@ export default function TransactionsPage() {
                                   return { background: `${_c}18`, border: `1px solid ${_c}35`, color: _c };
                                 }
                                 if (cat) return { background: `${cat.color}18`, border: `1px solid ${cat.color}35`, color: cat.color };
-                                return { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-muted)' };
+                                return { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' };
                               })()}>
                               {updatingId === tx.id ? (
                                 <span>…</span>
@@ -1230,11 +1228,11 @@ export default function TransactionsPage() {
                                 {cat && (
                                   <>
                                     <button onClick={() => assignCategory(tx.id, null)}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10"
-                                      style={{ color: '#FF6B6B' }}>
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)]"
+                                      style={{ color: 'var(--color-rose)' }}>
                                       <span>✕</span><span>Remove category</span>
                                     </button>
-                                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }} />
+                                    <div style={{ borderTop: '1px solid var(--color-border)' }} />
                                   </>
                                 )}
                                 {!pickerTransferStep && !pickerProjectDrill && (
@@ -1246,7 +1244,7 @@ export default function TransactionsPage() {
                                       onChange={(e) => setPickerSearch(e.target.value)}
                                       onClick={(e) => e.stopPropagation()}
                                       className="w-full px-2.5 py-1.5 text-xs outline-none rounded-lg"
-                                      style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)' }}
+                                      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
                                     />
                                   </div>
                                 )}
@@ -1254,7 +1252,7 @@ export default function TransactionsPage() {
                                   /* ── Transfer account picker ── */
                                   <>
                                     <div className="flex items-center gap-2 px-3 py-2"
-                                      style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                                      style={{ borderBottom: '1px solid var(--color-border)' }}>
                                       <button onClick={() => setPickerTransferStep(false)}
                                         className="text-sm hover:opacity-70 shrink-0"
                                         style={{ color: 'var(--color-text-muted)' }}>←</button>
@@ -1273,7 +1271,7 @@ export default function TransactionsPage() {
                                       return (
                                         <>
                                           <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase flex items-center gap-1"
-                                            style={{ color: '#9B6DFF' }}>
+                                            style={{ color: 'var(--color-primary)' }}>
                                             <span>💳</span> Credit Cards
                                           </p>
                                           {creditAccs.map((a) => {
@@ -1282,7 +1280,7 @@ export default function TransactionsPage() {
                                             return (
                                               <button key={a.id}
                                                 onClick={() => setTransferAccount(tx.id, a.id)}
-                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10"
+                                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-[var(--color-elevated)]"
                                                 style={{ background: selected ? `${c}15` : `${c}06`, borderLeft: `2px solid ${c}50` }}>
                                                 <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
                                                   style={{ background: `${c}20` }}>
@@ -1296,7 +1294,7 @@ export default function TransactionsPage() {
                                               </button>
                                             );
                                           })}
-                                          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0' }} />
+                                          <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
                                           <p className="px-3 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
                                             style={{ color: 'var(--color-text-muted)' }}>All accounts</p>
                                         </>
@@ -1305,7 +1303,7 @@ export default function TransactionsPage() {
                                     {!transferMatchesLoading && transferMatches.length > 0 && (
                                       <>
                                         <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase flex items-center gap-1"
-                                          style={{ color: '#F5C842' }}>
+                                          style={{ color: 'var(--color-amber)' }}>
                                           <span>✦</span> Suggested Matches
                                         </p>
                                         {transferMatches.map((m) => {
@@ -1315,8 +1313,8 @@ export default function TransactionsPage() {
                                           return (
                                             <button key={m.id}
                                               onClick={() => setTransferAccount(tx.id, acc?.id ?? null, m.id)}
-                                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10"
-                                              style={{ background: selected ? `${c}12` : 'rgba(245,200,66,0.04)', borderLeft: `2px solid ${c}60` }}>
+                                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)]"
+                                              style={{ background: selected ? `${c}12` : 'color-mix(in srgb, var(--color-amber) 4%, transparent)', borderLeft: `2px solid ${c}60` }}>
                                               <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
                                                 style={{ background: `${c}20` }}>
                                                 <AccountTypeIcon type={acc?.accountType ?? ''} size={18} />
@@ -1330,15 +1328,15 @@ export default function TransactionsPage() {
                                                 </p>
                                               </div>
                                               <div className="text-right shrink-0">
-                                                <p className="font-bold tabular-nums" style={{ color: Number(m.amount) >= 0 ? '#4FBF7F' : '#F07A3E' }}>
+                                                <p className="font-bold tabular-nums" style={{ color: Number(m.amount) >= 0 ? 'var(--color-green)' : 'var(--color-orange)' }}>
                                                   {Number(m.amount) >= 0 ? '+' : ''}{Number(m.amount).toFixed(2)}
                                                 </p>
-                                                <p className="text-[9px]" style={{ color: '#F5C842' }}>auto-link both</p>
+                                                <p className="text-[9px]" style={{ color: 'var(--color-amber)' }}>auto-link both</p>
                                               </div>
                                             </button>
                                           );
                                         })}
-                                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', margin: '4px 0' }} />
+                                        <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
                                         <p className="px-3 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
                                           style={{ color: 'var(--color-text-muted)' }}>Or pick account manually</p>
                                       </>
@@ -1346,10 +1344,10 @@ export default function TransactionsPage() {
 
                                     <button
                                       onClick={() => setTransferAccount(tx.id, null)}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10"
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)]"
                                       style={!tx.transferAccountId ? { background: 'rgba(107,107,138,0.12)' } : {}}>
                                       <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                        style={{ background: 'rgba(255,255,255,0.06)' }}>🏷️</span>
+                                        style={{ background: 'var(--color-elevated)' }}>🏷️</span>
                                       <span className="flex-1 text-left" style={{ color: 'var(--color-text-secondary)' }}>
                                         External / Unknown
                                       </span>
@@ -1361,7 +1359,7 @@ export default function TransactionsPage() {
                                       return (
                                         <button key={acc.id}
                                           onClick={() => setTransferAccount(tx.id, acc.id)}
-                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10"
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)]"
                                           style={selected ? { background: `${c}12` } : {}}>
                                           <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
                                             style={{ background: `${c}20` }}>
@@ -1399,7 +1397,7 @@ export default function TransactionsPage() {
                                             .finally(() => setTransferModalLoading(false));
                                         }
                                       }}
-                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10"
+                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-[var(--color-elevated)]"
                                         style={tx.categoryId === c.id ? { background: `${c.color}15` } : {}}>
                                         <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
                                           style={{ background: `${c.color}20` }}>{c.icon}</span>
@@ -1418,14 +1416,14 @@ export default function TransactionsPage() {
                                     {/* Secondary type (e.g. expense categories for a positive/refund transaction) */}
                                     {pickerCatsAlt.length > 0 && (
                                       <>
-                                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
+                                        <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
                                         <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
                                           style={{ color: 'var(--color-text-muted)' }}>
                                           {isIncome ? 'Refund / Expense' : 'Income'}
                                         </p>
                                         {pickerCatsAlt.map((c) => (
                                           <button key={c.id} onClick={() => assignCategory(tx.id, c.id)}
-                                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-white/10"
+                                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-[var(--color-elevated)]"
                                             style={tx.categoryId === c.id ? { background: `${c.color}15` } : {}}>
                                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
                                               style={{ background: `${c.color}20` }}>{c.icon}</span>
@@ -1442,7 +1440,7 @@ export default function TransactionsPage() {
                                     {/* Projects section */}
                                     {projects.length > 0 && (
                                       <>
-                                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
+                                        <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
                                         <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
                                           style={{ color: 'var(--color-text-muted)' }}>Projects</p>
                                         {projects.map((proj) => {
@@ -1451,7 +1449,7 @@ export default function TransactionsPage() {
                                           return (
                                             <button key={proj.id}
                                               onClick={() => setPickerProjectDrill(proj.id)}
-                                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10"
+                                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)]"
                                               style={linked ? { background: `${c}12` } : {}}>
                                               <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
                                                 style={{ background: `${c}20` }}>{proj.icon}</span>
@@ -1467,13 +1465,13 @@ export default function TransactionsPage() {
                                       </>
                                     )}
 
-                                    <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
+                                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
                                     <button
                                       onClick={() => { setOpenPickerId(null); setPickerProjectDrill(null); setNewCatForTxId(tx.id); setShowNewCatModal(true); }}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-white/10"
-                                      style={{ color: '#9B6DFF' }}>
+                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold transition-colors hover:bg-[var(--color-elevated)]"
+                                      style={{ color: 'var(--color-primary)' }}>
                                       <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                        style={{ background: 'rgba(155,109,255,0.15)' }}>+</span>
+                                        style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)' }}>+</span>
                                       New category
                                     </button>
                                   </>
@@ -1486,7 +1484,7 @@ export default function TransactionsPage() {
                                       <>
                                         {/* Header */}
                                         <div className="flex items-center gap-2 px-3 py-2"
-                                          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                                          style={{ borderBottom: '1px solid var(--color-border)' }}>
                                           <button onClick={() => { setPickerProjectDrill(null); setMarkAsSaleConfirm(null); }}
                                             className="text-sm hover:opacity-70 shrink-0"
                                             style={{ color: 'var(--color-text-muted)' }}>←</button>
@@ -1497,7 +1495,7 @@ export default function TransactionsPage() {
                                               onClick={() => unlinkFromProject(tx.id, pickerProjectDrill!)}
                                               disabled={linkingProj}
                                               className="text-[10px] font-semibold px-1.5 py-0.5 rounded hover:brightness-110 disabled:opacity-50 shrink-0"
-                                              style={{ background: 'rgba(255,107,107,0.15)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.25)' }}>
+                                              style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 25%, transparent)' }}>
                                               Unlink
                                             </button>
                                           )}
@@ -1506,10 +1504,10 @@ export default function TransactionsPage() {
                                         <button
                                           onClick={() => linkToProject(tx.id, pickerProjectDrill!, null)}
                                           disabled={linkingProj}
-                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10 disabled:opacity-50"
+                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)] disabled:opacity-50"
                                           style={tx.projectId === pickerProjectDrill && !tx.projectCategoryId ? { background: `${c}12` } : {}}>
                                           <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                            style={{ background: 'rgba(255,255,255,0.06)' }}>🏷️</span>
+                                            style={{ background: 'var(--color-elevated)' }}>🏷️</span>
                                           <span className="flex-1 text-left" style={{ color: 'var(--color-text-secondary)' }}>
                                             {linkingProj ? 'Linking…' : 'No specific category'}
                                           </span>
@@ -1522,7 +1520,7 @@ export default function TransactionsPage() {
                                           <button key={cat.id}
                                             onClick={() => linkToProject(tx.id, pickerProjectDrill!, cat.id)}
                                             disabled={linkingProj}
-                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/10 disabled:opacity-50"
+                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)] disabled:opacity-50"
                                             style={tx.projectId === pickerProjectDrill && tx.projectCategoryId === cat.id ? { background: `${cat.color}15` } : {}}>
                                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
                                               style={{ background: `${cat.color}20` }}>{cat.icon}</span>
@@ -1544,7 +1542,7 @@ export default function TransactionsPage() {
                                         {/* Mark as SOLD — only for income txs on active projects */}
                                         {Number(tx.amount) > 0 && proj?.status !== 'sold' && (
                                           <>
-                                            <div style={{ borderTop: '1px solid rgba(255,255,255,0.07)', margin: '4px 0' }} />
+                                            <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
                                             {markAsSaleConfirm === proj?.id ? (
                                               <div className="px-3 py-2.5 flex flex-col gap-2">
                                                 <p className="text-xs font-semibold text-white">Mark {proj.name} as sold?</p>
@@ -1553,15 +1551,15 @@ export default function TransactionsPage() {
                                                 </p>
                                                 <div className="flex gap-1.5">
                                                   <button type="button" onClick={() => setMarkAsSaleConfirm(null)}
-                                                    className="flex-1 py-1.5 text-xs rounded-lg hover:bg-white/10"
-                                                    style={{ color: 'var(--color-text-muted)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                                                    className="flex-1 py-1.5 text-xs rounded-lg hover:bg-[var(--color-elevated)]"
+                                                    style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
                                                     Cancel
                                                   </button>
                                                   <button type="button"
                                                     onClick={() => markProjectAsSold(tx.id, proj.id)}
                                                     disabled={markAsSaleSaving}
                                                     className="flex-1 py-1.5 text-xs font-semibold rounded-lg hover:brightness-110 disabled:opacity-50"
-                                                    style={{ background: 'rgba(79,191,127,0.20)', color: '#4FBF7F', border: '1px solid rgba(79,191,127,0.35)' }}>
+                                                    style={{ background: 'color-mix(in srgb, var(--color-green) 20%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 35%, transparent)' }}>
                                                     {markAsSaleSaving ? '…' : '✓ Confirm'}
                                                   </button>
                                                 </div>
@@ -1569,10 +1567,10 @@ export default function TransactionsPage() {
                                             ) : (
                                               <button type="button"
                                                 onClick={() => setMarkAsSaleConfirm(proj.id)}
-                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-white/10 transition-colors"
-                                                style={{ color: '#4FBF7F' }}>
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs hover:bg-[var(--color-elevated)] transition-colors"
+                                                style={{ color: 'var(--color-green)' }}>
                                                 <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                                  style={{ background: 'rgba(79,191,127,0.15)' }}>🏷️</span>
+                                                  style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)' }}>🏷️</span>
                                                 Mark {proj.name} as SOLD
                                               </button>
                                             )}
@@ -1603,7 +1601,7 @@ export default function TransactionsPage() {
                                 });
                                 setShowManualTx(true);
                               }}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10 shrink-0"
+                              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] shrink-0"
                               style={{ color: 'var(--color-text-muted)' }}
                               title="Edit transaction">
                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1617,17 +1615,17 @@ export default function TransactionsPage() {
                               <div className="flex items-center gap-1 shrink-0">
                                 {tx.transferAccountId && (
                                   <span className="text-[10px] px-1.5 py-0.5 rounded-md mr-1"
-                                    style={{ background: 'rgba(255,107,107,0.12)', color: '#FF6B6B' }}>
+                                    style={{ background: 'color-mix(in srgb, var(--color-rose) 12%, transparent)', color: 'var(--color-rose)' }}>
                                     ⚠ linked transfer
                                   </span>
                                 )}
                                 <button onClick={() => deleteManualTx(tx.id)}
                                   className="text-[10px] font-semibold px-2 py-1 rounded-lg"
-                                  style={{ background: 'rgba(255,107,107,0.20)', color: '#FF6B6B', border: '1px solid rgba(255,107,107,0.35)' }}>
+                                  style={{ background: 'color-mix(in srgb, var(--color-rose) 20%, transparent)', color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>
                                   Delete
                                 </button>
                                 <button onClick={() => setDeleteConfirmId(null)}
-                                  className="text-[10px] px-2 py-1 rounded-lg hover:bg-white/10"
+                                  className="text-[10px] px-2 py-1 rounded-lg hover:bg-[var(--color-elevated)]"
                                   style={{ color: 'var(--color-text-muted)' }}>
                                   Cancel
                                 </button>
@@ -1643,7 +1641,7 @@ export default function TransactionsPage() {
 
                           {/* Amount */}
                           <p className="text-sm font-bold tabular-nums w-24 text-right shrink-0"
-                            style={{ color: txIsTransfer ? '#6B6B8A' : isIncome ? '#4FBF7F' : 'white' }}>
+                            style={{ color: txIsTransfer ? '#6B6B8A' : isIncome ? 'var(--color-green)' : 'white' }}>
                             {formatAmount(amount)}
                           </p>
                         </div>
@@ -1682,7 +1680,7 @@ export default function TransactionsPage() {
                                 </div>
                                 {/* Counterpart amount */}
                                 <span className="text-xs font-bold tabular-nums shrink-0"
-                                  style={{ color: cpAmount >= 0 ? '#4FBF7F88' : 'rgba(255,255,255,0.3)' }}>
+                                  style={{ color: cpAmount >= 0 ? 'color-mix(in srgb, var(--color-green) 53%, transparent)' : 'var(--color-text-muted)' }}>
                                   {formatAmount(cpAmount)}
                                 </span>
                               </div>
@@ -1713,7 +1711,7 @@ export default function TransactionsPage() {
             onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowManualTx(false); setManualAccOpen(false); setManualCatOpen(false); setEditingTxId(null); } }}>
             {(() => {
               const isExpense  = manualTx.sign === '-';
-              const accent     = isExpense ? '#F07A3E' : '#4FBF7F';
+              const accent     = isExpense ? 'var(--color-orange)' : 'var(--color-green)';
               const selAcc     = accounts.find((a) => a.id === manualTx.bankAccountId);
               const selCat     = categories.find((c) => c.id === manualTx.categoryId);
               const catOptions = categories.filter((c) => c.type === (isExpense ? 'expense' : 'income') || c.type === 'both');
@@ -1725,23 +1723,23 @@ export default function TransactionsPage() {
 
                   {/* Hero header */}
                   <div className="flex flex-col items-center gap-3 px-6 pt-6 pb-5 rounded-t-2xl"
-                    style={{ background: `linear-gradient(160deg, ${accent}14 0%, transparent 60%)`, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                    style={{ background: `linear-gradient(160deg, ${accent}14 0%, transparent 60%)`, borderBottom: '1px solid var(--color-border)' }}>
                     <div className="flex items-center justify-between w-full">
                       {/* Type toggle */}
-                      <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                      <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                         <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '-', categoryId: '' }))}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                          style={{ background: isExpense ? '#F07A3E22' : 'transparent', color: isExpense ? '#F07A3E' : 'var(--color-text-muted)', border: isExpense ? '1px solid #F07A3E44' : '1px solid transparent' }}>
+                          style={{ background: isExpense ? 'color-mix(in srgb, var(--color-orange) 13%, transparent)' : 'transparent', color: isExpense ? 'var(--color-orange)' : 'var(--color-text-muted)', border: isExpense ? '1px solid color-mix(in srgb, var(--color-orange) 27%, transparent)' : '1px solid transparent' }}>
                           − Expense
                         </button>
                         <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '+', categoryId: '' }))}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                          style={{ background: !isExpense ? '#4FBF7F22' : 'transparent', color: !isExpense ? '#4FBF7F' : 'var(--color-text-muted)', border: !isExpense ? '1px solid #4FBF7F44' : '1px solid transparent' }}>
+                          style={{ background: !isExpense ? 'color-mix(in srgb, var(--color-green) 13%, transparent)' : 'transparent', color: !isExpense ? 'var(--color-green)' : 'var(--color-text-muted)', border: !isExpense ? '1px solid color-mix(in srgb, var(--color-green) 27%, transparent)' : '1px solid transparent' }}>
                           + Income
                         </button>
                       </div>
                       <button type="button" onClick={() => setShowManualTx(false)}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)]"
                         style={{ color: 'var(--color-text-muted)' }}>
                         <CloseIcon />
                       </button>
@@ -1772,13 +1770,13 @@ export default function TransactionsPage() {
                         <input required type="date" value={manualTx.date}
                           onChange={(e) => setManualTx((f) => ({ ...f, date: e.target.value }))}
                           className="px-3 py-2.5 text-sm outline-none rounded-xl w-full"
-                          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)', color: 'var(--color-text-primary)', colorScheme: 'dark' }} />
+                          style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', colorScheme: 'dark' }} />
                       </div>
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0" style={{ position: 'relative' }}>
                         <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Account</span>
                         <button type="button" onClick={() => { setManualAccOpen((o) => !o); setManualCatOpen(false); }}
                           className="px-3 py-2.5 text-sm flex items-center gap-2 rounded-xl outline-none text-left w-full"
-                          style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${selAcc ? (selAcc.color || accent) + '55' : 'rgba(255,255,255,0.10)'}`, color: selAcc ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                          style={{ background: 'var(--color-elevated)', border: `1px solid ${selAcc ? (selAcc.color || accent) + '55' : 'var(--color-elevated)'}`, color: selAcc ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                           {selAcc ? (
                             <>
                               <span className="w-2 h-2 rounded-full shrink-0" style={{ background: selAcc.color || accent }} />
@@ -1791,7 +1789,7 @@ export default function TransactionsPage() {
                         </button>
                         {manualAccOpen && (
                           <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
-                            style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', zIndex: 60, maxHeight: 200 }}>
+                            style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', zIndex: 60, maxHeight: 200 }}>
                             {accounts.map((a) => (
                               <button key={a.id} type="button"
                                 onClick={() => { setManualTx((f) => ({ ...f, bankAccountId: a.id })); setManualAccOpen(false); }}
@@ -1818,7 +1816,7 @@ export default function TransactionsPage() {
                       </span>
                       <button type="button" onClick={() => { setManualCatOpen((o) => !o); setManualAccOpen(false); }}
                         className="px-3 py-2.5 text-sm flex items-center gap-2.5 rounded-xl outline-none text-left w-full"
-                        style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${selCat ? selCat.color + '44' : 'rgba(255,255,255,0.10)'}`, color: selCat ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                        style={{ background: 'var(--color-elevated)', border: `1px solid ${selCat ? selCat.color + '44' : 'var(--color-elevated)'}`, color: selCat ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                         {selCat ? (
                           <>
                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${selCat.color}20` }}>{selCat.icon}</span>
@@ -1831,13 +1829,13 @@ export default function TransactionsPage() {
                       </button>
                       {manualCatOpen && (
                         <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
-                          style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', zIndex: 60, maxHeight: 220 }}>
+                          style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', zIndex: 60, maxHeight: 220 }}>
                           <button type="button" onClick={() => { setManualTx((f) => ({ ...f, categoryId: '' })); setManualCatOpen(false); }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
                             style={{ color: 'var(--color-text-muted)' }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-elevated)')}
                             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }}>—</span>
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'var(--color-elevated)' }}>—</span>
                             Uncategorized
                           </button>
                           {catOptions.map((c) => (
@@ -1859,9 +1857,9 @@ export default function TransactionsPage() {
 
                   {/* Footer */}
                   <div className="flex gap-2 justify-end px-5 py-4 rounded-b-2xl"
-                    style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                    style={{ borderTop: '1px solid var(--color-border)' }}>
                     <button type="button" onClick={() => setShowManualTx(false)}
-                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
                       style={{ color: 'var(--color-text-secondary)' }}>Cancel</button>
                     <button type="submit" disabled={manualTxSaving}
                       className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
@@ -1899,7 +1897,7 @@ export default function TransactionsPage() {
 
                   {/* Header */}
                   <div className="flex items-center justify-between px-5 py-4"
-                    style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                    style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <div>
                       <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>Link Transfer</p>
                       <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
@@ -1907,7 +1905,7 @@ export default function TransactionsPage() {
                       </p>
                     </div>
                     <button onClick={() => setTransferModal(null)}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)]"
                       style={{ color: 'var(--color-text-muted)' }}>✕</button>
                   </div>
 
@@ -1918,9 +1916,9 @@ export default function TransactionsPage() {
                       <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
                         style={{ color: 'var(--color-text-muted)' }}>{isOutgoing ? 'Money leaving' : 'Money arriving at'}</p>
                       <div className="flex items-center gap-3 p-3 rounded-xl"
-                        style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                        style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ background: isOutgoing ? 'rgba(255,107,107,0.15)' : 'rgba(79,191,127,0.15)' }}>
+                          style={{ background: isOutgoing ? 'color-mix(in srgb, var(--color-rose) 15%, transparent)' : 'color-mix(in srgb, var(--color-green) 15%, transparent)' }}>
                           <AccountTypeIcon type={srcTx.bankAccount?.accountType ?? ''} size={18} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -1930,7 +1928,7 @@ export default function TransactionsPage() {
                           </p>
                         </div>
                         <p className="text-base font-black tabular-nums shrink-0"
-                          style={{ color: isOutgoing ? '#FF6B6B' : '#4FBF7F' }}>
+                          style={{ color: isOutgoing ? 'var(--color-rose)' : 'var(--color-green)' }}>
                           {isOutgoing ? '−' : '+'}${absAmt.toFixed(2)}
                         </p>
                       </div>
@@ -1938,14 +1936,14 @@ export default function TransactionsPage() {
 
                     {/* Flow arrow */}
                     <div className="flex flex-col items-center gap-0.5">
-                      <div className="w-px h-3" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                      <div className="w-px h-3" style={{ background: 'var(--color-border)' }} />
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
                         style={{ background: 'rgba(107,107,138,0.15)', border: '1px solid rgba(107,107,138,0.25)' }}>
                         <span style={{ color: '#9B9BB8', fontSize: 11 }}>{isOutgoing ? '↓' : '↑'}</span>
                         <span className="text-xs font-bold tabular-nums" style={{ color: '#9B9BB8' }}>${absAmt.toFixed(2)}</span>
                         <span style={{ color: '#9B9BB8', fontSize: 11 }}>{isOutgoing ? '↓' : '↑'}</span>
                       </div>
-                      <div className="w-px h-3" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                      <div className="w-px h-3" style={{ background: 'var(--color-border)' }} />
                     </div>
 
                     {/* TO section */}
@@ -1971,7 +1969,7 @@ export default function TransactionsPage() {
                           </div>
                           {selMatch && (
                             <p className="text-sm font-black tabular-nums shrink-0"
-                              style={{ color: Number(selMatch.amount) >= 0 ? '#4FBF7F' : '#FF6B6B' }}>
+                              style={{ color: Number(selMatch.amount) >= 0 ? 'var(--color-green)' : 'var(--color-rose)' }}>
                               {Number(selMatch.amount) >= 0 ? '+' : '−'}${Math.abs(Number(selMatch.amount)).toFixed(2)}
                             </p>
                           )}
@@ -1987,7 +1985,7 @@ export default function TransactionsPage() {
                           {/* Auto matches */}
                           {transferModalMatches.length > 0 && (
                             <>
-                              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: '#4FBF7F' }}>✦ Suggested matches</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-green)' }}>✦ Suggested matches</p>
                               {transferModalMatches.map((m) => {
                                 const acc = m.bankAccount;
                                 const c   = acc?.color || '#9B6DFF';
@@ -1995,7 +1993,7 @@ export default function TransactionsPage() {
                                 return (
                                   <button key={m.id} type="button" onClick={() => setTransferModalSelected(sel ? null : m.id)}
                                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
-                                    style={{ background: sel ? `${c}18` : 'rgba(79,191,127,0.05)', border: `1px solid ${sel ? c + '55' : 'rgba(79,191,127,0.2)'}` }}>
+                                    style={{ background: sel ? `${c}18` : 'color-mix(in srgb, var(--color-green) 5%, transparent)', border: `1px solid ${sel ? c + '55' : 'color-mix(in srgb, var(--color-green) 20%, transparent)'}` }}>
                                     <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
                                       style={{ background: `${c}20` }}>
                                       <AccountTypeIcon type={acc?.accountType ?? ''} size={14} />
@@ -2005,13 +2003,13 @@ export default function TransactionsPage() {
                                       <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{acc?.accountName} · {m.date}</p>
                                     </div>
                                     <p className="text-xs font-bold tabular-nums shrink-0"
-                                      style={{ color: Number(m.amount) >= 0 ? '#4FBF7F' : '#FF6B6B' }}>
+                                      style={{ color: Number(m.amount) >= 0 ? 'var(--color-green)' : 'var(--color-rose)' }}>
                                       {Number(m.amount) >= 0 ? '+' : '−'}${Math.abs(Number(m.amount)).toFixed(2)}
                                     </p>
                                   </button>
                                 );
                               })}
-                              <div className="my-1" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }} />
+                              <div className="my-1" style={{ borderTop: '1px solid var(--color-border)' }} />
                             </>
                           )}
                           {/* Account picker */}
@@ -2030,7 +2028,7 @@ export default function TransactionsPage() {
                               return (
                                 <button key={a.id} type="button" onClick={() => setTransferModalSelected(sel ? null : `acc:${a.id}`)}
                                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
-                                  style={{ background: sel ? `${c}18` : 'rgba(255,255,255,0.03)', border: `1px solid ${sel ? c + '55' : 'rgba(255,255,255,0.07)'}` }}>
+                                  style={{ background: sel ? `${c}18` : 'var(--color-elevated)', border: `1px solid ${sel ? c + '55' : 'var(--color-elevated)'}` }}>
                                   <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
                                     style={{ background: `${c}20` }}>
                                     <AccountTypeIcon type={a.accountType} size={14} />
@@ -2051,9 +2049,9 @@ export default function TransactionsPage() {
 
                   {/* Footer */}
                   <div className="flex items-center justify-between px-5 py-4"
-                    style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                    style={{ borderTop: '1px solid var(--color-border)' }}>
                     <button onClick={() => setTransferModal(null)}
-                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
                       style={{ color: 'var(--color-text-secondary)' }}>Skip</button>
                     <button disabled={!transferModalSelected}
                       onClick={async () => {
@@ -2118,7 +2116,7 @@ export default function TransactionsPage() {
               </p>
               <div className="flex items-center gap-3 mt-1.5">
                 <span className="flex items-center gap-1 text-xs font-semibold"
-                  style={{ color: '#4FBF7F' }}>
+                  style={{ color: 'var(--color-green)' }}>
                   <span>✓</span>
                   <span>{importToast.imported} new</span>
                 </span>
@@ -2136,7 +2134,7 @@ export default function TransactionsPage() {
             </div>
             {/* Dismiss */}
             <button onClick={() => { setImportToast(null); if (importToastTimer.current) clearTimeout(importToastTimer.current); }}
-              className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-white/10 shrink-0 mt-0.5"
+              className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] shrink-0 mt-0.5"
               style={{ color: 'var(--color-text-muted)' }}>
               <CloseIcon />
             </button>
@@ -2164,10 +2162,10 @@ export default function TransactionsPage() {
       <div
         onMouseDown={startBudgetResize}
         className="w-1.5 shrink-0 cursor-col-resize group relative hover:bg-violet-500/30 transition-colors duration-150"
-        style={{ background: 'rgba(255,255,255,0.04)' }}
+        style={{ background: 'var(--color-elevated)' }}
       >
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 opacity-0 group-hover:opacity-100 rounded-full transition-opacity duration-150"
-          style={{ background: 'rgba(155,109,255,0.7)' }} />
+          style={{ background: 'color-mix(in srgb, var(--color-primary) 70%, transparent)' }} />
       </div>
 
       {/* ── Budget column ── */}
@@ -2182,7 +2180,7 @@ export default function TransactionsPage() {
           </div>
           <button onClick={toggleNotifications} title={showNotifications ? 'Hide notifications' : 'Show notifications'}
             className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors shrink-0"
-            style={{ background: showNotifications ? 'rgba(155,109,255,0.15)' : 'rgba(255,255,255,0.05)', color: showNotifications ? '#9B6DFF' : 'var(--color-text-muted)' }}>
+            style={{ background: showNotifications ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'var(--color-elevated)', color: showNotifications ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
             <BellIcon />
           </button>
         </div>
@@ -2202,30 +2200,30 @@ export default function TransactionsPage() {
               const spent     = Math.abs(Number(b.spent));
               const pct       = limit > 0 ? Math.min(spent / limit, 1) : 0;
               const over      = spent > limit;
-              const barColor  = over ? '#FF6B6B' : '#4FBF7F';
+              const barColor  = over ? 'var(--color-rose)' : 'var(--color-green)';
               const remaining = limit - spent;
               return (
                 <div key={b.id} className="rounded-xl p-3 flex flex-col gap-2"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: `1px solid ${over ? 'rgba(255,107,107,0.18)' : 'rgba(255,255,255,0.06)'}` }}>
+                  style={{ background: 'var(--color-elevated)', border: `1px solid ${over ? 'color-mix(in srgb, var(--color-rose) 18%, transparent)' : 'var(--color-elevated)'}` }}>
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
                       style={{ background: `${b.category.color}22` }}>{b.category.icon}</span>
                     <span className="text-xs font-semibold flex-1 truncate">{b.category.name}</span>
                     {over && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
-                        style={{ background: 'rgba(255,107,107,0.15)', color: '#FF6B6B' }}>Over</span>
+                        style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)' }}>Over</span>
                     )}
                   </div>
                   <div className="w-full h-2 rounded-full overflow-hidden"
-                    style={{ background: 'rgba(255,255,255,0.07)' }}>
+                    style={{ background: 'var(--color-elevated)' }}>
                     <div className="h-full rounded-full transition-all duration-500"
                       style={{ width: `${pct * 100}%`, background: barColor, boxShadow: `0 0 6px ${barColor}60` }} />
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-semibold tabular-nums" style={{ color: over ? '#FF6B6B' : '#4FBF7F' }}>
+                    <span className="text-[10px] font-semibold tabular-nums" style={{ color: over ? 'var(--color-rose)' : 'var(--color-green)' }}>
                       ${spent.toFixed(0)} spent
                     </span>
-                    <span className="text-[10px] tabular-nums" style={{ color: over ? '#FF6B6B' : 'var(--color-text-muted)' }}>
+                    <span className="text-[10px] tabular-nums" style={{ color: over ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
                       {over ? `+$${Math.abs(remaining).toFixed(0)} over` : `$${remaining.toFixed(0)} left`}
                     </span>
                     <span className="text-[10px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
@@ -2250,7 +2248,7 @@ export default function TransactionsPage() {
             </div>
             <button onClick={toggleNotifications} title="Hide notifications"
               className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors shrink-0"
-              style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-muted)' }}>
+              style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
               <CloseIcon />
             </button>
           </div>
@@ -2264,7 +2262,7 @@ export default function TransactionsPage() {
           style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
           <button onClick={toggleNotifications} title="Show notifications"
             className="mt-4 w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
-            style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--color-text-muted)' }}>
+            style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
             <BellIcon />
           </button>
         </div>

@@ -22,11 +22,6 @@ function progressColor(pct: number) {
   if (pct >= 80)  return 'var(--color-amber)';
   return 'var(--color-green)';
 }
-function progressHex(pct: number) {
-  if (pct >= 100) return '#EF4444';
-  if (pct >= 80)  return '#F59E0B';
-  return '#22C55E';
-}
 function monthLabel(m: string) {
   const [y, mo] = m.split('-');
   return new Date(Number(y), Number(mo) - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -160,9 +155,9 @@ export default function BudgetsPage() {
           <div className="flex items-center gap-2">
             {/* Month nav */}
             <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-              <button onClick={() => setMonth(prevMonth(month))} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors" style={{ color: 'var(--color-text-muted)' }}>‹</button>
+              <button onClick={() => setMonth(prevMonth(month))} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors" style={{ color: 'var(--color-text-muted)' }}>‹</button>
               <span className="text-sm font-semibold px-2 min-w-36 text-center">{monthLabel(month)}</span>
-              <button onClick={() => setMonth(nextMonth(month))} disabled={isCurrentMonth} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors disabled:opacity-30" style={{ color: 'var(--color-text-muted)' }}>›</button>
+              <button onClick={() => setMonth(nextMonth(month))} disabled={isCurrentMonth} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors disabled:opacity-30" style={{ color: 'var(--color-text-muted)' }}>›</button>
             </div>
             <button onClick={() => { setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '' }); }}
               className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5"
@@ -346,7 +341,7 @@ export default function BudgetsPage() {
                         {/* Edit/delete + chevron */}
                         <div className="flex items-center gap-1 shrink-0">
                           <button type="button" onClick={e => { e.stopPropagation(); setEditingId(b.id); setForm({ categoryId: b.categoryId, amount: String(b.amount) }); setShowForm(true); }}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors text-xs"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors text-xs"
                             style={{ color: 'var(--color-text-muted)' }}>✏️</button>
                           <button type="button" onClick={e => { e.stopPropagation(); handleDelete(b.id); }} disabled={deletingId === b.id}
                             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-500/20 transition-colors text-xs disabled:opacity-40"
@@ -476,7 +471,7 @@ export default function BudgetsPage() {
                       </div>
                     </div>
                     <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); }}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 shrink-0"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] shrink-0"
                       style={{ color: 'var(--color-text-muted)' }}>✕</button>
                   </div>
 
@@ -498,7 +493,7 @@ export default function BudgetsPage() {
                         </button>
                         {catDropOpen && (
                           <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
-                            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)', zIndex: 10, maxHeight: '50vh' }}>
+                            style={{ background: 'var(--popover-bg)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)', zIndex: 10, maxHeight: '50vh' }}>
                             {available.map(c => (
                               <button key={c.id} type="button"
                                 onClick={() => { setForm(f => ({ ...f, categoryId: c.id })); setCatDropOpen(false); }}
@@ -544,7 +539,7 @@ export default function BudgetsPage() {
 
                   <div className="flex gap-2 justify-end px-5 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
                     <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); }}
-                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-white/10 transition-colors"
+                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
                       style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
                     <button type="submit"
                       className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all"

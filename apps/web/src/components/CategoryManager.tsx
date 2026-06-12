@@ -11,9 +11,9 @@ type Category = CatType;
 const TRANSFER_TIP = "Transfer categories are for transactions that move money between your own accounts — like paying a credit card bill or moving funds to savings. They are excluded from budget calculations and income/expense totals so your reports stay accurate.";
 
 const TYPE_META: Record<string, { label: string; color: string }> = {
-  expense:  { label: 'Expense',  color: '#F07A3E' },
-  income:   { label: 'Income',   color: '#4FBF7F' },
-  both:     { label: 'Both',     color: '#9B6DFF' },
+  expense:  { label: 'Expense',  color: 'var(--color-orange)' },
+  income:   { label: 'Income',   color: 'var(--color-green)' },
+  both:     { label: 'Both',     color: 'var(--color-primary)' },
   transfer: { label: 'Transfer', color: '#6B6B8A' },
 };
 
@@ -182,7 +182,7 @@ export default function CategoryManager() {
 
             {/* Usage count */}
             <div className="rounded-xl px-4 py-3 flex items-center gap-3"
-              style={{ background: 'rgba(245,200,66,0.07)', border: '1px solid rgba(245,200,66,0.18)' }}>
+              style={{ background: 'color-mix(in srgb, var(--color-amber) 7%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 18%, transparent)' }}>
               <span className="text-lg shrink-0">🏷️</span>
               {usageLoading ? (
                 <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Checking transactions…</p>
@@ -192,7 +192,7 @@ export default function CategoryManager() {
                 </p>
               ) : (
                 <p className="text-sm">
-                  <span className="font-bold" style={{ color: '#F5C842' }}>{usageCount} transaction{usageCount !== 1 ? 's' : ''}</span>
+                  <span className="font-bold" style={{ color: 'var(--color-amber)' }}>{usageCount} transaction{usageCount !== 1 ? 's' : ''}</span>
                   <span style={{ color: 'var(--color-text-muted)' }}> are currently using this category.</span>
                 </p>
               )}
@@ -207,8 +207,8 @@ export default function CategoryManager() {
 
                 {/* Option 1: leave uncategorized */}
                 <label className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-white/5"
-                  style={{ border: `1px solid ${deleteAction === 'uncat' ? 'rgba(155,109,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
-                           background: deleteAction === 'uncat' ? 'rgba(155,109,255,0.07)' : 'transparent' }}>
+                  style={{ border: `1px solid ${deleteAction === 'uncat' ? 'color-mix(in srgb, var(--color-primary) 35%, transparent)' : 'var(--color-elevated)'}`,
+                           background: deleteAction === 'uncat' ? 'color-mix(in srgb, var(--color-primary) 7%, transparent)' : 'transparent' }}>
                   <input type="radio" name="deleteAction" value="uncat" checked={deleteAction === 'uncat'}
                     onChange={() => setDeleteAction('uncat')} className="mt-0.5 accent-violet-500" />
                   <div>
@@ -221,8 +221,8 @@ export default function CategoryManager() {
 
                 {/* Option 2: reassign */}
                 <label className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-white/5"
-                  style={{ border: `1px solid ${deleteAction === 'reassign' ? 'rgba(155,109,255,0.35)' : 'rgba(255,255,255,0.07)'}`,
-                           background: deleteAction === 'reassign' ? 'rgba(155,109,255,0.07)' : 'transparent' }}>
+                  style={{ border: `1px solid ${deleteAction === 'reassign' ? 'color-mix(in srgb, var(--color-primary) 35%, transparent)' : 'var(--color-elevated)'}`,
+                           background: deleteAction === 'reassign' ? 'color-mix(in srgb, var(--color-primary) 7%, transparent)' : 'transparent' }}>
                   <input type="radio" name="deleteAction" value="reassign" checked={deleteAction === 'reassign'}
                     onChange={() => setDeleteAction('reassign')} className="mt-0.5 accent-violet-500" />
                   <div className="flex-1 min-w-0">
@@ -233,7 +233,7 @@ export default function CategoryManager() {
                     {deleteAction === 'reassign' && (
                       <select value={reassignTarget} onChange={(e) => setReassignTarget(e.target.value)}
                         className="w-full px-3 py-2 text-sm rounded-lg outline-none appearance-none"
-                        style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', color: 'var(--color-text-primary)' }}>
+                        style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
                         <option value="">Select category…</option>
                         {categories.filter((c) => c.id !== confirmCat.id).map((c) => (
                           <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
@@ -248,15 +248,15 @@ export default function CategoryManager() {
             {/* Actions */}
             <div className="flex gap-2 justify-end pt-1">
               <button onClick={() => setConfirmCat(null)}
-                className="px-4 py-2 text-sm font-medium rounded-xl transition-colors hover:bg-white/10"
-                style={{ color: 'var(--color-text-secondary)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                className="px-4 py-2 text-sm font-medium rounded-xl transition-colors hover:bg-[var(--color-elevated)]"
+                style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
                 disabled={deletingId === confirmCat.id || usageLoading || (deleteAction === 'reassign' && !reassignTarget)}
                 className="px-4 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110 disabled:opacity-40"
-                style={{ background: 'rgba(255,107,107,0.18)', border: '1px solid rgba(255,107,107,0.35)', color: '#FF6B6B' }}>
+                style={{ background: 'color-mix(in srgb, var(--color-rose) 18%, transparent)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)', color: 'var(--color-rose)' }}>
                 {deletingId === confirmCat.id ? 'Deleting…' : 'Delete Category'}
               </button>
             </div>
@@ -297,7 +297,7 @@ function CategoryColumn({ title, color, icon, cats, onEdit, onDelete, deletingId
 
       {cats.length === 0 ? (
         <div className="py-6 flex items-center justify-center rounded-xl"
-          style={{ border: '1px dashed rgba(255,255,255,0.07)' }}>
+          style={{ border: '1px dashed var(--color-border)' }}>
           <p className="text-xs" style={{ color: 'var(--color-text-muted)', opacity: 0.5 }}>None yet</p>
         </div>
       ) : (
@@ -307,7 +307,7 @@ function CategoryColumn({ title, color, icon, cats, onEdit, onDelete, deletingId
             return (
               <div key={cat.id}
                 className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.025] group"
-                style={i > 0 ? { borderTop: '1px solid rgba(255,255,255,0.05)' } : {}}>
+                style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : {}}>
 
                 {/* Color bar */}
                 <div className="w-1 self-stretch rounded-full shrink-0 my-0.5" style={{ background: cat.color }} />
@@ -324,7 +324,7 @@ function CategoryColumn({ title, color, icon, cats, onEdit, onDelete, deletingId
                     <p className="text-sm font-semibold truncate">{cat.name}</p>
                     {isBoth && (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
-                        style={{ background: 'rgba(155,109,255,0.15)', color: '#9B6DFF' }}>Both</span>
+                        style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', color: 'var(--color-primary)' }}>Both</span>
                     )}
                     {cat.isDefault && (
                       <span className="text-[9px] rounded shrink-0" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>Default</span>
@@ -340,7 +340,7 @@ function CategoryColumn({ title, color, icon, cats, onEdit, onDelete, deletingId
                 {/* Actions */}
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                   <button onClick={() => onEdit(cat)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
                     title="Edit" style={{ color: 'var(--color-text-secondary)' }}>
                     <PencilIcon />
                   </button>
@@ -377,7 +377,7 @@ function PencilIcon() {
 function TrashIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-      style={{ color: '#FF6B6B' }}>
+      style={{ color: 'var(--color-rose)' }}>
       <polyline points="3 6 5 6 21 6"/>
       <path d="M19 6l-1 14H6L5 6"/>
       <path d="M10 11v6M14 11v6"/>
