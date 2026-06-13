@@ -8,7 +8,15 @@
       "PowerShell(Stop-Process -Id 11308, 15684, 17728, 21128, 23000 -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; if \\(Test-Path \"D:\\\\Coding\\\\cofre-budget\\\\apps\\\\web\\\\.next\\\\dev\\\\lock\"\\) { Remove-Item -Recurse -Force \"D:\\\\Coding\\\\cofre-budget\\\\apps\\\\web\\\\.next\\\\dev\\\\lock\" -ErrorAction SilentlyContinue }; \"Lock cleared — port 3000 free: \" + \\(-not \\(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue\\)\\))",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" --max-time 60 http://localhost:3000/projects)",
       "Bash(git fetch *)",
-      "Bash(git pull *)"
+      "Bash(git pull *)",
+      "Bash(git show *)",
+      "Read(//tmp/**)",
+      "Read(//c/tmp/**)",
+      "Bash(cp /tmp/remote-budgets.tsx ./remote-budgets.tmp.tsx && echo copied)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --max-time 90 http://localhost:3000/budgets)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
     ]
   }
 }

@@ -57,7 +57,7 @@ export default function LoginPage() {
           backgroundAttachment: 'fixed',
         }}
       />
-      <div className="relative w-full max-w-6xl flex items-center justify-center lg:justify-between gap-12 lg:px-12">
+      <div className="relative w-full max-w-6xl flex items-center justify-center lg:justify-between gap-12 lg:pl-12 lg:pr-0">
 
         {/* ── Quote ── */}
         <div className="hidden lg:flex flex-col max-w-xl pb-10">
@@ -89,10 +89,10 @@ export default function LoginPage() {
         <div
         className="relative w-full max-w-md lg:shrink-0 flex flex-col items-center px-6 sm:px-9 pt-11 pb-10 rounded-3xl"
         style={{
-          background: 'linear-gradient(165deg, rgba(18,27,48,0.46) 0%, rgba(9,15,29,0.34) 100%)',
-          backdropFilter: 'blur(26px) saturate(140%)',
-          WebkitBackdropFilter: 'blur(26px) saturate(140%)',
-          border: '1px solid rgba(255,255,255,0.13)',
+          background: 'linear-gradient(165deg, rgba(18,27,48,0.30) 0%, rgba(9,15,29,0.20) 100%)',
+          backdropFilter: 'blur(18px) saturate(140%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(140%)',
+          border: '1px solid rgba(255,255,255,0.11)',
           boxShadow: '0 30px 80px rgba(0,0,0,0.55), 0 0 90px rgba(201,160,92,0.07), inset 0 1px 0 rgba(255,255,255,0.12)',
         }}
       >
