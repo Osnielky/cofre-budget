@@ -10,6 +10,7 @@ import { User } from '../users/user.entity';
 import { VerificationCode, CodeType } from './verification-code.entity';
 import { MailService } from '../mail/mail.service';
 import * as bcrypt from 'bcryptjs';
+import { randomInt } from 'crypto';
 
 const CODE_TTL_MS   = 15 * 60 * 1000; // 15 minutes
 const MAX_ATTEMPTS  = 5;
@@ -131,7 +132,8 @@ export class AuthService {
   private async issueCode(email: string, type: CodeType): Promise<void> {
     // Invalidate any outstanding codes of this type for the email.
     await this.codes.update({ email, type, consumed: false }, { consumed: true });
-    const code = String(Math.floor(100000 + Math.random() * 900000));
+    // CSPRNG — codes gate email verification & password reset, so they must not be guessable.
+    const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     await this.codes.save(this.codes.create({
       email, code, type,
       expiresAt: new Date(Date.now() + CODE_TTL_MS),
