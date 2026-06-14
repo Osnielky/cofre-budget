@@ -14,12 +14,33 @@ export class UsersService {
     return this.repo.findOneBy({ id });
   }
 
+  findByEmail(email: string): Promise<User | null> {
+    return this.repo.findOneBy({ email: email.toLowerCase().trim() });
+  }
+
   findByEmailWithPassword(email: string): Promise<User | null> {
     return this.repo
       .createQueryBuilder('user')
       .addSelect('user.password')
-      .where('user.email = :email', { email })
+      .where('user.email = :email', { email: email.toLowerCase().trim() })
       .getOne();
+  }
+
+  createLocal(data: { email: string; password: string; name?: string }): Promise<User> {
+    return this.repo.save(this.repo.create({
+      email: data.email.toLowerCase().trim(),
+      password: data.password,
+      name: data.name?.trim() || null as any,
+      emailVerified: false,
+    }));
+  }
+
+  async setPassword(userId: string, hashedPassword: string): Promise<void> {
+    await this.repo.update({ id: userId }, { password: hashedPassword });
+  }
+
+  async markVerified(userId: string): Promise<void> {
+    await this.repo.update({ id: userId }, { emailVerified: true });
   }
 
   async findOrCreateByGoogle(profile: { id: string; email: string; name: string }): Promise<User> {

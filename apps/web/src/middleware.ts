@@ -10,19 +10,22 @@ function isJwtExpired(token: string): boolean {
   }
 }
 
+const PUBLIC_ROUTES = ['/login', '/register', '/verify', '/forgot-password', '/reset-password'];
+
 export function middleware(req: NextRequest) {
   const token = req.cookies.get('access_token')?.value;
   const { pathname } = req.nextUrl;
 
   const validToken = token && !isJwtExpired(token);
+  const isPublic = PUBLIC_ROUTES.includes(pathname);
 
-  if (!validToken && pathname !== '/login') {
+  if (!validToken && !isPublic) {
     const res = NextResponse.redirect(new URL('/login', req.url));
     // Clear stale cookie
     if (token) res.cookies.delete('access_token');
     return res;
   }
-  if (validToken && pathname === '/login') {
+  if (validToken && isPublic) {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
   return NextResponse.next();

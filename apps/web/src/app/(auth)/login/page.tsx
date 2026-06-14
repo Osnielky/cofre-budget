@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Logo from '@/components/Logo';
 
@@ -16,22 +17,43 @@ const inputStyle: React.CSSProperties = {
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('reset') === '1') {
+      setInfo('Password updated. Sign in with your new password.');
+    }
+  }, []);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     setLoading(true);
     const form = new FormData(e.currentTarget);
+    const email = String(form.get('email') ?? '');
     try {
       const res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email: form.get('email'), password: form.get('password') }),
+        body: JSON.stringify({ email, password: form.get('password') }),
       });
-      if (!res.ok) throw new Error();
-      router.push('/dashboard');
+      if (res.ok) {
+        router.push('/dashboard');
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 403 && data.code === 'EMAIL_NOT_VERIFIED') {
+        // Trigger a fresh code, then send them to verify.
+        fetch(`${API}/auth/resend-code`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', body: JSON.stringify({ email }),
+        }).catch(() => {});
+        router.push(`/verify?email=${encodeURIComponent(email)}`);
+        return;
+      }
+      throw new Error();
     } catch {
       setError('Invalid email or password');
     } finally {
@@ -130,10 +152,16 @@ export default function LoginPage() {
           </label>
 
           <label className="flex flex-col gap-2">
-            <span className="text-[10.5px] font-semibold uppercase"
-              style={{ color: 'rgba(221,184,119,0.85)', letterSpacing: '0.22em' }}>
-              Password
-            </span>
+            <div className="flex items-center justify-between">
+              <span className="text-[10.5px] font-semibold uppercase"
+                style={{ color: 'rgba(221,184,119,0.85)', letterSpacing: '0.22em' }}>
+                Password
+              </span>
+              <Link href="/forgot-password" className="text-[11px] transition-colors hover:brightness-125"
+                style={{ color: 'rgba(221,184,119,0.70)' }}>
+                Forgot?
+              </Link>
+            </div>
             <input
               name="password" type="password" required autoComplete="current-password"
               placeholder="••••••••"
@@ -142,6 +170,9 @@ export default function LoginPage() {
             />
           </label>
 
+          {info && (
+            <p className="text-sm text-center" style={{ color: 'rgba(221,184,119,0.85)' }}>{info}</p>
+          )}
           {error && (
             <p className="text-sm text-center" style={{ color: 'var(--color-rose)' }}>{error}</p>
           )}
@@ -176,6 +207,14 @@ export default function LoginPage() {
           <GoogleIcon />
           Continue with Google
         </a>
+
+        {/* ── Create account ── */}
+        <p className="mt-7 text-[12.5px]" style={{ color: 'rgba(242,241,234,0.55)' }}>
+          New to Cofre?{' '}
+          <Link href="/register" className="font-semibold transition-colors hover:brightness-125" style={{ color: '#DDB877' }}>
+            Create an account
+          </Link>
+        </p>
         </div>{/* end login card */}
 
       </div>
