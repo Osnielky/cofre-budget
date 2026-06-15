@@ -13,6 +13,12 @@ COPY . .
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
+# Next bakes rewrites() at BUILD time, so the proxy target must be present now,
+# not just at runtime. The browser calls the relative /api; this forwards it to
+# the API service server-side.
+ARG API_PROXY_URL
+ENV API_PROXY_URL=$API_PROXY_URL
+
 RUN npx nx build web --configuration=production
 
 # ── Runtime stage ─────────────────────────────────────────────────────
