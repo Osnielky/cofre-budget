@@ -1,11 +1,13 @@
 # CI/CD pipeline — runs on every push to `dev` (via a Cloud Build trigger).
-# Builds both images, deploys API → reads its URL → deploys web with that URL
-# as the proxy target → points the API's FRONTEND_URL back at the web service.
+# Builds both images, pushes them, then runs deploy/ci-deploy.sh which deploys
+# the API, reads its URL, deploys web pointed at it, and syncs FRONTEND_URL.
 #
 # Can also be run by hand:
 #   gcloud builds submit --config deploy/cloudbuild.yaml
 #
-# Project comes from the built-in $PROJECT_ID; commit tag from $SHORT_SHA.
+# Note: the deploy logic lives in deploy/ci-deploy.sh (a real shell script) so
+# that shell variables (the API/web URLs) aren't mis-parsed as Cloud Build
+# substitutions. Cloud Build values are passed into the script via `env`.
 
 substitutions:
   _REGION: us-central1
@@ -15,8 +17,7 @@ substitutions:
   _DB_USER: postgres
 
 steps:
-  # ── Build images (web has no build-time dependency on the API URL, so both
-  #    builds run in parallel from the start) ────────────────────────────────
+  # ── Build images (parallel: web has no build-time dependency on the API) ──
   - id: build-api
     name: gcr.io/cloud-builders/docker
     waitFor: ['-']
@@ -45,47 +46,31 @@ steps:
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest
       - .
 
-  # ── Deploy API, then capture its URL for the web service ──────────────────
-  - id: deploy-api
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    entrypoint: bash
+  # ── Push images to Artifact Registry (Cloud Run pulls from there) ─────────
+  - id: push-api
+    name: gcr.io/cloud-builders/docker
     waitFor: ['build-api']
-    args:
-      - -c
-      - |
-        set -e
-        gcloud run deploy cofre-api \
-          --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$SHORT_SHA \
-          --region ${_REGION} --allow-unauthenticated \
-          --min-instances=0 --max-instances=2 --memory=512Mi \
-          --add-cloudsql-instances ${_SQL_CONN} \
-          --set-env-vars "NODE_ENV=production,DB_HOST=/cloudsql/${_SQL_CONN},DB_PORT=5432,DB_USER=${_DB_USER},DB_NAME=${_DB_NAME},JWT_EXPIRES_IN=7d" \
-          --set-secrets "DB_PASS=DB_PASS:latest,JWT_SECRET=JWT_SECRET:latest"
-        gcloud run services describe cofre-api --region ${_REGION} \
-          --format='value(status.url)' > /workspace/api_url.txt
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api']
 
-  # ── Deploy web with the proxy target, then close the loop on FRONTEND_URL ──
-  - id: deploy-web
+  - id: push-web
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['build-web']
+    args: ['push', '--all-tags', '${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web']
+
+  # ── Deploy both services (shell script keeps the URL vars out of CB) ──────
+  - id: deploy
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: bash
-    waitFor: ['build-web', 'deploy-api']
-    args:
-      - -c
-      - |
-        set -e
-        API_URL="$(cat /workspace/api_url.txt)"
-        gcloud run deploy cofre-web \
-          --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$SHORT_SHA \
-          --region ${_REGION} --allow-unauthenticated \
-          --min-instances=0 --max-instances=2 --memory=512Mi \
-          --set-env-vars "API_PROXY_URL=${API_URL}"
-        WEB_URL="$(gcloud run services describe cofre-web --region ${_REGION} --format='value(status.url)')"
-        gcloud run services update cofre-api --region ${_REGION} \
-          --update-env-vars "FRONTEND_URL=${WEB_URL}"
-
-images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$SHORT_SHA
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$SHORT_SHA
+    waitFor: ['push-api', 'push-web']
+    args: ['deploy/ci-deploy.sh']
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+      - 'SHA=$SHORT_SHA'
+      - 'REGION=${_REGION}'
+      - 'REPO=${_REPO}'
+      - 'SQL_CONN=${_SQL_CONN}'
+      - 'DB_NAME=${_DB_NAME}'
+      - 'DB_USER=${_DB_USER}'
 
 options:
   logging: CLOUD_LOGGING_ONLY
