@@ -1,0 +1,93 @@
+# CI/CD pipeline — runs on every push to `dev` (via a Cloud Build trigger).
+# Builds both images, deploys API → reads its URL → deploys web with that URL
+# as the proxy target → points the API's FRONTEND_URL back at the web service.
+#
+# Can also be run by hand:
+#   gcloud builds submit --config deploy/cloudbuild.yaml
+#
+# Project comes from the built-in $PROJECT_ID; commit tag from $SHORT_SHA.
+
+substitutions:
+  _REGION: us-central1
+  _REPO: cofre
+  _SQL_CONN: cofre-dev:us-central1:cofre-dev
+  _DB_NAME: cofre_budget
+  _DB_USER: postgres
+
+steps:
+  # ── Build images (web has no build-time dependency on the API URL, so both
+  #    builds run in parallel from the start) ────────────────────────────────
+  - id: build-api
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']
+    args:
+      - build
+      - -f
+      - apps/api/Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:latest
+      - .
+
+  - id: build-web
+    name: gcr.io/cloud-builders/docker
+    waitFor: ['-']
+    args:
+      - build
+      - -f
+      - apps/web/Dockerfile
+      - --build-arg
+      - NEXT_PUBLIC_API_URL=/api
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$SHORT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest
+      - .
+
+  # ── Deploy API, then capture its URL for the web service ──────────────────
+  - id: deploy-api
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    waitFor: ['build-api']
+    args:
+      - -c
+      - |
+        set -e
+        gcloud run deploy cofre-api \
+          --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$SHORT_SHA \
+          --region ${_REGION} --allow-unauthenticated \
+          --min-instances=0 --max-instances=2 --memory=512Mi \
+          --add-cloudsql-instances ${_SQL_CONN} \
+          --set-env-vars "NODE_ENV=production,DB_HOST=/cloudsql/${_SQL_CONN},DB_PORT=5432,DB_USER=${_DB_USER},DB_NAME=${_DB_NAME},JWT_EXPIRES_IN=7d" \
+          --set-secrets "DB_PASS=DB_PASS:latest,JWT_SECRET=JWT_SECRET:latest"
+        gcloud run services describe cofre-api --region ${_REGION} \
+          --format='value(status.url)' > /workspace/api_url.txt
+
+  # ── Deploy web with the proxy target, then close the loop on FRONTEND_URL ──
+  - id: deploy-web
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    waitFor: ['build-web', 'deploy-api']
+    args:
+      - -c
+      - |
+        set -e
+        API_URL="$(cat /workspace/api_url.txt)"
+        gcloud run deploy cofre-web \
+          --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$SHORT_SHA \
+          --region ${_REGION} --allow-unauthenticated \
+          --min-instances=0 --max-instances=2 --memory=512Mi \
+          --set-env-vars "API_PROXY_URL=${API_URL}"
+        WEB_URL="$(gcloud run services describe cofre-web --region ${_REGION} --format='value(status.url)')"
+        gcloud run services update cofre-api --region ${_REGION} \
+          --update-env-vars "FRONTEND_URL=${WEB_URL}"
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$SHORT_SHA
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s

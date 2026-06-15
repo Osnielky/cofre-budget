@@ -6,11 +6,26 @@ import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
+const isProd = process.env.NODE_ENV === 'production';
+
+// In production the web and API are served from different Cloud Run domains,
+// which the browser treats as cross-site. SameSite=None (+Secure) is required
+// for the auth cookie to ride along on credentialed cross-origin requests.
+// Locally we stay on Lax so the cookie works over plain http on localhost.
 const COOKIE_OPTS = {
   httpOnly: true,
-  sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
+  sameSite: isProd ? ('none' as const) : ('lax' as const),
+  secure: isProd,
   maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: '/',
+};
+
+// clearCookie must match the same attributes or the browser won't remove it.
+const COOKIE_CLEAR_OPTS = {
+  httpOnly: true,
+  sameSite: isProd ? ('none' as const) : ('lax' as const),
+  secure: isProd,
+  path: '/',
 };
 
 @Controller('auth')
@@ -31,7 +46,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   logout(@Res() res: Response) {
-    res.clearCookie('access_token');
+    res.clearCookie('access_token', COOKIE_CLEAR_OPTS);
     return res.json({ message: 'Logged out' });
   }
 

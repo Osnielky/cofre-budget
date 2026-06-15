@@ -1,0 +1,10 @@
+# Builds the NestJS API image via Cloud Build (no local Docker needed).
+# Build context is the repo root so the Dockerfile's `nx build api` works.
+#   gcloud builds submit --config deploy/cloudbuild-api.yaml --substitutions=_IMAGE=...
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ['build', '-f', 'apps/api/Dockerfile', '-t', '${_IMAGE}', '.']
+images:
+  - '${_IMAGE}'
+options:
+  logging: CLOUD_LOGGING_ONLY   # avoids the "logsBucket / non-default SA" build error

@@ -121,7 +121,7 @@ export default function TransactionsPage() {
   const today = new Date().toISOString().slice(0, 10);
   const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '' });
 
-  const [importToast, setImportToast] = useState<{ imported: number; skipped: number; account: BankAccount } | null>(null);
+  const [importToast, setImportToast] = useState<{ imported: number; skipped: number; account: { bankName: string; accountName: string; accountType: string; color: string } } | null>(null);
   const importToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* name → most-recently-used category (cross-period, loaded once) */
