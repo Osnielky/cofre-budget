@@ -13,7 +13,21 @@
       "Read(//tmp/**)",
       "Read(//c/tmp/**)",
       "Bash(cp /tmp/remote-budgets.tsx ./remote-budgets.tmp.tsx && echo copied)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --max-time 90 http://localhost:3000/budgets)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --max-time 90 http://localhost:3000/budgets)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/resend/package.json'\\).version\\)\")",
+      "PowerShell(Start-Process -FilePath \"cmd.exe\" -ArgumentList \"/c\", \"cd /d D:\\\\Coding\\\\cofre-budget && npm run dev:api > api-boot.log 2>&1\" -WindowStyle Normal)",
+      "PowerShell(\"started\")",
+      "Bash(timeout 90 bash -c 'until grep -qE \"API running on|Error|error TS|Nest application successfully started|EADDRINUSE\" api-boot.log 2>/dev/null; do sleep 2; done')",
+      "Bash(timeout 60 bash -c 'until grep -qE \"API running on|DataTypeNotSupported|error TS|EADDRINUSE\" api-boot.log 2>/dev/null && tail -5 api-boot.log | grep -qE \"API running on|Error|error\"; do sleep 2; done')",
+      "Bash(curl -s -X POST http://localhost:3333/api/auth/register -H \"Content-Type: application/json\" -d '{\"email\":\"smoketest@example.com\",\"password\":\"supersecret123\",\"name\":\"Smoke\"}' -w \"\\\\nHTTP %{http_code}\\\\n\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --max-time 8 http://localhost:3000/login)",
+      "PowerShell(Start-Process -FilePath \"cmd.exe\" -ArgumentList \"/c\", \"cd /d D:\\\\Coding\\\\cofre-budget && npm run dev:web > web-boot.log 2>&1\" -WindowStyle Normal)",
+      "Bash(timeout 90 bash -c 'until grep -qaE \"Local:|Ready|error\" web-boot.log 2>/dev/null; do sleep 2; done')",
+      "Bash(netstat -ano)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3333/api/auth/me)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/login)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/register)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/forgot-password)"
     ],
     "additionalDirectories": [
       "\\tmp"
