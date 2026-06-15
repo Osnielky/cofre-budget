@@ -3,7 +3,10 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --ignore-scripts
+# npm install (not ci): the lockfile is generated on macOS/npm 11 and omits
+# some linux-only optional deps (rolldown/vitest bindings) that strict `npm ci`
+# rejects on this alpine image. install reconciles them for the build platform.
+RUN npm install --ignore-scripts --no-audit --no-fund
 
 COPY . .
 RUN npx nx build api --configuration=production
