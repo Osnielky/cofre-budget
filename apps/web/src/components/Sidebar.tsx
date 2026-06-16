@@ -13,6 +13,7 @@ const NAV = [
   { label: 'Transactions', href: '/transactions', icon: TransactionsIcon },
   { label: 'Budgets',      href: '/budgets',      icon: BudgetsIcon },
   { label: 'Projects',     href: '/projects',     icon: ProjectsIcon },
+  { label: 'Debts',        href: '/debts',        icon: DebtsIcon },
 ];
 
 export default function Sidebar() {
@@ -179,6 +180,14 @@ function ProjectsIcon() {
   return (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 19V5M9.3 19V9m5.4 10v-7M20 19V7"/>
+    </svg>
+  );
+}
+
+function DebtsIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
     </svg>
   );
 }
