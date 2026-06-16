@@ -1,4 +1,4 @@
-import { Controller, Post, Get, UseGuards, Request, Res } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, UseGuards, Request, Res, HttpCode } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
@@ -37,9 +37,51 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post('login')
   login(@Request() req: any, @Res() res: Response) {
+    if (this.authService.isUnverifiedPasswordUser(req.user)) {
+      return res.status(403).json({ code: 'EMAIL_UNVERIFIED', message: 'Please verify your email first.' });
+    }
     const result = this.authService.login(req.user);
     res.cookie('access_token', result.access_token, COOKIE_OPTS);
     return res.json({ user: result.user });
+  }
+
+  @Throttle({ default: { ttl: 900_000, limit: 5 } })
+  @Post('register')
+  @HttpCode(200)
+  async register(@Body() body: { name: string; email: string; password: string }) {
+    await this.authService.register(body.name, body.email, body.password);
+    return { message: 'Check your email to verify your account.' };
+  }
+
+  @SkipThrottle()
+  @Get('verify-email')
+  async verifyEmail(@Query('token') token: string, @Res() res: Response) {
+    const redirectTo = await this.authService.verifyEmail(token ?? '');
+    return res.redirect(redirectTo);
+  }
+
+  @Throttle({ default: { ttl: 900_000, limit: 5 } })
+  @Post('forgot-password')
+  @HttpCode(200)
+  async forgotPassword(@Body() body: { email: string }) {
+    await this.authService.requestPasswordReset(body.email);
+    return { message: 'If that email exists, we sent a reset link.' };
+  }
+
+  @Throttle({ default: { ttl: 900_000, limit: 5 } })
+  @Post('reset-password')
+  @HttpCode(200)
+  async resetPassword(@Body() body: { token: string; password: string }) {
+    await this.authService.resetPassword(body.token, body.password);
+    return { message: 'Password updated. You can sign in now.' };
+  }
+
+  @Throttle({ default: { ttl: 900_000, limit: 5 } })
+  @Post('resend-verification')
+  @HttpCode(200)
+  async resendVerification(@Body() body: { email: string }) {
+    await this.authService.resendVerification(body.email);
+    return { message: 'If that account exists and is unverified, we sent a new link.' };
   }
 
   @SkipThrottle()
