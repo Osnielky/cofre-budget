@@ -1,35 +1,44 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import Logo from '@/components/Logo';
+import { useState, FormEvent, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import AuthShell, { authInputStyle } from '@/components/AuthShell';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-const inputStyle: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.07)',
-  border: '1px solid rgba(255,255,255,0.13)',
-  borderRadius: 'var(--radius-input)',
-  color: '#F2F1EA',
-};
+const labelCls = 'text-[10.5px] font-semibold uppercase';
+const labelStyle: React.CSSProperties = { color: 'rgba(221,184,119,0.85)', letterSpacing: '0.22em' };
 
-export default function LoginPage() {
+function LoginInner() {
   const router = useRouter();
+  const params = useSearchParams();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [unverified, setUnverified] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
+  const [resent, setResent] = useState(false);
+
+  const verified = params.get('verified') === '1';
+  const linkError = params.get('error') === 'verify';
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setError(''); setUnverified(false); setResent(false); setLoading(true);
     const form = new FormData(e.currentTarget);
+    const email = String(form.get('email') ?? '');
     try {
       const res = await fetch(`${API}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email: form.get('email'), password: form.get('password') }),
+        body: JSON.stringify({ email, password: form.get('password') }),
       });
+      if (res.status === 403) {
+        const data = await res.json().catch(() => null);
+        if (data?.code === 'EMAIL_UNVERIFIED') { setUnverified(true); setPendingEmail(email); return; }
+        throw new Error();
+      }
       if (!res.ok) throw new Error();
       router.push('/dashboard');
     } catch {
@@ -39,147 +48,88 @@ export default function LoginPage() {
     }
   }
 
+  async function resend() {
+    await fetch(`${API}/auth/resend-verification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email: pendingEmail }),
+    });
+    setResent(true);
+  }
+
   return (
-    <div className="relative flex items-center justify-center min-h-dvh px-4 py-10 sm:py-14 overflow-x-hidden">
-      {/* ── Night-sky backdrop ── */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0"
-        style={{
-          backgroundImage: [
-            'radial-gradient(120% 90% at 50% 50%, transparent 52%, rgba(4,8,16,0.60) 100%)',
-            'radial-gradient(720px 540px at 32% 42%, rgba(201,160,92,0.10), transparent 62%)',
-            'linear-gradient(180deg, rgba(5,9,18,0.38) 0%, rgba(5,9,18,0.16) 45%, rgba(5,9,18,0.68) 100%)',
-            'url(/login-bg.jpg)',
-          ].join(', '),
-          backgroundSize: 'cover',
-          backgroundPosition: 'center 68%',
-          backgroundAttachment: 'fixed',
-        }}
-      />
-      <div className="relative w-full max-w-6xl flex items-center justify-center lg:justify-between gap-12 lg:pl-12 lg:pr-0">
-
-        {/* ── Quote ── */}
-        <div className="hidden lg:flex flex-col max-w-xl pb-10">
-          <span className="text-[11px] uppercase mb-7" style={{ color: 'rgba(221,184,119,0.65)', letterSpacing: '0.34em' }}>
-            Cofre · Wealth &amp; Budget
-          </span>
-          <p style={{
-            fontFamily: 'var(--font-cormorant), "Cormorant Garamond", Georgia, serif',
-            fontStyle: 'italic',
-            fontWeight: 500,
-            fontSize: 'clamp(40px, 4.2vw, 60px)',
-            lineHeight: 1.18,
-            letterSpacing: '0.01em',
-            background: 'linear-gradient(115deg, #EED9AE 0%, #DDB877 38%, #C9A05C 68%, #A87F45 100%)',
-            WebkitBackgroundClip: 'text',
-            backgroundClip: 'text',
-            color: 'transparent',
-            textShadow: '0 0 60px rgba(201,160,92,0.18)',
-          }}>
-            “If you can’t measure it, you can’t improve it.”
-          </p>
-          <div className="rounded-full mt-8 mb-5" style={{ width: 56, height: 2, background: '#C9A05C', opacity: 0.8 }} />
-          <span className="text-[11px] uppercase" style={{ color: 'rgba(242,241,234,0.45)', letterSpacing: '0.30em' }}>
-            Peter Drucker
-          </span>
-        </div>
-
-        {/* ── Login card ── */}
-        <div
-        className="relative w-full max-w-md lg:shrink-0 flex flex-col items-center px-6 sm:px-9 pt-11 pb-10 rounded-3xl"
-        style={{
-          background: 'linear-gradient(165deg, rgba(18,27,48,0.30) 0%, rgba(9,15,29,0.20) 100%)',
-          backdropFilter: 'blur(18px) saturate(140%)',
-          WebkitBackdropFilter: 'blur(18px) saturate(140%)',
-          border: '1px solid rgba(255,255,255,0.11)',
-          boxShadow: '0 30px 80px rgba(0,0,0,0.55), 0 0 90px rgba(201,160,92,0.07), inset 0 1px 0 rgba(255,255,255,0.12)',
-        }}
-      >
-        {/* ── Emblem ── */}
-        <span className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
-          style={{
-            border: '1px solid rgba(201,160,92,0.45)',
-            boxShadow: '0 0 0 4px rgba(201,160,92,0.10), 0 14px 40px rgba(201,160,92,0.18)',
-            background: 'rgba(201,160,92,0.08)',
-            color: '#DDB877',
-          }}>
-          <Logo size={38} className="block" />
-        </span>
-
-        {/* ── Wordmark ── */}
-        <h1 className="mt-5 font-bold tracking-tight" style={{ fontSize: 38, lineHeight: 1, color: '#F2F1EA' }}>Cofre</h1>
-        <p className="mt-3 text-[10px] uppercase" style={{ color: 'rgba(242,241,234,0.55)', letterSpacing: '0.34em' }}>
-          Wealth &amp; Budget
+    <>
+      {verified && (
+        <p className="w-full text-sm text-center mb-4" style={{ color: 'var(--color-green)' }}>
+          Email verified — please sign in.
         </p>
-        <div className="rounded-full mt-5 mb-8" style={{ width: 56, height: 2, background: '#C9A05C', opacity: 0.9 }} />
+      )}
+      {linkError && (
+        <p className="w-full text-sm text-center mb-4" style={{ color: 'var(--color-rose)' }}>
+          That verification link is invalid or expired. Sign in to get a new one.
+        </p>
+      )}
 
-        {/* ── Form ── */}
-        <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5" suppressHydrationWarning>
-          <label className="flex flex-col gap-2">
-            <span className="text-[10.5px] font-semibold uppercase"
-              style={{ color: 'rgba(221,184,119,0.85)', letterSpacing: '0.22em' }}>
-              Email
-            </span>
-            <input
-              name="email" type="email" required autoComplete="email"
-              placeholder="you@example.com"
-              className="px-4 py-3 text-sm outline-none transition-colors"
-              style={inputStyle}
-            />
-          </label>
+      <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5" suppressHydrationWarning>
+        <label className="flex flex-col gap-2">
+          <span className={labelCls} style={labelStyle}>Email</span>
+          <input name="email" type="email" required autoComplete="email" placeholder="you@example.com"
+            className="px-4 py-3 text-sm outline-none transition-colors" style={authInputStyle} />
+        </label>
 
-          <label className="flex flex-col gap-2">
-            <span className="text-[10.5px] font-semibold uppercase"
-              style={{ color: 'rgba(221,184,119,0.85)', letterSpacing: '0.22em' }}>
-              Password
-            </span>
-            <input
-              name="password" type="password" required autoComplete="current-password"
-              placeholder="••••••••"
-              className="px-4 py-3 text-sm outline-none transition-colors"
-              style={inputStyle}
-            />
-          </label>
+        <label className="flex flex-col gap-2">
+          <span className={labelCls} style={labelStyle}>Password</span>
+          <input name="password" type="password" required autoComplete="current-password" placeholder="••••••••"
+            className="px-4 py-3 text-sm outline-none transition-colors" style={authInputStyle} />
+        </label>
 
-          {error && (
-            <p className="text-sm text-center" style={{ color: 'var(--color-rose)' }}>{error}</p>
-          )}
+        {error && <p className="text-sm text-center" style={{ color: 'var(--color-rose)' }}>{error}</p>}
 
-          <button
-            type="submit" disabled={loading}
-            className="btn-gold mt-2 py-4 rounded-full text-[12.5px] font-semibold uppercase transition-all disabled:opacity-60 cursor-pointer"
-            style={{ letterSpacing: '0.18em' }}
-          >
-            {loading ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
+        {unverified && (
+          <div className="text-sm text-center flex flex-col gap-1.5" style={{ color: 'var(--color-amber)' }}>
+            <span>Please verify your email before signing in.</span>
+            {resent
+              ? <span style={{ color: 'var(--color-green)' }}>New link sent — check your inbox.</span>
+              : <button type="button" onClick={resend} className="underline cursor-pointer" style={{ color: 'rgba(221,184,119,0.95)' }}>Resend verification email</button>}
+          </div>
+        )}
 
-        {/* ── Divider ── */}
-        <div className="w-full flex items-center gap-4 my-6">
-          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.12)' }} />
-          <span className="text-[10px] uppercase" style={{ color: 'rgba(242,241,234,0.45)', letterSpacing: '0.28em' }}>or</span>
-          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.12)' }} />
-        </div>
+        <button type="submit" disabled={loading}
+          className="btn-gold mt-2 py-4 rounded-full text-[12.5px] font-semibold uppercase transition-all disabled:opacity-60 cursor-pointer"
+          style={{ letterSpacing: '0.18em' }}>
+          {loading ? 'Signing in…' : 'Sign in'}
+        </button>
+      </form>
 
-        {/* ── Google ── */}
-        <a
-          href={`${API}/auth/google`}
-          className="w-full flex items-center justify-center gap-3 py-4 rounded-full text-[12.5px] font-semibold uppercase no-underline transition-all hover:brightness-125"
-          style={{
-            letterSpacing: '0.14em',
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.14)',
-            color: '#F2F1EA',
-          }}
-        >
-          <GoogleIcon />
-          Continue with Google
-        </a>
-        </div>{/* end login card */}
-
+      <div className="w-full flex items-center justify-between mt-4 text-[12px]">
+        <Link href="/signup" className="no-underline hover:underline" style={{ color: 'rgba(221,184,119,0.9)' }}>Create account</Link>
+        <Link href="/forgot-password" className="no-underline hover:underline" style={{ color: 'rgba(242,241,234,0.6)' }}>Forgot password?</Link>
       </div>
-    </div>
+
+      <div className="w-full flex items-center gap-4 my-6">
+        <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.12)' }} />
+        <span className="text-[10px] uppercase" style={{ color: 'rgba(242,241,234,0.45)', letterSpacing: '0.28em' }}>or</span>
+        <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.12)' }} />
+      </div>
+
+      <a href={`${API}/auth/google`}
+        className="w-full flex items-center justify-center gap-3 py-4 rounded-full text-[12.5px] font-semibold uppercase no-underline transition-all hover:brightness-125"
+        style={{ letterSpacing: '0.14em', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#F2F1EA' }}>
+        <GoogleIcon />
+        Continue with Google
+      </a>
+    </>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <AuthShell>
+      <Suspense fallback={null}>
+        <LoginInner />
+      </Suspense>
+    </AuthShell>
   );
 }
 

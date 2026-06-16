@@ -10,13 +10,16 @@ function isJwtExpired(token: string): boolean {
   }
 }
 
+const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password'];
+
 export function middleware(req: NextRequest) {
   const token = req.cookies.get('access_token')?.value;
   const { pathname } = req.nextUrl;
 
   const validToken = token && !isJwtExpired(token);
+  const isPublic = PUBLIC_PATHS.includes(pathname);
 
-  if (!validToken && pathname !== '/login') {
+  if (!validToken && !isPublic) {
     const res = NextResponse.redirect(new URL('/login', req.url));
     // Clear stale cookie
     if (token) res.cookies.delete('access_token');
