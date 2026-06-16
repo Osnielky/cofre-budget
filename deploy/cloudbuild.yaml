@@ -15,6 +15,9 @@ substitutions:
   _SQL_CONN: cofre-dev:us-central1:cofre-dev
   _DB_NAME: cofre_budget
   _DB_USER: postgres
+  # Google OAuth client ID is public (safe to keep here); the secret stays in
+  # Secret Manager. Baked into the deploy so it survives every CI run.
+  _GOOGLE_CLIENT_ID: 193134215805-qpksslufmo42rnsk10nk4d5q4070gso5.apps.googleusercontent.com
   # The API's Cloud Run URL is deterministic (service-projectnumber.region).
   # Baked into the web build because Next evaluates rewrites() at build time.
   _API_PROXY_URL: https://cofre-api-193134215805.us-central1.run.app
@@ -76,6 +79,7 @@ steps:
       - 'SQL_CONN=${_SQL_CONN}'
       - 'DB_NAME=${_DB_NAME}'
       - 'DB_USER=${_DB_USER}'
+      - 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID}'
 
 options:
   logging: CLOUD_LOGGING_ONLY
