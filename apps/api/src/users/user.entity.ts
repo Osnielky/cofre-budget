@@ -23,6 +23,9 @@ export class User {
   @Column({ default: 'free' })
   plan: 'free' | 'pro';
 
+  @Column({ default: false })
+  emailVerified: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
