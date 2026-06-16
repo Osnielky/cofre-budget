@@ -9,6 +9,6 @@ export class DebtPayment {
   @Column() debtId: string;
   @Column({ type: 'decimal', precision: 12, scale: 2 }) amount: number;
   @Column({ type: 'date' }) date: string;
-  @Column({ nullable: true }) note: string | null;
+  @Column({ type: 'varchar', nullable: true }) note: string | null;
   @CreateDateColumn() createdAt: Date;
 }
