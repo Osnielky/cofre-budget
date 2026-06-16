@@ -7,8 +7,9 @@ import { Project } from '../projects/project.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Budget } from '../budgets/budget.entity';
+import { Debt } from '../debts/debt.entity';
 
-export type ResetScope = 'transactions' | 'categories' | 'projects' | 'bankAccounts' | 'budgets';
+export type ResetScope = 'transactions' | 'categories' | 'projects' | 'bankAccounts' | 'budgets' | 'debts';
 
 export interface ResetOptions {
   scope: ResetScope[];
@@ -30,6 +31,7 @@ export class DataResetService {
     @InjectRepository(ProjectCategory) private projCatRepo: Repository<ProjectCategory>,
     @InjectRepository(BankAccount)  private accountRepo: Repository<BankAccount>,
     @InjectRepository(Budget)       private budgetRepo: Repository<Budget>,
+    @InjectRepository(Debt)         private debtRepo: Repository<Debt>,
   ) {}
 
   async preview(userId: string, opts: ResetOptions): Promise<ResetResult> {
@@ -57,6 +59,10 @@ export class DataResetService {
 
     if (opts.scope.includes('budgets')) {
       counts.budgets = await this.budgetRepo.count({ where: { userId } });
+    }
+
+    if (opts.scope.includes('debts')) {
+      counts.debts = await this.debtRepo.count({ where: { userId } });
     }
 
     return { deleted: counts };
@@ -101,6 +107,13 @@ export class DataResetService {
       const accounts = await this.accountRepo.find({ where: { userId } });
       if (accounts.length) await this.accountRepo.remove(accounts);
       deleted.bankAccounts = accounts.length;
+    }
+
+    /* Removing a debt cascades its payments (onDelete: CASCADE) */
+    if (opts.scope.includes('debts')) {
+      const debts = await this.debtRepo.find({ where: { userId } });
+      if (debts.length) await this.debtRepo.remove(debts);
+      deleted.debts = debts.length;
     }
 
     return { deleted };
