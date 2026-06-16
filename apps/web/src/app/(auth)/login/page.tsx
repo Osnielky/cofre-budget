@@ -4,6 +4,7 @@ import { useState, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AuthShell, { authInputStyle } from '@/components/AuthShell';
+import { useUser } from '@/components/UserProvider';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -13,6 +14,7 @@ const labelStyle: React.CSSProperties = { color: 'rgba(221,184,119,0.85)', lette
 function LoginInner() {
   const router = useRouter();
   const params = useSearchParams();
+  const { refetch } = useUser();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [unverified, setUnverified] = useState(false);
@@ -40,6 +42,7 @@ function LoginInner() {
         throw new Error();
       }
       if (!res.ok) throw new Error();
+      refetch();                 // reload the user context so the new session shows immediately
       router.push('/dashboard');
     } catch {
       setError('Invalid email or password');
