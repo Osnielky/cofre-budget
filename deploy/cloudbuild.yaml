@@ -24,35 +24,38 @@ substitutions:
 
 steps:
   # ── Build images (parallel; web bakes in the static API proxy URL) ──
+  # Each pulls the previous :latest and builds with --cache-from, so when
+  # package*.json is unchanged Docker reuses the npm-install layer instead of
+  # reinstalling ~1700 packages — cutting most builds from ~10min to ~3-4min.
   - id: build-api
     name: gcr.io/cloud-builders/docker
+    entrypoint: bash
     waitFor: ['-']
     args:
-      - build
-      - -f
-      - apps/api/Dockerfile
-      - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$SHORT_SHA
-      - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:latest
-      - .
+      - -c
+      - |
+        docker pull ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:latest || true
+        docker build \
+          --cache-from ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:latest \
+          -f apps/api/Dockerfile \
+          -t ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:$SHORT_SHA \
+          -t ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api:latest .
 
   - id: build-web
     name: gcr.io/cloud-builders/docker
+    entrypoint: bash
     waitFor: ['-']
     args:
-      - build
-      - -f
-      - apps/web/Dockerfile
-      - --build-arg
-      - NEXT_PUBLIC_API_URL=/api
-      - --build-arg
-      - API_PROXY_URL=${_API_PROXY_URL}
-      - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$SHORT_SHA
-      - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest
-      - .
+      - -c
+      - |
+        docker pull ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest || true
+        docker build \
+          --cache-from ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest \
+          --build-arg NEXT_PUBLIC_API_URL=/api \
+          --build-arg API_PROXY_URL=${_API_PROXY_URL} \
+          -f apps/web/Dockerfile \
+          -t ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$SHORT_SHA \
+          -t ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:latest .
 
   # ── Push images to Artifact Registry (Cloud Run pulls from there) ─────────
   - id: push-api
