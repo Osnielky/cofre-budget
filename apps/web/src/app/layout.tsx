@@ -12,7 +12,7 @@ const jost      = Jost({ subsets: ['latin'], variable: '--font-jost' });
 export const metadata = {
   title: 'Cofre — Budget',
   description: 'Personal budget tracker',
-  icons: { icon: '/logo-chest.png', apple: '/logo-chest.png' },
+  // Favicon comes from app/icon.svg (the golden chest, matching the in-app logo).
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
