@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-interface Payment { id: string; amount: number; date: string; note: string | null }
+interface Payment { id: string; amount: number; date: string; note: string | null; transactionId: string | null }
 interface Debt {
   id: string; borrowerName: string; borrowerEmail: string | null; principal: number;
   description: string | null; startDate: string | null; dueDate: string | null; status: 'open' | 'paid';
@@ -217,7 +217,9 @@ export default function DebtsPage() {
                                 <span style={{ color: 'var(--color-text-muted)' }}>{p.date}{p.note ? ` · ${p.note}` : ''}</span>
                                 <span className="flex items-center gap-3">
                                   <span className="font-bold tabular-nums" style={{ color: 'var(--color-green)' }}>+${fmt(p.amount)}</span>
-                                  <button onClick={() => deletePayment(p.id)} className="hover:opacity-70" style={{ color: 'var(--color-text-muted)' }}>✕</button>
+                                  {p.transactionId
+                                    ? <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>via transaction</span>
+                                    : <button onClick={() => deletePayment(p.id)} className="hover:opacity-70" style={{ color: 'var(--color-text-muted)' }}>✕</button>}
                                 </span>
                               </div>
                             ))}

@@ -18,6 +18,7 @@ interface BankAccount { id: string; bankName: string; accountName: string; accou
 interface Transaction {
   id: string; name: string; amount: number; date: string; source: string;
   categoryRef: Category | null; bankAccount: BankAccount | null; projectId: string | null;
+  debtId?: string | null;
 }
 interface Budget { id: string; amount: number; spent: number; category: Category }
 interface Project { id: string; name: string; icon: string; color: string; type: string; status: string; expenses: number; income: number; costBasis: number; netGain: number | null; roi: number | null; purchasePrice: number }
@@ -146,7 +147,8 @@ export default function DashboardPage() {
   useEffect(() => { load(); }, [load]);
 
   /* ── Derived data ── */
-  const isTransfer   = (t: Transaction) => t.categoryRef?.type === 'transfer';
+  // Excluded from income/expense (transfers between own accounts + debt repayments)
+  const isTransfer   = (t: Transaction) => t.categoryRef?.type === 'transfer' || !!t.debtId;
   const isDebtAcc    = (a: BankAccount) => ['credit','loan'].includes(a.accountType);
   const income       = transactions.filter(t => Number(t.amount) > 0  && !isTransfer(t)).reduce((s,t) => s + Number(t.amount), 0);
   const expenses     = transactions.filter(t => Number(t.amount) < 0  && !isTransfer(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
