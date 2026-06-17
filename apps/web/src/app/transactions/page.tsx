@@ -25,7 +25,9 @@ interface Transaction {
   transferAccountId: string | null;
   transferAccount: BankAccount | null;
   counterpartTxId: string | null;
+  debtId: string | null;
 }
+interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid' }
 
 type Filter    = 'all' | 'uncategorized' | 'expense' | 'income';
 type RangeMode = 'month' | 'custom';
@@ -119,7 +121,8 @@ export default function TransactionsPage() {
   const [manualAccOpen, setManualAccOpen] = useState(false);
   const [manualCatOpen, setManualCatOpen] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
-  const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '' });
+  const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '' });
+  const [debts, setDebts] = useState<DebtLite[]>([]);
 
   const [importToast, setImportToast] = useState<{ imported: number; skipped: number; account: { bankName: string; accountName: string; accountType: string; color: string } } | null>(null);
   const importToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -206,12 +209,14 @@ export default function TransactionsPage() {
       fetch(`${API}/projects`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/transactions/category-hints`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/transactions/project-hints`, { credentials: 'include' }).then((r) => r.json()).catch(() => ({})),
-    ]).then(([cats, accs, projs, hints, pHints]) => {
+      fetch(`${API}/debts`, { credentials: 'include' }).then((r) => r.json()).catch(() => []),
+    ]).then(([cats, accs, projs, hints, pHints, dbt]) => {
       setCategories(Array.isArray(cats) ? cats : []);
       setAccounts(Array.isArray(accs) ? accs : []);
       setProjects(Array.isArray(projs) ? projs : []);
       if (hints && typeof hints === 'object') setCategoryHints(hints);
       if (pHints && typeof pHints === 'object') setProjectHints(pHints);
+      setDebts(Array.isArray(dbt) ? dbt : []);
     }).catch(() => {});
   }, []);
 
@@ -310,7 +315,7 @@ export default function TransactionsPage() {
         setTransactions((prev) => prev.map((t) => t.id === editingTxId ? { ...t, ...updated } : t));
         setShowManualTx(false);
         setEditingTxId(null);
-        setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '' });
+        setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '' });
         return;
       }
       const res = await fetch(`${API}/transactions`, {
@@ -322,14 +327,15 @@ export default function TransactionsPage() {
           amount: finalAmount,
           date: manualTx.date,
           bankAccountId: manualTx.bankAccountId,
-          categoryId: manualTx.categoryId || null,
+          categoryId: manualTx.debtId ? null : (manualTx.categoryId || null),
+          debtId: manualTx.debtId || null,
         }),
       });
       if (!res.ok) return;
       const created: Transaction = await res.json();
       setTransactions((prev) => [created, ...prev]);
       setShowManualTx(false);
-      setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '' });
+      setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '' });
     } finally {
       setManualTxSaving(false);
     }
@@ -481,7 +487,9 @@ export default function TransactionsPage() {
   }
 
   /* ── derived data ── */
-  const isTransfer = (t: Transaction) => t.categoryRef?.type === 'transfer';
+  // Excluded from income/expense totals: transfers between own accounts, and debt repayments
+  const isTransfer = (t: Transaction) => t.categoryRef?.type === 'transfer' || !!t.debtId;
+  const openDebts = debts.filter((d) => d.status === 'open');
   const uncategorizedCount = transactions.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
   const visible = transactions.filter((t) => {
     if (filter === 'uncategorized' && (t.categoryId || t.projectId || isTransfer(t))) return false;
@@ -1168,6 +1176,7 @@ export default function TransactionsPage() {
                             <button
                               onMouseDown={(e) => { if (isOpen) e.stopPropagation(); }}
                               onClick={(e) => {
+                                if (tx.debtId) return; // debt repayments are managed from the Debts page / by deleting the tx
                                 if (isOpen) { setOpenPickerId(null); setPickerProjectDrill(null); setPickerTransferStep(false); return; }
                                 const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
                                 const w = 220;
@@ -1186,6 +1195,7 @@ export default function TransactionsPage() {
                               disabled={updatingId === tx.id}
                               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:brightness-110 disabled:opacity-40"
                               style={(() => {
+                                if (tx.debtId) return { background: 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)', color: 'var(--color-card-violet)', cursor: 'default' };
                                 if (tx.projectId) {
                                   const _proj = projects.find((p) => p.id === tx.projectId);
                                   const _pCat = tx.projectCategoryId ? _proj?.categories?.find((c) => c.id === tx.projectCategoryId) : null;
@@ -1197,6 +1207,8 @@ export default function TransactionsPage() {
                               })()}>
                               {updatingId === tx.id ? (
                                 <span>…</span>
+                              ) : tx.debtId ? (
+                                <><span>🤝</span><span>Debt repayment · {debts.find((d) => d.id === tx.debtId)?.borrowerName ?? 'debt'}</span></>
                               ) : tx.projectId ? (() => {
                                 const _proj = projects.find((p) => p.id === tx.projectId);
                                 const _pCat = tx.projectCategoryId ? _proj?.categories?.find((c) => c.id === tx.projectCategoryId) : null;
@@ -1598,6 +1610,7 @@ export default function TransactionsPage() {
                                   date: tx.date,
                                   bankAccountId: tx.bankAccountId ?? '',
                                   categoryId: tx.categoryId ?? '',
+                                  debtId: tx.debtId ?? '',
                                 });
                                 setShowManualTx(true);
                               }}
@@ -1714,6 +1727,7 @@ export default function TransactionsPage() {
               const accent     = isExpense ? 'var(--color-orange)' : 'var(--color-green)';
               const selAcc     = accounts.find((a) => a.id === manualTx.bankAccountId);
               const selCat     = categories.find((c) => c.id === manualTx.categoryId);
+              const selDebt    = debts.find((d) => d.id === manualTx.debtId);
               const catOptions = categories.filter((c) => c.type === (isExpense ? 'expense' : 'income') || c.type === 'both');
               const amt        = parseFloat(manualTx.amountStr) || 0;
               return (
@@ -1727,12 +1741,12 @@ export default function TransactionsPage() {
                     <div className="flex items-center justify-between w-full">
                       {/* Type toggle */}
                       <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                        <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '-', categoryId: '' }))}
+                        <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '-', categoryId: '', debtId: '' }))}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
                           style={{ background: isExpense ? 'color-mix(in srgb, var(--color-orange) 13%, transparent)' : 'transparent', color: isExpense ? 'var(--color-orange)' : 'var(--color-text-muted)', border: isExpense ? '1px solid color-mix(in srgb, var(--color-orange) 27%, transparent)' : '1px solid transparent' }}>
                           − Expense
                         </button>
-                        <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '+', categoryId: '' }))}
+                        <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '+', categoryId: '', debtId: '' }))}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
                           style={{ background: !isExpense ? 'color-mix(in srgb, var(--color-green) 13%, transparent)' : 'transparent', color: !isExpense ? 'var(--color-green)' : 'var(--color-text-muted)', border: !isExpense ? '1px solid color-mix(in srgb, var(--color-green) 27%, transparent)' : '1px solid transparent' }}>
                           + Income
@@ -1817,7 +1831,12 @@ export default function TransactionsPage() {
                       <button type="button" onClick={() => { setManualCatOpen((o) => !o); setManualAccOpen(false); }}
                         className="px-3 py-2.5 text-sm flex items-center gap-2.5 rounded-xl outline-none text-left w-full"
                         style={{ background: 'var(--color-elevated)', border: `1px solid ${selCat ? selCat.color + '44' : 'var(--color-elevated)'}`, color: selCat ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                        {selCat ? (
+                        {selDebt ? (
+                          <>
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
+                            <span className="flex-1 font-medium" style={{ color: 'var(--color-card-violet)' }}>Debt repayment · {selDebt.borrowerName}</span>
+                          </>
+                        ) : selCat ? (
                           <>
                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${selCat.color}20` }}>{selCat.icon}</span>
                             <span className="flex-1 font-medium" style={{ color: selCat.color }}>{selCat.name}</span>
@@ -1838,6 +1857,24 @@ export default function TransactionsPage() {
                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'var(--color-elevated)' }}>—</span>
                             Uncategorized
                           </button>
+                          {!isExpense && openDebts.length > 0 && (
+                            <>
+                              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Debt repayment</p>
+                              {openDebts.map((d) => (
+                                <button key={d.id} type="button"
+                                  onClick={() => { setManualTx((f) => ({ ...f, debtId: d.id, categoryId: '' })); setManualCatOpen(false); }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                                  style={{ background: manualTx.debtId === d.id ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)' : 'transparent', color: manualTx.debtId === d.id ? 'var(--color-card-violet)' : 'var(--color-text-primary)' }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = 'color-mix(in srgb, var(--color-card-violet) 12%, transparent)')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.debtId === d.id ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)' : 'transparent')}>
+                                  <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
+                                  <span className="font-medium flex-1 text-left">{d.borrowerName}</span>
+                                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>${Number(d.remaining).toLocaleString('en-US', { minimumFractionDigits: 2 })} left</span>
+                                </button>
+                              ))}
+                              <div className="h-px my-1" style={{ background: 'var(--color-border)' }} />
+                            </>
+                          )}
                           {catOptions.map((c) => (
                             <button key={c.id} type="button"
                               onClick={() => { setManualTx((f) => ({ ...f, categoryId: c.id })); setManualCatOpen(false); }}
