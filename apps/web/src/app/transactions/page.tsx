@@ -118,6 +118,7 @@ export default function TransactionsPage() {
   const [newCatForTxId, setNewCatForTxId]     = useState<string | null>(null);
   const [showManualTx, setShowManualTx]   = useState(false);
   const [manualTxSaving, setManualTxSaving] = useState(false);
+  const [manualTxError, setManualTxError] = useState('');
   const [manualAccOpen, setManualAccOpen] = useState(false);
   const [manualCatOpen, setManualCatOpen] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
@@ -299,7 +300,9 @@ export default function TransactionsPage() {
   async function saveManualTx(e: React.FormEvent) {
     e.preventDefault();
     const amount = parseFloat(manualTx.amountStr);
-    if (!manualTx.bankAccountId || !manualTx.amountStr || isNaN(amount)) return;
+    setManualTxError('');
+    if (!manualTx.amountStr || isNaN(amount) || amount <= 0) { setManualTxError('Enter an amount greater than zero.'); return; }
+    if (!manualTx.bankAccountId) { setManualTxError('Choose an account for this transaction.'); return; }
     setManualTxSaving(true);
     try {
       const finalAmount = amount * (manualTx.sign === '-' ? -1 : 1);
@@ -544,7 +547,7 @@ export default function TransactionsPage() {
             <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
             <div className="flex items-center gap-2">
               {/* New manual transaction */}
-              <button onClick={() => setShowManualTx(true)}
+              <button onClick={() => { setManualTxError(''); setShowManualTx(true); }}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
                 style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 28%, transparent)', color: 'var(--color-green)' }}>
                 <PlusIcon /> New
@@ -1612,6 +1615,7 @@ export default function TransactionsPage() {
                                   categoryId: tx.categoryId ?? '',
                                   debtId: tx.debtId ?? '',
                                 });
+                                setManualTxError('');
                                 setShowManualTx(true);
                               }}
                               className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] shrink-0"
@@ -1893,9 +1897,11 @@ export default function TransactionsPage() {
                   </div>
 
                   {/* Footer */}
-                  <div className="flex gap-2 justify-end px-5 py-4 rounded-b-2xl"
+                  <div className="flex gap-2 items-center px-5 py-4 rounded-b-2xl"
                     style={{ borderTop: '1px solid var(--color-border)' }}>
-                    <button type="button" onClick={() => setShowManualTx(false)}
+                    {manualTxError && <p className="flex-1 text-xs" style={{ color: 'var(--color-rose)' }}>{manualTxError}</p>}
+                    {!manualTxError && <span className="flex-1" />}
+                    <button type="button" onClick={() => { setShowManualTx(false); setManualTxError(''); }}
                       className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
                       style={{ color: 'var(--color-text-secondary)' }}>Cancel</button>
                     <button type="submit" disabled={manualTxSaving}
