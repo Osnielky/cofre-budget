@@ -143,4 +143,18 @@ export class DebtsService {
     });
     return { sent: true };
   }
+
+  async recordPaymentFromTransaction(debtId: string, userId: string, p: { amount: number; date: string; transactionId: string }): Promise<void> {
+    await this.owned(debtId, userId); // throws NotFound/Forbidden if not the user's debt
+    await this.payments.save(this.payments.create({ debtId, amount: p.amount, date: p.date, transactionId: p.transactionId }));
+    await this.recomputeStatus(debtId, userId);
+  }
+
+  async removePaymentByTransaction(transactionId: string): Promise<void> {
+    const payment = await this.payments.findOneBy({ transactionId });
+    if (!payment) return;
+    const debt = await this.debts.findOneBy({ id: payment.debtId });
+    await this.payments.delete({ transactionId });
+    if (debt) await this.recomputeStatus(debt.id, debt.userId);
+  }
 }

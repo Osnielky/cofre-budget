@@ -39,7 +39,7 @@ export class TransactionsController {
   }
 
   @Post()
-  create(@Request() req: any, @Body() body: { name: string; amount: number; date: string; bankAccountId?: string | null; categoryId?: string | null }) {
+  create(@Request() req: any, @Body() body: { name: string; amount: number; date: string; bankAccountId?: string | null; categoryId?: string | null; debtId?: string | null }) {
     return this.service.createManual(req.user.id, body);
   }
 

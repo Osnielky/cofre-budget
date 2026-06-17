@@ -10,5 +10,7 @@ export class DebtPayment {
   @Column({ type: 'decimal', precision: 12, scale: 2 }) amount: number;
   @Column({ type: 'date' }) date: string;
   @Column({ type: 'varchar', nullable: true }) note: string | null;
+  /* Set when this payment was created from a manual transaction (managed by it). */
+  @Column({ type: 'varchar', nullable: true }) transactionId: string | null;
   @CreateDateColumn() createdAt: Date;
 }

@@ -51,6 +51,10 @@ export class Transaction {
   @Column({ nullable: true })
   categoryId: string;
 
+  /* Set when this transaction is a repayment of a debt (excluded from income/expense). */
+  @Column({ type: 'varchar', nullable: true })
+  debtId: string | null;
+
   /* For transfer-type categories: the counterpart account */
   @ManyToOne(() => BankAccount, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'transferAccountId' })

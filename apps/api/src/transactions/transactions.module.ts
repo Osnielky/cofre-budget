@@ -5,9 +5,10 @@ import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
 import { TransactionsService } from './transactions.service';
 import { TransactionsController } from './transactions.controller';
+import { DebtsModule } from '../debts/debts.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Transaction, BankAccount, ProjectCategory])],
+  imports: [TypeOrmModule.forFeature([Transaction, BankAccount, ProjectCategory]), DebtsModule],
   providers: [TransactionsService],
   controllers: [TransactionsController],
   exports: [TransactionsService],
