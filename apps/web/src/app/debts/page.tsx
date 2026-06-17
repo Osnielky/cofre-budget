@@ -9,7 +9,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 interface Payment { id: string; amount: number; date: string; note: string | null }
 interface Debt {
   id: string; borrowerName: string; borrowerEmail: string | null; principal: number;
-  description: string | null; dueDate: string | null; status: 'open' | 'paid';
+  description: string | null; startDate: string | null; dueDate: string | null; status: 'open' | 'paid';
   paid: number; remaining: number; percentage: number;
 }
 interface DebtDetail extends Debt { payments: Payment[] }
@@ -21,7 +21,7 @@ export default function DebtsPage() {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ borrowerName: '', borrowerEmail: '', principal: '', description: '', dueDate: '' });
+  const [form, setForm] = useState({ borrowerName: '', borrowerEmail: '', principal: '', description: '', startDate: today(), dueDate: '' });
   const [saving, setSaving] = useState(false);
 
   const [openId, setOpenId] = useState<string | null>(null);
@@ -57,11 +57,12 @@ export default function DebtsPage() {
         borrowerEmail: form.borrowerEmail || null,
         principal: parseFloat(form.principal),
         description: form.description || null,
+        startDate: form.startDate || null,
         dueDate: form.dueDate || null,
       }),
     });
     setSaving(false); setShowForm(false);
-    setForm({ borrowerName: '', borrowerEmail: '', principal: '', description: '', dueDate: '' });
+    setForm({ borrowerName: '', borrowerEmail: '', principal: '', description: '', startDate: today(), dueDate: '' });
     load();
   }
 
@@ -164,6 +165,11 @@ export default function DebtsPage() {
                               {d.status === 'paid' ? 'PAID' : 'OPEN'}
                             </span>
                           </div>
+                          {(d.startDate || d.dueDate) && (
+                            <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                              {d.startDate ? `Lent ${d.startDate}` : ''}{d.startDate && d.dueDate ? ' · ' : ''}{d.dueDate ? `due ${d.dueDate}` : ''}
+                            </p>
+                          )}
                           <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
                             <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: 'var(--color-green)' }} />
                           </div>
@@ -240,7 +246,7 @@ export default function DebtsPage() {
                 <button type="button" onClick={() => setShowForm(false)} className="w-8 h-8 rounded-lg hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-text-muted)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3 px-5 py-4">
-                {([['borrowerName', 'Borrower name', 'text', true], ['borrowerEmail', 'Email (optional)', 'email', false], ['principal', 'Amount lent', 'number', true], ['description', 'Note (optional)', 'text', false], ['dueDate', 'Due date (optional)', 'date', false]] as const).map(([key, label, type, req]) => (
+                {([['borrowerName', 'Borrower name', 'text', true], ['borrowerEmail', 'Email (optional)', 'email', false], ['principal', 'Amount lent', 'number', true], ['description', 'Note (optional)', 'text', false], ['startDate', 'Date lent', 'date', false], ['dueDate', 'Due date (optional)', 'date', false]] as const).map(([key, label, type, req]) => (
                   <label key={key} className="flex flex-col gap-1.5">
                     <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{label}</span>
                     <input required={req} type={type} step={type === 'number' ? '0.01' : undefined} min={type === 'number' ? '0.01' : undefined}

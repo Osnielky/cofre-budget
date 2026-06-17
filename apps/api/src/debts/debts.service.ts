@@ -15,6 +15,7 @@ export interface CreateDebtDto {
   borrowerEmail?: string | null;
   principal: number;
   description?: string | null;
+  startDate?: string | null;
   dueDate?: string | null;
 }
 export interface PaymentDto {
@@ -82,6 +83,7 @@ export class DebtsService {
       borrowerEmail: dto.borrowerEmail ?? null,
       principal: dto.principal,
       description: dto.description ?? null,
+      startDate: dto.startDate ?? null,
       dueDate: dto.dueDate ?? null,
       status: 'open',
     }));
@@ -95,6 +97,7 @@ export class DebtsService {
     if (dto.borrowerEmail !== undefined) debt.borrowerEmail = dto.borrowerEmail;
     if (dto.principal !== undefined) debt.principal = dto.principal;
     if (dto.description !== undefined) debt.description = dto.description;
+    if (dto.startDate !== undefined) debt.startDate = dto.startDate;
     if (dto.dueDate !== undefined) debt.dueDate = dto.dueDate;
     await this.debts.save(debt);
     return this.recomputeStatus(id, userId);

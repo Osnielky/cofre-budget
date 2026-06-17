@@ -14,6 +14,7 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
   private readonly resend = new Resend(this.config.get<string>('RESEND_API_KEY') ?? '');
   private readonly from = this.config.get<string>('MAIL_FROM') ?? 'Cofre <onboarding@resend.dev>';
+  private readonly appUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
 
   constructor(private config: ConfigService) {}
 
@@ -76,6 +77,13 @@ export class MailService {
     <div style="font-size:13px;letter-spacing:0.28em;text-transform:uppercase;color:#DDB877;margin-bottom:20px">Cofre &middot; Wealth &amp; Budget</div>
     <h1 style="font-size:22px;margin:0 0 14px;color:#F2F1EA">${heading}</h1>
     <div style="font-size:14px;line-height:1.7;color:#cfd4de">${bodyHtml}</div>
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid #26314d">
+      <p style="font-size:13px;line-height:1.6;color:#aeb4c2;margin:0 0 14px">
+        This was sent with <strong style="color:#DDB877">Cofre</strong> — a simple, beautiful way to track your money,
+        budgets, savings, and the loans you give or receive. Want to take control of your finances too?
+      </p>
+      <a href="${this.appUrl}/signup" style="display:inline-block;background:linear-gradient(180deg,#DDB877,#C9A05C);color:#131C30;font-weight:600;text-decoration:none;padding:11px 22px;border-radius:999px;font-size:12.5px;letter-spacing:0.06em">Try Cofre free</a>
+    </div>
   </div>
 </div>`;
   }
