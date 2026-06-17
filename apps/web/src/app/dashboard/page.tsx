@@ -115,6 +115,7 @@ export default function DashboardPage() {
   const [accounts, setAccounts]    = useState<BankAccount[]>([]);
   const [budgets, setBudgets]      = useState<Budget[]>([]);
   const [projects, setProjects]    = useState<Project[]>([]);
+  const [debts, setDebts]          = useState<{ remaining: number; status: 'open' | 'paid' }[]>([]);
   const [loading, setLoading]      = useState(true);
   const { user } = useUser();
   const tc = useThemeColors();
@@ -125,18 +126,20 @@ export default function DashboardPage() {
       const from = monthFrom(month), to = monthTo(month);
       const yearFrom = `${new Date().getFullYear()}-01-01`;
       const yearTo   = new Date().toISOString().slice(0, 10);
-      const [tx, ytx, accs, bdg, proj] = await Promise.all([
+      const [tx, ytx, accs, bdg, proj, dbt] = await Promise.all([
         fetch(`${API}/transactions?from=${from}&to=${to}&limit=500`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/transactions?from=${yearFrom}&to=${yearTo}&limit=5000`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/bank-accounts`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/budgets?month=${month}`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/projects`, { credentials:'include' }).then(r=>r.json()),
+        fetch(`${API}/debts`, { credentials:'include' }).then(r=>r.json()),
       ]);
       setTx(Array.isArray(tx) ? tx : []);
       setYearTx(Array.isArray(ytx) ? ytx : []);
       setAccounts(Array.isArray(accs) ? accs : []);
       setBudgets(Array.isArray(bdg) ? bdg : []);
       setProjects(Array.isArray(proj) ? proj : []);
+      setDebts(Array.isArray(dbt) ? dbt : []);
     } catch {} finally { setLoading(false); }
   }, [month]);
 
@@ -154,8 +157,11 @@ export default function DashboardPage() {
   const incomeTarget    = incomeTargets.reduce((s,b) => s + Number(b.amount), 0) || null;
   const targetPct       = incomeTarget ? Math.round((income / incomeTarget) * 100) : null;
   const totalBalance = accounts.reduce((s,a) => s + (isDebtAcc(a) ? -Math.abs(Number(a.balance||0)) : Number(a.balance||0)), 0);
-  const totalAssets  = accounts.filter(a => !isDebtAcc(a)).reduce((s,a) => s + Number(a.balance||0), 0);
+  /* Money others still owe you = a receivable asset (open debts' remaining). */
+  const receivables  = debts.filter(d => d.status === 'open').reduce((s,d) => s + Number(d.remaining || 0), 0);
+  const totalAssets  = accounts.filter(a => !isDebtAcc(a)).reduce((s,a) => s + Number(a.balance||0), 0) + receivables;
   const totalDebt    = accounts.filter(a => isDebtAcc(a)).reduce((s,a) => s + Math.abs(Number(a.balance||0)), 0);
+  const netWorth     = totalBalance + receivables;
   const isCurrentMonth = month === currentMonth();
 
   /* Prev month comparison from yearTx */
@@ -283,7 +289,7 @@ export default function DashboardPage() {
           {/* ── Row 1: Stat cards ── */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
             {[
-              { label: 'Net Worth',    value: `$${fmt(totalBalance)}`,                    sub: `${accounts.length} accounts`,              accent: tc.violet, icon: ICON_WALLET,  delta: null,     inverseDelta: false },
+              { label: 'Net Worth',    value: `$${fmt(netWorth)}`,                        sub: receivables > 0 ? `incl. $${fmt(receivables)} owed to you` : `${accounts.length} accounts`, accent: tc.violet, icon: ICON_WALLET,  delta: null,     inverseDelta: false },
               { label: 'Income',       value: `$${fmt(income)}`,                          sub: targetPct != null ? `${targetPct}% of $${fmt(incomeTarget!)} target` : `vs ${monthShort(prevM)}: $${fmt(prevInc)}`, accent: tc.green,  icon: ICON_TRENDUP, delta: incDelta, inverseDelta: false },
               { label: 'Expenses',     value: `$${fmt(expenses)}`,                        sub: `vs ${monthShort(prevM)}: $${fmt(prevExp)}`, accent: tc.orange, icon: ICON_TRENDDN, delta: expDelta, inverseDelta: true },
               { label: 'Savings Rate', value: `${savingsRate >= 0 ? '' : '-'}${Math.abs(savingsRate).toFixed(1)}%`, sub: net >= 0 ? `$${fmt(net)} saved` : `$${fmt(Math.abs(net))} deficit`, accent: savingsRate >= 30 ? tc.green : savingsRate >= 0 ? tc.amber : tc.rose, icon: ICON_SAVINGS, delta: null, inverseDelta: false },
@@ -571,7 +577,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <p className="card-title">Accounts</p>
                   <div className="text-right">
-                    <p className="text-xs font-black tabular-nums" style={{ color: 'var(--color-primary)' }}>${fmt(totalBalance)}</p>
+                    <p className="text-xs font-black tabular-nums" style={{ color: 'var(--color-primary)' }}>${fmt(netWorth)}</p>
                     <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>net worth</p>
                   </div>
                 </div>
