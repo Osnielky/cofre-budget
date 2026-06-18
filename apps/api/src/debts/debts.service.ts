@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Debt } from './debt.entity';
 import { DebtPayment } from './debt-payment.entity';
+import { Transaction } from '../transactions/transaction.entity';
 import { MailService } from '../mail/mail.service';
 
 export interface DebtWithBalance extends Debt {
@@ -30,6 +31,7 @@ export class DebtsService {
   constructor(
     @InjectRepository(Debt) private debts: Repository<Debt>,
     @InjectRepository(DebtPayment) private payments: Repository<DebtPayment>,
+    @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
     private mail: MailService,
   ) {}
 
@@ -105,6 +107,9 @@ export class DebtsService {
 
   async remove(id: string, userId: string): Promise<void> {
     await this.owned(id, userId);
+    // Detach any linked transactions — they survive as normal entries (the
+    // debt's payment records cascade-delete with the debt below).
+    await this.txRepo.update({ debtId: id }, { debtId: null });
     await this.debts.delete(id); // cascades payments
   }
 

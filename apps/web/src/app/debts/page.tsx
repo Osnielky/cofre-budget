@@ -208,7 +208,12 @@ export default function DebtsPage() {
                             style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>Send statement</button>
                           {confirmDeleteId === d.id ? (
                             <span className="flex items-center gap-1.5">
-                              <span className="text-[11px]" style={{ color: 'var(--color-rose)' }}>Delete debt &amp; its payments?</span>
+                              <span className="text-[11px]" style={{ color: 'var(--color-rose)' }}>
+                                Delete debt &amp; its payments?{(() => {
+                                  const n = detail.payments.filter((p) => p.transactionId).length;
+                                  return n > 0 ? ` ${n} linked transaction${n > 1 ? 's' : ''} will be kept as income.` : '';
+                                })()}
+                              </span>
                               <button type="button" onClick={() => { setConfirmDeleteId(null); deleteDebt(d.id); }}
                                 className="px-2.5 py-2 text-xs font-semibold rounded-xl text-white" style={{ background: 'var(--color-rose)' }}>Yes, delete</button>
                               <button type="button" onClick={() => setConfirmDeleteId(null)}
