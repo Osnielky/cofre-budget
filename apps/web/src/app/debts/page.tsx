@@ -28,6 +28,7 @@ export default function DebtsPage() {
   const [detail, setDetail] = useState<DebtDetail | null>(null);
   const [pay, setPay] = useState({ amount: '', date: today(), note: '', emailReceipt: true });
   const [toast, setToast] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -205,7 +206,17 @@ export default function DebtsPage() {
                           <button type="button" onClick={sendStatement} disabled={!d.borrowerEmail}
                             className="ml-auto px-3 py-2 text-xs font-semibold rounded-xl disabled:opacity-40 hover:bg-[var(--color-elevated)]"
                             style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>Send statement</button>
-                          <button type="button" onClick={() => deleteDebt(d.id)} className="px-3 py-2 text-xs font-semibold rounded-xl hover:bg-red-500/15" style={{ color: 'var(--color-rose)' }}>Delete</button>
+                          {confirmDeleteId === d.id ? (
+                            <span className="flex items-center gap-1.5">
+                              <span className="text-[11px]" style={{ color: 'var(--color-rose)' }}>Delete debt &amp; its payments?</span>
+                              <button type="button" onClick={() => { setConfirmDeleteId(null); deleteDebt(d.id); }}
+                                className="px-2.5 py-2 text-xs font-semibold rounded-xl text-white" style={{ background: 'var(--color-rose)' }}>Yes, delete</button>
+                              <button type="button" onClick={() => setConfirmDeleteId(null)}
+                                className="px-2.5 py-2 text-xs font-medium rounded-xl hover:bg-[var(--color-elevated)]" style={{ color: 'var(--color-text-secondary)' }}>Cancel</button>
+                            </span>
+                          ) : (
+                            <button type="button" onClick={() => setConfirmDeleteId(d.id)} className="px-3 py-2 text-xs font-semibold rounded-xl hover:bg-red-500/15" style={{ color: 'var(--color-rose)' }}>Delete</button>
+                          )}
                         </form>
 
                         {detail.payments.length === 0 ? (
