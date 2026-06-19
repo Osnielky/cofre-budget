@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Logo from './Logo';
+import Avatar from './Avatar';
 import { useUser } from './UserProvider';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -21,6 +22,18 @@ export default function Sidebar() {
   const router     = useRouter();
   const { user } = useUser();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  /* Close the mobile drawer whenever the route changes. */
+  useEffect(() => { setOpen(false); }, [pathname]);
+
+  /* Lock body scroll while the mobile drawer is open. */
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [open]);
 
   async function handleLogout() {
     setLoggingOut(true);
@@ -29,15 +42,53 @@ export default function Sidebar() {
   }
 
   const displayName = user?.name || user?.email?.split('@')[0] || '…';
-  const initials    = displayName.slice(0, 2).toUpperCase();
 
   return (
-    <aside className="w-64 shrink-0 flex flex-col" style={{
+    <>
+    {/* ── Mobile top bar (hidden on md+) ── */}
+    <div className="md:hidden fixed top-0 inset-x-0 h-14 z-30 flex items-center gap-3 px-4" style={{
+      background: 'var(--color-surface)',
+      backdropFilter: 'var(--glass-blur)',
+      WebkitBackdropFilter: 'var(--glass-blur)',
+      borderBottom: '1px solid var(--color-border)',
+    }}>
+      <button onClick={() => setOpen(true)} aria-label="Open menu"
+        className="w-9 h-9 -ml-1 rounded-lg flex items-center justify-center transition-colors"
+        style={{ color: 'var(--color-text-secondary)' }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-elevated)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+        <MenuIcon />
+      </button>
+      <Link href="/dashboard" className="flex items-center gap-2 no-underline">
+        <span className="flex items-center" style={{ color: 'var(--color-primary)' }}>
+          <Logo size={22} className="block" />
+        </span>
+        <span className="brand-name text-base" style={{ color: 'var(--color-text-primary)' }}>Cofre</span>
+      </Link>
+    </div>
+
+    {/* ── Backdrop ── */}
+    {open && (
+      <div onClick={() => setOpen(false)} aria-hidden
+        className="md:hidden fixed inset-0 z-40"
+        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} />
+    )}
+
+    <aside className={`w-64 shrink-0 flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-out md:static md:z-auto md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`} style={{
       background: 'var(--color-surface)',
       backdropFilter: 'var(--glass-blur)',
       WebkitBackdropFilter: 'var(--glass-blur)',
       borderRight: '1px solid var(--color-border)',
     }}>
+
+      {/* Close button — mobile only */}
+      <button onClick={() => setOpen(false)} aria-label="Close menu"
+        className="md:hidden absolute top-4 right-4 w-8 h-8 rounded-lg flex items-center justify-center transition-colors z-10"
+        style={{ color: 'var(--color-text-muted)' }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-elevated)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+        <CloseIcon />
+      </button>
 
       {/* ── Brand ── */}
       <div className="px-6 pt-7 pb-6 mb-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -127,10 +178,7 @@ export default function Sidebar() {
       {/* ── User block ── */}
       <div className="mx-3 mb-4 p-3 rounded-2xl flex items-center gap-2.5"
         style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)' }}>
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shrink-0"
-          style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-violet) 100%)', color: '#fff' }}>
-          {initials}
-        </div>
+        <Avatar name={user?.name} email={user?.email} src={user?.avatarUrl} size={32} rounded={12} />
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold truncate leading-tight" style={{ color: 'var(--color-text-primary)' }}>
             {displayName}
@@ -149,6 +197,23 @@ export default function Sidebar() {
       </div>
 
     </aside>
+    </>
+  );
+}
+
+function MenuIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
   );
 }
 

@@ -103,4 +103,16 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await this.usersService.setPassword(user.id, passwordHash);
   }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    if (newPassword.length < 8) throw new BadRequestException('Password must be at least 8 characters.');
+    const user = await this.usersService.findByIdWithPassword(userId);
+    if (!user?.password) {
+      throw new BadRequestException('Your account signs in with Google and has no password to change.');
+    }
+    const valid = await bcrypt.compare(currentPassword, user.password);
+    if (!valid) throw new BadRequestException('Current password is incorrect.');
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.usersService.setPassword(user.id, passwordHash);
+  }
 }

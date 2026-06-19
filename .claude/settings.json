@@ -13,7 +13,12 @@
       "Read(//tmp/**)",
       "Read(//c/tmp/**)",
       "Bash(cp /tmp/remote-budgets.tsx ./remote-budgets.tmp.tsx && echo copied)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --max-time 90 http://localhost:3000/budgets)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" --max-time 90 http://localhost:3000/budgets)",
+      "Bash(echo \"started, pid $!\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3333/api)",
+      "Bash(kill 38675 38725)",
+      "Bash(node dist/apps/api/main.js)",
+      "Bash(echo \"started pid $!\")"
     ],
     "additionalDirectories": [
       "\\tmp"

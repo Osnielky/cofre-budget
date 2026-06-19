@@ -1,10 +1,14 @@
 interface Props { type: string; size?: number }
 
 export default function AccountTypeIcon({ type, size = 18 }: Props) {
-  if (type === 'credit') return <CreditCardIcon size={size} />;
+  if (type === 'credit' || type === 'line_of_credit') return <CreditCardIcon size={size} />;
   if (type === 'checking') return <DebitCardIcon size={size} />;
   if (type === 'investment') return <InvestmentIcon size={size} />;
-  const icons: Record<string, string> = { savings: '🏦', cash: '💵', loan: '🤝' };
+  const icons: Record<string, string> = {
+    savings: '🏦', cash: '💵', loan: '🤝',
+    paypal: '🅿️', merchant: '🏪', mortgage: '🏠',
+    other_asset: '📦', other_liability: '📉',
+  };
   return <span style={{ fontSize: size * 0.85, lineHeight: 1 }}>{icons[type] ?? '🏦'}</span>;
 }
 

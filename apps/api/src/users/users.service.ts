@@ -52,14 +52,22 @@ export class UsersService {
     await this.repo.update(id, { password: passwordHash });
   }
 
-  async findOrCreateByGoogle(profile: { id: string; email: string; name: string }): Promise<User> {
+  async findOrCreateByGoogle(profile: { id: string; email: string; name: string; avatarUrl?: string }): Promise<User> {
     let user = await this.repo.findOneBy({ googleId: profile.id });
-    if (user) return user;
+    if (user) {
+      // Refresh the Google picture in case it changed.
+      if (profile.avatarUrl && user.avatarUrl !== profile.avatarUrl) {
+        user.avatarUrl = profile.avatarUrl;
+        return this.repo.save(user);
+      }
+      return user;
+    }
 
     user = await this.repo.findOneBy({ email: profile.email });
     if (user) {
       user.googleId = profile.id;
       if (!user.name) user.name = profile.name;
+      if (!user.avatarUrl && profile.avatarUrl) user.avatarUrl = profile.avatarUrl;
       user.emailVerified = true;
       return this.repo.save(user);
     }
@@ -68,7 +76,15 @@ export class UsersService {
       googleId: profile.id,
       email: profile.email,
       name: profile.name,
+      avatarUrl: profile.avatarUrl,
       emailVerified: true,
     }));
+  }
+
+  async updateProfile(id: string, data: { name?: string }): Promise<User> {
+    const patch: Partial<User> = {};
+    if (typeof data.name === 'string') patch.name = data.name.trim();
+    if (Object.keys(patch).length) await this.repo.update(id, patch);
+    return this.repo.findOneByOrFail({ id });
   }
 }

@@ -4,7 +4,18 @@ import { createContext, useContext, useEffect, useState } from 'react';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-interface User { name?: string; email: string }
+interface User {
+  id?: string;
+  name?: string;
+  email: string;
+  avatarUrl?: string | null;
+  googleId?: string | null;
+  plan?: 'free' | 'pro';
+  emailVerified?: boolean;
+  createdAt?: string;
+}
+
+export type { User };
 
 interface UserContextValue {
   user:      User | null;

@@ -101,8 +101,8 @@ export default function DebtsPage() {
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
-        <div className="sticky top-0 z-20 px-6 pt-5 pb-4 flex items-center justify-between gap-4 flex-wrap"
+      <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
+        <div className="sticky top-14 md:top-0 z-20 px-6 pt-5 pb-4 flex items-center justify-between gap-4 flex-wrap"
           style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
           <div>
             <h1 className="text-xl font-bold tracking-tight">Debts</h1>

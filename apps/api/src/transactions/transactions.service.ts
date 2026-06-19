@@ -5,6 +5,7 @@ import { Transaction } from './transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
 import { DebtsService } from '../debts/debts.service';
+import { isLiabilityType } from '../bank-accounts/account-types';
 
 export interface CsvRow {
   date: string;        // MM/DD/YYYY or YYYY-MM-DD
@@ -203,8 +204,8 @@ export class TransactionsService {
         account.balance = finalBalance;
         await this.accountRepo.save(account);
         balanceUpdated = true;
-      } else if (['credit', 'loan'].includes(account.accountType)) {
-        // Credit/loan: recalculate balance as total amount owed from all transactions
+      } else if (isLiabilityType(account.accountType)) {
+        // Liability accounts: recalculate balance as total amount owed from all transactions
         const raw = await this.repo
           .createQueryBuilder('tx')
           .select('COALESCE(SUM(tx.amount), 0)', 'total')

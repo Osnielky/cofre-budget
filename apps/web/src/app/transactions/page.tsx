@@ -7,6 +7,7 @@ import CsvImportModal from '@/components/CsvImportModal';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
+import { ACCOUNT_GROUPS, accountTypeLabel, isImportable, isLiability } from '@/lib/accountTypes';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -536,10 +537,10 @@ export default function TransactionsPage() {
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
 
-      <main className="flex-1 overflow-y-auto min-w-0">
+      <main className="flex-1 overflow-y-auto min-w-0 pt-14 md:pt-0">
 
         {/* ── Sticky header ── */}
-        <div className="sticky top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-4"
+        <div className="sticky top-14 md:top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-4"
           style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
 
           {/* Title + actions */}
@@ -578,9 +579,7 @@ export default function TransactionsPage() {
                         </div>
 
                         {(() => {
-                          const importableAccounts = accounts.filter((a) =>
-                            ['checking', 'savings', 'credit', 'investment'].includes(a.accountType),
-                          );
+                          const importableAccounts = accounts.filter((a) => isImportable(a.accountType));
                           return importableAccounts.length === 0 ? (
                           <p className="px-4 py-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
                             No bank accounts yet — create one below.
@@ -596,10 +595,40 @@ export default function TransactionsPage() {
                                   style={{ borderLeft: '3px solid transparent' }}
                                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${c}12`; (e.currentTarget as HTMLElement).style.borderLeftColor = `${c}80`; }}
                                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderLeftColor = 'transparent'; }}>
-                                  <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base"
-                                    style={{ background: `${c}25`, border: `1px solid ${c}35` }}>
-                                    <AccountTypeIcon type={a.accountType} size={16} />
-                                  </span>
+                                  {/* Composite icon: bank logo + type badge — mirrors the account cards */}
+                                  {(() => {
+                                    const bankMeta = BANKS.find((b) => b.name === a.bankName);
+                                    const isCash   = a.accountType === 'cash';
+                                    return (
+                                      <div className="relative shrink-0" style={{ width: 32, height: 32 }}>
+                                        <div className="w-full h-full rounded-xl flex items-center justify-center overflow-hidden"
+                                          style={{ background: isCash ? `${c}25` : 'white', border: `1px solid ${c}35` }}>
+                                          {isCash ? (
+                                            <span style={{ fontSize: 16 }}>💵</span>
+                                          ) : bankMeta ? (
+                                            <img
+                                              src={`https://logo.clearbit.com/${bankMeta.domain}`}
+                                              alt={a.bankName}
+                                              width={22} height={22}
+                                              style={{ objectFit: 'contain' }}
+                                              onError={(e) => {
+                                                e.currentTarget.src = `https://www.google.com/s2/favicons?domain=${bankMeta.domain}&sz=64`;
+                                                e.currentTarget.style.background = 'transparent';
+                                              }}
+                                            />
+                                          ) : (
+                                            <AccountTypeIcon type={a.accountType} size={16} />
+                                          )}
+                                        </div>
+                                        {!isCash && (
+                                          <div className="absolute -bottom-1 -right-1 w-[17px] h-[17px] rounded-lg flex items-center justify-center"
+                                            style={{ background: c, color: '#fff', border: '2px solid var(--popover-bg)' }}>
+                                            <AccountTypeIcon type={a.accountType} size={10} />
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{a.bankName}</p>
                                     <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.accountName}</p>
@@ -657,23 +686,32 @@ export default function TransactionsPage() {
                             <button type="button" onClick={() => setNewAccTypeOpen((o) => !o)}
                               className="w-full px-2 py-2 text-xs rounded-lg flex items-center justify-between gap-1"
                               style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
-                              <span className="capitalize">{newAcc.accountType === 'credit' ? 'Credit Card' : newAcc.accountType === 'loan' ? 'Loan' : newAcc.accountType.charAt(0).toUpperCase() + newAcc.accountType.slice(1)}</span>
+                              <span>{accountTypeLabel(newAcc.accountType)}</span>
                               <svg width="8" height="8" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
                                 <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             </button>
                             {newAccTypeOpen && (
-                              <div className="absolute top-full left-0 right-0 mt-1 rounded-lg overflow-hidden z-50"
-                                style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
-                                {[['checking','Checking'],['savings','Savings'],['credit','Credit Card'],['investment','Investment'],['cash','Cash'],['loan','Loan']].map(([val, label]) => (
-                                  <button key={val} type="button"
-                                    onClick={() => { setNewAcc((f) => ({ ...f, accountType: val })); setNewAccTypeOpen(false); }}
-                                    className="w-full px-3 py-2 text-xs text-left transition-colors"
-                                    style={{ background: newAcc.accountType === val ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'transparent', color: newAcc.accountType === val ? 'var(--color-primary)' : 'var(--color-text-primary)' }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-elevated)')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.background = newAcc.accountType === val ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'transparent')}>
-                                    {label}
-                                  </button>
+                              <div className="absolute top-full left-0 right-0 mt-1 rounded-lg overflow-y-auto z-50"
+                                style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '240px' }}>
+                                {ACCOUNT_GROUPS.map((grp) => (
+                                  <div key={grp.group}>
+                                    <p className="px-3 pt-2 pb-0.5 text-[9px] font-bold uppercase tracking-widest"
+                                      style={{ color: 'var(--color-text-muted)' }}>{grp.label}</p>
+                                    {grp.types.map((meta) => {
+                                      const val = meta.value;
+                                      return (
+                                        <button key={val} type="button"
+                                          onClick={() => { setNewAcc((f) => ({ ...f, accountType: val })); setNewAccTypeOpen(false); }}
+                                          className="w-full px-3 py-2 text-xs text-left transition-colors flex items-center gap-2"
+                                          style={{ background: newAcc.accountType === val ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'transparent', color: newAcc.accountType === val ? 'var(--color-primary)' : 'var(--color-text-primary)' }}
+                                          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-elevated)')}
+                                          onMouseLeave={(e) => (e.currentTarget.style.background = newAcc.accountType === val ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'transparent')}>
+                                          <AccountTypeIcon type={val} size={14} />{meta.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 ))}
                               </div>
                             )}
@@ -1281,7 +1319,7 @@ export default function TransactionsPage() {
                                     )}
                                     {/* No matches — show credit card accounts as quick suggestions */}
                                     {!transferMatchesLoading && transferMatches.length === 0 && (() => {
-                                      const creditAccs = accounts.filter((a) => ['credit', 'loan'].includes(a.accountType) && a.id !== tx.bankAccountId);
+                                      const creditAccs = accounts.filter((a) => isLiability(a.accountType) && a.id !== tx.bankAccountId);
                                       if (!creditAccs.length) return null;
                                       return (
                                         <>
@@ -2061,8 +2099,8 @@ export default function TransactionsPage() {
                           </p>
                           {accounts.filter((a) => a.id !== srcTx.bankAccountId)
                             .sort((a, b) => {
-                              const aCredit = ['credit', 'loan'].includes(a.accountType) ? 0 : 1;
-                              const bCredit = ['credit', 'loan'].includes(b.accountType) ? 0 : 1;
+                              const aCredit = isLiability(a.accountType) ? 0 : 1;
+                              const bCredit = isLiability(b.accountType) ? 0 : 1;
                               return aCredit - bCredit;
                             })
                             .map((a) => {

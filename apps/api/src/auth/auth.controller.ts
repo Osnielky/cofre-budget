@@ -1,8 +1,9 @@
-import { Controller, Post, Get, Body, Query, UseGuards, Request, Res, HttpCode } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Query, UseGuards, Request, Res, HttpCode } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { UsersService } from '../users/users.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -30,7 +31,10 @@ const COOKIE_CLEAR_OPTS = {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private usersService: UsersService,
+  ) {}
 
   // 5 attempts per 15 minutes — brute-force protection
   @Throttle({ default: { ttl: 900_000, limit: 5 } })
@@ -96,6 +100,22 @@ export class AuthController {
   @Get('me')
   me(@Request() req: any) {
     return req.user;
+  }
+
+  @SkipThrottle()
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile')
+  updateProfile(@Request() req: any, @Body() body: { name?: string }) {
+    return this.usersService.updateProfile(req.user.id, { name: body.name });
+  }
+
+  @Throttle({ default: { ttl: 900_000, limit: 10 } })
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @HttpCode(200)
+  async changePassword(@Request() req: any, @Body() body: { currentPassword: string; newPassword: string }) {
+    await this.authService.changePassword(req.user.id, body.currentPassword ?? '', body.newPassword ?? '');
+    return { message: 'Password updated.' };
   }
 
   @UseGuards(AuthGuard('google'))

@@ -10,6 +10,7 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Cell, PieChart, Pie, Area, AreaChart,
 } from 'recharts';
+import { isLiability, isTrackingAccount } from '@/lib/accountTypes';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -148,10 +149,14 @@ export default function DashboardPage() {
 
   /* ── Derived data ── */
   // Excluded from income/expense (transfers between own accounts + debt repayments)
+  // Tracking accounts (investment, mortgage, other asset/liability) are net-worth only —
+  // exclude them from income/expense/cash-flow, alongside transfers & debt repayments.
   const isTransfer   = (t: Transaction) => t.categoryRef?.type === 'transfer' || !!t.debtId;
-  const isDebtAcc    = (a: BankAccount) => ['credit','loan'].includes(a.accountType);
-  const income       = transactions.filter(t => Number(t.amount) > 0  && !isTransfer(t)).reduce((s,t) => s + Number(t.amount), 0);
-  const expenses     = transactions.filter(t => Number(t.amount) < 0  && !isTransfer(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
+  const isTrackingTx = (t: Transaction) => isTrackingAccount(t.bankAccount?.accountType ?? '');
+  const inCashFlow   = (t: Transaction) => !isTransfer(t) && !isTrackingTx(t);
+  const isDebtAcc    = (a: BankAccount) => isLiability(a.accountType);
+  const income       = transactions.filter(t => Number(t.amount) > 0  && inCashFlow(t)).reduce((s,t) => s + Number(t.amount), 0);
+  const expenses     = transactions.filter(t => Number(t.amount) < 0  && inCashFlow(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
   const net          = income - expenses;
   const savingsRate  = income > 0 ? (net / income * 100) : 0;
   const spendingBudgets = budgets.filter(b => b.category?.type !== 'income');
@@ -253,7 +258,7 @@ export default function DashboardPage() {
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
 
         {/* ── Topbar ── */}
         <div className="px-8 pt-9 flex items-end justify-between gap-6 flex-wrap">

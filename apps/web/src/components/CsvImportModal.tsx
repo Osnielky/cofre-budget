@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { isLiability } from '@/lib/accountTypes';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -30,7 +31,9 @@ const glass: React.CSSProperties = {
 };
 
 const ACC_ICONS: Record<string, string> = {
-  checking: '💳', savings: '🏦', cash: '💵', credit: '💰', investment: '📈', debit: '💳',
+  checking: '💳', savings: '🏦', cash: '💵', credit: '💳', investment: '📈', debit: '💳',
+  line_of_credit: '💳', paypal: '🅿️', merchant: '🏪', mortgage: '🏠',
+  other_asset: '📦', other_liability: '📉', loan: '🤝',
 };
 
 interface DupCheck { newCount: number; duplicateCount: number; duplicateIds: Set<string> }
@@ -399,8 +402,8 @@ function validate(rows: CsvRow[], account: BankAccount, fileName: string, rawTex
 
   /* ── Primary: bank format fingerprint ── */
   const { bank: csvBank, type: csvType } = detectCsvFingerprint(rawText);
-  const acctIsCredit = account.accountType === 'credit';
-  const acctIsBank   = ['checking', 'savings', 'cash', 'debit'].includes(account.accountType);
+  const acctIsCredit = isLiability(account.accountType);
+  const acctIsBank   = ['checking', 'savings', 'cash', 'debit', 'paypal', 'merchant'].includes(account.accountType);
 
   // Wrong account TYPE (credit vs bank)
   if (csvType === 'bank' && acctIsCredit) {
@@ -445,7 +448,7 @@ function validate(rows: CsvRow[], account: BankAccount, fileName: string, rawTex
   const total = rows.length;
 
   /* Credit cards: expect mostly negative amounts (charges) */
-  if (account.accountType === 'credit' && positiveCount / total > 0.8) {
+  if (isLiability(account.accountType) && positiveCount / total > 0.8) {
     warnings.push({
       level: 'warn',
       message: `This CSV has mostly positive amounts but "${account.accountName}" is a credit card — credit card exports usually show charges as positive. Double-check you exported the right account.`,
