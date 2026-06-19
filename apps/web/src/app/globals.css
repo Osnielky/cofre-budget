@@ -115,6 +115,17 @@ body::before {
 @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
+@keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Horizontal category bar — grows from the left on mount, staggered via inline animation-delay */
+.cat-bar-fill {
+  transform-origin: left center;
+  animation: barGrow 0.75s cubic-bezier(0.22, 0.85, 0.25, 1) both;
+}
+.cat-bar-row:hover .cat-bar-fill { filter: brightness(1.12); }
+@media (prefers-reduced-motion: reduce) {
+  .cat-bar-fill { animation: none; }
+}
 
 
 /* ═══════════════════════════════════════════════
