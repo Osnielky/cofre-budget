@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Sidebar from '@/components/Sidebar';
 import CsvImportModal from '@/components/CsvImportModal';
+import ImportReconcileModal from '@/components/ImportReconcileModal';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
@@ -92,6 +93,7 @@ export default function TransactionsPage() {
   const [updatingId, setUpdatingId]     = useState<string | null>(null);
   const [importAccount, setImportAccount]       = useState<BankAccount | null>(null);
   const [showImportPicker, setShowImportPicker] = useState(false);
+  const [showFileImport, setShowFileImport]     = useState(false);
   const [showAddAccForm, setShowAddAccForm]     = useState(false);
   const [addingAcc, setAddingAcc]               = useState(false);
   const [addAccError, setAddAccError]           = useState('');
@@ -572,6 +574,18 @@ export default function TransactionsPage() {
                     {!showAddAccForm ? (
                       /* ── Account list ── */
                       <>
+                        {/* File-first entry: auto-detect account */}
+                        <button
+                          onClick={() => { setShowFileImport(true); setShowImportPicker(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left transition-all hover:brightness-110"
+                          style={{ borderBottom: '1px solid var(--color-border)', color: 'var(--color-primary)' }}
+                        >
+                          <UploadIcon />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold">Import a file — auto-detect account</p>
+                            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Drop a CSV; we&apos;ll find the right account</p>
+                          </div>
+                        </button>
                         <div className="px-4 pt-3.5 pb-2 flex items-center gap-2"
                           style={{ borderBottom: '1px solid var(--color-border)' }}>
                           <span className="text-[10px] font-bold tracking-widest uppercase flex-1"
@@ -2230,6 +2244,22 @@ export default function TransactionsPage() {
             onClose={() => setImportAccount(null)}
             onImported={(result) => {
               setImportAccount(null);
+              loadTransactions();
+              setImportToast(result);
+              if (importToastTimer.current) clearTimeout(importToastTimer.current);
+              importToastTimer.current = setTimeout(() => setImportToast(null), 6000);
+            }}
+          />
+        )}
+
+        {/* File-first import modal — auto-detects account from CSV */}
+        {showFileImport && (
+          <ImportReconcileModal
+            accounts={accounts}
+            onClose={() => setShowFileImport(false)}
+            onAccountCreated={(a) => setAccounts((prev) => prev.some((x) => x.id === a.id) ? prev : [...prev, a as BankAccount])}
+            onImported={(result) => {
+              setShowFileImport(false);
               loadTransactions();
               setImportToast(result);
               if (importToastTimer.current) clearTimeout(importToastTimer.current);
