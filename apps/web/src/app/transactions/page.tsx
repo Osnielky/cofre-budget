@@ -13,7 +13,7 @@ import { ACCOUNT_GROUPS, accountTypeLabel, isImportable, isLiability } from '@/l
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 interface Category { id: string; name: string; icon: string; color: string; type: string }
-interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null }
+interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null; last4?: string | null }
 interface Budget { id: string; categoryId: string; category: Category; amount: string | number; spent: number }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
 interface Project { id: string; name: string; icon: string; color: string; status: string; categories?: ProjectCategory[] }
