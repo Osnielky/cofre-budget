@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, MoreThan } from 'typeorm';
 import { Budget } from './budget.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { TRACKING_TYPES } from '../bank-accounts/account-types';
 
 export interface BudgetWithSpent extends Budget {
   spent: number;
@@ -28,11 +29,14 @@ export class BudgetsService {
         const isIncome = b.category?.type === 'income';
         const raw = await this.txRepo
           .createQueryBuilder('tx')
+          .leftJoin('tx.bankAccount', 'ba')
           .select(isIncome ? 'COALESCE(SUM(tx.amount), 0)' : 'COALESCE(SUM(ABS(tx.amount)), 0)', 'spent')
           .where('tx.userId = :userId', { userId })
           .andWhere('tx.categoryId = :categoryId', { categoryId: b.categoryId })
           .andWhere(isIncome ? 'tx.amount > 0' : 'tx.amount < 0')
           .andWhere('tx.date >= :startDate AND tx.date <= :endDate', { startDate, endDate })
+          // Tracking accounts (investment, mortgage, …) are net-worth only — keep them out of budget spend.
+          .andWhere('(ba."accountType" IS NULL OR ba."accountType" NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] })
           .getRawOne<{ spent: string }>();
 
         const spent      = parseFloat(raw?.spent ?? '0');

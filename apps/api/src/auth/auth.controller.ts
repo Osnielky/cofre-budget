@@ -1,8 +1,9 @@
-import { Controller, Post, Get, Body, HttpCode, UseGuards, Request, Res } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Query, UseGuards, Request, Res, HttpCode } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { UsersService } from '../users/users.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -30,68 +31,61 @@ const COOKIE_CLEAR_OPTS = {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private usersService: UsersService,
+  ) {}
 
   // 5 attempts per 15 minutes — brute-force protection
   @Throttle({ default: { ttl: 900_000, limit: 5 } })
   @UseGuards(LocalAuthGuard)
   @Post('login')
   login(@Request() req: any, @Res() res: Response) {
+    if (this.authService.isUnverifiedPasswordUser(req.user)) {
+      return res.status(403).json({ code: 'EMAIL_UNVERIFIED', message: 'Please verify your email first.' });
+    }
     const result = this.authService.login(req.user);
     res.cookie('access_token', result.access_token, COOKIE_OPTS);
     return res.json({ user: result.user });
   }
 
-  // ── Registration & email verification ──────────────────────────
-  @Throttle({ default: { ttl: 3_600_000, limit: 8 } })
+  @Throttle({ default: { ttl: 900_000, limit: 5 } })
   @Post('register')
   @HttpCode(200)
-  register(@Body() body: { email: string; password: string; name?: string }) {
-    return this.authService.register(body.email, body.password, body.name);
+  async register(@Body() body: { name: string; email: string; password: string }) {
+    await this.authService.register(body.name, body.email, body.password);
+    return { message: 'Check your email to verify your account.' };
   }
 
-  @Throttle({ default: { ttl: 900_000, limit: 10 } })
-  @Post('verify-email')
-  @HttpCode(200)
-  async verifyEmail(@Body() body: { email: string; code: string }, @Res() res: Response) {
-    const result = await this.authService.verifyEmail(body.email, body.code);
-    res.cookie('access_token', result.access_token, COOKIE_OPTS);
-    return res.json({ user: result.user });
+  @SkipThrottle()
+  @Get('verify-email')
+  async verifyEmail(@Query('token') token: string, @Res() res: Response) {
+    const redirectTo = await this.authService.verifyEmail(token ?? '');
+    return res.redirect(redirectTo);
   }
 
-  @Throttle({ default: { ttl: 900_000, limit: 4 } })
-  @Post('resend-code')
-  @HttpCode(200)
-  async resendCode(@Body() body: { email: string }) {
-    await this.authService.resendCode(body.email);
-    return { message: 'If the account exists and is unverified, a new code was sent.' };
-  }
-
-  // ── Password reset ─────────────────────────────────────────────
   @Throttle({ default: { ttl: 900_000, limit: 5 } })
   @Post('forgot-password')
   @HttpCode(200)
   async forgotPassword(@Body() body: { email: string }) {
-    await this.authService.forgotPassword(body.email);
-    return { message: 'If an account exists, a reset code has been sent.' };
+    await this.authService.requestPasswordReset(body.email);
+    return { message: 'If that email exists, we sent a reset link.' };
   }
 
-  @Throttle({ default: { ttl: 900_000, limit: 10 } })
+  @Throttle({ default: { ttl: 900_000, limit: 5 } })
   @Post('reset-password')
   @HttpCode(200)
-  async resetPassword(@Body() body: { email: string; code: string; password: string }) {
-    await this.authService.resetPassword(body.email, body.code, body.password);
-    return { message: 'Password updated. You can now sign in.' };
+  async resetPassword(@Body() body: { token: string; password: string }) {
+    await this.authService.resetPassword(body.token, body.password);
+    return { message: 'Password updated. You can sign in now.' };
   }
 
-  // ── Change password (authenticated) ────────────────────────────
-  @SkipThrottle()
-  @UseGuards(JwtAuthGuard)
-  @Post('change-password')
+  @Throttle({ default: { ttl: 900_000, limit: 5 } })
+  @Post('resend-verification')
   @HttpCode(200)
-  async changePassword(@Request() req: any, @Body() body: { currentPassword: string; newPassword: string }) {
-    await this.authService.changePassword(req.user.id, body.currentPassword, body.newPassword);
-    return { message: 'Password changed successfully.' };
+  async resendVerification(@Body() body: { email: string }) {
+    await this.authService.resendVerification(body.email);
+    return { message: 'If that account exists and is unverified, we sent a new link.' };
   }
 
   @SkipThrottle()
@@ -106,6 +100,22 @@ export class AuthController {
   @Get('me')
   me(@Request() req: any) {
     return req.user;
+  }
+
+  @SkipThrottle()
+  @UseGuards(JwtAuthGuard)
+  @Patch('profile')
+  updateProfile(@Request() req: any, @Body() body: { name?: string }) {
+    return this.usersService.updateProfile(req.user.id, { name: body.name });
+  }
+
+  @Throttle({ default: { ttl: 900_000, limit: 10 } })
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @HttpCode(200)
+  async changePassword(@Request() req: any, @Body() body: { currentPassword: string; newPassword: string }) {
+    await this.authService.changePassword(req.user.id, body.currentPassword ?? '', body.newPassword ?? '');
+    return { message: 'Password updated.' };
   }
 
   @UseGuards(AuthGuard('google'))

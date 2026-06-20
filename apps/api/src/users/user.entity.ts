@@ -20,11 +20,14 @@ export class User {
   @Column({ nullable: true, unique: true })
   googleId: string;
 
-  @Column({ default: false })
-  emailVerified: boolean;
+  @Column({ nullable: true })
+  avatarUrl: string;
 
   @Column({ default: 'free' })
   plan: 'free' | 'pro';
+
+  @Column({ default: false })
+  emailVerified: boolean;
 
   @CreateDateColumn()
   createdAt: Date;

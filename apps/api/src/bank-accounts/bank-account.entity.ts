@@ -5,7 +5,11 @@ import {
 } from 'typeorm';
 import { User } from '../users/user.entity';
 
-export type AccountType = 'checking' | 'savings' | 'credit' | 'investment';
+// Stored as a free-form string column; this union documents the supported values.
+// See account-types.ts for liability / tracking / importable classification.
+export type AccountType =
+  | 'checking' | 'savings' | 'credit' | 'cash' | 'line_of_credit' | 'paypal' | 'merchant' // budget
+  | 'investment' | 'mortgage' | 'other_asset' | 'other_liability'; // tracking
 
 @Entity('bank_accounts')
 export class BankAccount {

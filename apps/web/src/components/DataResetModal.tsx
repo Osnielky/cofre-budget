@@ -4,7 +4,7 @@ import { useState } from 'react';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-export type ResetScope = 'transactions' | 'categories' | 'projects' | 'bankAccounts' | 'budgets';
+export type ResetScope = 'transactions' | 'categories' | 'projects' | 'bankAccounts' | 'budgets' | 'debts';
 
 export const SCOPE_ITEMS: {
   id: ResetScope; label: string; description: string; icon: string; color: string; warning?: string;
@@ -45,6 +45,13 @@ export const SCOPE_ITEMS: {
     icon: '🏦',
     color: 'var(--color-amber)',
     warning: 'Existing transactions are kept but lose their account link.',
+  },
+  {
+    id: 'debts',
+    label: 'Debts',
+    description: 'All tracked loans and their payment history',
+    icon: '🤝',
+    color: 'var(--color-card-violet)',
   },
 ];
 

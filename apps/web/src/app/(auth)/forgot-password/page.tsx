@@ -1,117 +1,68 @@
 'use client';
 
 import { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import AuthShell, { authInputStyle, authLabelStyle, AuthLink, AuthError } from '@/components/AuthShell';
+import Link from 'next/link';
+import AuthShell, { authInputStyle } from '@/components/AuthShell';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-export default function ForgotPasswordPage() {
-  const router = useRouter();
-  const [step, setStep] = useState<'request' | 'reset'>('request');
-  const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [info, setInfo] = useState('');
-  const [loading, setLoading] = useState(false);
+const labelCls = 'text-[10.5px] font-semibold uppercase';
+const labelStyle: React.CSSProperties = { color: 'rgba(221,184,119,0.85)', letterSpacing: '0.22em' };
 
-  async function handleRequest(e: FormEvent) {
+export default function ForgotPasswordPage() {
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError('');
+    const form = new FormData(e.currentTarget);
     setLoading(true);
     try {
       await fetch(`${API}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: form.get('email') }),
       });
-      setStep('reset');
-      setInfo(`If an account exists for ${email}, a reset code has been sent.`);
-    } catch {
-      setError('Something went wrong — try again');
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* always show the same message — enumeration-safe */ }
+    finally { setLoading(false); setSent(true); }
   }
 
-  async function handleReset(e: FormEvent) {
-    e.preventDefault();
-    setError('');
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return; }
-    setLoading(true);
-    try {
-      const res = await fetch(`${API}/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email, code: code.trim(), password }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || 'Could not reset password');
-      router.push('/login?reset=1');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Reset failed');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (step === 'reset') {
+  if (sent) {
     return (
-      <AuthShell
-        title="Set a new password"
-        subtitle="Enter the code and your new password"
-        footer={<button onClick={() => setStep('request')} className="text-[12.5px]" style={{ color: 'rgba(242,241,234,0.55)', cursor: 'pointer' }}>← Start over</button>}
-      >
-        <form onSubmit={handleReset} className="w-full flex flex-col gap-5">
-          {info && <p className="text-sm text-center" style={{ color: 'rgba(221,184,119,0.85)' }}>{info}</p>}
-          <label className="flex flex-col gap-2">
-            <span className="text-[10.5px] font-semibold uppercase" style={authLabelStyle}>Reset code</span>
-            <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              inputMode="numeric" autoFocus placeholder="000000"
-              className="px-4 py-3 text-center text-2xl font-bold outline-none transition-colors"
-              style={{ ...authInputStyle, letterSpacing: '0.4em' }} />
-          </label>
-          <label className="flex flex-col gap-2">
-            <span className="text-[10.5px] font-semibold uppercase" style={authLabelStyle}>New password</span>
-            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" required autoComplete="new-password"
-              placeholder="At least 8 characters" className="px-4 py-3 text-sm outline-none transition-colors" style={authInputStyle} />
-          </label>
-          <AuthError message={error} />
-          <button type="submit" disabled={loading || code.length !== 6}
-            className="btn-gold mt-1 py-4 rounded-full text-[12.5px] font-semibold uppercase transition-all disabled:opacity-50 cursor-pointer"
-            style={{ letterSpacing: '0.18em' }}>
-            {loading ? 'Updating…' : 'Reset password'}
-          </button>
-        </form>
+      <AuthShell>
+        <p className="text-base text-center font-semibold" style={{ color: '#F2F1EA' }}>Check your email</p>
+        <p className="text-sm text-center mt-3 leading-relaxed" style={{ color: 'rgba(242,241,234,0.7)' }}>
+          If that email is registered, we sent a link to reset your password. The link expires in 1 hour.
+        </p>
+        <Link href="/login" className="btn-gold mt-7 py-3.5 px-8 rounded-full text-[12.5px] font-semibold uppercase no-underline transition-all"
+          style={{ letterSpacing: '0.18em' }}>
+          Back to sign in
+        </Link>
       </AuthShell>
     );
   }
 
   return (
-    <AuthShell
-      title="Forgot password?"
-      subtitle="We’ll email you a reset code"
-      footer={<span className="text-[12.5px]" style={{ color: 'rgba(242,241,234,0.55)' }}>Remembered it? <AuthLink href="/login">Sign in</AuthLink></span>}
-    >
-      <form onSubmit={handleRequest} className="w-full flex flex-col gap-5">
+    <AuthShell>
+      <p className="text-sm text-center mb-5 leading-relaxed" style={{ color: 'rgba(242,241,234,0.7)' }}>
+        Enter your email and we’ll send you a link to reset your password.
+      </p>
+      <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5" suppressHydrationWarning>
         <label className="flex flex-col gap-2">
-          <span className="text-[10.5px] font-semibold uppercase" style={authLabelStyle}>Email</span>
-          <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required autoComplete="email"
-            placeholder="you@example.com" className="px-4 py-3 text-sm outline-none transition-colors" style={authInputStyle} />
+          <span className={labelCls} style={labelStyle}>Email</span>
+          <input name="email" type="email" required autoComplete="email" placeholder="you@example.com"
+            className="px-4 py-3 text-sm outline-none transition-colors" style={authInputStyle} />
         </label>
-        <AuthError message={error} />
         <button type="submit" disabled={loading}
           className="btn-gold mt-2 py-4 rounded-full text-[12.5px] font-semibold uppercase transition-all disabled:opacity-60 cursor-pointer"
           style={{ letterSpacing: '0.18em' }}>
-          {loading ? 'Sending…' : 'Send reset code'}
-        </button>
-        <button type="button" onClick={() => setStep('reset')} className="text-[12px]" style={{ color: '#DDB877', cursor: 'pointer' }}>
-          I already have a code
+          {loading ? 'Sending…' : 'Send reset link'}
         </button>
       </form>
+      <p className="mt-5 text-[12px]" style={{ color: 'rgba(242,241,234,0.6)' }}>
+        <Link href="/login" className="no-underline hover:underline" style={{ color: 'rgba(221,184,119,0.9)' }}>Back to sign in</Link>
+      </p>
     </AuthShell>
   );
 }

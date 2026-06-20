@@ -12,6 +12,7 @@ import { TransactionsModule } from '../transactions/transactions.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { BudgetsModule } from '../budgets/budgets.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { DebtsModule } from '../debts/debts.module';
 import { DataResetModule } from '../data-reset/data-reset.module';
 
 @Module({
@@ -31,6 +32,7 @@ import { DataResetModule } from '../data-reset/data-reset.module';
     CategoriesModule,
     BudgetsModule,
     ProjectsModule,
+    DebtsModule,
     DataResetModule,
   ],
   providers: [

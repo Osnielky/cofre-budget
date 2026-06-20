@@ -4,6 +4,8 @@ import { Between, Repository } from 'typeorm';
 import { Transaction } from './transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
+import { DebtsService } from '../debts/debts.service';
+import { isLiabilityType } from '../bank-accounts/account-types';
 
 export interface CsvRow {
   date: string;        // MM/DD/YYYY or YYYY-MM-DD
@@ -18,6 +20,7 @@ export class TransactionsService {
     @InjectRepository(Transaction) private repo: Repository<Transaction>,
     @InjectRepository(BankAccount) private accountRepo: Repository<BankAccount>,
     @InjectRepository(ProjectCategory) private projCatRepo: Repository<ProjectCategory>,
+    private debtsService: DebtsService,
   ) {}
 
   async getCategoryHints(userId: string): Promise<Record<string, { id: string; name: string; icon: string; color: string }>> {
@@ -201,8 +204,8 @@ export class TransactionsService {
         account.balance = finalBalance;
         await this.accountRepo.save(account);
         balanceUpdated = true;
-      } else if (['credit', 'loan'].includes(account.accountType)) {
-        // Credit/loan: recalculate balance as total amount owed from all transactions
+      } else if (isLiabilityType(account.accountType)) {
+        // Liability accounts: recalculate balance as total amount owed from all transactions
         const raw = await this.repo
           .createQueryBuilder('tx')
           .select('COALESCE(SUM(tx.amount), 0)', 'total')
@@ -221,12 +224,13 @@ export class TransactionsService {
 
   async createManual(userId: string, dto: {
     name: string; amount: number; date: string;
-    bankAccountId?: string | null; categoryId?: string | null;
+    bankAccountId?: string | null; categoryId?: string | null; debtId?: string | null;
   }): Promise<Transaction> {
     if (dto.bankAccountId) {
       const account = await this.accountRepo.findOneBy({ id: dto.bankAccountId });
       if (!account || account.userId !== userId) throw new ForbiddenException();
     }
+    if (dto.debtId && !(dto.amount > 0)) throw new BadRequestException('A debt repayment must be a positive (income) amount.');
     const saved = await this.repo.save(
       this.repo.create({
         userId,
@@ -236,9 +240,18 @@ export class TransactionsService {
         name: dto.name,
         date: dto.date,
         pending: false,
-        categoryId: dto.categoryId ?? undefined,
+        categoryId: dto.debtId ? undefined : (dto.categoryId ?? undefined),
+        debtId: dto.debtId ?? undefined,
       }),
     );
+    if (dto.debtId) {
+      try {
+        await this.debtsService.recordPaymentFromTransaction(dto.debtId, userId, { amount: dto.amount, date: dto.date, transactionId: saved.id });
+      } catch (e) {
+        await this.repo.remove(saved); // don't leave an orphaned tx if the debt was invalid
+        throw e;
+      }
+    }
     return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'bankAccount'] });
   }
 
@@ -266,6 +279,11 @@ export class TransactionsService {
     const tx = await this.repo.findOneBy({ id, userId });
     if (!tx) throw new NotFoundException();
     if (tx.source !== 'manual') throw new BadRequestException('Only manual transactions can be deleted');
+
+    /* Remove the linked debt payment, if this tx was a debt repayment */
+    if (tx.debtId) {
+      await this.debtsService.removePaymentByTransaction(tx.id);
+    }
 
     /* Reverse the transfer account balance adjustment */
     if (tx.transferAccountId) {

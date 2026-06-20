@@ -7,6 +7,7 @@ import CsvImportModal from '@/components/CsvImportModal';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
+import { ACCOUNT_GROUPS, accountTypeLabel, isImportable, isLiability } from '@/lib/accountTypes';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -25,7 +26,9 @@ interface Transaction {
   transferAccountId: string | null;
   transferAccount: BankAccount | null;
   counterpartTxId: string | null;
+  debtId: string | null;
 }
+interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid' }
 
 type Filter    = 'all' | 'uncategorized' | 'expense' | 'income';
 type RangeMode = 'month' | 'custom';
@@ -116,10 +119,12 @@ export default function TransactionsPage() {
   const [newCatForTxId, setNewCatForTxId]     = useState<string | null>(null);
   const [showManualTx, setShowManualTx]   = useState(false);
   const [manualTxSaving, setManualTxSaving] = useState(false);
+  const [manualTxError, setManualTxError] = useState('');
   const [manualAccOpen, setManualAccOpen] = useState(false);
   const [manualCatOpen, setManualCatOpen] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
-  const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '' });
+  const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '' });
+  const [debts, setDebts] = useState<DebtLite[]>([]);
 
   const [importToast, setImportToast] = useState<{ imported: number; skipped: number; account: { bankName: string; accountName: string; accountType: string; color: string } } | null>(null);
   const importToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -206,12 +211,14 @@ export default function TransactionsPage() {
       fetch(`${API}/projects`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/transactions/category-hints`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/transactions/project-hints`, { credentials: 'include' }).then((r) => r.json()).catch(() => ({})),
-    ]).then(([cats, accs, projs, hints, pHints]) => {
+      fetch(`${API}/debts`, { credentials: 'include' }).then((r) => r.json()).catch(() => []),
+    ]).then(([cats, accs, projs, hints, pHints, dbt]) => {
       setCategories(Array.isArray(cats) ? cats : []);
       setAccounts(Array.isArray(accs) ? accs : []);
       setProjects(Array.isArray(projs) ? projs : []);
       if (hints && typeof hints === 'object') setCategoryHints(hints);
       if (pHints && typeof pHints === 'object') setProjectHints(pHints);
+      setDebts(Array.isArray(dbt) ? dbt : []);
     }).catch(() => {});
   }, []);
 
@@ -294,7 +301,9 @@ export default function TransactionsPage() {
   async function saveManualTx(e: React.FormEvent) {
     e.preventDefault();
     const amount = parseFloat(manualTx.amountStr);
-    if (!manualTx.bankAccountId || !manualTx.amountStr || isNaN(amount)) return;
+    setManualTxError('');
+    if (!manualTx.amountStr || isNaN(amount) || amount <= 0) { setManualTxError('Enter an amount greater than zero.'); return; }
+    if (!manualTx.bankAccountId) { setManualTxError('Choose an account for this transaction.'); return; }
     setManualTxSaving(true);
     try {
       const finalAmount = amount * (manualTx.sign === '-' ? -1 : 1);
@@ -310,7 +319,7 @@ export default function TransactionsPage() {
         setTransactions((prev) => prev.map((t) => t.id === editingTxId ? { ...t, ...updated } : t));
         setShowManualTx(false);
         setEditingTxId(null);
-        setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '' });
+        setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '' });
         return;
       }
       const res = await fetch(`${API}/transactions`, {
@@ -322,14 +331,15 @@ export default function TransactionsPage() {
           amount: finalAmount,
           date: manualTx.date,
           bankAccountId: manualTx.bankAccountId,
-          categoryId: manualTx.categoryId || null,
+          categoryId: manualTx.debtId ? null : (manualTx.categoryId || null),
+          debtId: manualTx.debtId || null,
         }),
       });
       if (!res.ok) return;
       const created: Transaction = await res.json();
       setTransactions((prev) => [created, ...prev]);
       setShowManualTx(false);
-      setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '' });
+      setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '' });
     } finally {
       setManualTxSaving(false);
     }
@@ -481,7 +491,9 @@ export default function TransactionsPage() {
   }
 
   /* ── derived data ── */
-  const isTransfer = (t: Transaction) => t.categoryRef?.type === 'transfer';
+  // Excluded from income/expense totals: transfers between own accounts, and debt repayments
+  const isTransfer = (t: Transaction) => t.categoryRef?.type === 'transfer' || !!t.debtId;
+  const openDebts = debts.filter((d) => d.status === 'open');
   const uncategorizedCount = transactions.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
   const visible = transactions.filter((t) => {
     if (filter === 'uncategorized' && (t.categoryId || t.projectId || isTransfer(t))) return false;
@@ -525,10 +537,10 @@ export default function TransactionsPage() {
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
 
-      <main className="flex-1 overflow-y-auto min-w-0">
+      <main className="flex-1 overflow-y-auto min-w-0 pt-14 md:pt-0">
 
         {/* ── Sticky header ── */}
-        <div className="sticky top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-4"
+        <div className="sticky top-14 md:top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-4"
           style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
 
           {/* Title + actions */}
@@ -536,7 +548,7 @@ export default function TransactionsPage() {
             <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
             <div className="flex items-center gap-2">
               {/* New manual transaction */}
-              <button onClick={() => setShowManualTx(true)}
+              <button onClick={() => { setManualTxError(''); setShowManualTx(true); }}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
                 style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 28%, transparent)', color: 'var(--color-green)' }}>
                 <PlusIcon /> New
@@ -567,9 +579,7 @@ export default function TransactionsPage() {
                         </div>
 
                         {(() => {
-                          const importableAccounts = accounts.filter((a) =>
-                            ['checking', 'savings', 'credit', 'investment'].includes(a.accountType),
-                          );
+                          const importableAccounts = accounts.filter((a) => isImportable(a.accountType));
                           return importableAccounts.length === 0 ? (
                           <p className="px-4 py-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
                             No bank accounts yet — create one below.
@@ -585,10 +595,40 @@ export default function TransactionsPage() {
                                   style={{ borderLeft: '3px solid transparent' }}
                                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = `${c}12`; (e.currentTarget as HTMLElement).style.borderLeftColor = `${c}80`; }}
                                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.borderLeftColor = 'transparent'; }}>
-                                  <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base"
-                                    style={{ background: `${c}25`, border: `1px solid ${c}35` }}>
-                                    <AccountTypeIcon type={a.accountType} size={16} />
-                                  </span>
+                                  {/* Composite icon: bank logo + type badge — mirrors the account cards */}
+                                  {(() => {
+                                    const bankMeta = BANKS.find((b) => b.name === a.bankName);
+                                    const isCash   = a.accountType === 'cash';
+                                    return (
+                                      <div className="relative shrink-0" style={{ width: 32, height: 32 }}>
+                                        <div className="w-full h-full rounded-xl flex items-center justify-center overflow-hidden"
+                                          style={{ background: isCash ? `${c}25` : 'white', border: `1px solid ${c}35` }}>
+                                          {isCash ? (
+                                            <span style={{ fontSize: 16 }}>💵</span>
+                                          ) : bankMeta ? (
+                                            <img
+                                              src={`https://logo.clearbit.com/${bankMeta.domain}`}
+                                              alt={a.bankName}
+                                              width={22} height={22}
+                                              style={{ objectFit: 'contain' }}
+                                              onError={(e) => {
+                                                e.currentTarget.src = `https://www.google.com/s2/favicons?domain=${bankMeta.domain}&sz=64`;
+                                                e.currentTarget.style.background = 'transparent';
+                                              }}
+                                            />
+                                          ) : (
+                                            <AccountTypeIcon type={a.accountType} size={16} />
+                                          )}
+                                        </div>
+                                        {!isCash && (
+                                          <div className="absolute -bottom-1 -right-1 w-[17px] h-[17px] rounded-lg flex items-center justify-center"
+                                            style={{ background: c, color: '#fff', border: '2px solid var(--popover-bg)' }}>
+                                            <AccountTypeIcon type={a.accountType} size={10} />
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{a.bankName}</p>
                                     <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.accountName}</p>
@@ -646,23 +686,32 @@ export default function TransactionsPage() {
                             <button type="button" onClick={() => setNewAccTypeOpen((o) => !o)}
                               className="w-full px-2 py-2 text-xs rounded-lg flex items-center justify-between gap-1"
                               style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
-                              <span className="capitalize">{newAcc.accountType === 'credit' ? 'Credit Card' : newAcc.accountType === 'loan' ? 'Loan' : newAcc.accountType.charAt(0).toUpperCase() + newAcc.accountType.slice(1)}</span>
+                              <span>{accountTypeLabel(newAcc.accountType)}</span>
                               <svg width="8" height="8" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
                                 <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             </button>
                             {newAccTypeOpen && (
-                              <div className="absolute top-full left-0 right-0 mt-1 rounded-lg overflow-hidden z-50"
-                                style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
-                                {[['checking','Checking'],['savings','Savings'],['credit','Credit Card'],['investment','Investment'],['cash','Cash'],['loan','Loan']].map(([val, label]) => (
-                                  <button key={val} type="button"
-                                    onClick={() => { setNewAcc((f) => ({ ...f, accountType: val })); setNewAccTypeOpen(false); }}
-                                    className="w-full px-3 py-2 text-xs text-left transition-colors"
-                                    style={{ background: newAcc.accountType === val ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'transparent', color: newAcc.accountType === val ? 'var(--color-primary)' : 'var(--color-text-primary)' }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-elevated)')}
-                                    onMouseLeave={(e) => (e.currentTarget.style.background = newAcc.accountType === val ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'transparent')}>
-                                    {label}
-                                  </button>
+                              <div className="absolute top-full left-0 right-0 mt-1 rounded-lg overflow-y-auto z-50"
+                                style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '240px' }}>
+                                {ACCOUNT_GROUPS.map((grp) => (
+                                  <div key={grp.group}>
+                                    <p className="px-3 pt-2 pb-0.5 text-[9px] font-bold uppercase tracking-widest"
+                                      style={{ color: 'var(--color-text-muted)' }}>{grp.label}</p>
+                                    {grp.types.map((meta) => {
+                                      const val = meta.value;
+                                      return (
+                                        <button key={val} type="button"
+                                          onClick={() => { setNewAcc((f) => ({ ...f, accountType: val })); setNewAccTypeOpen(false); }}
+                                          className="w-full px-3 py-2 text-xs text-left transition-colors flex items-center gap-2"
+                                          style={{ background: newAcc.accountType === val ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'transparent', color: newAcc.accountType === val ? 'var(--color-primary)' : 'var(--color-text-primary)' }}
+                                          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-elevated)')}
+                                          onMouseLeave={(e) => (e.currentTarget.style.background = newAcc.accountType === val ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'transparent')}>
+                                          <AccountTypeIcon type={val} size={14} />{meta.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 ))}
                               </div>
                             )}
@@ -1168,6 +1217,7 @@ export default function TransactionsPage() {
                             <button
                               onMouseDown={(e) => { if (isOpen) e.stopPropagation(); }}
                               onClick={(e) => {
+                                if (tx.debtId) return; // debt repayments are managed from the Debts page / by deleting the tx
                                 if (isOpen) { setOpenPickerId(null); setPickerProjectDrill(null); setPickerTransferStep(false); return; }
                                 const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
                                 const w = 220;
@@ -1186,6 +1236,7 @@ export default function TransactionsPage() {
                               disabled={updatingId === tx.id}
                               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:brightness-110 disabled:opacity-40"
                               style={(() => {
+                                if (tx.debtId) return { background: 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)', color: 'var(--color-card-violet)', cursor: 'default' };
                                 if (tx.projectId) {
                                   const _proj = projects.find((p) => p.id === tx.projectId);
                                   const _pCat = tx.projectCategoryId ? _proj?.categories?.find((c) => c.id === tx.projectCategoryId) : null;
@@ -1197,6 +1248,8 @@ export default function TransactionsPage() {
                               })()}>
                               {updatingId === tx.id ? (
                                 <span>…</span>
+                              ) : tx.debtId ? (
+                                <><span>🤝</span><span>Debt repayment · {debts.find((d) => d.id === tx.debtId)?.borrowerName ?? 'debt'}</span></>
                               ) : tx.projectId ? (() => {
                                 const _proj = projects.find((p) => p.id === tx.projectId);
                                 const _pCat = tx.projectCategoryId ? _proj?.categories?.find((c) => c.id === tx.projectCategoryId) : null;
@@ -1266,7 +1319,7 @@ export default function TransactionsPage() {
                                     )}
                                     {/* No matches — show credit card accounts as quick suggestions */}
                                     {!transferMatchesLoading && transferMatches.length === 0 && (() => {
-                                      const creditAccs = accounts.filter((a) => ['credit', 'loan'].includes(a.accountType) && a.id !== tx.bankAccountId);
+                                      const creditAccs = accounts.filter((a) => isLiability(a.accountType) && a.id !== tx.bankAccountId);
                                       if (!creditAccs.length) return null;
                                       return (
                                         <>
@@ -1598,7 +1651,9 @@ export default function TransactionsPage() {
                                   date: tx.date,
                                   bankAccountId: tx.bankAccountId ?? '',
                                   categoryId: tx.categoryId ?? '',
+                                  debtId: tx.debtId ?? '',
                                 });
+                                setManualTxError('');
                                 setShowManualTx(true);
                               }}
                               className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] shrink-0"
@@ -1714,6 +1769,7 @@ export default function TransactionsPage() {
               const accent     = isExpense ? 'var(--color-orange)' : 'var(--color-green)';
               const selAcc     = accounts.find((a) => a.id === manualTx.bankAccountId);
               const selCat     = categories.find((c) => c.id === manualTx.categoryId);
+              const selDebt    = debts.find((d) => d.id === manualTx.debtId);
               const catOptions = categories.filter((c) => c.type === (isExpense ? 'expense' : 'income') || c.type === 'both');
               const amt        = parseFloat(manualTx.amountStr) || 0;
               return (
@@ -1727,12 +1783,12 @@ export default function TransactionsPage() {
                     <div className="flex items-center justify-between w-full">
                       {/* Type toggle */}
                       <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                        <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '-', categoryId: '' }))}
+                        <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '-', categoryId: '', debtId: '' }))}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
                           style={{ background: isExpense ? 'color-mix(in srgb, var(--color-orange) 13%, transparent)' : 'transparent', color: isExpense ? 'var(--color-orange)' : 'var(--color-text-muted)', border: isExpense ? '1px solid color-mix(in srgb, var(--color-orange) 27%, transparent)' : '1px solid transparent' }}>
                           − Expense
                         </button>
-                        <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '+', categoryId: '' }))}
+                        <button type="button" onClick={() => setManualTx((f) => ({ ...f, sign: '+', categoryId: '', debtId: '' }))}
                           className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
                           style={{ background: !isExpense ? 'color-mix(in srgb, var(--color-green) 13%, transparent)' : 'transparent', color: !isExpense ? 'var(--color-green)' : 'var(--color-text-muted)', border: !isExpense ? '1px solid color-mix(in srgb, var(--color-green) 27%, transparent)' : '1px solid transparent' }}>
                           + Income
@@ -1817,7 +1873,12 @@ export default function TransactionsPage() {
                       <button type="button" onClick={() => { setManualCatOpen((o) => !o); setManualAccOpen(false); }}
                         className="px-3 py-2.5 text-sm flex items-center gap-2.5 rounded-xl outline-none text-left w-full"
                         style={{ background: 'var(--color-elevated)', border: `1px solid ${selCat ? selCat.color + '44' : 'var(--color-elevated)'}`, color: selCat ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                        {selCat ? (
+                        {selDebt ? (
+                          <>
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
+                            <span className="flex-1 font-medium" style={{ color: 'var(--color-card-violet)' }}>Debt repayment · {selDebt.borrowerName}</span>
+                          </>
+                        ) : selCat ? (
                           <>
                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${selCat.color}20` }}>{selCat.icon}</span>
                             <span className="flex-1 font-medium" style={{ color: selCat.color }}>{selCat.name}</span>
@@ -1838,6 +1899,24 @@ export default function TransactionsPage() {
                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'var(--color-elevated)' }}>—</span>
                             Uncategorized
                           </button>
+                          {!isExpense && openDebts.length > 0 && (
+                            <>
+                              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Debt repayment</p>
+                              {openDebts.map((d) => (
+                                <button key={d.id} type="button"
+                                  onClick={() => { setManualTx((f) => ({ ...f, debtId: d.id, categoryId: '' })); setManualCatOpen(false); }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                                  style={{ background: manualTx.debtId === d.id ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)' : 'transparent', color: manualTx.debtId === d.id ? 'var(--color-card-violet)' : 'var(--color-text-primary)' }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = 'color-mix(in srgb, var(--color-card-violet) 12%, transparent)')}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.debtId === d.id ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)' : 'transparent')}>
+                                  <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
+                                  <span className="font-medium flex-1 text-left">{d.borrowerName}</span>
+                                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>${Number(d.remaining).toLocaleString('en-US', { minimumFractionDigits: 2 })} left</span>
+                                </button>
+                              ))}
+                              <div className="h-px my-1" style={{ background: 'var(--color-border)' }} />
+                            </>
+                          )}
                           {catOptions.map((c) => (
                             <button key={c.id} type="button"
                               onClick={() => { setManualTx((f) => ({ ...f, categoryId: c.id })); setManualCatOpen(false); }}
@@ -1856,9 +1935,11 @@ export default function TransactionsPage() {
                   </div>
 
                   {/* Footer */}
-                  <div className="flex gap-2 justify-end px-5 py-4 rounded-b-2xl"
+                  <div className="flex gap-2 items-center px-5 py-4 rounded-b-2xl"
                     style={{ borderTop: '1px solid var(--color-border)' }}>
-                    <button type="button" onClick={() => setShowManualTx(false)}
+                    {manualTxError && <p className="flex-1 text-xs" style={{ color: 'var(--color-rose)' }}>{manualTxError}</p>}
+                    {!manualTxError && <span className="flex-1" />}
+                    <button type="button" onClick={() => { setShowManualTx(false); setManualTxError(''); }}
                       className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
                       style={{ color: 'var(--color-text-secondary)' }}>Cancel</button>
                     <button type="submit" disabled={manualTxSaving}
@@ -2018,8 +2099,8 @@ export default function TransactionsPage() {
                           </p>
                           {accounts.filter((a) => a.id !== srcTx.bankAccountId)
                             .sort((a, b) => {
-                              const aCredit = ['credit', 'loan'].includes(a.accountType) ? 0 : 1;
-                              const bCredit = ['credit', 'loan'].includes(b.accountType) ? 0 : 1;
+                              const aCredit = isLiability(a.accountType) ? 0 : 1;
+                              const bCredit = isLiability(b.accountType) ? 0 : 1;
                               return aCredit - bCredit;
                             })
                             .map((a) => {

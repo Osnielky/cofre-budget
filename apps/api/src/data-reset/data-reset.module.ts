@@ -6,11 +6,12 @@ import { Project } from '../projects/project.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Budget } from '../budgets/budget.entity';
+import { Debt } from '../debts/debt.entity';
 import { DataResetService } from './data-reset.service';
 import { DataResetController } from './data-reset.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Transaction, Category, Project, ProjectCategory, BankAccount, Budget])],
+  imports: [TypeOrmModule.forFeature([Transaction, Category, Project, ProjectCategory, BankAccount, Budget, Debt])],
   controllers: [DataResetController],
   providers: [DataResetService],
 })

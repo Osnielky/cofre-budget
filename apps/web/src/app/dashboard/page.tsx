@@ -10,6 +10,7 @@ import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Cell, PieChart, Pie, Area, AreaChart,
 } from 'recharts';
+import { isLiability, isTrackingAccount } from '@/lib/accountTypes';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -18,6 +19,7 @@ interface BankAccount { id: string; bankName: string; accountName: string; accou
 interface Transaction {
   id: string; name: string; amount: number; date: string; source: string;
   categoryRef: Category | null; bankAccount: BankAccount | null; projectId: string | null;
+  debtId?: string | null;
 }
 interface Budget { id: string; amount: number; spent: number; category: Category }
 interface Project { id: string; name: string; icon: string; color: string; type: string; status: string; expenses: number; income: number; costBasis: number; netGain: number | null; roi: number | null; purchasePrice: number }
@@ -115,6 +117,7 @@ export default function DashboardPage() {
   const [accounts, setAccounts]    = useState<BankAccount[]>([]);
   const [budgets, setBudgets]      = useState<Budget[]>([]);
   const [projects, setProjects]    = useState<Project[]>([]);
+  const [debts, setDebts]          = useState<{ remaining: number; status: 'open' | 'paid' }[]>([]);
   const [loading, setLoading]      = useState(true);
   const { user } = useUser();
   const tc = useThemeColors();
@@ -125,28 +128,35 @@ export default function DashboardPage() {
       const from = monthFrom(month), to = monthTo(month);
       const yearFrom = `${new Date().getFullYear()}-01-01`;
       const yearTo   = new Date().toISOString().slice(0, 10);
-      const [tx, ytx, accs, bdg, proj] = await Promise.all([
+      const [tx, ytx, accs, bdg, proj, dbt] = await Promise.all([
         fetch(`${API}/transactions?from=${from}&to=${to}&limit=500`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/transactions?from=${yearFrom}&to=${yearTo}&limit=5000`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/bank-accounts`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/budgets?month=${month}`, { credentials:'include' }).then(r=>r.json()),
         fetch(`${API}/projects`, { credentials:'include' }).then(r=>r.json()),
+        fetch(`${API}/debts`, { credentials:'include' }).then(r=>r.json()),
       ]);
       setTx(Array.isArray(tx) ? tx : []);
       setYearTx(Array.isArray(ytx) ? ytx : []);
       setAccounts(Array.isArray(accs) ? accs : []);
       setBudgets(Array.isArray(bdg) ? bdg : []);
       setProjects(Array.isArray(proj) ? proj : []);
+      setDebts(Array.isArray(dbt) ? dbt : []);
     } catch {} finally { setLoading(false); }
   }, [month]);
 
   useEffect(() => { load(); }, [load]);
 
   /* ── Derived data ── */
-  const isTransfer   = (t: Transaction) => t.categoryRef?.type === 'transfer';
-  const isDebtAcc    = (a: BankAccount) => ['credit','loan'].includes(a.accountType);
-  const income       = transactions.filter(t => Number(t.amount) > 0  && !isTransfer(t)).reduce((s,t) => s + Number(t.amount), 0);
-  const expenses     = transactions.filter(t => Number(t.amount) < 0  && !isTransfer(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
+  // Excluded from income/expense (transfers between own accounts + debt repayments)
+  // Tracking accounts (investment, mortgage, other asset/liability) are net-worth only —
+  // exclude them from income/expense/cash-flow, alongside transfers & debt repayments.
+  const isTransfer   = (t: Transaction) => t.categoryRef?.type === 'transfer' || !!t.debtId;
+  const isTrackingTx = (t: Transaction) => isTrackingAccount(t.bankAccount?.accountType ?? '');
+  const inCashFlow   = (t: Transaction) => !isTransfer(t) && !isTrackingTx(t);
+  const isDebtAcc    = (a: BankAccount) => isLiability(a.accountType);
+  const income       = transactions.filter(t => Number(t.amount) > 0  && inCashFlow(t)).reduce((s,t) => s + Number(t.amount), 0);
+  const expenses     = transactions.filter(t => Number(t.amount) < 0  && inCashFlow(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
   const net          = income - expenses;
   const savingsRate  = income > 0 ? (net / income * 100) : 0;
   const spendingBudgets = budgets.filter(b => b.category?.type !== 'income');
@@ -154,8 +164,11 @@ export default function DashboardPage() {
   const incomeTarget    = incomeTargets.reduce((s,b) => s + Number(b.amount), 0) || null;
   const targetPct       = incomeTarget ? Math.round((income / incomeTarget) * 100) : null;
   const totalBalance = accounts.reduce((s,a) => s + (isDebtAcc(a) ? -Math.abs(Number(a.balance||0)) : Number(a.balance||0)), 0);
-  const totalAssets  = accounts.filter(a => !isDebtAcc(a)).reduce((s,a) => s + Number(a.balance||0), 0);
+  /* Money others still owe you = a receivable asset (open debts' remaining). */
+  const receivables  = debts.filter(d => d.status === 'open').reduce((s,d) => s + Number(d.remaining || 0), 0);
+  const totalAssets  = accounts.filter(a => !isDebtAcc(a)).reduce((s,a) => s + Number(a.balance||0), 0) + receivables;
   const totalDebt    = accounts.filter(a => isDebtAcc(a)).reduce((s,a) => s + Math.abs(Number(a.balance||0)), 0);
+  const netWorth     = totalBalance + receivables;
   const isCurrentMonth = month === currentMonth();
 
   /* Prev month comparison from yearTx */
@@ -165,18 +178,27 @@ export default function DashboardPage() {
   const incDelta = prevInc > 0 ? ((income - prevInc) / prevInc * 100) : 0;
   const expDelta = prevExp > 0 ? ((expenses - prevExp) / prevExp * 100) : 0;
 
-  /* Category spending */
-  const catSpend = transactions
+  /* Ranked category breakdown (horizontal bar chart): total + tx count + prev-month delta */
+  const catFull = transactions
     .filter(t => Number(t.amount) < 0 && !isTransfer(t) && t.categoryRef)
-    .reduce<Record<string, { cat: Category; total: number }>>((m,t) => {
+    .reduce<Record<string, { cat: Category; total: number; count: number }>>((m,t) => {
       const c = t.categoryRef!;
-      if (!m[c.id]) m[c.id] = { cat:c, total:0 };
+      if (!m[c.id]) m[c.id] = { cat: c, total: 0, count: 0 };
       m[c.id].total += Math.abs(Number(t.amount));
+      m[c.id].count += 1;
       return m;
     }, {});
-  const topCats      = Object.values(catSpend).sort((a,b) => b.total - a.total).slice(0,6);
-  const maxCatSpend  = topCats[0]?.total || 1;
-  const totalCatSpend = topCats.reduce((s,c) => s + c.total, 0);
+  const prevCatTotals = yearTx
+    .filter(t => t.date.startsWith(prevM) && Number(t.amount) < 0 && !isTransfer(t) && t.categoryRef)
+    .reduce<Record<string, number>>((m,t) => {
+      const id = t.categoryRef!.id; m[id] = (m[id] || 0) + Math.abs(Number(t.amount)); return m;
+    }, {});
+  const catRanked      = Object.values(catFull).map(x => ({ ...x, prev: prevCatTotals[x.cat.id] ?? 0 })).sort((a,b) => b.total - a.total);
+  const catRankedTop   = catRanked.slice(0, 10);
+  const catRankedTotal = catRanked.reduce((s,x) => s + x.total, 0);
+  const catRankedMax   = catRankedTop[0]?.total || 1;
+  const avgPerCat      = catRanked.length ? catRankedTotal / catRanked.length : 0;
+  const topCatShare    = catRankedTotal > 0 && catRankedTop[0] ? (catRankedTop[0].total / catRankedTotal * 100) : 0;
 
   /* Budget health */
   const overBudget     = spendingBudgets.filter(b => Number(b.spent) > Number(b.amount));
@@ -245,7 +267,7 @@ export default function DashboardPage() {
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
 
         {/* ── Topbar ── */}
         <div className="px-8 pt-9 flex items-end justify-between gap-6 flex-wrap">
@@ -283,7 +305,7 @@ export default function DashboardPage() {
           {/* ── Row 1: Stat cards ── */}
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
             {[
-              { label: 'Net Worth',    value: `$${fmt(totalBalance)}`,                    sub: `${accounts.length} accounts`,              accent: tc.violet, icon: ICON_WALLET,  delta: null,     inverseDelta: false },
+              { label: 'Net Worth',    value: `$${fmt(netWorth)}`,                        sub: receivables > 0 ? `incl. $${fmt(receivables)} owed to you` : `${accounts.length} accounts`, accent: tc.violet, icon: ICON_WALLET,  delta: null,     inverseDelta: false },
               { label: 'Income',       value: `$${fmt(income)}`,                          sub: targetPct != null ? `${targetPct}% of $${fmt(incomeTarget!)} target` : `vs ${monthShort(prevM)}: $${fmt(prevInc)}`, accent: tc.green,  icon: ICON_TRENDUP, delta: incDelta, inverseDelta: false },
               { label: 'Expenses',     value: `$${fmt(expenses)}`,                        sub: `vs ${monthShort(prevM)}: $${fmt(prevExp)}`, accent: tc.orange, icon: ICON_TRENDDN, delta: expDelta, inverseDelta: true },
               { label: 'Savings Rate', value: `${savingsRate >= 0 ? '' : '-'}${Math.abs(savingsRate).toFixed(1)}%`, sub: net >= 0 ? `$${fmt(net)} saved` : `$${fmt(Math.abs(net))} deficit`, accent: savingsRate >= 30 ? tc.green : savingsRate >= 0 ? tc.amber : tc.rose, icon: ICON_SAVINGS, delta: null, inverseDelta: false },
@@ -397,8 +419,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ── Row 3: Spending trend + top categories ── */}
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          {/* ── Row 3: Spending trend + ranked category breakdown ── */}
+          <div className="flex flex-col gap-5">
 
             {/* Daily spending area chart */}
             <div className="flex flex-col gap-4 p-7 rounded-2xl" style={glass}>
@@ -437,77 +459,84 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Spending by Category — donut */}
-            <div className="flex flex-col gap-4 p-7 rounded-2xl" style={glass}>
-              {/* Header */}
-              <div className="flex items-center justify-between">
+            {/* Spending by Category — ranked horizontal bars */}
+            <div className="flex flex-col gap-5 p-7 rounded-2xl" style={glass}>
+              {/* Header + summary stats */}
+              <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <p className="card-title">Spending by Category</p>
-                  <p className="text-2xl font-extrabold mt-0.5 tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
-                    {loading ? '—' : `$${fmt(expenses)}`}
+                  <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {monthLabel(month)} · top {Math.min(10, catRankedTop.length)}{catRanked.length > 10 ? ` of ${catRanked.length}` : ''}
                   </p>
                 </div>
-                <span className="text-[10px] font-semibold px-2.5 py-1 rounded-lg"
-                  style={{ background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
-                  {monthLabel(month)}
-                </span>
+                <div className="flex items-center gap-6">
+                  {[
+                    { label: 'Total',     value: loading ? '—' : `$${fmt(catRankedTotal)}`, color: 'var(--color-orange)' },
+                    { label: 'Avg / cat', value: loading ? '—' : fmtK(avgPerCat),           color: 'var(--color-text-primary)' },
+                    { label: 'Top share', value: loading ? '—' : `${topCatShare.toFixed(0)}%`, color: 'var(--color-violet)' },
+                  ].map(s => (
+                    <div key={s.label} className="text-right">
+                      <p className="text-[9.5px] font-semibold uppercase" style={{ color: 'var(--color-text-muted)', letterSpacing: '0.14em' }}>{s.label}</p>
+                      <p className="text-lg font-extrabold tabular-nums mt-0.5" style={{ color: s.color }}>{s.value}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {loading ? (
-                <div className="h-40 flex items-center justify-center text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</div>
-              ) : topCats.length === 0 ? (
-                <div className="h-40 flex flex-col items-center justify-center gap-2">
+                <div className="h-48 flex items-center justify-center text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</div>
+              ) : catRankedTop.length === 0 ? (
+                <div className="h-48 flex flex-col items-center justify-center gap-2">
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-50" aria-hidden="true">
                     <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>
                   </svg>
-                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No categorized expenses.</p>
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No categorized expenses this month.</p>
                 </div>
               ) : (
-                <div className="flex gap-4 items-center">
-                  {/* Donut */}
-                  <div className="relative shrink-0" style={{ width: 148, height: 148 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={topCats.map(({ cat, total }) => ({ name: cat.name, value: total, color: cat.color }))}
-                          cx="50%" cy="50%"
-                          innerRadius={46} outerRadius={68}
-                          dataKey="value" paddingAngle={2} stroke="none"
-                          startAngle={90} endAngle={-270}>
-                          {topCats.map(({ cat }, i) => <Cell key={i} fill={cat.color} />)}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 10, fontSize: 11 }}
-                          formatter={(v: unknown, name: unknown) => [`$${fmt(Number(v))}`, String(name)]}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    {/* Center label */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <p className="text-lg font-extrabold leading-none" style={{ color: 'var(--color-text-primary)' }}>
-                        {budgetPct > 0 ? `${Math.min(100, budgetPct).toFixed(0)}%` : `${topCats.length}`}
-                      </p>
-                      <p className="text-[9px] font-semibold mt-0.5 text-center leading-tight px-2" style={{ color: 'var(--color-text-muted)' }}>
-                        {budgetPct > 0 ? 'Total\nExpends' : 'Categories'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Legend */}
-                  <div className="flex flex-col gap-2 flex-1 min-w-0">
-                    {topCats.map(({ cat, total }) => {
-                      const pct = totalCatSpend > 0 ? (total / totalCatSpend * 100).toFixed(0) : '0';
-                      return (
-                        <div key={cat.id} className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: cat.color }} />
-                          <span className="text-xs flex-1 truncate" style={{ color: 'var(--color-text-secondary)' }}>
-                            {cat.icon} {cat.name}
-                          </span>
-                          <span className="text-[10px] font-bold shrink-0" style={{ color: cat.color }}>{pct}%</span>
+                <div className="flex flex-col gap-3.5">
+                  {catRankedTop.map(({ cat, total, count, prev }, i) => {
+                    const pct      = catRankedTotal > 0 ? (total / catRankedTotal * 100) : 0;
+                    const widthPct = Math.max(2, total / catRankedMax * 100);
+                    const delta    = prev > 0 ? ((total - prev) / prev * 100) : null;
+                    return (
+                      <div key={cat.id} className="cat-bar-row group">
+                        {/* Label row */}
+                        <div className="flex items-center justify-between gap-3 mb-1.5">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="text-[11px] font-bold tabular-nums w-4 text-center shrink-0" style={{ color: 'var(--color-text-muted)' }}>{i + 1}</span>
+                            <span className="w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0"
+                              style={{ background: `color-mix(in srgb, ${cat.color} 16%, transparent)` }}>{cat.icon}</span>
+                            <span className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{cat.name}</span>
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md shrink-0 hidden sm:inline"
+                              style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
+                              {count} tx
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            {delta !== null && Math.abs(delta) >= 0.5 && (
+                              <span className="text-[10px] font-bold flex items-center gap-0.5"
+                                style={{ color: delta > 0 ? 'var(--color-rose)' : 'var(--color-green)' }}
+                                title={`vs ${monthShort(prevM)}: $${fmt(prev)}`}>
+                                {delta > 0 ? '↑' : '↓'}{Math.abs(delta).toFixed(0)}%
+                              </span>
+                            )}
+                            <span className="text-[11px] font-semibold tabular-nums w-10 text-right" style={{ color: 'var(--color-text-muted)' }}>{pct.toFixed(1)}%</span>
+                            <span className="text-sm font-extrabold tabular-nums w-24 text-right" style={{ color: 'var(--color-text-primary)' }}>${fmt(total)}</span>
+                          </div>
                         </div>
-                      );
-                    })}
-                  </div>
+                        {/* Bar */}
+                        <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--color-elevated)' }}>
+                          <div className="cat-bar-fill h-full rounded-full"
+                            style={{
+                              width: `${widthPct}%`,
+                              background: `linear-gradient(90deg, color-mix(in srgb, ${cat.color} 78%, black) 0%, ${cat.color} 55%, color-mix(in srgb, ${cat.color} 55%, white) 100%)`,
+                              boxShadow: `0 0 12px color-mix(in srgb, ${cat.color} 45%, transparent)`,
+                              animationDelay: `${i * 55}ms`,
+                            }} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -571,7 +600,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <p className="card-title">Accounts</p>
                   <div className="text-right">
-                    <p className="text-xs font-black tabular-nums" style={{ color: 'var(--color-primary)' }}>${fmt(totalBalance)}</p>
+                    <p className="text-xs font-black tabular-nums" style={{ color: 'var(--color-primary)' }}>${fmt(netWorth)}</p>
                     <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>net worth</p>
                   </div>
                 </div>
