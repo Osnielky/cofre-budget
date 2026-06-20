@@ -37,7 +37,9 @@ const TIER_LABELS: Record<MatchTier, string> = {
   none:   'No match',
 };
 
-export default function ImportReconcileModal({ accounts, onClose, onImported }: Props) {
+const ACC_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0'];
+
+export default function ImportReconcileModal({ accounts, onClose, onImported, onAccountCreated }: Props) {
   const [rows, setRows]             = useState<CsvRow[]>([]);
   const [csvBalance, setCsvBalance] = useState<number | undefined>(undefined);
   const [fileName, setFileName]     = useState('');
@@ -49,6 +51,12 @@ export default function ImportReconcileModal({ accounts, onClose, onImported }: 
   const [dragging, setDragging]     = useState(false);
   const [dupCheck, setDupCheck]     = useState<DupCheck | null>(null);
   const [dupChecking, setDupChecking] = useState(false);
+
+  // Create-new-account form state
+  const [newAcc, setNewAcc] = useState({
+    bankName: '', accountName: '', accountType: 'checking', last4: '', color: '#9B6DFF',
+  });
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function checkDups(parsed: CsvRow[], accountId: string) {
@@ -87,6 +95,21 @@ export default function ImportReconcileModal({ accounts, onClose, onImported }: 
         setRanking(rank);
         const bestId = rank.best ? rank.best.account.id : 'create';
         setSelectedId(bestId);
+
+        // Prefill create-form from file fingerprint
+        const detectedType = fingerprint.type === 'credit' ? 'credit' : 'checking';
+        const bank = fingerprint.bank
+          ? fingerprint.bank.replace(/\b\w/g, (c) => c.toUpperCase())
+          : '';
+        const typeLabel = detectedType.charAt(0).toUpperCase() + detectedType.slice(1);
+        setNewAcc({
+          bankName: bank,
+          accountName: `${bank ? bank + ' ' : ''}${typeLabel}${last4 ? ' ••' + last4 : ''}`.trim(),
+          accountType: detectedType,
+          last4: last4 ?? '',
+          color: '#9B6DFF',
+        });
+
         if (bestId !== 'create') {
           checkDups(parsed, bestId);
         }
@@ -123,21 +146,44 @@ export default function ImportReconcileModal({ accounts, onClose, onImported }: 
   }
 
   async function handleImport() {
-    if (!selectedId || selectedId === 'create') return;
-    const account = accounts.find((a) => a.id === selectedId);
-    if (!account) return;
     setImporting(true); setError('');
     try {
-      const res = await fetch(`${API}/transactions/import`, {
+      let account: MatchAccount;
+      if (selectedId === 'create') {
+        if (!newAcc.bankName.trim() || !newAcc.accountName.trim()) {
+          setError('Bank name and account name are required.'); setImporting(false); return;
+        }
+        const res = await fetch(`${API}/bank-accounts`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({
+            bankName: newAcc.bankName.trim(),
+            accountName: newAcc.accountName.trim(),
+            accountType: newAcc.accountType,
+            color: newAcc.color,
+            currency: 'USD',
+            balance: csvBalance ?? 0,
+            last4: newAcc.last4 || null,
+          }),
+        });
+        if (!res.ok) throw new Error('Could not create the account.');
+        account = await res.json();
+        onAccountCreated(account);
+      } else {
+        const found = accounts.find((a) => a.id === selectedId);
+        if (!found) { setImporting(false); return; }
+        account = found;
+      }
+
+      const imp = await fetch(`${API}/transactions/import`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ bankAccountId: account.id, rows, finalBalance: csvBalance }),
       });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      if (!imp.ok) throw new Error('Account created, but import failed. Re-run the import into that account.');
+      const data = await imp.json();
       setResult(data);
       onImported({ imported: data.imported, skipped: data.skipped, account });
-    } catch {
-      setError('Import failed. Please try again.');
+    } catch (err: any) {
+      setError(err.message ?? 'Import failed. Please try again.');
     } finally { setImporting(false); }
   }
 
@@ -152,7 +198,8 @@ export default function ImportReconcileModal({ accounts, onClose, onImported }: 
   const tierColor = selectedId === 'create' ? 'var(--color-text-muted)' : TIER_COLORS[confidenceTier];
   const tierLabel = selectedId === 'create' ? '' : TIER_LABELS[confidenceTier];
 
-  const importDisabled = !selectedId || selectedId === 'create' || importing || dupChecking;
+  const createReady = selectedId === 'create' && newAcc.bankName.trim() !== '' && newAcc.accountName.trim() !== '';
+  const importDisabled = !selectedId || importing || dupChecking || (selectedId === 'create' && !createReady);
 
   return (
     <div
@@ -185,7 +232,7 @@ export default function ImportReconcileModal({ accounts, onClose, onImported }: 
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors shrink-0"
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)] transition-colors shrink-0"
             style={{ color: 'var(--color-text-muted)' }}
           >
             ✕
@@ -334,6 +381,94 @@ export default function ImportReconcileModal({ accounts, onClose, onImported }: 
                       <span style={{ color: tierColor }}>{confidenceText}</span>
                     </div>
                   )}
+
+                  {/* Inline create-account form */}
+                  {selectedId === 'create' && (
+                    <div
+                      className="flex flex-col gap-3 mt-1 p-4 rounded-xl"
+                      style={{ background: 'color-mix(in srgb, var(--color-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 18%, transparent)' }}
+                    >
+                      <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--color-primary)' }}>
+                        New account details
+                      </p>
+
+                      {/* Bank name */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                          Bank name <span style={{ color: 'var(--color-card-orange)' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Chase"
+                          value={newAcc.bankName}
+                          onChange={(e) => setNewAcc((f) => ({ ...f, bankName: e.target.value }))}
+                          className="w-full px-3 py-2 text-sm rounded-xl outline-none"
+                          style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                        />
+                      </div>
+
+                      {/* Account name */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                          Account name <span style={{ color: 'var(--color-card-orange)' }}>*</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Checking ••1234"
+                          value={newAcc.accountName}
+                          onChange={(e) => setNewAcc((f) => ({ ...f, accountName: e.target.value }))}
+                          className="w-full px-3 py-2 text-sm rounded-xl outline-none"
+                          style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                        />
+                      </div>
+
+                      {/* Account type + last 4 */}
+                      <div className="flex gap-2">
+                        <div className="flex flex-col gap-1 flex-1">
+                          <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</label>
+                          <select
+                            value={newAcc.accountType}
+                            onChange={(e) => setNewAcc((f) => ({ ...f, accountType: e.target.value }))}
+                            className="w-full px-3 py-2 text-sm rounded-xl outline-none"
+                            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                          >
+                            <option value="checking">Checking</option>
+                            <option value="savings">Savings</option>
+                            <option value="credit">Credit</option>
+                            <option value="investment">Investment</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1" style={{ width: '90px' }}>
+                          <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Last 4</label>
+                          <input
+                            type="text"
+                            placeholder="1234"
+                            maxLength={4}
+                            value={newAcc.last4}
+                            onChange={(e) => setNewAcc((f) => ({ ...f, last4: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                            className="w-full px-3 py-2 text-sm rounded-xl outline-none tabular-nums"
+                            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Color swatches */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</label>
+                        <div className="flex items-center gap-2">
+                          {ACC_COLORS.map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => setNewAcc((f) => ({ ...f, color: c }))}
+                              className="w-5 h-5 rounded-full transition-transform hover:scale-110 shrink-0"
+                              style={{ background: c, outline: newAcc.color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -390,7 +525,8 @@ export default function ImportReconcileModal({ accounts, onClose, onImported }: 
                 >
                   {importing ? 'Importing…'
                     : dupChecking ? 'Checking…'
-                    : selectedId === 'create' ? 'Select an account'
+                    : selectedId === 'create' && !createReady ? 'Fill in account details'
+                    : selectedId === 'create' ? `Create & import ${rows.length} transaction${rows.length !== 1 ? 's' : ''}`
                     : dupCheck ? `Import ${dupCheck.newCount} transaction${dupCheck.newCount !== 1 ? 's' : ''}`
                     : `Import ${rows.length} transactions`}
                 </button>
