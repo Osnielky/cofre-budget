@@ -271,7 +271,7 @@ export default function ProjectsPage() {
       }
 
       setProjects((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
-      if (expandedId === showSell.id) await loadDetail(showSell.id);
+      if (selectedId === showSell.id) await loadDetail(showSell.id);
       setShowSell(null);
       setSellLinkedTx(null); setSellAllTx([]);
     } finally { setSelling(false); }

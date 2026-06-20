@@ -1,0 +1,19 @@
+# Builds the Next.js web image. With the single-origin proxy, the browser only
+# calls the relative path /api, so NEXT_PUBLIC_API_URL is baked in as "/api"
+# (pass _API_URL=/api). The real API URL is supplied at *runtime* via the
+# API_PROXY_URL env var on the web Cloud Run service — see deploy.sh.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - 'build'
+      - '-f'
+      - 'apps/web/Dockerfile'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_URL=${_API_URL}'
+      - '-t'
+      - '${_IMAGE}'
+      - '.'
+images:
+  - '${_IMAGE}'
+options:
+  logging: CLOUD_LOGGING_ONLY

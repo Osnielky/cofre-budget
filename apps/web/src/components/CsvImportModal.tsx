@@ -490,7 +490,7 @@ function validate(rows: CsvRow[], account: BankAccount, fileName: string, rawTex
 
 const DATE_COL_NAMES = ['transaction date','trans date','trans. date','activity date','date','posting date','posted date','post date','value date','booking date'];
 
-function parseCsv(text: string): CsvRow[] {
+function parseCsv(text: string): { rows: CsvRow[]; finalBalance: number | undefined } {
   const allLines = text.trim().split('\n').map((l) => l.trim()).filter(Boolean);
   if (allLines.length < 2) throw new Error('CSV file is empty or has no data rows.');
 

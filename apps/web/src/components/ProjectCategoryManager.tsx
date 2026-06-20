@@ -75,7 +75,7 @@ export default function ProjectCategoryManager() {
       if (!res.ok) return;
       const created: ProjectCategory = await res.json();
       setCats((prev) => [...prev, created]);
-      setAddForm({ name: '', icon: '📦', color: '#9B6DFF' });
+      setAddForm({ name: '', icon: '📦', color: '#9B6DFF', type: activeType });
       setShowAdd(false);
     } finally { setAddSaving(false); }
   }
