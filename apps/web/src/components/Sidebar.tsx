@@ -23,8 +23,14 @@ export default function Sidebar() {
 
   async function handleLogout() {
     setLoggingOut(true);
-    await fetch(`${API}/auth/logout`, { method: 'POST', credentials: 'include' });
-    router.push('/login');
+    try {
+      await fetch(`${API}/auth/logout`, { method: 'POST', credentials: 'include' });
+    } catch {
+      // Network error or API down — log out client-side anyway.
+    } finally {
+      router.push('/login');
+      setLoggingOut(false);
+    }
   }
 
   const displayName = user?.name || user?.email?.split('@')[0] || '…';
