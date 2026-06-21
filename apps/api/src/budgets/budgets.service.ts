@@ -18,6 +18,32 @@ export class BudgetsService {
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
   ) {}
 
+  /** Average monthly spend per category over the trailing `months` months,
+      to suggest budget amounts. Expenses only; tracking accounts excluded. */
+  async categoryAverages(userId: string, months = 3): Promise<Record<string, number>> {
+    const n = Math.min(Math.max(months, 1), 12);
+    const now = new Date();
+    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - n, 1));
+    const startDate = start.toISOString().slice(0, 10);
+
+    const rows = await this.txRepo
+      .createQueryBuilder('tx')
+      .leftJoin('tx.bankAccount', 'ba')
+      .select('tx.categoryId', 'categoryId')
+      .addSelect('COALESCE(SUM(ABS(tx.amount)), 0)', 'total')
+      .where('tx.userId = :userId', { userId })
+      .andWhere('tx.amount < 0')
+      .andWhere('tx.categoryId IS NOT NULL')
+      .andWhere('tx.date >= :startDate', { startDate })
+      .andWhere('(ba."accountType" IS NULL OR ba."accountType" NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] })
+      .groupBy('tx.categoryId')
+      .getRawMany<{ categoryId: string; total: string }>();
+
+    const map: Record<string, number> = {};
+    for (const r of rows) map[r.categoryId] = parseFloat(r.total) / n;
+    return map;
+  }
+
   async findWithSpent(userId: string, month: string): Promise<BudgetWithSpent[]> {
     const budgets = await this.repo.find({ where: { userId, month } });
     const startDate = `${month}-01`;

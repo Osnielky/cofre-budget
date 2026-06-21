@@ -12,6 +12,11 @@ export class BudgetsController {
     return this.service.getMonthSummaries(req.user.id);
   }
 
+  @Get('category-averages')
+  categoryAverages(@Request() req: any, @Query('months') months?: string) {
+    return this.service.categoryAverages(req.user.id, months ? parseInt(months, 10) : 3);
+  }
+
   @Get()
   list(@Request() req: any, @Query('month') month?: string) {
     const m = month ?? currentMonth();
