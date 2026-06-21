@@ -565,14 +565,25 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
             </button>
             {rows.length > 0 && !result && (() => {
               const nothingNew = dupCheck && dupCheck.newCount === 0 && selectedId !== 'create';
-              if (nothingNew) return (
-                <span
-                  className="text-xs font-semibold px-3 py-2 rounded-xl"
-                  style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 25%, transparent)' }}
-                >
-                  ✓ All already imported
-                </span>
-              );
+              if (nothingNew) {
+                // Already imported — but let the user refresh the balance from the
+                // file's ending balance (server applies it even with 0 new rows).
+                if (csvBalance !== undefined) return (
+                  <button onClick={handleImport} disabled={importing}
+                    className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50 transition-all"
+                    style={{ background: 'var(--color-primary)' }}>
+                    {importing ? 'Updating…' : `Update balance to $${csvBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                  </button>
+                );
+                return (
+                  <span
+                    className="text-xs font-semibold px-3 py-2 rounded-xl"
+                    style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 25%, transparent)' }}
+                  >
+                    ✓ All already imported
+                  </span>
+                );
+              }
               return (
                 <button
                   onClick={handleImport}

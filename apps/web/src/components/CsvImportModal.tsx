@@ -9,7 +9,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 interface BankAccount {
   id: string; bankName: string; accountName: string; accountType: string; color: string;
-  last4?: string | null;
+  last4?: string | null; balance?: number;
 }
 
 interface ImportResult { imported: number; skipped: number; account: BankAccount; }
@@ -303,12 +303,25 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
             </button>
             {rows.length > 0 && !result && (() => {
               const nothingNew = dupCheck && dupCheck.newCount === 0;
-              if (nothingNew) return (
-                <span className="text-xs font-semibold px-3 py-2 rounded-xl"
-                  style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 25%, transparent)' }}>
-                  ✓ All already imported
-                </span>
-              );
+              if (nothingNew) {
+                // Everything's already imported — but if the file's ending balance
+                // differs from the account's, let the user refresh just the balance
+                // (sends the import; the server applies finalBalance with 0 new rows).
+                const canUpdateBalance = csvBalance !== undefined && Number(account.balance ?? 0) !== csvBalance;
+                if (canUpdateBalance) return (
+                  <button onClick={handleImport} disabled={importing}
+                    className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50 transition-all"
+                    style={{ background: account.color }}>
+                    {importing ? 'Updating…' : `Update balance to $${csvBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                  </button>
+                );
+                return (
+                  <span className="text-xs font-semibold px-3 py-2 rounded-xl"
+                    style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 25%, transparent)' }}>
+                    ✓ All already imported
+                  </span>
+                );
+              }
               return (
                 <button onClick={handleImport} disabled={importing || hasErrors || dupChecking}
                   className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50 transition-all"
