@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { parseCsv, detectCsvFingerprint, extractFileLast4 } from '@/lib/csvImport';
+import { parseCsv, detectCsvFingerprint, extractFileLast4, bankNamesMatch } from '@/lib/csvImport';
 import type { CsvRow } from '@/lib/csvImport';
 import { rankAccounts } from '@/lib/accountMatch';
 import type { MatchAccount, RankResult, MatchTier } from '@/lib/accountMatch';
+import { BANKS } from '@/components/BankSelect';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -39,6 +40,15 @@ const TIER_LABELS: Record<MatchTier, string> = {
 };
 
 const ACC_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0'];
+
+/* Map a detected fingerprint bank (lowercase, e.g. "bank of america", "citi")
+   to the BANKS registry's canonical display name so the saved account resolves
+   to a known logo. Falls back to title-case when no registry entry matches. */
+function canonicalBankName(detected: string | null): string {
+  if (!detected) return '';
+  const hit = BANKS.find((b) => bankNamesMatch(detected, b.name));
+  return hit ? hit.name : detected.replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export default function ImportReconcileModal({ accounts, onClose, onImported, onAccountCreated }: Props) {
   const [rows, setRows]             = useState<CsvRow[]>([]);
@@ -97,11 +107,12 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
         const bestId = rank.best ? rank.best.account.id : 'create';
         setSelectedId(bestId);
 
-        // Prefill create-form from file fingerprint
+        // Prefill create-form from file fingerprint. Use the canonical bank name
+        // from the BANKS registry so the saved account matches a known logo
+        // (detection yields e.g. "bank of america" / "citi"; the registry has
+        // "Bank of America" / "Citibank").
         const detectedType = fingerprint.type === 'credit' ? 'credit' : 'checking';
-        const bank = fingerprint.bank
-          ? fingerprint.bank.replace(/\b\w/g, (c) => c.toUpperCase())
-          : '';
+        const bank = canonicalBankName(fingerprint.bank);
         const typeLabel = detectedType.charAt(0).toUpperCase() + detectedType.slice(1);
         setNewAcc({
           bankName: bank,
