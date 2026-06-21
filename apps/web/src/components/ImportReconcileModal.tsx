@@ -192,12 +192,10 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
   const newCount = dupCheck ? dupCheck.newCount : rows.length;
 
   const selectedRanked = ranking?.ranked.find((r) => r.account.id === selectedId) ?? null;
-  const confidenceText = selectedId === 'create'
-    ? 'A new account will be created from this file'
-    : selectedRanked?.reason ?? '';
+  const confidenceText = selectedRanked?.reason ?? '';
   const confidenceTier: MatchTier = selectedRanked?.tier ?? 'none';
-  const tierColor = selectedId === 'create' ? 'var(--color-text-muted)' : TIER_COLORS[confidenceTier];
-  const tierLabel = selectedId === 'create' ? '' : TIER_LABELS[confidenceTier];
+  const tierColor = TIER_COLORS[confidenceTier];
+  const tierLabel = selectedRanked ? TIER_LABELS[confidenceTier] : '';
 
   const createReady = selectedId === 'create' && newAcc.bankName.trim() !== '' && newAcc.accountName.trim() !== '';
   const importDisabled = !selectedId || importing || dupChecking || (selectedId === 'create' && !createReady);
@@ -368,8 +366,8 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
                     ]}
                   />
 
-                  {/* Confidence label */}
-                  {selectedId && (
+                  {/* Existing-account confidence label */}
+                  {selectedId && selectedId !== 'create' && (
                     <div className="flex items-center gap-2 text-xs">
                       {tierLabel && (
                         <span
@@ -380,6 +378,24 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
                         </span>
                       )}
                       <span style={{ color: tierColor }}>{confidenceText}</span>
+                    </div>
+                  )}
+
+                  {/* Create-account notice — make it clear a brand-new account is being made */}
+                  {selectedId === 'create' && (
+                    <div
+                      className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-xs"
+                      style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 28%, transparent)' }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                        strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5" style={{ color: 'var(--color-primary)' }}>
+                        <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+                      </svg>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                        No matching account found. A <strong style={{ color: 'var(--color-primary)' }}>new account</strong>
+                        {newAcc.accountName.trim() ? <> — <strong style={{ color: 'var(--color-text-primary)' }}>“{newAcc.accountName.trim()}”</strong></> : null}
+                        {' '}will be created and these {rows.length} transaction{rows.length !== 1 ? 's' : ''} imported into it. Review the details below.
+                      </span>
                     </div>
                   )}
 

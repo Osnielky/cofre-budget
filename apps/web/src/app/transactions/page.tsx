@@ -8,7 +8,7 @@ import ImportReconcileModal from '@/components/ImportReconcileModal';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
-import { ACCOUNT_GROUPS, accountTypeLabel, isImportable, isLiability } from '@/lib/accountTypes';
+import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiability } from '@/lib/accountTypes';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -647,10 +647,12 @@ export default function TransactionsPage() {
                                     <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{a.bankName}</p>
                                     <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.accountName}</p>
                                   </div>
+                                  {(() => { const tc = accountTypeMeta(a.accountType).accent; return (
                                   <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md capitalize shrink-0"
-                                    style={{ background: `${c}18`, color: c, border: `1px solid ${c}30` }}>
+                                    style={{ background: `color-mix(in srgb, ${tc} 16%, transparent)`, color: tc, border: `1px solid color-mix(in srgb, ${tc} 32%, transparent)` }}>
                                     {a.accountType}
                                   </span>
+                                  ); })()}
                                 </button>
                               );
                             })}
@@ -998,12 +1000,12 @@ export default function TransactionsPage() {
                         <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
                           {acc?.accountName}
                         </p>
-                        {acc?.accountType && (
+                        {acc?.accountType && (() => { const tc = accountTypeMeta(acc.accountType).accent; return (
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 capitalize"
-                            style={{ background: `${accColor}22`, color: accColor, border: `1px solid ${accColor}40` }}>
+                            style={{ background: `color-mix(in srgb, ${tc} 18%, transparent)`, color: tc, border: `1px solid color-mix(in srgb, ${tc} 38%, transparent)` }}>
                             {acc.accountType}
                           </span>
-                        )}
+                          ); })()}
                       </div>
                     </div>
 
@@ -2132,8 +2134,10 @@ export default function TransactionsPage() {
                                     <p className="text-xs font-semibold truncate" style={{ color: sel ? c : 'var(--color-text-primary)' }}>{a.accountName}</p>
                                     <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.bankName}</p>
                                   </div>
+                                  {(() => { const tc = accountTypeMeta(a.accountType).accent; return (
                                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded capitalize shrink-0"
-                                    style={{ background: `${c}18`, color: c }}>{a.accountType}</span>
+                                    style={{ background: `color-mix(in srgb, ${tc} 16%, transparent)`, color: tc }}>{a.accountType}</span>
+                                  ); })()}
                                 </button>
                               );
                             })}

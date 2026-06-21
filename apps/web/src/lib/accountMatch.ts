@@ -31,12 +31,19 @@ function typeMatches(csvType: CsvType, accountType: string): boolean {
   return false; // 'unknown' agrees with nothing
 }
 
+/* Title-case a normalized bank label ("bank of america" → "Bank of America"). */
+function bankLabel(bank: string): string {
+  return bank.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 /* Rank accounts best-first against a parsed file.
    - last-4 equality  → exact
    - bank + type both agree, no last-4 conflict → strong
-   - type agrees only  → weak
-   A last-4 that is present on BOTH sides but differs disqualifies the account
-   (tier 'none') — it is dropped from suggestions, never pre-selected. */
+   - type agrees only (and no bank conflict) → weak
+   Disqualifiers (tier 'none', dropped from suggestions, never pre-selected):
+   - a last-4 present on BOTH sides that differs
+   - a DETECTED bank that doesn't match the account's bank — a Bank of America
+     file must not weak-match a Chase account just because both are checking. */
 export function rankAccounts(
   accounts: MatchAccount[],
   fingerprint: CsvFingerprint,
@@ -46,9 +53,9 @@ export function rankAccounts(
     const last4Conflict =
       !!fileLast4 && !!account.last4 && fileLast4 !== account.last4;
     const last4Hit = !!fileLast4 && account.last4 === fileLast4;
-    const bankHit =
-      !!fingerprint.bank && !!account.bankName &&
-      bankNamesMatch(fingerprint.bank, account.bankName);
+    const bankKnown = !!fingerprint.bank && !!account.bankName;
+    const bankHit = bankKnown && bankNamesMatch(fingerprint.bank!, account.bankName);
+    const bankConflict = bankKnown && !bankHit;
     const typeHit = typeMatches(fingerprint.type, account.accountType);
 
     if (last4Conflict) {
@@ -56,6 +63,9 @@ export function rankAccounts(
     }
     if (last4Hit) {
       return { account, tier: 'exact', reason: `Matched account ending in ${fileLast4}` };
+    }
+    if (bankConflict) {
+      return { account, tier: 'none', reason: `File is from ${bankLabel(fingerprint.bank!)}, not ${account.bankName}` };
     }
     if (bankHit && typeHit) {
       return { account, tier: 'strong', reason: `Looks like your ${account.bankName} ${account.accountType}` };
