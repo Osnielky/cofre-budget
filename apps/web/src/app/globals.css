@@ -391,36 +391,41 @@ html[data-theme="creme"] ::selection    { background: rgba(176,141,62,0.25); col
 ═══════════════════════════════════════════════ */
 html[data-theme="noir"] {
   --font-sans: var(--font-jost), "Jost", ui-sans-serif, system-ui, sans-serif;
+  /* Jost runs small & light; bump the base so all rem text scales up a touch. */
+  font-size: 17px;
 
   --color-base:     #0D1526;
   --color-surface:  rgba(255, 255, 255, 0.055);
   --color-elevated: rgba(255, 255, 255, 0.09);
-  --color-border:   rgba(255, 255, 255, 0.12);
+  --color-border:   rgba(255, 255, 255, 0.14);
 
-  --color-text-primary:   #F2F1EA;
-  --color-text-secondary: rgba(242, 241, 234, 0.68);
-  --color-text-muted:     rgba(242, 241, 234, 0.45);
+  /* Higher-contrast text for legibility on the deep navy. */
+  --color-text-primary:   #F7F6F0;
+  --color-text-secondary: rgba(244, 243, 236, 0.84);
+  --color-text-muted:     rgba(244, 243, 236, 0.62);
 
-  --color-primary:  #C9A05C;
-  --color-green:    #8FBE9B;
-  --color-rose:     #D98C7A;
-  --color-amber:    #DDB877;
-  --color-orange:   #C9845C;
-  --color-sky:      #8FAECC;
-  --color-violet:   #A99BC4;
+  /* More vivid champagne-gold palette — richer & more saturated than the
+     original muted tones, while keeping the gilded identity. */
+  --color-primary:  #E6B85C;
+  --color-green:    #5FD295;
+  --color-rose:     #F0917C;
+  --color-amber:    #F2C65E;
+  --color-orange:   #EE9055;
+  --color-sky:      #76BBF0;
+  --color-violet:   #B79DF2;
 
-  --color-card-amber:  #DDB877;
-  --color-card-orange: #C9845C;
-  --color-card-violet: #A99BC4;
-  --color-card-green:  #8FBE9B;
-  --color-card-sky:    #8FAECC;
-  --color-card-red:    #D98C7A;
+  --color-card-amber:  #F2C65E;
+  --color-card-orange: #EE9055;
+  --color-card-violet: #B79DF2;
+  --color-card-green:  #5FD295;
+  --color-card-sky:    #76BBF0;
+  --color-card-red:    #F0917C;
 
-  --nav-active-bg:     linear-gradient(135deg, rgba(201, 160, 92, 0.16), rgba(201, 160, 92, 0.06));
-  --nav-active-fg:     #DDB877;
-  --nav-active-border: 1px solid rgba(201, 160, 92, 0.35);
+  --nav-active-bg:     linear-gradient(135deg, rgba(230, 184, 92, 0.20), rgba(230, 184, 92, 0.08));
+  --nav-active-fg:     #F2C65E;
+  --nav-active-border: 1px solid rgba(230, 184, 92, 0.45);
   --nav-active-bar:    transparent;
-  --nav-icon-active:   #DDB877;
+  --nav-icon-active:   #F2C65E;
 
   --sidebar-bg: rgba(10, 17, 31, 0.88);
   --header-bg:  rgba(13, 21, 38, 0.92);

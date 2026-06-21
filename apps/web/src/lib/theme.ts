@@ -100,11 +100,11 @@ export const THEMES: Theme[] = [
     preview: {
       bg:      '#0D1526',
       surface: 'rgba(255,255,255,0.07)',
-      accent:  '#C9A05C',
-      accent2: '#8FBE9B',
-      text:    '#F2F1EA',
-      textDim: 'rgba(242,241,234,0.66)',
-      border:  'rgba(255,255,255,0.14)',
+      accent:  '#E6B85C',
+      accent2: '#5FD295',
+      text:    '#F7F6F0',
+      textDim: 'rgba(244,243,236,0.78)',
+      border:  'rgba(255,255,255,0.16)',
     },
   },
 ];
