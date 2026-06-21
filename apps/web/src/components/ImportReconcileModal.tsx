@@ -576,6 +576,7 @@ function SelectMenu({
 }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
 
   const selected = options.find((o) => o.value === value) ?? null;
@@ -595,7 +596,12 @@ function SelectMenu({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (btnRef.current && !btnRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      // Ignore clicks on the trigger AND inside the portal menu — the menu lives
+      // outside btnRef in document.body, so without this an option click would
+      // close the menu before its onClick fires.
+      if (btnRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onReflow = () => setOpen(false); // close on scroll/resize rather than chase position
     document.addEventListener('mousedown', onDown);
@@ -634,6 +640,7 @@ function SelectMenu({
 
       {open && pos && createPortal(
         <div
+          ref={menuRef}
           role="listbox"
           className="fixed z-[60] rounded-xl overflow-hidden py-1"
           style={{
