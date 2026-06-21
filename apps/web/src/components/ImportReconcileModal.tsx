@@ -58,6 +58,7 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
   const [ranking, setRanking]       = useState<RankResult | null>(null);
   const [selectedId, setSelectedId] = useState<string | 'create' | null>(null);
   const [importing, setImporting]   = useState(false);
+  const [progress, setProgress]     = useState<{ done: number; total: number } | null>(null);
   const [result, setResult]         = useState<{ imported: number; skipped: number } | null>(null);
   const [dragging, setDragging]     = useState(false);
   const [dupCheck, setDupCheck]     = useState<DupCheck | null>(null);
@@ -158,7 +159,7 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
   }
 
   async function handleImport() {
-    setImporting(true); setError('');
+    setImporting(true); setError(''); setProgress(null);
     try {
       let account: MatchAccount;
       if (selectedId === 'create') {
@@ -186,14 +187,28 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
         account = found;
       }
 
-      const imp = await fetch(`${API}/transactions/import`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ bankAccountId: account.id, rows, finalBalance: csvBalance }),
-      });
-      if (!imp.ok) throw new Error('Account created, but import failed. Re-run the import into that account.');
-      const data = await imp.json();
-      setResult(data);
-      onImported({ imported: data.imported, skipped: data.skipped, account });
+      // Import in chunks so we can show real progress and keep each request small.
+      // Dedup is per-row (server-side), so chunks are independent; finalBalance is
+      // sent only with the last chunk to set the account's closing balance once.
+      const CHUNK = 200;
+      let imported = 0, skipped = 0;
+      setProgress({ done: 0, total: rows.length });
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const slice = rows.slice(i, i + CHUNK);
+        const isLast = i + CHUNK >= rows.length;
+        const imp = await fetch(`${API}/transactions/import`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({ bankAccountId: account.id, rows: slice, finalBalance: isLast ? csvBalance : undefined }),
+        });
+        if (!imp.ok) throw new Error('Import failed partway through. Re-run the import into that account to finish.');
+        const data = await imp.json();
+        imported += data.imported ?? 0;
+        skipped += data.skipped ?? 0;
+        setProgress({ done: Math.min(i + CHUNK, rows.length), total: rows.length });
+      }
+
+      setResult({ imported, skipped });
+      onImported({ imported, skipped, account });
     } catch (err: any) {
       setError(err.message ?? 'Import failed. Please try again.');
     } finally { setImporting(false); }
@@ -522,6 +537,20 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
 
           {error && <p className="text-xs px-1" style={{ color: 'var(--color-card-orange)' }}>{error}</p>}
         </div>
+
+        {/* Import progress */}
+        {importing && progress && (
+          <div className="px-5 pt-3">
+            <div className="flex items-center justify-between mb-1.5 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              <span>Importing transactions…</span>
+              <span className="tabular-nums">{progress.done.toLocaleString()} / {progress.total.toLocaleString()}</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-elevated)' }}>
+              <div className="h-full rounded-full transition-all duration-200 ease-out"
+                style={{ width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%`, background: 'var(--color-primary)' }} />
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
