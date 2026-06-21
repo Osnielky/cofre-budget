@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { parseCsv, detectCsvFingerprint, extractFileLast4 } from '@/lib/csvImport';
 import type { CsvRow } from '@/lib/csvImport';
 import { rankAccounts } from '@/lib/accountMatch';
@@ -352,20 +353,20 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
                   <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                     Import into account
                   </label>
-                  <select
+                  <SelectMenu
                     value={selectedId ?? ''}
-                    onChange={(e) => handleSelectChange(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl text-sm"
-                    style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
-                  >
-                    {ranking.ranked.map((r) => (
-                      <option key={r.account.id} value={r.account.id}>
-                        {r.account.bankName} — {r.account.accountName}
-                        {r.tier === 'none' ? ' (no match)' : ''}
-                      </option>
-                    ))}
-                    <option value="create">➕ Create new account…</option>
-                  </select>
+                    onChange={handleSelectChange}
+                    ariaLabel="Import into account"
+                    options={[
+                      ...ranking.ranked.map((r) => ({
+                        value: r.account.id,
+                        label: `${r.account.bankName} — ${r.account.accountName}`,
+                        note: r.tier === 'none' ? 'no match' : TIER_LABELS[r.tier],
+                        noteColor: TIER_COLORS[r.tier],
+                      })),
+                      { value: 'create', label: '＋ Create new account…', accent: true },
+                    ]}
+                  />
 
                   {/* Confidence label */}
                   {selectedId && (
@@ -426,17 +427,17 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
                       <div className="flex gap-2">
                         <div className="flex flex-col gap-1 flex-1">
                           <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</label>
-                          <select
+                          <SelectMenu
                             value={newAcc.accountType}
-                            onChange={(e) => setNewAcc((f) => ({ ...f, accountType: e.target.value }))}
-                            className="w-full px-3 py-2 text-sm rounded-xl outline-none"
-                            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
-                          >
-                            <option value="checking">Checking</option>
-                            <option value="savings">Savings</option>
-                            <option value="credit">Credit</option>
-                            <option value="investment">Investment</option>
-                          </select>
+                            onChange={(v) => setNewAcc((f) => ({ ...f, accountType: v }))}
+                            ariaLabel="Account type"
+                            options={[
+                              { value: 'checking',   label: 'Checking' },
+                              { value: 'savings',    label: 'Savings' },
+                              { value: 'credit',     label: 'Credit' },
+                              { value: 'investment', label: 'Investment' },
+                            ]}
+                          />
                         </div>
                         <div className="flex flex-col gap-1" style={{ width: '90px' }}>
                           <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Last 4</label>
@@ -536,5 +537,131 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── Dark themed dropdown (replaces native <select>, whose option list can't be
+   styled and renders with the OS's white/blue chrome on a dark modal). ── */
+interface SelectOption {
+  value: string;
+  label: string;
+  note?: string;        // small right-aligned tag (e.g. match tier)
+  noteColor?: string;   // color token for the note
+  accent?: boolean;     // render label in the primary accent (e.g. "Create new…")
+}
+
+function SelectMenu({
+  value, options, onChange, ariaLabel,
+}: {
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+  ariaLabel?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [pos, setPos] = useState<{ left: number; top: number; width: number } | null>(null);
+
+  const selected = options.find((o) => o.value === value) ?? null;
+
+  function place() {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos({ left: r.left, top: r.bottom + 4, width: r.width });
+  }
+
+  function toggle() {
+    if (!open) place();
+    setOpen((v) => !v);
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (btnRef.current && !btnRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onReflow = () => setOpen(false); // close on scroll/resize rather than chase position
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('resize', onReflow);
+    window.addEventListener('scroll', onReflow, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('resize', onReflow);
+      window.removeEventListener('scroll', onReflow, true);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={toggle}
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="w-full px-3 py-2 rounded-xl text-sm flex items-center justify-between gap-2 text-left transition-colors"
+        style={{
+          background: 'var(--color-elevated)',
+          border: `1px solid ${open ? 'color-mix(in srgb, var(--color-primary) 45%, transparent)' : 'var(--color-border)'}`,
+          color: selected?.accent ? 'var(--color-primary)' : 'var(--color-text-primary)',
+        }}
+      >
+        <span className="truncate">{selected ? selected.label : 'Select…'}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          style={{ color: 'var(--color-text-muted)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {open && pos && createPortal(
+        <div
+          role="listbox"
+          className="fixed z-[60] rounded-xl overflow-hidden py-1"
+          style={{
+            left: pos.left, top: pos.top, width: pos.width, maxHeight: 280, overflowY: 'auto',
+            background: 'var(--color-elevated)',
+            border: 'var(--glass-border)',
+            boxShadow: 'var(--glass-shadow)',
+            backdropFilter: 'var(--glass-blur)',
+            WebkitBackdropFilter: 'var(--glass-blur)',
+          }}
+        >
+          {options.map((o) => {
+            const isSel = o.value === value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="option"
+                aria-selected={isSel}
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                className="w-full flex items-center justify-between gap-3 px-3 py-2 text-sm text-left transition-colors"
+                style={{
+                  background: isSel ? 'color-mix(in srgb, var(--color-primary) 12%, transparent)' : 'transparent',
+                  color: o.accent ? 'var(--color-primary)' : 'var(--color-text-primary)',
+                }}
+                onMouseEnter={(e) => { if (!isSel) (e.currentTarget as HTMLElement).style.background = 'color-mix(in srgb, var(--color-primary) 7%, transparent)'; }}
+                onMouseLeave={(e) => { if (!isSel) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >
+                <span className="truncate">{o.label}</span>
+                {o.note && (
+                  <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md"
+                    style={{
+                      color: o.noteColor ?? 'var(--color-text-muted)',
+                      background: `color-mix(in srgb, ${o.noteColor ?? 'var(--color-text-muted)'} 14%, transparent)`,
+                    }}>
+                    {o.note}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
