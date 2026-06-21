@@ -109,7 +109,9 @@ export function parseCsv(text: string): { rows: CsvRow[]; finalBalance: number |
   if (lines.length < 2) throw new Error('No transactions found in this file.');
 
   const rawHeaders = parseRow(lines[0]);
-  const headers    = rawHeaders.map((h) => h.toLowerCase().trim());
+  // Strip trailing dots so "Running Bal." matches "running bal" (internal dots
+  // like "trans. date" are preserved).
+  const headers    = rawHeaders.map((h) => h.toLowerCase().trim().replace(/\.+$/, ''));
 
   const col = (names: string[]) =>
     names.map((n) => headers.indexOf(n)).find((i) => i >= 0) ?? -1;
@@ -132,8 +134,20 @@ export function parseCsv(text: string): { rows: CsvRow[]; finalBalance: number |
   const balIdx     = col(['balance','running bal','running balance','available balance','ledger balance','current balance']);
 
   const rows: CsvRow[] = [];
+  // Running-balance per row (incl. beginning/ending-balance marker rows), in file
+  // order, so we can pick the chronologically-latest one regardless of sort order.
+  const balanceEntries: { date: string; bal: number }[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cols = parseRow(lines[i]);
+
+    // Capture the running balance before any row-skipping — marker rows like
+    // "Ending balance as of …" carry the figure we want.
+    if (balIdx >= 0) {
+      const balDate = normalizeDate(cols[dateIdx]?.trim() ?? '');
+      const balRaw  = cols[balIdx]?.replace(/[$,\s]/g, '') ?? '';
+      const balNum  = parseFloat(balRaw);
+      if (balDate && !isNaN(balNum)) balanceEntries.push({ date: balDate, bal: balNum });
+    }
 
     if (typeIdx >= 0 && SKIP_TYPES.has(cols[typeIdx]?.trim().toLowerCase() ?? '')) continue;
 
@@ -164,13 +178,14 @@ export function parseCsv(text: string): { rows: CsvRow[]; finalBalance: number |
     rows.push({ date, referenceNumber, name, amount });
   }
 
-  // Extract most recent balance from the first data row (banks sort newest first)
+  // Current balance = running balance of the chronologically-latest row. Handles
+  // both sort orders: take the last row when oldest-first, the first when newest-first.
   let finalBalance: number | undefined;
-  if (balIdx >= 0 && lines.length > 1) {
-    const firstDataRow = parseRow(lines[1]);
-    const raw = firstDataRow[balIdx]?.replace(/[$,\s]/g, '') ?? '';
-    const parsed = parseFloat(raw);
-    if (!isNaN(parsed)) finalBalance = parsed;
+  if (balanceEntries.length > 0) {
+    const first = balanceEntries[0];
+    const last  = balanceEntries[balanceEntries.length - 1];
+    const ascending = first.date <= last.date; // oldest-first
+    finalBalance = ascending ? last.bal : first.bal;
   }
 
   return { rows, finalBalance };

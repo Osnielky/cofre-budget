@@ -198,25 +198,26 @@ export class TransactionsService {
 
     let balanceUpdated = false;
 
-    if (imported > 0) {
-      if (finalBalance !== undefined && !isNaN(finalBalance)) {
-        // CSV had an explicit balance column (e.g. BofA checking "Running Bal.")
-        account.balance = finalBalance;
-        await this.accountRepo.save(account);
-        balanceUpdated = true;
-      } else if (isLiabilityType(account.accountType)) {
-        // Liability accounts: recalculate balance as total amount owed from all transactions
-        const raw = await this.repo
-          .createQueryBuilder('tx')
-          .select('COALESCE(SUM(tx.amount), 0)', 'total')
-          .where('tx.bankAccountId = :bankAccountId', { bankAccountId })
-          .getRawOne<{ total: string }>();
-        const total = parseFloat(raw?.total ?? '0');
-        // Expenses are negative, payments are positive → owed = -total
-        account.balance = parseFloat((-total).toFixed(2));
-        await this.accountRepo.save(account);
-        balanceUpdated = true;
-      }
+    if (finalBalance !== undefined && !isNaN(finalBalance)) {
+      // CSV had an explicit balance column (e.g. BofA checking "Running Bal.").
+      // Apply regardless of how many rows were new so re-importing refreshes the
+      // balance, and chunked imports still update even if the final chunk is all
+      // duplicates (the balance only rides on the last chunk).
+      account.balance = finalBalance;
+      await this.accountRepo.save(account);
+      balanceUpdated = true;
+    } else if (imported > 0 && isLiabilityType(account.accountType)) {
+      // Liability accounts: recalculate balance as total amount owed from all transactions
+      const raw = await this.repo
+        .createQueryBuilder('tx')
+        .select('COALESCE(SUM(tx.amount), 0)', 'total')
+        .where('tx.bankAccountId = :bankAccountId', { bankAccountId })
+        .getRawOne<{ total: string }>();
+      const total = parseFloat(raw?.total ?? '0');
+      // Expenses are negative, payments are positive → owed = -total
+      account.balance = parseFloat((-total).toFixed(2));
+      await this.accountRepo.save(account);
+      balanceUpdated = true;
     }
 
     return { imported, skipped, balanceUpdated };
