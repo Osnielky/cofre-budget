@@ -12,17 +12,26 @@ function esc(s: string): string {
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly resend = new Resend(this.config.get<string>('RESEND_API_KEY') ?? '');
+  private readonly resend: Resend | null;
   private readonly from = this.config.get<string>('MAIL_FROM') ?? 'Cofre <onboarding@resend.dev>';
   private readonly appUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
 
-  constructor(private config: ConfigService) {}
+  constructor(private config: ConfigService) {
+    // Resend's constructor throws when the key is empty. Only create the client
+    // when configured; otherwise run in a no-op "dev" mode that logs instead of
+    // sending, so the API boots locally without RESEND_API_KEY.
+    const key = this.config.get<string>('RESEND_API_KEY');
+    this.resend = key ? new Resend(key) : null;
+    if (!this.resend) {
+      this.logger.warn('RESEND_API_KEY not set — emails will be logged, not sent.');
+    }
+  }
 
   async sendVerification(to: string, name: string, link: string): Promise<void> {
     await this.send(
       to,
       'Verify your Cofre account',
-      `Welcome to Cofre${name ? ', ' + name : ''}!`,
+      `Welcome to Cofre${name ? ', ' + esc(name) : ''}!`,
       'Confirm your email to finish setting up your account.',
       'Verify email',
       link,
@@ -62,6 +71,7 @@ export class MailService {
   }
 
   private async sendPlain(to: string, subject: string, heading: string, bodyHtml: string): Promise<void> {
+    if (!this.resend) { this.logger.warn(`[dev] email not sent (no RESEND_API_KEY): "${subject}" → ${to}`); return; }
     try {
       await this.resend.emails.send({ from: this.from, to, subject, html: this.templatePlain(heading, bodyHtml) });
     } catch (err) {
@@ -89,6 +99,7 @@ export class MailService {
   }
 
   private async send(to: string, subject: string, heading: string, body: string, cta: string, link: string): Promise<void> {
+    if (!this.resend) { this.logger.warn(`[dev] email not sent (no RESEND_API_KEY): "${subject}" → ${to}`); return; }
     try {
       await this.resend.emails.send({ from: this.from, to, subject, html: this.template(heading, body, cta, link) });
     } catch (err) {
