@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Request, HttpCode } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BankAccountsService } from './bank-accounts.service';
 import { CreateBankAccountDto } from './dto/create-bank-account.dto';
@@ -23,9 +23,18 @@ export class BankAccountsController {
     return this.service.update(id, req.user.id, dto);
   }
 
+  @Get(':id/transaction-count')
+  async transactionCount(@Param('id') id: string, @Request() req: any) {
+    return { count: await this.service.countTransactions(id, req.user.id) };
+  }
+
   @Delete(':id')
   @HttpCode(204)
-  remove(@Param('id') id: string, @Request() req: any) {
-    return this.service.remove(id, req.user.id);
+  remove(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Query('deleteTransactions') deleteTransactions?: string,
+  ) {
+    return this.service.remove(id, req.user.id, deleteTransactions === 'true');
   }
 }

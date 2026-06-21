@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BankAccount } from './bank-account.entity';
+import { Transaction } from '../transactions/transaction.entity';
 import { CreateBankAccountDto } from './dto/create-bank-account.dto';
 
 @Injectable()
@@ -9,7 +10,17 @@ export class BankAccountsService {
   constructor(
     @InjectRepository(BankAccount)
     private repo: Repository<BankAccount>,
+    @InjectRepository(Transaction)
+    private txRepo: Repository<Transaction>,
   ) {}
+
+  /** Number of transactions booked to this account (ownership-checked). */
+  async countTransactions(id: string, userId: string): Promise<number> {
+    const account = await this.repo.findOneBy({ id });
+    if (!account) throw new NotFoundException();
+    if (account.userId !== userId) throw new ForbiddenException();
+    return this.txRepo.count({ where: { bankAccountId: id } });
+  }
 
   findAllByUser(userId: string): Promise<BankAccount[]> {
     return this.repo.find({ where: { userId }, order: { createdAt: 'ASC' } });
@@ -32,10 +43,14 @@ export class BankAccountsService {
     return this.repo.save(account);
   }
 
-  async remove(id: string, userId: string): Promise<void> {
+  async remove(id: string, userId: string, deleteTransactions = false): Promise<void> {
     const account = await this.repo.findOneBy({ id });
     if (!account) throw new NotFoundException();
     if (account.userId !== userId) throw new ForbiddenException();
+    // Otherwise the relation's onDelete: 'SET NULL' orphans them ("Unknown Bank").
+    if (deleteTransactions) {
+      await this.txRepo.delete({ bankAccountId: id });
+    }
     await this.repo.remove(account);
   }
 }

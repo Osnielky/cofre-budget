@@ -182,6 +182,9 @@ export default function SettingsPage() {
   const [editingAccount, setEditingAccount] = useState<BankAccount | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<BankAccount | null>(null);
+  const [deleteTxToo, setDeleteTxToo] = useState(false);
+  const [deleteTxCount, setDeleteTxCount] = useState<number | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [importAccount, setImportAccount] = useState<BankAccount | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
@@ -305,11 +308,26 @@ export default function SettingsPage() {
     finally { setSubmitting(false); }
   }
 
-  async function handleDelete(id: string) {
+  function openDeleteConfirm(account: BankAccount) {
+    setConfirmDelete(account);
+    setDeleteTxToo(false);
+    setDeleteTxCount(null);
+    // Fetch how many transactions this account has, to show in the dialog.
+    fetch(`${API}/bank-accounts/${account.id}/transaction-count`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { count: 0 }))
+      .then((d) => setDeleteTxCount(typeof d.count === 'number' ? d.count : 0))
+      .catch(() => setDeleteTxCount(0));
+  }
+
+  async function confirmDeleteAccount() {
+    if (!confirmDelete) return;
+    const id = confirmDelete.id;
     setDeletingId(id);
     try {
-      await fetch(`${API}/bank-accounts/${id}`, { method: 'DELETE', credentials: 'include' });
+      const qs = deleteTxToo ? '?deleteTransactions=true' : '';
+      await fetch(`${API}/bank-accounts/${id}${qs}`, { method: 'DELETE', credentials: 'include' });
       setAccounts((prev) => prev.filter((a) => a.id !== id));
+      setConfirmDelete(null);
     } finally { setDeletingId(null); }
   }
 
@@ -754,7 +772,7 @@ export default function SettingsPage() {
                               <SyncIcon spinning={syncingId === account.id} />
                             </button>
                           )}
-                          <button onClick={() => handleDelete(account.id)} disabled={deletingId === account.id}
+                          <button onClick={() => openDeleteConfirm(account)} disabled={deletingId === account.id}
                             className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 disabled:opacity-40"
                             title="Remove account">
                             {deletingId === account.id ? <span className="text-xs">…</span> : <TrashIcon />}
@@ -842,6 +860,58 @@ export default function SettingsPage() {
           onClose={() => setImportAccount(null)}
           onImported={() => setImportAccount(null)}
         />
+      )}
+
+      {confirmDelete && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+          onMouseDown={(e) => { if (e.target === e.currentTarget && deletingId !== confirmDelete.id) setConfirmDelete(null); }}>
+          <div className="w-full max-w-md flex flex-col rounded-2xl overflow-hidden"
+            style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
+            <div className="px-6 py-5" style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>Delete account</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                Remove <strong style={{ color: 'var(--color-text-secondary)' }}>{confirmDelete.bankName} — {confirmDelete.accountName}</strong>? This can’t be undone.
+              </p>
+            </div>
+
+            <div className="px-6 py-5 flex flex-col gap-3">
+              <label className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors"
+                style={{
+                  background: deleteTxToo ? 'color-mix(in srgb, var(--color-card-orange) 10%, transparent)' : 'var(--color-surface)',
+                  border: `1px solid ${deleteTxToo ? 'color-mix(in srgb, var(--color-card-orange) 35%, transparent)' : 'var(--color-border)'}`,
+                }}>
+                <input type="checkbox" checked={deleteTxToo} onChange={(e) => setDeleteTxToo(e.target.checked)}
+                  className="mt-0.5 accent-[var(--color-card-orange)]" style={{ width: 16, height: 16 }} />
+                <span className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                  Also delete{' '}
+                  <strong style={{ color: 'var(--color-text-primary)' }}>
+                    {deleteTxCount === null ? 'the' : deleteTxCount} transaction{deleteTxCount === 1 ? '' : 's'}
+                  </strong>{' '}in this account.
+                  <span className="block mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    If left unchecked, transactions are kept and shown under “Unknown Bank”.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 px-6 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
+              <button type="button" onClick={() => setConfirmDelete(null)} disabled={deletingId === confirmDelete.id}
+                className="px-4 py-2 text-sm font-medium rounded-xl transition-colors hover:bg-[var(--color-surface)] disabled:opacity-50"
+                style={{ color: 'var(--color-text-secondary)' }}>
+                Cancel
+              </button>
+              <button type="button" onClick={confirmDeleteAccount} disabled={deletingId === confirmDelete.id}
+                className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50 transition-all"
+                style={{ background: 'var(--color-card-orange)' }}>
+                {deletingId === confirmDelete.id
+                  ? 'Deleting…'
+                  : deleteTxToo ? 'Delete account & transactions' : 'Delete account'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
 
       {showResetModal && (
