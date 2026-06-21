@@ -31,6 +31,7 @@ interface BankAccount {
   provider: string;
   plaidItemId: string | null;
   last4?: string | null;
+  txCount?: number;
 }
 
 const TYPE_META: Record<string, { label: string; accent: string; icon: string }> = Object.fromEntries(
@@ -311,12 +312,14 @@ export default function SettingsPage() {
   function openDeleteConfirm(account: BankAccount) {
     setConfirmDelete(account);
     setDeleteTxToo(false);
-    setDeleteTxCount(null);
-    // Fetch how many transactions this account has, to show in the dialog.
+    // Seed from the count that came with the accounts list (reliable, already loaded).
+    setDeleteTxCount(typeof account.txCount === 'number' ? account.txCount : null);
+    // Refresh from the dedicated endpoint, but only overwrite on success — never
+    // fall back to a misleading 0 if the request fails.
     fetch(`${API}/bank-accounts/${account.id}/transaction-count`, { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : { count: 0 }))
-      .then((d) => setDeleteTxCount(typeof d.count === 'number' ? d.count : 0))
-      .catch(() => setDeleteTxCount(0));
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && typeof d.count === 'number') setDeleteTxCount(d.count); })
+      .catch(() => {});
   }
 
   async function confirmDeleteAccount() {

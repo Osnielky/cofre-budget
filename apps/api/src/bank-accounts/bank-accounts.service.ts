@@ -22,8 +22,18 @@ export class BankAccountsService {
     return this.txRepo.count({ where: { bankAccountId: id } });
   }
 
-  findAllByUser(userId: string): Promise<BankAccount[]> {
-    return this.repo.find({ where: { userId }, order: { createdAt: 'ASC' } });
+  async findAllByUser(userId: string): Promise<(BankAccount & { txCount: number })[]> {
+    const accounts = await this.repo.find({ where: { userId }, order: { createdAt: 'ASC' } });
+    const counts = await this.txRepo
+      .createQueryBuilder('t')
+      .select('t.bankAccountId', 'id')
+      .addSelect('COUNT(*)', 'c')
+      .where('t.userId = :userId', { userId })
+      .andWhere('t.bankAccountId IS NOT NULL')
+      .groupBy('t.bankAccountId')
+      .getRawMany<{ id: string; c: string }>();
+    const byId = new Map(counts.map((r) => [r.id, Number(r.c)]));
+    return accounts.map((a) => ({ ...a, txCount: byId.get(a.id) ?? 0 }));
   }
 
   countByUser(userId: string): Promise<number> {
