@@ -281,6 +281,7 @@ export class TransactionsService {
     const tx = await this.repo.findOneBy({ id, userId });
     if (!tx) throw new NotFoundException();
     if (tx.source !== 'manual') throw new BadRequestException('Only manual transactions can be deleted');
+    if (tx.isSplitParent) throw new BadRequestException('Cannot delete a split transaction — unsplit it first');
 
     /* Remove the linked debt payment, if this tx was a debt repayment */
     if (tx.debtId) {
@@ -418,17 +419,18 @@ export class TransactionsService {
       );
     }
 
-    // sign of parent determines sign of children (+income, -expense)
     const sign = Number(tx.amount) >= 0 ? 1 : -1;
 
-    tx.isSplitParent = true;
-    tx.categoryId = null;
-    await this.repo.save(tx);
+    const childIds: string[] = await this.repo.manager.transaction(async (em) => {
+      tx.isSplitParent = true;
+      tx.categoryId = null;
+      tx.projectId = null;
+      tx.projectCategoryId = null;
+      await em.save(tx);
 
-    const children: Transaction[] = [];
-    for (const piece of splits) {
-      const child = await this.repo.save(
-        this.repo.create({
+      const ids: string[] = [];
+      for (const piece of splits) {
+        const child = em.create(Transaction, {
           userId: tx.userId,
           parentId: tx.id,
           bankAccountId: tx.bankAccountId ?? undefined,
@@ -439,15 +441,18 @@ export class TransactionsService {
           categoryId: piece.categoryId ?? undefined,
           pending: tx.pending,
           isSplitParent: false,
-        }),
-      );
-      const loaded = await this.repo.findOne({
-        where: { id: child.id },
-        relations: ['categoryRef', 'bankAccount'],
-      });
-      children.push(loaded);
-    }
-    return children;
+        });
+        const saved = await em.save(child);
+        ids.push(saved.id);
+      }
+      return ids;
+    });
+
+    return Promise.all(
+      childIds.map((cid) =>
+        this.repo.findOne({ where: { id: cid }, relations: ['categoryRef', 'bankAccount'] }),
+      ),
+    );
   }
 
   async unsplit(id: string, userId: string): Promise<Transaction> {
