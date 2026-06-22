@@ -86,6 +86,7 @@ export class TransactionsService {
       .leftJoinAndSelect('tx.bankAccount', 'bankAccount')
       .leftJoinAndSelect('tx.transferAccount', 'transferAccount')
       .where('tx.userId = :userId', { userId })
+      .andWhere('tx.isSplitParent = false')
       .orderBy('tx.date', 'DESC')
       .addOrderBy('tx.createdAt', 'DESC')
       .limit(limit);
