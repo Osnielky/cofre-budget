@@ -9,6 +9,7 @@ import BankSelect, { BANKS } from '@/components/BankSelect';
 import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiability } from '@/lib/accountTypes';
+import SplitTransactionModal from '@/components/SplitTransactionModal';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -28,6 +29,8 @@ interface Transaction {
   transferAccount: BankAccount | null;
   counterpartTxId: string | null;
   debtId: string | null;
+  parentId: string | null;
+  isSplitParent: boolean;
 }
 interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid' }
 
@@ -127,6 +130,7 @@ export default function TransactionsPage() {
   const today = new Date().toISOString().slice(0, 10);
   const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '' });
   const [debts, setDebts] = useState<DebtLite[]>([]);
+  const [splitTx, setSplitTx] = useState<Transaction | null>(null);
 
   const [importToast, setImportToast] = useState<{ imported: number; skipped: number; account: { bankName: string; accountName: string; accountType: string; color: string } } | null>(null);
   const importToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -431,6 +435,19 @@ export default function TransactionsPage() {
       ));
       setOpenPickerId(null); setPickerProjectDrill(null);
     } finally { setLinkingProj(false); }
+  }
+
+  async function unsplitTransaction(tx: Transaction) {
+    const parentId = tx.parentId!;
+    const res = await fetch(`${API}/transactions/${tx.id}/unsplit`, {
+      method: 'DELETE', credentials: 'include',
+    });
+    if (!res.ok) return;
+    const restored: Transaction = await res.json();
+    setTransactions((prev) => [
+      restored,
+      ...prev.filter((t) => t.parentId !== parentId && t.id !== parentId),
+    ]);
   }
 
   async function markProjectAsSold(txId: string, projectId: string) {
@@ -1116,16 +1133,23 @@ export default function TransactionsPage() {
 
                               {/* Income/expense/transfer bar */}
                               <div className="w-1 h-8 rounded-full shrink-0"
-                                style={{ background: txIsTransfer ? '#6B6B8A' : isIncome ? 'var(--color-green)' : 'var(--color-orange)' }} />
+                                style={{ background: tx.parentId ? 'var(--color-primary)' : txIsTransfer ? '#6B6B8A' : isIncome ? 'var(--color-green)' : 'var(--color-orange)' }} />
 
                               {/* Name + source */}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate leading-snug">{tx.name}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase"
-                                    style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
-                                    {tx.source}
-                                  </span>
+                                  {tx.parentId ? (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                      style={{ background: 'color-mix(in srgb, var(--color-primary) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 28%, transparent)', color: 'var(--color-primary)' }}>
+                                      ✂ Split
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase"
+                                      style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
+                                      {tx.source}
+                                    </span>
+                                  )}
                                   {tx.pending && (
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
                                       style={{ background: 'color-mix(in srgb, var(--color-amber) 12%, transparent)', color: 'var(--color-amber)' }}>
@@ -1654,6 +1678,29 @@ export default function TransactionsPage() {
                             )}
                           </div>
 
+                          {/* Split / Unsplit */}
+                          {!tx.debtId && !txIsTransfer && (
+                            tx.parentId ? (
+                              <button
+                                onClick={() => unsplitTransaction(tx)}
+                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110 shrink-0"
+                                style={{ background: 'color-mix(in srgb, var(--color-text-muted) 10%, transparent)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
+                                title="Unsplit — recombine into one transaction"
+                              >
+                                ↩ Unsplit
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setSplitTx(tx)}
+                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110 shrink-0"
+                                style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)', color: 'var(--color-primary)' }}
+                                title="Split into multiple categories"
+                              >
+                                ✂ Split
+                              </button>
+                            )
+                          )}
+
                           {/* Delete — manual only */}
                           {tx.source === 'manual' && deleteConfirmId !== tx.id && (
                             <button
@@ -1774,6 +1821,22 @@ export default function TransactionsPage() {
             })
           )}
         </div>
+
+        {/* Split transaction modal */}
+        {splitTx && (
+          <SplitTransactionModal
+            tx={splitTx}
+            categories={categories}
+            onSave={(children) => {
+              setTransactions((prev) => [
+                ...children,
+                ...prev.filter((t) => t.id !== splitTx.id),
+              ]);
+              setSplitTx(null);
+            }}
+            onClose={() => setSplitTx(null)}
+          />
+        )}
 
         {/* Manual transaction modal */}
         {showManualTx && createPortal(
