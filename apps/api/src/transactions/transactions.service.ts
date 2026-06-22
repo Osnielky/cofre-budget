@@ -399,6 +399,79 @@ export class TransactionsService {
     acc.balance = Number(acc.balance) + (mode === 'apply' ? delta : -delta);
     await this.accountRepo.save(acc);
   }
+
+  async split(
+    id: string,
+    userId: string,
+    splits: { categoryId: string | null; amount: number }[],
+  ): Promise<Transaction[]> {
+    const tx = await this.repo.findOneByOrFail({ id, userId });
+    if (tx.isSplitParent) throw new BadRequestException('Transaction is already split');
+    if (tx.parentId) throw new BadRequestException('Cannot split a split piece — unsplit the parent first');
+    if (splits.length < 2) throw new BadRequestException('At least 2 split pieces required');
+
+    const txTotal = Math.abs(Number(tx.amount));
+    const splitTotal = splits.reduce((s, p) => s + Math.abs(p.amount), 0);
+    if (Math.abs(splitTotal - txTotal) > 0.01) {
+      throw new BadRequestException(
+        `Split amounts (${splitTotal.toFixed(2)}) must sum to the transaction total (${txTotal.toFixed(2)})`,
+      );
+    }
+
+    // sign of parent determines sign of children (+income, -expense)
+    const sign = Number(tx.amount) >= 0 ? 1 : -1;
+
+    tx.isSplitParent = true;
+    tx.categoryId = null;
+    await this.repo.save(tx);
+
+    const children: Transaction[] = [];
+    for (const piece of splits) {
+      const child = await this.repo.save(
+        this.repo.create({
+          userId: tx.userId,
+          parentId: tx.id,
+          bankAccountId: tx.bankAccountId ?? undefined,
+          source: tx.source,
+          name: tx.name,
+          date: tx.date,
+          amount: sign * Math.abs(piece.amount),
+          categoryId: piece.categoryId ?? undefined,
+          pending: tx.pending,
+          isSplitParent: false,
+        }),
+      );
+      const loaded = await this.repo.findOne({
+        where: { id: child.id },
+        relations: ['categoryRef', 'bankAccount'],
+      });
+      children.push(loaded);
+    }
+    return children;
+  }
+
+  async unsplit(id: string, userId: string): Promise<Transaction> {
+    let tx = await this.repo.findOneBy({ id, userId });
+    if (!tx) throw new NotFoundException();
+
+    // Accept either a child id or the parent id
+    if (tx.parentId) {
+      tx = await this.repo.findOneBy({ id: tx.parentId, userId });
+      if (!tx) throw new NotFoundException();
+    }
+
+    if (!tx.isSplitParent) throw new BadRequestException('Transaction is not split');
+
+    await this.repo.delete({ parentId: tx.id, userId });
+
+    tx.isSplitParent = false;
+    tx.categoryId = null;
+    const saved = await this.repo.save(tx);
+    return this.repo.findOne({
+      where: { id: saved.id },
+      relations: ['categoryRef', 'bankAccount'],
+    });
+  }
 }
 
 /* Accepts MM/DD/YYYY or YYYY-MM-DD */
