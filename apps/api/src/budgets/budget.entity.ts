@@ -24,6 +24,11 @@ export class Budget {
   @Column({ default: '2026-06' })
   month: string;
 
+  /* Month this value was last explicitly set. Carried-forward copies preserve
+     the origin; an explicit edit stamps the edit's month. Null = legacy/own month. */
+  @Column({ nullable: true })
+  sourceMonth: string;
+
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   amount: number;
 

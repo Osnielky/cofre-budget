@@ -10,7 +10,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface MonthSummary { month: string; total: number; count: number }
 interface BudgetWithSpent {
-  id: string; categoryId: string; category: Category; month?: string;
+  id: string; categoryId: string; category: Category; month?: string; sourceMonth?: string | null;
   amount: number; spent: number; percentage: number; remaining: number;
 }
 interface Transaction {
@@ -455,6 +455,13 @@ export default function BudgetsPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-semibold text-sm">{b.category?.name ?? 'Unknown'}</p>
+                            {b.sourceMonth && b.sourceMonth < month && (
+                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1"
+                                style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}
+                                title={`Carried over from ${monthLabel(b.sourceMonth)}. Editing here updates this month onward — past months stay as they were.`}>
+                                ↪ from {monthLabel(b.sourceMonth)}
+                              </span>
+                            )}
                             {pct >= 100 && (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                                 style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)' }}>

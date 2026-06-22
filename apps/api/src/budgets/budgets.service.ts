@@ -92,7 +92,8 @@ export class BudgetsService {
     const priorBudgets = await this.repo.find({ where: { userId, month: priorAnchor.month } });
     await Promise.all(
       priorBudgets.map(b =>
-        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month }))
+        // Preserve where the value originated so the new month shows "from <month>".
+        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month, sourceMonth: b.sourceMonth ?? b.month }))
       ),
     );
   }
@@ -104,7 +105,7 @@ export class BudgetsService {
     if (existing.length > 0) await this.repo.remove(existing);
     await Promise.all(
       source.map(b =>
-        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month: toMonth }))
+        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month: toMonth, sourceMonth: b.sourceMonth ?? b.month }))
       ),
     );
   }
@@ -128,17 +129,19 @@ export class BudgetsService {
   }
 
   async create(userId: string, dto: { categoryId: string; amount: number; month: string }): Promise<Budget> {
+    // Explicitly set this month → the value now originates here.
     const existing = await this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } });
     if (existing) {
       existing.amount = dto.amount;
+      existing.sourceMonth = dto.month;
       await this.repo.save(existing);
     } else {
-      await this.repo.save(this.repo.create({ ...dto, userId }));
+      await this.repo.save(this.repo.create({ ...dto, userId, sourceMonth: dto.month }));
     }
-    // Propagate the new amount to all future months that already have a record
+    // Propagate the new amount AND origin to all future months that already have a record.
     await this.repo.update(
       { userId, categoryId: dto.categoryId, month: MoreThan(dto.month) },
-      { amount: dto.amount },
+      { amount: dto.amount, sourceMonth: dto.month },
     );
     return this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } }) as Promise<Budget>;
   }
@@ -148,11 +151,12 @@ export class BudgetsService {
     if (!budget) throw new NotFoundException();
     if (budget.userId !== userId) throw new ForbiddenException();
     budget.amount = dto.amount;
+    budget.sourceMonth = budget.month; // edited here → originates here
     await this.repo.save(budget);
     // Propagate forward — past months are untouched
     await this.repo.update(
       { userId, categoryId: budget.categoryId, month: MoreThan(budget.month) },
-      { amount: dto.amount },
+      { amount: dto.amount, sourceMonth: budget.month },
     );
     return budget;
   }
