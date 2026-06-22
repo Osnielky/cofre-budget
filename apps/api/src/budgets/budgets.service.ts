@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Budget } from './budget.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { TRACKING_TYPES } from '../bank-accounts/account-types';
@@ -128,6 +128,30 @@ export class BudgetsService {
     return this.repo.count({ where: { userId } });
   }
 
+  /** Apply an amount to every already-materialized future month for this category:
+      update where a record exists, insert where it's missing. This is why a budget
+      set (or added) this month also shows up next month — including categories that
+      a future month didn't previously have. Past months are never touched. */
+  private async propagateForward(userId: string, categoryId: string, amount: number, fromMonth: string): Promise<void> {
+    const futureMonths = await this.repo
+      .createQueryBuilder('b')
+      .select('DISTINCT b.month', 'month')
+      .where('b.userId = :userId', { userId })
+      .andWhere('b.month > :fromMonth', { fromMonth })
+      .getRawMany<{ month: string }>();
+
+    for (const { month } of futureMonths) {
+      const existing = await this.repo.findOne({ where: { userId, categoryId, month } });
+      if (existing) {
+        existing.amount = amount;
+        existing.sourceMonth = fromMonth;
+        await this.repo.save(existing);
+      } else {
+        await this.repo.save(this.repo.create({ userId, categoryId, amount, month, sourceMonth: fromMonth }));
+      }
+    }
+  }
+
   async create(userId: string, dto: { categoryId: string; amount: number; month: string }): Promise<Budget> {
     // Explicitly set this month → the value now originates here.
     const existing = await this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } });
@@ -138,11 +162,7 @@ export class BudgetsService {
     } else {
       await this.repo.save(this.repo.create({ ...dto, userId, sourceMonth: dto.month }));
     }
-    // Propagate the new amount AND origin to all future months that already have a record.
-    await this.repo.update(
-      { userId, categoryId: dto.categoryId, month: MoreThan(dto.month) },
-      { amount: dto.amount, sourceMonth: dto.month },
-    );
+    await this.propagateForward(userId, dto.categoryId, dto.amount, dto.month);
     return this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } }) as Promise<Budget>;
   }
 
@@ -153,11 +173,7 @@ export class BudgetsService {
     budget.amount = dto.amount;
     budget.sourceMonth = budget.month; // edited here → originates here
     await this.repo.save(budget);
-    // Propagate forward — past months are untouched
-    await this.repo.update(
-      { userId, categoryId: budget.categoryId, month: MoreThan(budget.month) },
-      { amount: dto.amount, sourceMonth: budget.month },
-    );
+    await this.propagateForward(userId, budget.categoryId, dto.amount, budget.month);
     return budget;
   }
 
