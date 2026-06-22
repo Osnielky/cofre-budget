@@ -18,7 +18,17 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3333/api)",
       "Bash(kill 38675 38725)",
       "Bash(node dist/apps/api/main.js)",
-      "Bash(echo \"started pid $!\")"
+      "Bash(echo \"started pid $!\")",
+      "Bash(/Users/osnielky/.claude/plugins/cache/claude-plugins-official/superpowers/6.0.3/skills/subagent-driven-development/scripts/review-package 44f47dc HEAD)",
+      "Bash(/Users/osnielky/.claude/plugins/cache/claude-plugins-official/superpowers/6.0.3/skills/subagent-driven-development/scripts/task-brief /Users/osnielky/Desktop/cofre-budget/docs/superpowers/plans/2026-06-22-split-transactions.md 5)",
+      "Bash(/Users/osnielky/.claude/plugins/cache/claude-plugins-official/superpowers/6.0.3/skills/subagent-driven-development/scripts/review-package 1703a4b HEAD)",
+      "Bash(git -C /Users/osnielky/Desktop/cofre-budget diff --stat HEAD)",
+      "Bash(git -C /Users/osnielky/Desktop/cofre-budget add apps/api/src/transactions/transactions.service.ts .superpowers/sdd/task-5-report.md)",
+      "Bash(git -C /Users/osnielky/Desktop/cofre-budget commit -m ' *)",
+      "Bash(/Users/osnielky/.claude/plugins/cache/claude-plugins-official/superpowers/6.0.3/skills/subagent-driven-development/scripts/review-package fb75f27 *)",
+      "Bash(git -C /Users/osnielky/Desktop/cofre-budget log --oneline -5)",
+      "Bash(git -C /Users/osnielky/Desktop/cofre-budget diff f14b41f HEAD -- apps/api/src/transactions/transactions.service.ts)",
+      "Bash(gh pr create --title 'feat: split transactions into multiple categories' --body ' *)"
     ],
     "additionalDirectories": [
       "\\tmp"
