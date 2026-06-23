@@ -93,7 +93,7 @@ export class BudgetsService {
     await Promise.all(
       priorBudgets.map(b =>
         // Preserve where the value originated so the new month shows "from <month>".
-        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month, sourceMonth: b.sourceMonth ?? b.month }))
+        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month, sourceMonth: b.sourceMonth ?? b.month, projectId: b.projectId ?? null }))
       ),
     );
   }
@@ -105,7 +105,7 @@ export class BudgetsService {
     if (existing.length > 0) await this.repo.remove(existing);
     await Promise.all(
       source.map(b =>
-        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month: toMonth, sourceMonth: b.sourceMonth ?? b.month }))
+        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month: toMonth, sourceMonth: b.sourceMonth ?? b.month, projectId: b.projectId ?? null }))
       ),
     );
   }
@@ -132,7 +132,7 @@ export class BudgetsService {
       update where a record exists, insert where it's missing. This is why a budget
       set (or added) this month also shows up next month — including categories that
       a future month didn't previously have. Past months are never touched. */
-  private async propagateForward(userId: string, categoryId: string, amount: number, fromMonth: string): Promise<void> {
+  private async propagateForward(userId: string, categoryId: string, amount: number, fromMonth: string, projectId?: string | null): Promise<void> {
     const futureMonths = await this.repo
       .createQueryBuilder('b')
       .select('DISTINCT b.month', 'month')
@@ -145,35 +145,38 @@ export class BudgetsService {
       if (existing) {
         existing.amount = amount;
         existing.sourceMonth = fromMonth;
+        if (projectId !== undefined) existing.projectId = projectId ?? null;
         await this.repo.save(existing);
       } else {
-        await this.repo.save(this.repo.create({ userId, categoryId, amount, month, sourceMonth: fromMonth }));
+        await this.repo.save(this.repo.create({ userId, categoryId, amount, month, sourceMonth: fromMonth, projectId: projectId ?? null }));
       }
     }
   }
 
-  async create(userId: string, dto: { categoryId: string; amount: number; month: string }): Promise<Budget> {
+  async create(userId: string, dto: { categoryId: string; amount: number; month: string; projectId?: string | null }): Promise<Budget> {
     // Explicitly set this month → the value now originates here.
     const existing = await this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } });
     if (existing) {
       existing.amount = dto.amount;
       existing.sourceMonth = dto.month;
+      if (dto.projectId !== undefined) existing.projectId = dto.projectId ?? null;
       await this.repo.save(existing);
     } else {
       await this.repo.save(this.repo.create({ ...dto, userId, sourceMonth: dto.month }));
     }
-    await this.propagateForward(userId, dto.categoryId, dto.amount, dto.month);
+    await this.propagateForward(userId, dto.categoryId, dto.amount, dto.month, dto.projectId);
     return this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } }) as Promise<Budget>;
   }
 
-  async update(id: string, userId: string, dto: { amount: number }): Promise<Budget> {
+  async update(id: string, userId: string, dto: { amount: number; projectId?: string | null }): Promise<Budget> {
     const budget = await this.repo.findOneBy({ id });
     if (!budget) throw new NotFoundException();
     if (budget.userId !== userId) throw new ForbiddenException();
     budget.amount = dto.amount;
     budget.sourceMonth = budget.month; // edited here → originates here
+    if (dto.projectId !== undefined) budget.projectId = dto.projectId ?? null;
     await this.repo.save(budget);
-    await this.propagateForward(userId, budget.categoryId, dto.amount, budget.month);
+    await this.propagateForward(userId, budget.categoryId, dto.amount, budget.month, dto.projectId);
     return budget;
   }
 

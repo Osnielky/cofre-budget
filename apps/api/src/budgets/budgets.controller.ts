@@ -36,12 +36,12 @@ export class BudgetsController {
   }
 
   @Post()
-  create(@Request() req: any, @Body() body: { categoryId: string; amount: number; month?: string }) {
+  create(@Request() req: any, @Body() body: { categoryId: string; amount: number; month?: string; projectId?: string | null }) {
     return this.service.create(req.user.id, { ...body, month: body.month ?? currentMonth() });
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Request() req: any, @Body() body: { amount: number }) {
+  update(@Param('id') id: string, @Request() req: any, @Body() body: { amount: number; projectId?: string | null }) {
     return this.service.update(id, req.user.id, body);
   }
 
