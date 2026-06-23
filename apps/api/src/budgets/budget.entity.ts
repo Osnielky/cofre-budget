@@ -4,6 +4,7 @@ import {
   CreateDateColumn, UpdateDateColumn,
 } from 'typeorm';
 import { Category } from '../categories/category.entity';
+import { Project } from '../projects/project.entity';
 
 @Entity('budgets')
 @Unique(['userId', 'categoryId', 'month'])
@@ -31,6 +32,13 @@ export class Budget {
 
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   amount: number;
+
+  @Column({ nullable: true })
+  projectId: string | null;
+
+  @ManyToOne(() => Project, { nullable: true, eager: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'projectId' })
+  project: Project | null;
 
   @CreateDateColumn()
   createdAt: Date;
