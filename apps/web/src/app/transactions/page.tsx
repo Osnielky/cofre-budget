@@ -1827,11 +1827,8 @@ export default function TransactionsPage() {
           <SplitTransactionModal
             tx={splitTx}
             categories={categories}
-            onSave={(children) => {
-              setTransactions((prev) => [
-                ...(children as unknown as Transaction[]),
-                ...prev.filter((t) => t.id !== splitTx.id),
-              ]);
+            onSave={() => {
+              loadTransactions();
               setSplitTx(null);
             }}
             onClose={() => setSplitTx(null)}

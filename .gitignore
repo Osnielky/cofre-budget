@@ -6,3 +6,6 @@ dist
 .nx/cache
 .nx/workspace-data
 .gstack/
+
+# TypeScript incremental build cache (generated)
+*.tsbuildinfo

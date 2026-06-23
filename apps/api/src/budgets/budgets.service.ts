@@ -113,12 +113,16 @@ export class BudgetsService {
   }
 
   async getMonthSummaries(userId: string): Promise<{ month: string; total: number; count: number }[]> {
+    // Count only spending budgets (exclude income targets) so the total matches
+    // the "Total Budget" shown on the page.
     const rows = await this.repo
       .createQueryBuilder('b')
+      .leftJoin('b.category', 'c')
       .select('b.month', 'month')
       .addSelect('SUM(b.amount)', 'total')
       .addSelect('COUNT(*)', 'count')
       .where('b.userId = :userId', { userId })
+      .andWhere("(c.type IS NULL OR c.type != 'income')")
       .groupBy('b.month')
       .orderBy('b.month', 'DESC')
       .getRawMany<{ month: string; total: string; count: string }>();

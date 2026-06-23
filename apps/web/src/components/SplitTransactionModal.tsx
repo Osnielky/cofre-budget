@@ -32,6 +32,12 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [openPickerIdx, setOpenPickerIdx] = useState<number | null>(null);
+  const [pickerSearch, setPickerSearch] = useState('');
+
+  function togglePicker(idx: number) {
+    setOpenPickerIdx(openPickerIdx === idx ? null : idx);
+    setPickerSearch('');
+  }
 
   const allocated = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
   const remaining = absTotal - allocated;
@@ -93,7 +99,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose 
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
-        className="w-full max-w-md flex flex-col rounded-2xl"
+        className="w-full max-w-xl flex flex-col rounded-2xl"
         style={{
           background: 'var(--color-elevated)',
           border: 'var(--glass-border)',
@@ -142,8 +148,8 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose 
                 <div className="flex-1 relative">
                   <button
                     type="button"
-                    onClick={() => setOpenPickerIdx(openPickerIdx === idx ? null : idx)}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs text-left transition-all hover:brightness-110"
+                    onClick={() => togglePicker(idx)}
+                    className="w-full flex items-center gap-2 px-3 py-3 rounded-xl text-sm text-left transition-all hover:brightness-110"
                     style={
                       cat
                         ? { background: `${cat.color}18`, border: `1px solid ${cat.color}35`, color: cat.color }
@@ -160,58 +166,71 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose 
                     </svg>
                   </button>
 
-                  {openPickerIdx === idx && (
-                    <div
-                      className="absolute left-0 top-full mt-1 z-50 rounded-xl py-1 overflow-y-auto"
-                      style={{
-                        background: 'var(--popover-bg)',
-                        border: 'var(--glass-border)',
-                        boxShadow: 'var(--glass-shadow)',
-                        minWidth: '180px',
-                        maxHeight: '200px',
-                        width: '100%',
-                      }}
-                    >
-                      {cat && (
-                        <button
-                          onClick={() => { updateLine(idx, { categoryId: '' }); setOpenPickerIdx(null); }}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)]"
-                          style={{ color: 'var(--color-rose)' }}
-                        >
-                          <span>✕</span><span>Remove</span>
-                        </button>
-                      )}
-                      {primaryCats.map((c) => (
-                        <button
-                          key={c.id}
-                          onClick={() => { updateLine(idx, { categoryId: c.id }); setOpenPickerIdx(null); }}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)]"
-                          style={line.categoryId === c.id ? { background: `${c.color}15` } : {}}
-                        >
-                          <span className="w-5 h-5 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${c.color}20` }}>{c.icon}</span>
-                          <span className="font-medium flex-1 text-left" style={{ color: line.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}>{c.name}</span>
-                          {line.categoryId === c.id && <span style={{ color: c.color }}>✓</span>}
-                        </button>
-                      ))}
-                      {secondaryCats.length > 0 && (
-                        <>
-                          <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-                          {secondaryCats.map((c) => (
+                  {openPickerIdx === idx && (() => {
+                    const q = pickerSearch.trim().toLowerCase();
+                    const fp = q ? primaryCats.filter((c) => c.name.toLowerCase().includes(q)) : primaryCats;
+                    const fs = q ? secondaryCats.filter((c) => c.name.toLowerCase().includes(q)) : secondaryCats;
+                    const renderCat = (c: Category) => (
+                      <button
+                        key={c.id}
+                        onClick={() => { updateLine(idx, { categoryId: c.id }); setOpenPickerIdx(null); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--color-elevated)]"
+                        style={line.categoryId === c.id ? { background: `${c.color}15` } : {}}
+                      >
+                        <span className="w-6 h-6 rounded-lg flex items-center justify-center text-base shrink-0" style={{ background: `${c.color}20` }}>{c.icon}</span>
+                        <span className="font-medium flex-1 text-left" style={{ color: line.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}>{c.name}</span>
+                        {line.categoryId === c.id && <span style={{ color: c.color }}>✓</span>}
+                      </button>
+                    );
+                    return (
+                      <div
+                        className="absolute left-0 top-full mt-1 z-50 rounded-xl flex flex-col"
+                        style={{
+                          background: 'var(--popover-bg)',
+                          border: 'var(--glass-border)',
+                          boxShadow: 'var(--glass-shadow)',
+                          minWidth: '240px',
+                          maxHeight: '320px',
+                          width: '100%',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {/* Search */}
+                        <div className="p-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                          <input
+                            autoFocus
+                            value={pickerSearch}
+                            onChange={(e) => setPickerSearch(e.target.value)}
+                            placeholder="Search categories…"
+                            className="w-full px-3 py-2 text-sm rounded-lg outline-none"
+                            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                          />
+                        </div>
+
+                        <div className="py-1 overflow-y-auto">
+                          {cat && !q && (
                             <button
-                              key={c.id}
-                              onClick={() => { updateLine(idx, { categoryId: c.id }); setOpenPickerIdx(null); }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)]"
-                              style={line.categoryId === c.id ? { background: `${c.color}15` } : {}}
+                              onClick={() => { updateLine(idx, { categoryId: '' }); setOpenPickerIdx(null); }}
+                              className="w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--color-elevated)]"
+                              style={{ color: 'var(--color-rose)' }}
                             >
-                              <span className="w-5 h-5 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${c.color}20` }}>{c.icon}</span>
-                              <span className="font-medium flex-1 text-left" style={{ color: line.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}>{c.name}</span>
-                              {line.categoryId === c.id && <span style={{ color: c.color }}>✓</span>}
+                              <span>✕</span><span>Remove</span>
                             </button>
-                          ))}
-                        </>
-                      )}
-                    </div>
-                  )}
+                          )}
+                          {fp.map(renderCat)}
+                          {fs.length > 0 && (
+                            <>
+                              <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+                              {fs.map(renderCat)}
+                            </>
+                          )}
+                          {fp.length === 0 && fs.length === 0 && (
+                            <p className="px-3 py-4 text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>No categories match “{pickerSearch}”.</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Amount input */}
