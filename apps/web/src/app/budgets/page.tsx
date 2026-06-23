@@ -203,7 +203,7 @@ export default function BudgetsPage() {
 
   const sorted = [...spending].sort((a, b) => {
     if (sort === 'pct')   return b.percentage - a.percentage;
-    if (sort === 'spent') return Number(b.spent) - Number(a.spent);
+    if (sort === 'spent') return Number(b.amount) - Number(a.amount);
     return (a.category?.name ?? '').localeCompare(b.category?.name ?? '');
   });
 
