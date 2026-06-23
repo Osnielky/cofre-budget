@@ -59,6 +59,15 @@ export class TransactionsController {
     return this.service.importCsv(req.user.id, body.bankAccountId, body.rows, body.finalBalance);
   }
 
+  @Post(':id/split')
+  split(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: { splits: { categoryId: string | null; amount: number }[] },
+  ) {
+    return this.service.split(id, req.user.id, body.splits);
+  }
+
   @Patch(':id')
   updateManual(
     @Param('id') id: string,
@@ -66,6 +75,11 @@ export class TransactionsController {
     @Body() body: { name?: string; amount?: number; date?: string; bankAccountId?: string | null },
   ) {
     return this.service.updateManual(id, req.user.id, body);
+  }
+
+  @Delete(':id/unsplit')
+  unsplit(@Param('id') id: string, @Request() req: any) {
+    return this.service.unsplit(id, req.user.id);
   }
 
   @Delete(':id')

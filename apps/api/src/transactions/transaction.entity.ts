@@ -94,4 +94,10 @@ export class Transaction {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Column({ type: 'uuid', nullable: true, default: null })
+  parentId: string | null;
+
+  @Column({ default: false })
+  isSplitParent: boolean;
 }

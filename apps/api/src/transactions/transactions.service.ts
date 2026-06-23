@@ -86,6 +86,7 @@ export class TransactionsService {
       .leftJoinAndSelect('tx.bankAccount', 'bankAccount')
       .leftJoinAndSelect('tx.transferAccount', 'transferAccount')
       .where('tx.userId = :userId', { userId })
+      .andWhere('tx.isSplitParent = false')
       .orderBy('tx.date', 'DESC')
       .addOrderBy('tx.createdAt', 'DESC')
       .limit(limit);
@@ -280,6 +281,7 @@ export class TransactionsService {
     const tx = await this.repo.findOneBy({ id, userId });
     if (!tx) throw new NotFoundException();
     if (tx.source !== 'manual') throw new BadRequestException('Only manual transactions can be deleted');
+    if (tx.isSplitParent) throw new BadRequestException('Cannot delete a split transaction — unsplit it first');
 
     /* Remove the linked debt payment, if this tx was a debt repayment */
     if (tx.debtId) {
@@ -397,6 +399,83 @@ export class TransactionsService {
     const delta = -txAmount; // positive for outgoing tx, negative for incoming
     acc.balance = Number(acc.balance) + (mode === 'apply' ? delta : -delta);
     await this.accountRepo.save(acc);
+  }
+
+  async split(
+    id: string,
+    userId: string,
+    splits: { categoryId: string | null; amount: number }[],
+  ): Promise<Transaction[]> {
+    const tx = await this.repo.findOneByOrFail({ id, userId });
+    if (tx.isSplitParent) throw new BadRequestException('Transaction is already split');
+    if (tx.parentId) throw new BadRequestException('Cannot split a split piece — unsplit the parent first');
+    if (splits.length < 2) throw new BadRequestException('At least 2 split pieces required');
+
+    const txTotal = Math.abs(Number(tx.amount));
+    const splitTotal = splits.reduce((s, p) => s + Math.abs(p.amount), 0);
+    if (Math.abs(splitTotal - txTotal) > 0.01) {
+      throw new BadRequestException(
+        `Split amounts (${splitTotal.toFixed(2)}) must sum to the transaction total (${txTotal.toFixed(2)})`,
+      );
+    }
+
+    const sign = Number(tx.amount) >= 0 ? 1 : -1;
+
+    const childIds: string[] = await this.repo.manager.transaction(async (em) => {
+      tx.isSplitParent = true;
+      tx.categoryId = null;
+      tx.projectId = null;
+      tx.projectCategoryId = null;
+      await em.save(tx);
+
+      const ids: string[] = [];
+      for (const piece of splits) {
+        const child = em.create(Transaction, {
+          userId: tx.userId,
+          parentId: tx.id,
+          bankAccountId: tx.bankAccountId ?? undefined,
+          source: tx.source,
+          name: tx.name,
+          date: tx.date,
+          amount: sign * Math.abs(piece.amount),
+          categoryId: piece.categoryId ?? undefined,
+          pending: tx.pending,
+          isSplitParent: false,
+        });
+        const saved = await em.save(child);
+        ids.push(saved.id);
+      }
+      return ids;
+    });
+
+    return Promise.all(
+      childIds.map((cid) =>
+        this.repo.findOne({ where: { id: cid }, relations: ['categoryRef', 'bankAccount'] }),
+      ),
+    );
+  }
+
+  async unsplit(id: string, userId: string): Promise<Transaction> {
+    let tx = await this.repo.findOneBy({ id, userId });
+    if (!tx) throw new NotFoundException();
+
+    // Accept either a child id or the parent id
+    if (tx.parentId) {
+      tx = await this.repo.findOneBy({ id: tx.parentId, userId });
+      if (!tx) throw new NotFoundException();
+    }
+
+    if (!tx.isSplitParent) throw new BadRequestException('Transaction is not split');
+
+    await this.repo.delete({ parentId: tx.id, userId });
+
+    tx.isSplitParent = false;
+    tx.categoryId = null;
+    const saved = await this.repo.save(tx);
+    return this.repo.findOne({
+      where: { id: saved.id },
+      relations: ['categoryRef', 'bankAccount'],
+    });
   }
 }
 
