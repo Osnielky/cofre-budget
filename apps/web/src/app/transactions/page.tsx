@@ -1827,11 +1827,10 @@ export default function TransactionsPage() {
           <SplitTransactionModal
             tx={splitTx}
             categories={categories}
-            onSave={(children) => {
-              setTransactions((prev) => [
-                ...children,
-                ...prev.filter((t) => t.id !== splitTx.id),
-              ]);
+            onSave={() => {
+              // Reload from the server so the split children arrive fully-typed
+              // (the modal types them minimally) and the parent is hidden.
+              loadTransactions();
               setSplitTx(null);
             }}
             onClose={() => setSplitTx(null)}
