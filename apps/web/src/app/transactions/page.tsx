@@ -1829,7 +1829,7 @@ export default function TransactionsPage() {
             categories={categories}
             onSave={(children) => {
               setTransactions((prev) => [
-                ...children,
+                ...(children as unknown as Transaction[]),
                 ...prev.filter((t) => t.id !== splitTx.id),
               ]);
               setSplitTx(null);
