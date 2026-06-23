@@ -9,9 +9,11 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface MonthSummary { month: string; total: number; count: number }
+interface Project { id: string; name: string; icon: string; color?: string | null; type: string; status: string }
 interface BudgetWithSpent {
   id: string; categoryId: string; category: Category; month?: string; sourceMonth?: string | null;
   amount: number; spent: number; percentage: number; remaining: number;
+  projectId?: string | null; project?: Project | null;
 }
 interface Transaction {
   id: string; name: string; amount: number; date: string;
@@ -55,9 +57,11 @@ export default function BudgetsPage() {
   const [showForm, setShowForm]     = useState(false);
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [form, setForm]             = useState({ categoryId: '', amount: '' });
+  const [form, setForm]             = useState({ categoryId: '', amount: '', projectId: '' });
   const [sort, setSort]             = useState<'pct' | 'spent' | 'name'>('pct');
   const [catDropOpen, setCatDropOpen] = useState(false);
+  const [projects, setProjects]           = useState<Project[]>([]);
+  const [projectDropOpen, setProjectDropOpen] = useState(false);
   const [formKind, setFormKind]     = useState<'expense' | 'income'>('expense');
 
   /* Expanded budget detail */
@@ -164,10 +168,12 @@ export default function BudgetsPage() {
       .then(() => Promise.all([
         fetch(`${API}/budgets?month=${month}`, { credentials: 'include' }).then(r => r.json()),
         fetch(`${API}/categories`, { credentials: 'include' }).then(r => r.json()),
+        fetch(`${API}/projects`, { credentials: 'include' }).then(r => r.json()),
       ]))
-      .then(([b, c]) => {
+      .then(([b, c, p]) => {
         setBudgets(Array.isArray(b) ? b : []);
         setCategories(Array.isArray(c) ? c : []);
+        setProjects(Array.isArray(p) ? p : []);
       }).catch(() => {}).finally(() => setLoading(false));
   }, [month]);
 
@@ -227,7 +233,7 @@ export default function BudgetsPage() {
       const cat = categories.find(c => c.id === form.categoryId);
       setBudgets(bs => [...bs, { ...created, category: cat ?? created.category, amount: amt, spent: 0, percentage: 0, remaining: amt }]);
     }
-    setShowForm(false); setEditingId(null); setForm({ categoryId: '', amount: '' });
+    setShowForm(false); setEditingId(null); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '' });
   }
 
   async function handleDelete(id: string) {
@@ -282,7 +288,7 @@ export default function BudgetsPage() {
               </svg>
               Set all
             </button>
-            <button onClick={() => { setFormKind('expense'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '' }); }}
+            <button onClick={() => { setFormKind('expense'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '', projectId: '' }); }}
               className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5"
               style={{ background: 'var(--color-card-violet)' }}>
               <span className="text-base leading-none">+</span> Add Budget
@@ -507,7 +513,7 @@ export default function BudgetsPage() {
 
                         {/* Edit/delete + chevron */}
                         <div className="flex items-center gap-1 shrink-0">
-                          <button type="button" onClick={e => { e.stopPropagation(); setFormKind('expense'); setEditingId(b.id); setForm({ categoryId: b.categoryId, amount: String(b.amount) }); setShowForm(true); }}
+                          <button type="button" onClick={e => { e.stopPropagation(); setFormKind('expense'); setEditingId(b.id); setForm({ categoryId: b.categoryId, amount: String(b.amount), projectId: b.projectId ?? '' }); setShowForm(true); }}
                             className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors text-xs"
                             style={{ color: 'var(--color-text-muted)' }}>✏️</button>
                           <button type="button" onClick={e => { e.stopPropagation(); handleDelete(b.id); }} disabled={deletingId === b.id}
@@ -624,7 +630,7 @@ export default function BudgetsPage() {
                   </div>
                   {targets.length > 0 && (
                     <button type="button"
-                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '' }); }}
+                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '', projectId: '' }); }}
                       className="px-3 py-1.5 text-[11px] font-semibold rounded-xl hover:brightness-110 transition-all text-white flex items-center gap-1"
                       style={{ background: 'var(--color-green)' }}>
                       <span className="text-sm leading-none">+</span> Add Target
@@ -647,7 +653,7 @@ export default function BudgetsPage() {
                       </p>
                     </div>
                     <button type="button"
-                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '' }); }}
+                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '', projectId: '' }); }}
                       className="mt-1 px-4 py-2 text-xs font-semibold text-white rounded-xl hover:brightness-110 transition-all"
                       style={{ background: 'var(--color-green)' }}>
                       + Set your first target
@@ -683,7 +689,7 @@ export default function BudgetsPage() {
                         </div>
                         <div className="flex items-center gap-0.5 shrink-0">
                           <button type="button"
-                            onClick={() => { setFormKind('income'); setEditingId(t.id); setForm({ categoryId: t.categoryId, amount: String(t.amount) }); setShowForm(true); }}
+                            onClick={() => { setFormKind('income'); setEditingId(t.id); setForm({ categoryId: t.categoryId, amount: String(t.amount), projectId: t.projectId ?? '' }); setShowForm(true); }}
                             className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors text-xs"
                             style={{ color: 'var(--color-text-muted)' }}>✏️</button>
                           <button type="button" onClick={() => handleDelete(t.id)} disabled={deletingId === t.id}
@@ -720,7 +726,7 @@ export default function BudgetsPage() {
         {showForm && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowForm(false); setEditingId(null); setCatDropOpen(false); } }}>
+            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowForm(false); setEditingId(null); setCatDropOpen(false); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '' }); } }}>
             {(() => {
               const selCat = categories.find(c => c.id === form.categoryId);
               const accent = selCat?.color ?? 'var(--color-card-violet)';
@@ -747,7 +753,7 @@ export default function BudgetsPage() {
                         </p>
                       </div>
                     </div>
-                    <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); }}
+                    <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '' }); }}
                       className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] shrink-0"
                       style={{ color: 'var(--color-text-muted)' }}>✕</button>
                   </div>
@@ -817,7 +823,7 @@ export default function BudgetsPage() {
                   </div>
 
                   <div className="flex gap-2 justify-end px-5 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-                    <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); }}
+                    <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '' }); }}
                       className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
                       style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
                     <button type="submit"
