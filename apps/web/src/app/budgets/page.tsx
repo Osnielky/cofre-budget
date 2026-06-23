@@ -679,13 +679,23 @@ export default function BudgetsPage() {
                             style={{ background: `${tColor}20`, border: `1px solid ${tColor}30` }}>
                             {t.category?.icon ?? '💼'}
                           </span>
-                          <span className="text-sm font-semibold truncate">{t.category?.name ?? 'Unknown'}</span>
-                          {reached && (
-                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                              style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>
-                              GOAL MET
-                            </span>
-                          )}
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-sm font-semibold truncate">{t.category?.name ?? 'Unknown'}</span>
+                              {reached && (
+                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                                  style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>
+                                  GOAL MET
+                                </span>
+                              )}
+                            </div>
+                            {t.project && (
+                              <span className="text-[11px] truncate flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                                <span>{t.project.icon}</span>
+                                <span>{t.project.name}</span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-0.5 shrink-0">
                           <button type="button"
