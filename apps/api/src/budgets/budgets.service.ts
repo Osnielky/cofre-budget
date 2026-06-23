@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Budget } from './budget.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { Project } from '../projects/project.entity';
 import { TRACKING_TYPES } from '../bank-accounts/account-types';
 
 export interface BudgetWithSpent extends Budget {
@@ -16,6 +17,7 @@ export class BudgetsService {
   constructor(
     @InjectRepository(Budget) private repo: Repository<Budget>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
+    @InjectRepository(Project) private projectRepo: Repository<Project>,
   ) {}
 
   /** Average monthly spend per category over the trailing `months` months,
@@ -154,6 +156,10 @@ export class BudgetsService {
   }
 
   async create(userId: string, dto: { categoryId: string; amount: number; month: string; projectId?: string | null }): Promise<Budget> {
+    if (dto.projectId) {
+      const proj = await this.projectRepo.findOneBy({ id: dto.projectId });
+      if (!proj || proj.userId !== userId) throw new ForbiddenException();
+    }
     // Explicitly set this month → the value now originates here.
     const existing = await this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } });
     if (existing) {
@@ -172,12 +178,16 @@ export class BudgetsService {
     const budget = await this.repo.findOneBy({ id });
     if (!budget) throw new NotFoundException();
     if (budget.userId !== userId) throw new ForbiddenException();
+    if (dto.projectId) {
+      const proj = await this.projectRepo.findOneBy({ id: dto.projectId });
+      if (!proj || proj.userId !== userId) throw new ForbiddenException();
+    }
     budget.amount = dto.amount;
     budget.sourceMonth = budget.month; // edited here → originates here
     if (dto.projectId !== undefined) budget.projectId = dto.projectId ?? null;
     await this.repo.save(budget);
     await this.propagateForward(userId, budget.categoryId, dto.amount, budget.month, dto.projectId);
-    return budget;
+    return this.repo.findOneBy({ id }) as Promise<Budget>;
   }
 
   async remove(id: string, userId: string): Promise<void> {
