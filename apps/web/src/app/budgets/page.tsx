@@ -223,15 +223,15 @@ export default function BudgetsPage() {
     e.preventDefault();
     const amt = parseFloat(form.amount);
     if (editingId) {
-      await fetch(`${API}/budgets/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ amount: amt }) });
+      await fetch(`${API}/budgets/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ amount: amt, projectId: form.projectId || null }) });
       const prev = budgets.find(b => b.id === editingId);
       const spentAmt = prev?.spent ?? 0;
-      setBudgets(bs => bs.map(b => b.id === editingId ? { ...b, amount: amt, percentage: amt > 0 ? Math.round((spentAmt / amt) * 100) : 0, remaining: amt - spentAmt } : b));
+      setBudgets(bs => bs.map(b => b.id === editingId ? { ...b, amount: amt, projectId: form.projectId || null, project: projects.find(p => p.id === form.projectId) ?? null, percentage: amt > 0 ? Math.round((spentAmt / amt) * 100) : 0, remaining: amt - spentAmt } : b));
     } else {
-      const res = await fetch(`${API}/budgets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ categoryId: form.categoryId, amount: amt, month }) });
+      const res = await fetch(`${API}/budgets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ categoryId: form.categoryId, amount: amt, month, projectId: form.projectId || null }) });
       const created = await res.json();
       const cat = categories.find(c => c.id === form.categoryId);
-      setBudgets(bs => [...bs, { ...created, category: cat ?? created.category, amount: amt, spent: 0, percentage: 0, remaining: amt }]);
+      setBudgets(bs => [...bs, { ...created, category: cat ?? created.category, project: projects.find(p => p.id === form.projectId) ?? null, amount: amt, spent: 0, percentage: 0, remaining: amt }]);
     }
     setShowForm(false); setEditingId(null); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '' });
   }
@@ -792,6 +792,65 @@ export default function BudgetsPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Project picker — income targets only */}
+                    {formKind === 'income' && (
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                          Project <span style={{ color: 'var(--color-text-muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                        </span>
+                        <div style={{ position: 'relative' }}>
+                          {(() => {
+                            const selProj = projects.find(p => p.id === form.projectId);
+                            const projColor = selProj?.color ?? '#9B6DFF';
+                            return (
+                              <>
+                                <button type="button" onClick={() => setProjectDropOpen(o => !o)}
+                                  className="w-full px-3 py-2.5 text-sm flex items-center gap-2.5 rounded-xl outline-none text-left"
+                                  style={{ background: 'var(--color-surface)', border: `1px solid ${selProj ? projColor + '44' : 'var(--color-border)'}`, color: selProj ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                                  {selProj ? (
+                                    <><span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${projColor}20` }}>{selProj.icon}</span>
+                                    <span className="flex-1 font-medium" style={{ color: projColor }}>{selProj.name}</span></>
+                                  ) : <span className="flex-1">Select a project…</span>}
+                                  <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0, transform: projectDropOpen ? 'rotate(180deg)' : undefined }}>
+                                    <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                </button>
+                                {projectDropOpen && (
+                                  <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
+                                    style={{ background: 'var(--popover-bg)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)', zIndex: 10, maxHeight: '50vh' }}>
+                                    {/* None option */}
+                                    <button type="button"
+                                      onClick={() => { setForm(f => ({ ...f, projectId: '' })); setProjectDropOpen(false); }}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                                      style={{ background: form.projectId === '' ? 'rgba(155,109,255,0.08)' : 'transparent', color: form.projectId === '' ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}
+                                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(155,109,255,0.06)')}
+                                      onMouseLeave={e => (e.currentTarget.style.background = form.projectId === '' ? 'rgba(155,109,255,0.08)' : 'transparent')}>
+                                      <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'rgba(155,109,255,0.12)' }}>—</span>
+                                      <span className="font-medium">None</span>
+                                    </button>
+                                    {projects.filter(p => p.status === 'active').map(p => {
+                                      const pc = p.color ?? '#9B6DFF';
+                                      return (
+                                        <button key={p.id} type="button"
+                                          onClick={() => { setForm(f => ({ ...f, projectId: p.id })); setProjectDropOpen(false); }}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                                          style={{ background: form.projectId === p.id ? `${pc}18` : 'transparent', color: form.projectId === p.id ? pc : 'var(--color-text-primary)' }}
+                                          onMouseEnter={e => (e.currentTarget.style.background = `${pc}12`)}
+                                          onMouseLeave={e => (e.currentTarget.style.background = form.projectId === p.id ? `${pc}18` : 'transparent')}>
+                                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${pc}20` }}>{p.icon}</span>
+                                          <span className="font-medium">{p.name}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Amount */}
                     <div className="flex flex-col gap-2">
