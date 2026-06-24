@@ -1188,7 +1188,7 @@ export default function TransactionsPage() {
 
                           {/* ── Category suggestion ── */}
                           {(() => {
-                            if (tx.categoryId || txIsTransfer) return null;
+                            if (tx.categoryId || tx.projectId || tx.debtId || txIsTransfer) return null;
                             // 1. Normalize name: strip trailing unique codes like "WFCT126NB7CP"
                             const normName = tx.name.replace(/\s+(?:conf#\S+|[A-Z0-9]{6,})$/i, '').trim();
                             // 2. Past-history hints
@@ -1230,7 +1230,7 @@ export default function TransactionsPage() {
 
                           {/* ── Project category suggestion ── */}
                           {(() => {
-                            if (tx.projectId || tx.categoryId) return null;
+                            if (tx.projectId || tx.categoryId || tx.debtId || txIsTransfer) return null;
                             const normName = tx.name.replace(/\s+(?:conf#\S+|[A-Z0-9]{6,})$/i, '').trim();
                             const ph = projectHints[tx.name] ?? projectHints[normName] ?? null;
                             if (!ph) return null;
