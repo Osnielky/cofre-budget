@@ -118,6 +118,10 @@ export default function ProjectsPage() {
   const [deletingCat, setDeletingCat]   = useState<string | null>(null);
   const [seedingCat, setSeedingCat]     = useState<string | null>(null);
 
+  /* Remove purchase transaction state */
+  const [removingPurchaseTx, setRemovingPurchaseTx] = useState<string | null>(null);
+  const [removePurchaseTxError, setRemovePurchaseTxError] = useState<string | null>(null);
+
   /* Project form state */
   const emptyForm = { name: '', type: 'vehicle', icon: '🚗', color: PRESET_COLORS[0], description: '', purchasePrice: '', purchaseDate: '', imageUrl: '' };
   const [form, setForm] = useState(emptyForm);
@@ -329,19 +333,31 @@ export default function ProjectsPage() {
   }
 
   async function removePurchaseTx(projectId: string) {
-    const res = await fetch(`${API}/projects/${projectId}/purchase-tx`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ transactionId: null }),
-    });
-    if (!res.ok) return;
-    const updated = await res.json();
-    setProjects((prev) => prev.map((p) =>
-      p.id === projectId
-        ? { ...p, purchaseTxId: null, costBasis: updated.costBasis }
-        : p,
-    ));
+    setRemovingPurchaseTx(projectId);
+    setRemovePurchaseTxError(null);
+    try {
+      const res = await fetch(`${API}/projects/${projectId}/purchase-tx`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ transactionId: null }),
+      });
+      if (!res.ok) {
+        setRemovePurchaseTxError('Failed to remove purchase designation');
+        return;
+      }
+      const updated = await res.json();
+      setProjects((prev) => prev.map((p) =>
+        p.id === projectId
+          ? { ...p, purchaseTxId: null, costBasis: updated.costBasis }
+          : p,
+      ));
+      setRemovePurchaseTxError(null);
+    } catch (error) {
+      setRemovePurchaseTxError('Failed to remove purchase designation');
+    } finally {
+      setRemovingPurchaseTx(null);
+    }
   }
 
   function openCreate() { setEditing(null); setForm(emptyForm); setShowForm(true); }
@@ -854,17 +870,25 @@ export default function ProjectsPage() {
                                 </div>
                               </div>
                               {tx.id === sel.purchaseTxId && (
-                                <button
-                                  onClick={() => removePurchaseTx(sel.id)}
-                                  className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 hover:brightness-110 transition-all"
-                                  style={{
-                                    background: 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)',
-                                    color: 'var(--color-card-violet)',
-                                    border: '1px solid color-mix(in srgb, var(--color-card-violet) 30%, transparent)',
-                                  }}
-                                  title="Remove purchase designation">
-                                  🏷 Purchase
-                                </button>
+                                <div className="flex flex-col gap-0.5 items-end">
+                                  <button
+                                    onClick={() => removePurchaseTx(sel.id)}
+                                    disabled={removingPurchaseTx === sel.id}
+                                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    style={{
+                                      background: removePurchaseTxError === null ? 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)' : 'color-mix(in srgb, #F07A3E 15%, transparent)',
+                                      color: removePurchaseTxError === null ? 'var(--color-card-violet)' : '#F07A3E',
+                                      border: removePurchaseTxError === null ? '1px solid color-mix(in srgb, var(--color-card-violet) 30%, transparent)' : '1px solid color-mix(in srgb, #F07A3E 30%, transparent)',
+                                    }}
+                                    title={removePurchaseTxError || "Remove purchase designation"}>
+                                    {removingPurchaseTx === sel.id ? '…' : '🏷 Purchase'}
+                                  </button>
+                                  {removePurchaseTxError && (
+                                    <p className="text-[9px] text-right" style={{ color: '#F07A3E' }}>
+                                      {removePurchaseTxError}
+                                    </p>
+                                  )}
+                                </div>
                               )}
                               <span className="text-sm font-semibold tabular-nums shrink-0"
                                 style={{ color: Number(tx.amount) >= 0 ? '#4FBF7F' : '#F07A3E' }}>
