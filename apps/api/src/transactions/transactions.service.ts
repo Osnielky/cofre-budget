@@ -308,6 +308,13 @@ export class TransactionsService {
 
   async updateCategory(id: string, userId: string, categoryId: string | null): Promise<Transaction> {
     const tx = await this.repo.findOneByOrFail({ id, userId });
+
+    // Assigning a real category unlinks any existing debt
+    if (categoryId && tx.debtId) {
+      await this.debtsService.removePaymentByTransaction(tx.id);
+      tx.debtId = undefined;
+    }
+
     /* If clearing a transfer category, undo balance + clear counterpart link */
     if (!categoryId && tx.transferAccountId) {
       await this.adjustTransferBalance(tx.transferAccountId, userId, Number(tx.amount), 'undo');
@@ -325,6 +332,33 @@ export class TransactionsService {
     tx.categoryId = categoryId ?? undefined;
     const saved = await this.repo.save(tx);
     return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'transferAccount'] });
+  }
+
+  async updateDebt(id: string, userId: string, debtId: string | null): Promise<Transaction> {
+    const tx = await this.repo.findOneByOrFail({ id, userId });
+
+    if (tx.debtId) {
+      await this.debtsService.removePaymentByTransaction(tx.id);
+    }
+
+    if (debtId) {
+      tx.debtId    = debtId;
+      tx.categoryId = undefined;
+      await this.repo.save(tx);
+      await this.debtsService.recordPaymentFromTransaction(debtId, userId, {
+        amount: Math.abs(Number(tx.amount)),
+        date:   tx.date,
+        transactionId: tx.id,
+      });
+    } else {
+      tx.debtId = undefined;
+      await this.repo.save(tx);
+    }
+
+    return this.repo.findOne({
+      where: { id },
+      relations: ['categoryRef', 'bankAccount', 'transferAccount'],
+    });
   }
 
   async findTransferMatches(userId: string, amount: number, date: string, excludeAccountId: string): Promise<Transaction[]> {

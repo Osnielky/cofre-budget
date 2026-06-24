@@ -96,6 +96,15 @@ export class TransactionsController {
     return this.service.updateCategory(id, req.user.id, categoryId);
   }
 
+  @Patch(':id/debt')
+  updateDebt(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body('debtId') debtId: string | null,
+  ) {
+    return this.service.updateDebt(id, req.user.id, debtId);
+  }
+
   @Patch(':id/transfer-account')
   updateTransferAccount(
     @Param('id') id: string,
