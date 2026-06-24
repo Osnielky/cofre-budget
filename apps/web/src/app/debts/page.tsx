@@ -208,7 +208,7 @@ export default function DebtsPage() {
                           </div>
                           {(d.startDate || d.dueDate) && (
                             <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                              {d.startDate ? `Lent ${d.startDate}` : ''}{d.startDate && d.dueDate ? ' · ' : ''}{d.dueDate ? `due ${d.dueDate}` : ''}
+                              {d.startDate ? `${d.direction === 'owed' ? 'Borrowed' : 'Lent'} ${d.startDate}` : ''}{d.startDate && d.dueDate ? ' · ' : ''}{d.dueDate ? `due ${d.dueDate}` : ''}
                             </p>
                           )}
                           <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
@@ -227,7 +227,9 @@ export default function DebtsPage() {
                       <div className="px-5 pb-5 flex flex-col gap-4" style={{ borderTop: '1px solid var(--color-border)' }}>
                         <form onSubmit={recordPayment} className="flex flex-wrap items-end gap-2 pt-4">
                           <div className="flex flex-col gap-1">
-                            <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Payment</span>
+                            <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                              {d.direction === 'owed' ? 'Amount paid back' : 'Payment'}
+                            </span>
                             <input required type="number" step="0.01" min="0.01" placeholder="0.00" value={pay.amount}
                               onChange={e => setPay(p => ({ ...p, amount: e.target.value }))}
                               className="w-28 px-3 py-2 text-sm rounded-xl outline-none" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
@@ -241,7 +243,7 @@ export default function DebtsPage() {
                           <label className="flex items-center gap-1.5 text-[11px]" style={{ color: d.borrowerEmail ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
                             <input type="checkbox" checked={pay.emailReceipt && !!d.borrowerEmail} disabled={!d.borrowerEmail}
                               onChange={e => setPay(p => ({ ...p, emailReceipt: e.target.checked }))} />
-                            Email receipt
+                            {d.direction === 'owed' ? 'Email confirmation' : 'Email receipt'}
                           </label>
                           <button type="button" onClick={sendStatement} disabled={!d.borrowerEmail}
                             className="ml-auto px-3 py-2 text-xs font-semibold rounded-xl disabled:opacity-40 hover:bg-[var(--color-elevated)]"
@@ -272,7 +274,9 @@ export default function DebtsPage() {
                               <div key={p.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg" style={{ background: 'var(--color-elevated)' }}>
                                 <span style={{ color: 'var(--color-text-muted)' }}>{p.date}{p.note ? ` · ${p.note}` : ''}</span>
                                 <span className="flex items-center gap-3">
-                                  <span className="font-bold tabular-nums" style={{ color: 'var(--color-green)' }}>+${fmt(p.amount)}</span>
+                                  <span className="font-bold tabular-nums" style={{ color: d.direction === 'owed' ? 'var(--color-orange)' : 'var(--color-green)' }}>
+                                    {d.direction === 'owed' ? '−' : '+'}${fmt(p.amount)}
+                                  </span>
                                   {p.transactionId
                                     ? <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>via transaction</span>
                                     : <button onClick={() => deletePayment(p.id)} className="hover:opacity-70" style={{ color: 'var(--color-text-muted)' }}>✕</button>}
