@@ -51,14 +51,21 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose 
       if (t.closest('[data-cat-trigger]') || menuRef.current?.contains(t)) return;
       setOpenPickerIdx(null);
     };
-    const onReflow = () => setOpenPickerIdx(null);
+    const onResize = () => setOpenPickerIdx(null);
+    // Scrolling the menu's own list must NOT close it — only outside scrolls
+    // (which would detach the fixed-positioned menu from its trigger).
+    const onScroll = (e: Event) => {
+      const t = e.target as Node;
+      if (menuRef.current && (menuRef.current === t || menuRef.current.contains(t))) return;
+      setOpenPickerIdx(null);
+    };
     document.addEventListener('mousedown', onDown);
-    window.addEventListener('resize', onReflow);
-    window.addEventListener('scroll', onReflow, true);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onScroll, true);
     return () => {
       document.removeEventListener('mousedown', onDown);
-      window.removeEventListener('resize', onReflow);
-      window.removeEventListener('scroll', onReflow, true);
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onScroll, true);
     };
   }, [openPickerIdx]);
 
@@ -238,7 +245,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose 
                           />
                         </div>
 
-                        <div className="py-1 overflow-y-auto">
+                        <div className="py-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
                           {cat && !q && (
                             <button
                               onClick={() => { updateLine(idx, { categoryId: '' }); setOpenPickerIdx(null); }}
