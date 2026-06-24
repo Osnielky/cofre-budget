@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -33,11 +33,34 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose 
   const [error, setError] = useState('');
   const [openPickerIdx, setOpenPickerIdx] = useState<number | null>(null);
   const [pickerSearch, setPickerSearch] = useState('');
+  const [pickerRect, setPickerRect] = useState<DOMRect | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-  function togglePicker(idx: number) {
-    setOpenPickerIdx(openPickerIdx === idx ? null : idx);
+  function togglePicker(idx: number, e: React.MouseEvent<HTMLButtonElement>) {
+    if (openPickerIdx === idx) { setOpenPickerIdx(null); return; }
+    setPickerRect(e.currentTarget.getBoundingClientRect());
+    setOpenPickerIdx(idx);
     setPickerSearch('');
   }
+
+  // Close the category menu on outside-click / scroll / resize.
+  useEffect(() => {
+    if (openPickerIdx === null) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('[data-cat-trigger]') || menuRef.current?.contains(t)) return;
+      setOpenPickerIdx(null);
+    };
+    const onReflow = () => setOpenPickerIdx(null);
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('resize', onReflow);
+    window.addEventListener('scroll', onReflow, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('resize', onReflow);
+      window.removeEventListener('scroll', onReflow, true);
+    };
+  }, [openPickerIdx]);
 
   const allocated = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
   const remaining = absTotal - allocated;
@@ -148,7 +171,8 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose 
                 <div className="flex-1 relative">
                   <button
                     type="button"
-                    onClick={() => togglePicker(idx)}
+                    data-cat-trigger
+                    onClick={(e) => togglePicker(idx, e)}
                     className="w-full flex items-center gap-2 px-3 py-3 rounded-xl text-sm text-left transition-all hover:brightness-110"
                     style={
                       cat
@@ -182,16 +206,23 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose 
                         {line.categoryId === c.id && <span style={{ color: c.color }}>✓</span>}
                       </button>
                     );
-                    return (
+                    if (!pickerRect) return null;
+                    const DROP_MAX = 340;
+                    const openUp = pickerRect.bottom + DROP_MAX > window.innerHeight
+                      && pickerRect.top > window.innerHeight - pickerRect.bottom;
+                    return createPortal(
                       <div
-                        className="absolute left-0 top-full mt-1 z-50 rounded-xl flex flex-col"
+                        ref={menuRef}
+                        className="fixed z-[60] rounded-xl flex flex-col"
                         style={{
+                          left: pickerRect.left,
+                          width: pickerRect.width,
+                          top: openUp ? undefined : pickerRect.bottom + 4,
+                          bottom: openUp ? window.innerHeight - pickerRect.top + 4 : undefined,
                           background: 'var(--popover-bg)',
                           border: 'var(--glass-border)',
                           boxShadow: 'var(--glass-shadow)',
-                          minWidth: '240px',
-                          maxHeight: '320px',
-                          width: '100%',
+                          maxHeight: DROP_MAX,
                           overflow: 'hidden',
                         }}
                       >
@@ -228,7 +259,8 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose 
                             <p className="px-3 py-4 text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>No categories match “{pickerSearch}”.</p>
                           )}
                         </div>
-                      </div>
+                      </div>,
+                      document.body,
                     );
                   })()}
                 </div>
