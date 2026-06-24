@@ -32,7 +32,7 @@ interface Transaction {
   parentId: string | null;
   isSplitParent: boolean;
 }
-interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid' }
+interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid'; direction: 'lent' | 'owed' }
 
 type Filter    = 'all' | 'uncategorized' | 'expense' | 'income';
 type RangeMode = 'month' | 'custom';
@@ -1289,7 +1289,15 @@ export default function TransactionsPage() {
                               {updatingId === tx.id ? (
                                 <span>…</span>
                               ) : tx.debtId ? (
-                                <><span>🤝</span><span>Debt repayment · {debts.find((d) => d.id === tx.debtId)?.borrowerName ?? 'debt'}</span></>
+                                (() => {
+                                  const linkedDebt = debts.find((d) => d.id === tx.debtId);
+                                  return (
+                                    <><span>🤝</span><span>
+                                      {linkedDebt?.direction === 'owed' ? 'Debt payment · ' : 'Debt repayment · '}
+                                      {linkedDebt?.borrowerName ?? 'debt'}
+                                    </span></>
+                                  );
+                                })()
                               ) : tx.projectId ? (() => {
                                 const _proj = projects.find((p) => p.id === tx.projectId);
                                 const _pCat = tx.projectCategoryId ? _proj?.categories?.find((c) => c.id === tx.projectCategoryId) : null;
@@ -1952,7 +1960,9 @@ export default function TransactionsPage() {
                         {selDebt ? (
                           <>
                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
-                            <span className="flex-1 font-medium" style={{ color: 'var(--color-card-violet)' }}>Debt repayment · {selDebt.borrowerName}</span>
+                            <span className="flex-1 font-medium" style={{ color: 'var(--color-card-violet)' }}>
+                              {selDebt.direction === 'owed' ? 'Debt payment · ' : 'Debt repayment · '}{selDebt.borrowerName}
+                            </span>
                           </>
                         ) : selCat ? (
                           <>
@@ -1975,18 +1985,23 @@ export default function TransactionsPage() {
                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'var(--color-elevated)' }}>—</span>
                             Uncategorized
                           </button>
-                          {!isExpense && openDebts.length > 0 && (
+                          {openDebts.length > 0 && (
                             <>
                               <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Debt repayment</p>
                               {openDebts.map((d) => (
                                 <button key={d.id} type="button"
-                                  onClick={() => { setManualTx((f) => ({ ...f, debtId: d.id, categoryId: '' })); setManualCatOpen(false); }}
+                                  onClick={() => {
+                                    setManualTx((f) => ({ ...f, debtId: d.id, categoryId: '', sign: d.direction === 'owed' ? '-' : '+' }));
+                                    setManualCatOpen(false);
+                                  }}
                                   className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
                                   style={{ background: manualTx.debtId === d.id ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)' : 'transparent', color: manualTx.debtId === d.id ? 'var(--color-card-violet)' : 'var(--color-text-primary)' }}
                                   onMouseEnter={(e) => (e.currentTarget.style.background = 'color-mix(in srgb, var(--color-card-violet) 12%, transparent)')}
                                   onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.debtId === d.id ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)' : 'transparent')}>
                                   <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
-                                  <span className="font-medium flex-1 text-left">{d.borrowerName}</span>
+                                  <span className="font-medium flex-1 text-left">
+                                    {d.direction === 'owed' ? '↓ ' : '↑ '}{d.borrowerName}
+                                  </span>
                                   <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>${Number(d.remaining).toLocaleString('en-US', { minimumFractionDigits: 2 })} left</span>
                                 </button>
                               ))}
