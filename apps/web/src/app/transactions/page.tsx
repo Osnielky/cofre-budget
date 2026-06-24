@@ -1367,6 +1367,55 @@ export default function TransactionsPage() {
                                     />
                                   </div>
                                 )}
+                                {/* Remove debt link */}
+                                {tx.debtId && (
+                                  <>
+                                    <button
+                                      onClick={() => assignDebt(tx.id, null)}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)]"
+                                      style={{ color: 'var(--color-rose)' }}>
+                                      <span>✕</span><span>Remove debt link</span>
+                                    </button>
+                                    <div style={{ borderTop: '1px solid var(--color-border)' }} />
+                                  </>
+                                )}
+
+                                {/* Debt payment section */}
+                                {!pickerTransferStep && !pickerProjectDrill && (() => {
+                                  const filteredDebts = openDebts.filter((d) =>
+                                    !pickerSearch || d.borrowerName.toLowerCase().includes(pickerSearch.toLowerCase()),
+                                  );
+                                  if (!filteredDebts.length) return null;
+                                  return (
+                                    <>
+                                      <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
+                                        style={{ color: 'var(--color-card-violet)' }}>Debt payment</p>
+                                      {filteredDebts.map((d) => (
+                                        <button key={d.id}
+                                          onClick={() => assignDebt(tx.id, d.id)}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors"
+                                          style={{
+                                            background: tx.debtId === d.id
+                                              ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)'
+                                              : 'transparent',
+                                            color: tx.debtId === d.id ? 'var(--color-card-violet)' : 'var(--color-text-primary)',
+                                          }}
+                                          onMouseEnter={(e) => (e.currentTarget.style.background = 'color-mix(in srgb, var(--color-card-violet) 12%, transparent)')}
+                                          onMouseLeave={(e) => (e.currentTarget.style.background = tx.debtId === d.id
+                                            ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)'
+                                            : 'transparent')}>
+                                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                            style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
+                                          <span className="font-medium flex-1 text-left">{d.borrowerName}</span>
+                                          <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                                            ${Number(d.remaining).toLocaleString('en-US', { minimumFractionDigits: 2 })} left
+                                          </span>
+                                        </button>
+                                      ))}
+                                      <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+                                    </>
+                                  );
+                                })()}
                                 {pickerTransferStep && openPickerId === tx.id ? (
                                   /* ── Transfer account picker ── */
                                   <>
