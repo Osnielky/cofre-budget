@@ -341,6 +341,21 @@ export class TransactionsService {
       await this.debtsService.removePaymentByTransaction(tx.id);
     }
 
+    // Clear any existing transfer link
+    if (tx.transferAccountId) {
+      await this.adjustTransferBalance(tx.transferAccountId, userId, Number(tx.amount), 'undo');
+      if (tx.counterpartTxId) {
+        const counterpart = await this.repo.findOneBy({ id: tx.counterpartTxId, userId });
+        if (counterpart) {
+          counterpart.counterpartTxId   = undefined;
+          counterpart.transferAccountId = undefined;
+          await this.repo.save(counterpart);
+        }
+      }
+      tx.transferAccountId = undefined;
+      tx.counterpartTxId   = undefined;
+    }
+
     if (debtId) {
       tx.debtId    = debtId;
       tx.categoryId = undefined;

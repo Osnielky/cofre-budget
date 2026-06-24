@@ -285,6 +285,7 @@ export default function TransactionsPage() {
         ...t,
         categoryId: updated.categoryId,
         categoryRef: updated.categoryRef,
+        debtId: updated.debtId ?? null,
         ...(!categoryId && { transferAccountId: null, transferAccount: null, counterpartTxId: null }),
       };
       if (counterpartId && t.id === counterpartId) return {
@@ -1368,7 +1369,7 @@ export default function TransactionsPage() {
                                   </div>
                                 )}
                                 {/* Remove debt link */}
-                                {tx.debtId && (
+                                {tx.debtId && !pickerTransferStep && !pickerProjectDrill && (
                                   <>
                                     <button
                                       onClick={() => assignDebt(tx.id, null)}
