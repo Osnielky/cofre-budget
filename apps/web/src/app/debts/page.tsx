@@ -21,8 +21,14 @@ export default function DebtsPage() {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [formDir, setFormDir] = useState<'lent' | 'owed'>('lent');
   const [form, setForm] = useState({ borrowerName: '', borrowerEmail: '', principal: '', description: '', startDate: today(), dueDate: '' });
   const [saving, setSaving] = useState(false);
+
+  const resetForm = () => {
+    setFormDir('lent');
+    setForm({ borrowerName: '', borrowerEmail: '', principal: '', description: '', startDate: today(), dueDate: '' });
+  };
 
   const [openId, setOpenId] = useState<string | null>(null);
   const [detail, setDetail] = useState<DebtDetail | null>(null);
@@ -60,10 +66,10 @@ export default function DebtsPage() {
         description: form.description || null,
         startDate: form.startDate || null,
         dueDate: form.dueDate || null,
+        direction: formDir,
       }),
     });
-    setSaving(false); setShowForm(false);
-    setForm({ borrowerName: '', borrowerEmail: '', principal: '', description: '', startDate: today(), dueDate: '' });
+    setSaving(false); setShowForm(false); resetForm();
     load();
   }
 
@@ -257,25 +263,54 @@ export default function DebtsPage() {
 
         {showForm && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-            onMouseDown={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-            <form onSubmit={createDebt} className="w-full max-w-sm flex flex-col rounded-2xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)' }}>
+            onMouseDown={e => { if (e.target === e.currentTarget) { setShowForm(false); resetForm(); } }}>
+            <form onSubmit={createDebt} className="w-full max-w-sm flex flex-col rounded-2xl"
+              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)' }}>
               <div className="px-5 py-4 flex items-center justify-between rounded-t-2xl" style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <p className="font-bold text-sm">New Debt</p>
-                <button type="button" onClick={() => setShowForm(false)} className="w-8 h-8 rounded-lg hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-text-muted)' }}>✕</button>
+                <button type="button" onClick={() => { setShowForm(false); resetForm(); }}
+                  className="w-8 h-8 rounded-lg hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-text-muted)' }}>✕</button>
               </div>
               <div className="flex flex-col gap-3 px-5 py-4">
-                {([['borrowerName', 'Borrower name', 'text', true], ['borrowerEmail', 'Email (optional)', 'email', false], ['principal', 'Amount lent', 'number', true], ['description', 'Note (optional)', 'text', false], ['startDate', 'Date lent', 'date', false], ['dueDate', 'Due date (optional)', 'date', false]] as const).map(([key, label, type, req]) => (
+                {/* Direction toggle */}
+                <div className="flex gap-1 p-1 rounded-xl self-start" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                  {(['lent', 'owed'] as const).map((dir) => (
+                    <button key={dir} type="button" onClick={() => setFormDir(dir)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                      style={{
+                        background: formDir === dir ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)' : 'transparent',
+                        color: formDir === dir ? 'var(--color-card-violet)' : 'var(--color-text-muted)',
+                        border: formDir === dir ? '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)' : '1px solid transparent',
+                      }}>
+                      {dir === 'lent' ? 'I Lent' : 'I Owe'}
+                    </button>
+                  ))}
+                </div>
+                {/* Fields with direction-aware labels */}
+                {([
+                  ['borrowerName', formDir === 'lent' ? 'Borrower name' : 'Lender name', 'text', true],
+                  ['borrowerEmail', 'Email (optional)', 'email', false],
+                  ['principal', formDir === 'lent' ? 'Amount lent' : 'Amount owed', 'number', true],
+                  ['description', 'Note (optional)', 'text', false],
+                  ['startDate', formDir === 'lent' ? 'Date lent' : 'Date borrowed', 'date', false],
+                  ['dueDate', 'Due date (optional)', 'date', false],
+                ] as const).map(([key, label, type, req]) => (
                   <label key={key} className="flex flex-col gap-1.5">
                     <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{label}</span>
                     <input required={req} type={type} step={type === 'number' ? '0.01' : undefined} min={type === 'number' ? '0.01' : undefined}
                       value={(form as any)[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                      className="px-3 py-2.5 text-sm rounded-xl outline-none" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
+                      className="px-3 py-2.5 text-sm rounded-xl outline-none"
+                      style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
                   </label>
                 ))}
               </div>
               <div className="flex gap-2 justify-end px-5 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-                <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 text-sm font-medium rounded-xl" style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
-                <button type="submit" disabled={saving} className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50" style={{ background: 'var(--color-card-violet)' }}>{saving ? 'Saving…' : 'Create'}</button>
+                <button type="button" onClick={() => { setShowForm(false); resetForm(); }}
+                  className="px-4 py-2 text-sm font-medium rounded-xl"
+                  style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
+                <button type="submit" disabled={saving}
+                  className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50"
+                  style={{ background: 'var(--color-card-violet)' }}>{saving ? 'Saving…' : 'Create'}</button>
               </div>
             </form>
           </div>,
