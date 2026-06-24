@@ -60,6 +60,7 @@ interface Project {
   expenses: number; income: number; costBasis: number;
   netGain: number | null; roi: number | null; txCount: number;
   imageUrl?: string | null;
+  purchaseTxId: string | null;
   transactions?: Transaction[];
   categories?: ProjectCategory[];
   categoryBreakdown?: CategoryBreakdown[];
@@ -325,6 +326,22 @@ export default function ProjectsPage() {
       await fetch(`${API}/projects/${projectId}/categories/${catId}`, { method: 'DELETE', credentials: 'include' });
       await loadDetail(projectId);
     } finally { setDeletingCat(null); }
+  }
+
+  async function removePurchaseTx(projectId: string) {
+    const res = await fetch(`${API}/projects/${projectId}/purchase-tx`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ transactionId: null }),
+    });
+    if (!res.ok) return;
+    const updated = await res.json();
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId
+        ? { ...p, purchaseTxId: null, costBasis: updated.costBasis }
+        : p,
+    ));
   }
 
   function openCreate() { setEditing(null); setForm(emptyForm); setShowForm(true); }
@@ -836,6 +853,19 @@ export default function ProjectsPage() {
                                   />
                                 </div>
                               </div>
+                              {tx.id === sel.purchaseTxId && (
+                                <button
+                                  onClick={() => removePurchaseTx(sel.id)}
+                                  className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 hover:brightness-110 transition-all"
+                                  style={{
+                                    background: 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)',
+                                    color: 'var(--color-card-violet)',
+                                    border: '1px solid color-mix(in srgb, var(--color-card-violet) 30%, transparent)',
+                                  }}
+                                  title="Remove purchase designation">
+                                  🏷 Purchase
+                                </button>
+                              )}
                               <span className="text-sm font-semibold tabular-nums shrink-0"
                                 style={{ color: Number(tx.amount) >= 0 ? '#4FBF7F' : '#F07A3E' }}>
                                 {Number(tx.amount) >= 0 ? '+' : ''}${Math.abs(Number(tx.amount)).toFixed(2)}
@@ -1152,7 +1182,10 @@ export default function ProjectsPage() {
                   <p className="font-bold text-base">{showSell.name}</p>
                   <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                     Cost basis <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>${showSell.costBasis.toFixed(2)}</span>
-                    <span className="opacity-50"> = ${Number(showSell.purchasePrice).toFixed(2)} purchase + ${showSell.expenses.toFixed(2)} expenses</span>
+                    {showSell.purchaseTxId
+                      ? <span className="opacity-50"> = initial cost from transaction + ${showSell.expenses.toFixed(2)} expenses</span>
+                      : <span className="opacity-50"> = ${Number(showSell.purchasePrice).toFixed(2)} estimated purchase + ${showSell.expenses.toFixed(2)} expenses</span>
+                    }
                   </p>
                 </div>
                 <button type="button" onClick={() => setShowSell(null)}
