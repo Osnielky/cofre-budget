@@ -18,6 +18,7 @@ export interface CreateDebtDto {
   description?: string | null;
   startDate?: string | null;
   dueDate?: string | null;
+  direction?: 'lent' | 'owed';
 }
 export interface PaymentDto {
   amount: number;
@@ -66,8 +67,10 @@ export class DebtsService {
     return wb;
   }
 
-  async findAll(userId: string): Promise<DebtWithBalance[]> {
-    const list = await this.debts.find({ where: { userId }, order: { createdAt: 'DESC' } });
+  async findAll(userId: string, direction?: 'lent' | 'owed'): Promise<DebtWithBalance[]> {
+    const where: any = { userId };
+    if (direction) where.direction = direction;
+    const list = await this.debts.find({ where, order: { createdAt: 'DESC' } });
     return Promise.all(list.map((d) => this.withBalance(d)));
   }
 
@@ -88,6 +91,7 @@ export class DebtsService {
       startDate: dto.startDate ?? null,
       dueDate: dto.dueDate ?? null,
       status: 'open',
+      direction: dto.direction ?? 'lent',
     }));
     return this.withBalance(debt);
   }
@@ -101,6 +105,7 @@ export class DebtsService {
     if (dto.description !== undefined) debt.description = dto.description;
     if (dto.startDate !== undefined) debt.startDate = dto.startDate;
     if (dto.dueDate !== undefined) debt.dueDate = dto.dueDate;
+    if (dto.direction !== undefined) debt.direction = dto.direction;
     await this.debts.save(debt);
     return this.recomputeStatus(id, userId);
   }
