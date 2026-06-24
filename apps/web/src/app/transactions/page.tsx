@@ -303,6 +303,25 @@ export default function TransactionsPage() {
     setUpdatingId(null);
   }
 
+  async function assignDebt(txId: string, debtId: string | null) {
+    setUpdatingId(txId);
+    setOpenPickerId(null);
+    const res = await fetch(`${API}/transactions/${txId}/debt`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ debtId }),
+    });
+    if (!res.ok) { setUpdatingId(null); return; }
+    const updated: Transaction = await res.json();
+    setTransactions((prev) => prev.map((t) =>
+      t.id === txId
+        ? { ...t, debtId: updated.debtId, categoryId: updated.categoryId, categoryRef: updated.categoryRef }
+        : t,
+    ));
+    setUpdatingId(null);
+  }
+
   /* ── manual transaction ── */
   async function saveManualTx(e: React.FormEvent) {
     e.preventDefault();
@@ -1257,7 +1276,6 @@ export default function TransactionsPage() {
                             <button
                               onMouseDown={(e) => { if (isOpen) e.stopPropagation(); }}
                               onClick={(e) => {
-                                if (tx.debtId) return; // debt repayments are managed from the Debts page / by deleting the tx
                                 if (isOpen) { setOpenPickerId(null); setPickerProjectDrill(null); setPickerTransferStep(false); return; }
                                 const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
                                 const w = 220;
@@ -1276,7 +1294,7 @@ export default function TransactionsPage() {
                               disabled={updatingId === tx.id}
                               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:brightness-110 disabled:opacity-40"
                               style={(() => {
-                                if (tx.debtId) return { background: 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)', color: 'var(--color-card-violet)', cursor: 'default' };
+                                if (tx.debtId) return { background: 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)', color: 'var(--color-card-violet)' };
                                 if (tx.projectId) {
                                   const _proj = projects.find((p) => p.id === tx.projectId);
                                   const _pCat = tx.projectCategoryId ? _proj?.categories?.find((c) => c.id === tx.projectCategoryId) : null;
