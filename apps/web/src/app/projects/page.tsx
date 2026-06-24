@@ -120,7 +120,7 @@ export default function ProjectsPage() {
 
   /* Remove purchase transaction state */
   const [removingPurchaseTx, setRemovingPurchaseTx] = useState<string | null>(null);
-  const [removePurchaseTxError, setRemovePurchaseTxError] = useState<string | null>(null);
+  const [removePurchaseTxError, setRemovePurchaseTxError] = useState<Record<string, string | null>>({});
 
   /* Project form state */
   const emptyForm = { name: '', type: 'vehicle', icon: '🚗', color: PRESET_COLORS[0], description: '', purchasePrice: '', purchaseDate: '', imageUrl: '' };
@@ -334,7 +334,7 @@ export default function ProjectsPage() {
 
   async function removePurchaseTx(projectId: string) {
     setRemovingPurchaseTx(projectId);
-    setRemovePurchaseTxError(null);
+    setRemovePurchaseTxError((prev) => ({ ...prev, [projectId]: null }));
     try {
       const res = await fetch(`${API}/projects/${projectId}/purchase-tx`, {
         method: 'PATCH',
@@ -343,7 +343,7 @@ export default function ProjectsPage() {
         body: JSON.stringify({ transactionId: null }),
       });
       if (!res.ok) {
-        setRemovePurchaseTxError('Failed to remove purchase designation');
+        setRemovePurchaseTxError((prev) => ({ ...prev, [projectId]: 'Failed to remove purchase designation' }));
         return;
       }
       const updated = await res.json();
@@ -352,9 +352,9 @@ export default function ProjectsPage() {
           ? { ...p, purchaseTxId: null, costBasis: updated.costBasis }
           : p,
       ));
-      setRemovePurchaseTxError(null);
+      setRemovePurchaseTxError((prev) => ({ ...prev, [projectId]: null }));
     } catch (error) {
-      setRemovePurchaseTxError('Failed to remove purchase designation');
+      setRemovePurchaseTxError((prev) => ({ ...prev, [projectId]: 'Failed to remove purchase designation' }));
     } finally {
       setRemovingPurchaseTx(null);
     }
@@ -876,16 +876,16 @@ export default function ProjectsPage() {
                                     disabled={removingPurchaseTx === sel.id}
                                     className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     style={{
-                                      background: removePurchaseTxError === null ? 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)' : 'color-mix(in srgb, #F07A3E 15%, transparent)',
-                                      color: removePurchaseTxError === null ? 'var(--color-card-violet)' : '#F07A3E',
-                                      border: removePurchaseTxError === null ? '1px solid color-mix(in srgb, var(--color-card-violet) 30%, transparent)' : '1px solid color-mix(in srgb, #F07A3E 30%, transparent)',
+                                      background: !removePurchaseTxError[sel.id] ? 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)' : 'color-mix(in srgb, #F07A3E 15%, transparent)',
+                                      color: !removePurchaseTxError[sel.id] ? 'var(--color-card-violet)' : '#F07A3E',
+                                      border: !removePurchaseTxError[sel.id] ? '1px solid color-mix(in srgb, var(--color-card-violet) 30%, transparent)' : '1px solid color-mix(in srgb, #F07A3E 30%, transparent)',
                                     }}
-                                    title={removePurchaseTxError || "Remove purchase designation"}>
+                                    title={removePurchaseTxError[sel.id] || "Remove purchase designation"}>
                                     {removingPurchaseTx === sel.id ? '…' : '🏷 Purchase'}
                                   </button>
-                                  {removePurchaseTxError && (
+                                  {removePurchaseTxError[sel.id] && (
                                     <p className="text-[9px] text-right" style={{ color: '#F07A3E' }}>
-                                      {removePurchaseTxError}
+                                      {removePurchaseTxError[sel.id]}
                                     </p>
                                   )}
                                 </div>
