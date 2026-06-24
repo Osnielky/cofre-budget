@@ -232,7 +232,7 @@ export class TransactionsService {
       const account = await this.accountRepo.findOneBy({ id: dto.bankAccountId });
       if (!account || account.userId !== userId) throw new ForbiddenException();
     }
-    if (dto.debtId && !(dto.amount > 0)) throw new BadRequestException('A debt repayment must be a positive (income) amount.');
+    if (dto.debtId && !(Math.abs(dto.amount) > 0)) throw new BadRequestException('A debt repayment amount must be non-zero.');
     const saved = await this.repo.save(
       this.repo.create({
         userId,
@@ -248,7 +248,7 @@ export class TransactionsService {
     );
     if (dto.debtId) {
       try {
-        await this.debtsService.recordPaymentFromTransaction(dto.debtId, userId, { amount: dto.amount, date: dto.date, transactionId: saved.id });
+        await this.debtsService.recordPaymentFromTransaction(dto.debtId, userId, { amount: Math.abs(dto.amount), date: dto.date, transactionId: saved.id });
       } catch (e) {
         await this.repo.remove(saved); // don't leave an orphaned tx if the debt was invalid
         throw e;
