@@ -10,7 +10,7 @@ interface Payment { id: string; amount: number; date: string; note: string | nul
 interface Debt {
   id: string; borrowerName: string; borrowerEmail: string | null; principal: number;
   description: string | null; startDate: string | null; dueDate: string | null; status: 'open' | 'paid';
-  paid: number; remaining: number; percentage: number;
+  paid: number; remaining: number; percentage: number; direction: 'lent' | 'owed';
 }
 interface DebtDetail extends Debt { payments: Payment[] }
 
@@ -24,6 +24,7 @@ export default function DebtsPage() {
   const [formDir, setFormDir] = useState<'lent' | 'owed'>('lent');
   const [form, setForm] = useState({ borrowerName: '', borrowerEmail: '', principal: '', description: '', startDate: today(), dueDate: '' });
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<'lent' | 'owed'>('lent');
 
   const resetForm = () => {
     setFormDir('lent');
@@ -49,10 +50,19 @@ export default function DebtsPage() {
   }, []);
   useEffect(() => { if (openId) loadDetail(openId); else setDetail(null); }, [openId, loadDetail]);
 
-  const totalLent = debts.reduce((s, d) => s + Number(d.principal), 0);
-  const totalRepaid = debts.reduce((s, d) => s + Number(d.paid), 0);
-  const outstanding = debts.filter(d => d.status === 'open').reduce((s, d) => s + Number(d.remaining), 0);
-  const peopleOwing = debts.filter(d => d.status === 'open').length;
+  const lentDebts  = debts.filter(d => d.direction === 'lent');
+  const owedDebts  = debts.filter(d => d.direction === 'owed');
+  const tabDebts   = activeTab === 'lent' ? lentDebts : owedDebts;
+
+  const totalLent     = lentDebts.reduce((s, d) => s + Number(d.principal), 0);
+  const totalRepaid   = lentDebts.reduce((s, d) => s + Number(d.paid), 0);
+  const outstanding   = lentDebts.filter(d => d.status === 'open').reduce((s, d) => s + Number(d.remaining), 0);
+  const peopleOwing   = lentDebts.filter(d => d.status === 'open').length;
+
+  const totalOwed     = owedDebts.reduce((s, d) => s + Number(d.principal), 0);
+  const totalPaidBack = owedDebts.reduce((s, d) => s + Number(d.paid), 0);
+  const stillOwe      = owedDebts.filter(d => d.status === 'open').reduce((s, d) => s + Number(d.remaining), 0);
+  const creditors     = owedDebts.filter(d => d.status === 'open').length;
 
   async function createDebt(e: React.FormEvent) {
     e.preventDefault();
@@ -108,28 +118,48 @@ export default function DebtsPage() {
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
-        <div className="sticky top-14 md:top-0 z-20 px-6 pt-5 pb-4 flex items-center justify-between gap-4 flex-wrap"
+        <div className="sticky top-14 md:top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-3"
           style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Debts</h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Money you lent out</p>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Debts</h1>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Track money you lend and owe</p>
+            </div>
+            <button onClick={() => setShowForm(true)}
+              className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5"
+              style={{ background: 'var(--color-card-violet)' }}>
+              <span className="text-base leading-none">+</span> Add Debt
+            </button>
           </div>
-          <button onClick={() => setShowForm(true)}
-            className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5"
-            style={{ background: 'var(--color-card-violet)' }}>
-            <span className="text-base leading-none">+</span> Add Debt
-          </button>
+          <div className="flex gap-1 p-1 rounded-xl self-start" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+            {(['lent', 'owed'] as const).map((tab) => (
+              <button key={tab} type="button" onClick={() => setActiveTab(tab)}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
+                style={{
+                  background: activeTab === tab ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)' : 'transparent',
+                  color: activeTab === tab ? 'var(--color-card-violet)' : 'var(--color-text-muted)',
+                  border: activeTab === tab ? '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)' : '1px solid transparent',
+                }}>
+                {tab === 'lent' ? 'I Lent' : 'I Owe'}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="p-6 flex flex-col gap-5">
           {!loading && debts.length > 0 && (
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-              {[
-                { label: 'Total Lent', value: `$${fmt(totalLent)}`, color: 'var(--color-card-violet)' },
-                { label: 'Total Repaid', value: `$${fmt(totalRepaid)}`, color: 'var(--color-green)' },
-                { label: 'Outstanding', value: `$${fmt(outstanding)}`, color: 'var(--color-orange)' },
-                { label: 'People Owing', value: `${peopleOwing}`, color: 'var(--color-card-sky)' },
-              ].map(s => (
+              {(activeTab === 'lent' ? [
+                { label: 'Total Lent',   value: `$${fmt(totalLent)}`,    color: 'var(--color-card-violet)' },
+                { label: 'Total Repaid', value: `$${fmt(totalRepaid)}`,  color: 'var(--color-green)' },
+                { label: 'Outstanding',  value: `$${fmt(outstanding)}`,  color: 'var(--color-orange)' },
+                { label: 'People Owing', value: `${peopleOwing}`,        color: 'var(--color-card-sky)' },
+              ] : [
+                { label: 'Total Owed',     value: `$${fmt(totalOwed)}`,     color: 'var(--color-card-violet)' },
+                { label: 'Total Paid Back',value: `$${fmt(totalPaidBack)}`, color: 'var(--color-green)' },
+                { label: 'Still Owe',      value: `$${fmt(stillOwe)}`,      color: 'var(--color-orange)' },
+                { label: 'Creditors',      value: `${creditors}`,           color: 'var(--color-card-sky)' },
+              ]).map(s => (
                 <div key={s.label} className="p-4 rounded-2xl flex flex-col gap-1.5"
                   style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
                   <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: s.color }}>{s.label}</span>
@@ -141,18 +171,22 @@ export default function DebtsPage() {
 
           {loading ? (
             <p className="text-xs text-center py-12" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
-          ) : debts.length === 0 ? (
+          ) : tabDebts.length === 0 ? (
             <div className="py-16 flex flex-col items-center gap-4 text-center rounded-2xl" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
               <span className="text-5xl opacity-30">🤝</span>
               <div>
                 <p className="font-semibold text-base">No debts tracked</p>
-                <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>Record money you lent so you can track repayments.</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                  {activeTab === 'lent'
+                    ? 'Record money you lent so you can track repayments.'
+                    : 'Record money you owe so you can track payments.'}
+                </p>
               </div>
               <button onClick={() => setShowForm(true)} className="mt-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl hover:brightness-110" style={{ background: 'var(--color-card-violet)' }}>+ Add Your First Debt</button>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {debts.map(d => {
+              {tabDebts.map(d => {
                 const open = openId === d.id;
                 const pct = Math.min(d.percentage, 100);
                 return (
