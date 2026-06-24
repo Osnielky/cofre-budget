@@ -44,6 +44,9 @@ export class Project {
   @Column({ type: 'date', nullable: true })
   saleDate: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  purchaseTxId: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
