@@ -17,7 +17,7 @@ interface Category { id: string; name: string; icon: string; color: string; type
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null; last4?: string | null }
 interface Budget { id: string; categoryId: string; category: Category; amount: string | number; spent: number }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
-interface Project { id: string; name: string; icon: string; color: string; status: string; categories?: ProjectCategory[] }
+interface Project { id: string; name: string; icon: string; color: string; status: string; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[] }
 interface TransferMatch { id: string; name: string; amount: number; date: string; bankAccount: BankAccount | null }
 interface Transaction {
   id: string; name: string; amount: number; date: string; source: string; pending: boolean;
@@ -106,6 +106,7 @@ export default function TransactionsPage() {
   const importBtnRef  = useRef<HTMLDivElement>(null);
 
   const [pickerProjectDrill, setPickerProjectDrill]   = useState<string | null>(null);
+  const [pickerShowPurchasePrompt, setPickerShowPurchasePrompt] = useState(false);
   const [pickerTransferStep, setPickerTransferStep]   = useState(false);
   const [pickerSearch, setPickerSearch]               = useState('');
   const [transferMatches, setTransferMatches]         = useState<TransferMatch[]>([]);
@@ -413,9 +414,38 @@ export default function TransactionsPage() {
         ));
       }
 
-      setOpenPickerId(null); setPickerProjectDrill(null);
+      setOpenPickerId(null); setPickerProjectDrill(null); setPickerShowPurchasePrompt(false);
     } catch {
       // network/CORS error — silently ignore
+    } finally { setLinkingProj(false); }
+  }
+
+  async function markAsPurchase(txId: string, projectId: string) {
+    setLinkingProj(true);
+    try {
+      // First link the transaction to the project (no category)
+      await fetch(`${API}/projects/${projectId}/link/${txId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ projectCategoryId: null }),
+      });
+      // Then designate it as the purchase transaction
+      const res = await fetch(`${API}/projects/${projectId}/purchase-tx`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ transactionId: txId }),
+      });
+      if (!res.ok) return;
+      const updatedProject = await res.json();
+      setTransactions((prev) => prev.map((t) =>
+        t.id === txId ? { ...t, projectId, projectCategoryId: null } : t,
+      ));
+      setProjects((prev) => prev.map((p) =>
+        p.id === projectId ? { ...p, purchaseTxId: updatedProject.purchaseTxId } : p,
+      ));
+      setOpenPickerId(null);
+      setPickerProjectDrill(null);
+      setPickerShowPurchasePrompt(false);
+    } catch {
+      // silently ignore network errors
     } finally { setLinkingProj(false); }
   }
 
@@ -1277,7 +1307,7 @@ export default function TransactionsPage() {
                             <button
                               onMouseDown={(e) => { if (isOpen) e.stopPropagation(); }}
                               onClick={(e) => {
-                                if (isOpen) { setOpenPickerId(null); setPickerProjectDrill(null); setPickerTransferStep(false); return; }
+                                if (isOpen) { setOpenPickerId(null); setPickerProjectDrill(null); setPickerTransferStep(false); setPickerShowPurchasePrompt(false); return; }
                                 const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
                                 const w = 220;
                                 const left = Math.max(4, rect.right - w);
@@ -1654,7 +1684,7 @@ export default function TransactionsPage() {
                                         {/* Header */}
                                         <div className="flex items-center gap-2 px-3 py-2"
                                           style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                          <button onClick={() => { setPickerProjectDrill(null); setMarkAsSaleConfirm(null); }}
+                                          <button onClick={() => { setPickerProjectDrill(null); setMarkAsSaleConfirm(null); setPickerShowPurchasePrompt(false); }}
                                             className="text-sm hover:opacity-70 shrink-0"
                                             style={{ color: 'var(--color-text-muted)' }}>←</button>
                                           <span className="text-base shrink-0">{proj?.icon}</span>
@@ -1669,43 +1699,83 @@ export default function TransactionsPage() {
                                             </button>
                                           )}
                                         </div>
-                                        {/* No category option */}
-                                        <button
-                                          onClick={() => linkToProject(tx.id, pickerProjectDrill!, null)}
-                                          disabled={linkingProj}
-                                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)] disabled:opacity-50"
-                                          style={tx.projectId === pickerProjectDrill && !tx.projectCategoryId ? { background: `${c}12` } : {}}>
-                                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                            style={{ background: 'var(--color-elevated)' }}>🏷️</span>
-                                          <span className="flex-1 text-left" style={{ color: 'var(--color-text-secondary)' }}>
-                                            {linkingProj ? 'Linking…' : 'No specific category'}
-                                          </span>
-                                          {tx.projectId === pickerProjectDrill && !tx.projectCategoryId && (
-                                            <span className="text-xs" style={{ color: c }}>✓</span>
-                                          )}
-                                        </button>
-                                        {/* Project categories */}
-                                        {(proj?.categories ?? []).map((cat) => (
-                                          <button key={cat.id}
-                                            onClick={() => linkToProject(tx.id, pickerProjectDrill!, cat.id)}
-                                            disabled={linkingProj}
-                                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)] disabled:opacity-50"
-                                            style={tx.projectId === pickerProjectDrill && tx.projectCategoryId === cat.id ? { background: `${cat.color}15` } : {}}>
-                                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                              style={{ background: `${cat.color}20` }}>{cat.icon}</span>
-                                            <span className="flex-1 font-medium text-left"
-                                              style={{ color: tx.projectId === pickerProjectDrill && tx.projectCategoryId === cat.id ? cat.color : 'var(--color-text-primary)' }}>
-                                              {cat.name}
-                                            </span>
-                                            {tx.projectId === pickerProjectDrill && tx.projectCategoryId === cat.id && (
-                                              <span className="text-xs" style={{ color: cat.color }}>✓</span>
+                                        {/* Purchase prompt — shown when user clicked the initial purchase flow */}
+                                        {pickerShowPurchasePrompt ? (
+                                          <div className="px-3 py-3 flex flex-col gap-3">
+                                            <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                                              How should we record this?
+                                            </p>
+                                            <button
+                                              onClick={() => { setPickerShowPurchasePrompt(false); linkToProject(tx.id, pickerProjectDrill!, null); }}
+                                              disabled={linkingProj}
+                                              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs text-left transition-colors hover:bg-(--color-elevated) disabled:opacity-50"
+                                              style={{ border: '1px solid var(--color-border)' }}>
+                                              <span className="text-base">📂</span>
+                                              <div>
+                                                <p className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>Project expense</p>
+                                                <p style={{ color: 'var(--color-text-muted)' }}>Added to ongoing costs</p>
+                                              </div>
+                                            </button>
+                                            <button
+                                              onClick={() => markAsPurchase(tx.id, pickerProjectDrill!)}
+                                              disabled={linkingProj}
+                                              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-xs text-left transition-colors disabled:opacity-50"
+                                              style={{ border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)', background: 'color-mix(in srgb, var(--color-card-violet) 10%, transparent)' }}>
+                                              <span className="text-base">🏷️</span>
+                                              <div>
+                                                <p className="font-semibold" style={{ color: 'var(--color-card-violet)' }}>Initial purchase</p>
+                                                <p style={{ color: 'var(--color-text-muted)' }}>Replaces the ${Number(proj?.purchasePrice ?? 0).toFixed(0)} estimate</p>
+                                              </div>
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <>
+                                            {/* No category option */}
+                                            <button
+                                              onClick={() => {
+                                                const proj = projects.find((p) => p.id === pickerProjectDrill);
+                                                if (Number(tx.amount) < 0 && proj && !proj.purchaseTxId && tx.projectId !== pickerProjectDrill) {
+                                                  setPickerShowPurchasePrompt(true);
+                                                } else {
+                                                  linkToProject(tx.id, pickerProjectDrill!, null);
+                                                }
+                                              }}
+                                              disabled={linkingProj}
+                                              className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-(--color-elevated) disabled:opacity-50"
+                                              style={tx.projectId === pickerProjectDrill && !tx.projectCategoryId ? { background: `${proj?.color || '#9B6DFF'}12` } : {}}>
+                                              <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                                style={{ background: 'var(--color-elevated)' }}>🏷️</span>
+                                              <span className="flex-1 text-left" style={{ color: 'var(--color-text-secondary)' }}>
+                                                {linkingProj ? 'Linking…' : 'No specific category'}
+                                              </span>
+                                              {tx.projectId === pickerProjectDrill && !tx.projectCategoryId && (
+                                                <span className="text-xs" style={{ color: proj?.color || '#9B6DFF' }}>✓</span>
+                                              )}
+                                            </button>
+                                            {/* Project categories */}
+                                            {(proj?.categories ?? []).map((cat) => (
+                                              <button key={cat.id}
+                                                onClick={() => linkToProject(tx.id, pickerProjectDrill!, cat.id)}
+                                                disabled={linkingProj}
+                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-(--color-elevated) disabled:opacity-50"
+                                                style={tx.projectId === pickerProjectDrill && tx.projectCategoryId === cat.id ? { background: `${cat.color}15` } : {}}>
+                                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                                  style={{ background: `${cat.color}20` }}>{cat.icon}</span>
+                                                <span className="flex-1 font-medium text-left"
+                                                  style={{ color: tx.projectId === pickerProjectDrill && tx.projectCategoryId === cat.id ? cat.color : 'var(--color-text-primary)' }}>
+                                                  {cat.name}
+                                                </span>
+                                                {tx.projectId === pickerProjectDrill && tx.projectCategoryId === cat.id && (
+                                                  <span className="text-xs" style={{ color: cat.color }}>✓</span>
+                                                )}
+                                              </button>
+                                            ))}
+                                            {(!proj?.categories || proj.categories.length === 0) && (
+                                              <p className="text-xs px-3 py-2 text-center" style={{ color: 'var(--color-text-muted)' }}>
+                                                No categories — add them in Projects page.
+                                              </p>
                                             )}
-                                          </button>
-                                        ))}
-                                        {(!proj?.categories || proj.categories.length === 0) && (
-                                          <p className="text-xs px-3 py-2 text-center" style={{ color: 'var(--color-text-muted)' }}>
-                                            No categories — add them in Projects page.
-                                          </p>
+                                          </>
                                         )}
 
                                         {/* Mark as SOLD — only for income txs on active projects */}
