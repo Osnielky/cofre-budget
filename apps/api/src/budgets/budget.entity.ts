@@ -19,10 +19,10 @@ export class Budget {
   @JoinColumn({ name: 'categoryId' })
   category: Category | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   categoryId: string | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   projectCategoryId: string | null;
 
   @Column({ default: '2026-06' })
