@@ -424,10 +424,11 @@ export default function TransactionsPage() {
     setLinkingProj(true);
     try {
       // First link the transaction to the project (no category)
-      await fetch(`${API}/projects/${projectId}/link/${txId}`, {
+      const linkRes = await fetch(`${API}/projects/${projectId}/link/${txId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ projectCategoryId: null }),
       });
+      if (!linkRes.ok) return;
       // Then designate it as the purchase transaction
       const res = await fetch(`${API}/projects/${projectId}/purchase-tx`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
@@ -439,7 +440,7 @@ export default function TransactionsPage() {
         t.id === txId ? { ...t, projectId, projectCategoryId: null } : t,
       ));
       setProjects((prev) => prev.map((p) =>
-        p.id === projectId ? { ...p, purchaseTxId: updatedProject.purchaseTxId } : p,
+        p.id === projectId ? { ...p, purchaseTxId: updatedProject.purchaseTxId, costBasis: updatedProject.costBasis } : p,
       ));
       setOpenPickerId(null);
       setPickerProjectDrill(null);
