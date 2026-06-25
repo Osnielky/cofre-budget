@@ -114,7 +114,7 @@ export default function TransactionsPage() {
   const [linkingProj, setLinkingProj]                 = useState(false);
   const [deleteConfirmId, setDeleteConfirmId]         = useState<string | null>(null);
   const [editingTxId, setEditingTxId]                 = useState<string | null>(null);
-  const [transferModal, setTransferModal]             = useState<{ tx: Transaction } | null>(null);
+  const [transferModal, setTransferModal]             = useState<{ tx: Transaction; categoryId: string } | null>(null);
   const [transferModalMatches, setTransferModalMatches] = useState<Transaction[]>([]);
   const [transferModalLoading, setTransferModalLoading] = useState(false);
   const [transferModalSelected, setTransferModalSelected] = useState<string | null>(null); // tx id
@@ -1582,11 +1582,10 @@ export default function TransactionsPage() {
                                     {pickerCats.map((c) => (
                                       <button key={c.id} onClick={() => {
                                         const isTransfer = c.type === 'transfer';
-                                        assignCategory(tx.id, c.id, isTransfer);
                                         setPickerProjectDrill(null);
                                         if (isTransfer) {
                                           setOpenPickerId(null);
-                                          setTransferModal({ tx });
+                                          setTransferModal({ tx, categoryId: c.id });
                                           setTransferModalSelected(null);
                                           setTransferModalMatches([]);
                                           setTransferModalLoading(true);
@@ -1595,6 +1594,8 @@ export default function TransactionsPage() {
                                             .then((m) => { if (Array.isArray(m)) { setTransferModalMatches(m); if (m.length > 0) setTransferModalSelected(m[0].id); } })
                                             .catch(() => {})
                                             .finally(() => setTransferModalLoading(false));
+                                        } else {
+                                          assignCategory(tx.id, c.id);
                                         }
                                       }}
                                         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-[var(--color-elevated)]"
@@ -2372,6 +2373,7 @@ export default function TransactionsPage() {
                         const isTxMatch = !transferModalSelected.startsWith('acc:');
                         const matchTx   = isTxMatch ? transferModalMatches.find((m) => m.id === transferModalSelected) : null;
                         const accId     = isTxMatch ? (matchTx?.bankAccountId ?? null) : transferModalSelected.replace('acc:', '');
+                        await assignCategory(srcTx.id, transferModal!.categoryId, true);
                         await setTransferAccount(srcTx.id, accId, matchTx?.id);
                         setTransferModal(null);
                         setTransferModalSelected(null);
