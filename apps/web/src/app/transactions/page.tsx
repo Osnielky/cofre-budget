@@ -423,12 +423,15 @@ export default function TransactionsPage() {
   async function markAsPurchase(txId: string, projectId: string) {
     setLinkingProj(true);
     try {
-      // First link the transaction to the project (no category)
-      const linkRes = await fetch(`${API}/projects/${projectId}/link/${txId}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ projectCategoryId: null }),
-      });
-      if (!linkRes.ok) return;
+      // Link the transaction to the project if not already linked
+      const tx = transactions.find((t) => t.id === txId);
+      if (tx?.projectId !== projectId) {
+        const linkRes = await fetch(`${API}/projects/${projectId}/link/${txId}`, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({ projectCategoryId: null }),
+        });
+        if (!linkRes.ok) return;
+      }
       // Then designate it as the purchase transaction
       const res = await fetch(`${API}/projects/${projectId}/purchase-tx`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
@@ -1736,7 +1739,7 @@ export default function TransactionsPage() {
                                             <button
                                               onClick={() => {
                                                 const proj = projects.find((p) => p.id === pickerProjectDrill);
-                                                if (Number(tx.amount) < 0 && proj && !proj.purchaseTxId && tx.projectId !== pickerProjectDrill) {
+                                                if (Number(tx.amount) < 0 && proj && !proj.purchaseTxId) {
                                                   setPickerShowPurchasePrompt(true);
                                                 } else {
                                                   linkToProject(tx.id, pickerProjectDrill!, null);
