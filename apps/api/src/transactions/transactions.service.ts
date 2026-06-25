@@ -329,9 +329,9 @@ export class TransactionsService {
       tx.transferAccountId = undefined;
       tx.counterpartTxId   = undefined;
     }
-    tx.categoryId = categoryId ?? undefined;
+    tx.categoryId = categoryId;
     const saved = await this.repo.save(tx);
-    return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'transferAccount'] });
+    return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'transferAccount', 'bankAccount'] });
   }
 
   async updateDebt(id: string, userId: string, debtId: string | null): Promise<Transaction> {
