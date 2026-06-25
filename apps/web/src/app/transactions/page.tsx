@@ -31,6 +31,7 @@ interface Transaction {
   debtId: string | null;
   parentId: string | null;
   isSplitParent: boolean;
+  note: string | null;
 }
 interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid'; direction: 'lent' | 'owed' }
 
@@ -129,7 +130,7 @@ export default function TransactionsPage() {
   const [manualAccOpen, setManualAccOpen] = useState(false);
   const [manualCatOpen, setManualCatOpen] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
-  const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '' });
+  const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
   const [debts, setDebts] = useState<DebtLite[]>([]);
   const [splitTx, setSplitTx] = useState<Transaction | null>(null);
 
@@ -339,14 +340,14 @@ export default function TransactionsPage() {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ name: manualTx.name, amount: finalAmount, date: manualTx.date, bankAccountId: manualTx.bankAccountId }),
+          body: JSON.stringify({ name: manualTx.name, amount: finalAmount, date: manualTx.date, bankAccountId: manualTx.bankAccountId, note: manualTx.note || null }),
         });
         if (!res.ok) return;
         const updated: Transaction = await res.json();
         setTransactions((prev) => prev.map((t) => t.id === editingTxId ? { ...t, ...updated } : t));
         setShowManualTx(false);
         setEditingTxId(null);
-        setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '' });
+        setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
         return;
       }
       const res = await fetch(`${API}/transactions`, {
@@ -360,13 +361,14 @@ export default function TransactionsPage() {
           bankAccountId: manualTx.bankAccountId,
           categoryId: manualTx.debtId ? null : (manualTx.categoryId || null),
           debtId: manualTx.debtId || null,
+          note: manualTx.note || null,
         }),
       });
       if (!res.ok) return;
       const created: Transaction = await res.json();
       setTransactions((prev) => [created, ...prev]);
       setShowManualTx(false);
-      setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '' });
+      setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
     } finally {
       setManualTxSaving(false);
     }
@@ -1192,6 +1194,9 @@ export default function TransactionsPage() {
                               {/* Name + source */}
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate leading-snug">{tx.name}</p>
+                                {tx.note && (
+                                  <p className="text-[11px] truncate leading-snug" style={{ color: 'var(--color-text-muted)' }}>{tx.note}</p>
+                                )}
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                   {tx.parentId ? (
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
@@ -1866,6 +1871,7 @@ export default function TransactionsPage() {
                                   bankAccountId: tx.bankAccountId ?? '',
                                   categoryId: tx.categoryId ?? '',
                                   debtId: tx.debtId ?? '',
+                                  note: tx.note ?? '',
                                 });
                                 setManualTxError('');
                                 setShowManualTx(true);
@@ -2165,6 +2171,22 @@ export default function TransactionsPage() {
                         </div>
                       )}
                     </div>
+
+                  {/* Note */}
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                      Note <span style={{ opacity: 0.5, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                    </span>
+                    <input
+                      type="text"
+                      placeholder="Add a note…"
+                      maxLength={500}
+                      value={manualTx.note}
+                      onChange={(e) => setManualTx((f) => ({ ...f, note: e.target.value }))}
+                      className="px-3 py-2.5 text-sm outline-none rounded-xl w-full"
+                      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                    />
+                  </div>
 
                   </div>
 
