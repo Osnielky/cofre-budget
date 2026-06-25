@@ -2003,7 +2003,15 @@ export default function TransactionsPage() {
               const selAcc     = accounts.find((a) => a.id === manualTx.bankAccountId);
               const selCat     = categories.find((c) => c.id === manualTx.categoryId);
               const selDebt    = debts.find((d) => d.id === manualTx.debtId);
-              const catOptions = categories.filter((c) => c.type === (isExpense ? 'expense' : 'income') || c.type === 'both');
+              const catOptions = isExpense
+                ? categories.filter((c) => c.type === 'expense' || c.type === 'both')
+                : null;
+              const incomePrimary = !isExpense
+                ? categories.filter((c) => c.type === 'income' || c.type === 'both')
+                : null;
+              const incomeSecondary = !isExpense
+                ? categories.filter((c) => c.type === 'expense')
+                : null;
               const amt        = parseFloat(manualTx.amountStr) || 0;
               return (
                 <form onSubmit={saveManualTx}
@@ -2157,17 +2165,49 @@ export default function TransactionsPage() {
                               <div className="h-px my-1" style={{ background: 'var(--color-border)' }} />
                             </>
                           )}
-                          {catOptions.map((c) => (
-                            <button key={c.id} type="button"
-                              onClick={() => { setManualTx((f) => ({ ...f, categoryId: c.id })); setManualCatOpen(false); }}
-                              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
-                              style={{ background: manualTx.categoryId === c.id ? `${c.color}18` : 'transparent', color: manualTx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}
-                              onMouseEnter={(e) => (e.currentTarget.style.background = `${c.color}12`)}
-                              onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.categoryId === c.id ? `${c.color}18` : 'transparent')}>
-                              <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${c.color}20` }}>{c.icon}</span>
-                              <span className="font-medium">{c.name}</span>
-                            </button>
-                          ))}
+                          {isExpense ? (
+                            catOptions!.map((c) => (
+                              <button key={c.id} type="button"
+                                onClick={() => { setManualTx((f) => ({ ...f, categoryId: c.id })); setManualCatOpen(false); }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                                style={{ background: manualTx.categoryId === c.id ? `${c.color}18` : 'transparent', color: manualTx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = `${c.color}12`)}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.categoryId === c.id ? `${c.color}18` : 'transparent')}>
+                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${c.color}20` }}>{c.icon}</span>
+                                <span className="font-medium">{c.name}</span>
+                              </button>
+                            ))
+                          ) : (
+                            <>
+                              {incomePrimary!.map((c) => (
+                                <button key={c.id} type="button"
+                                  onClick={() => { setManualTx((f) => ({ ...f, categoryId: c.id })); setManualCatOpen(false); }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                                  style={{ background: manualTx.categoryId === c.id ? `${c.color}18` : 'transparent', color: manualTx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}
+                                  onMouseEnter={(e) => (e.currentTarget.style.background = `${c.color}12`)}
+                                  onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.categoryId === c.id ? `${c.color}18` : 'transparent')}>
+                                  <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${c.color}20` }}>{c.icon}</span>
+                                  <span className="font-medium">{c.name}</span>
+                                </button>
+                              ))}
+                              {incomeSecondary!.length > 0 && (
+                                <>
+                                  <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Expense categories</p>
+                                  {incomeSecondary!.map((c) => (
+                                    <button key={c.id} type="button"
+                                      onClick={() => { setManualTx((f) => ({ ...f, categoryId: c.id })); setManualCatOpen(false); }}
+                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                                      style={{ background: manualTx.categoryId === c.id ? `${c.color}18` : 'transparent', color: manualTx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}
+                                      onMouseEnter={(e) => (e.currentTarget.style.background = `${c.color}12`)}
+                                      onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.categoryId === c.id ? `${c.color}18` : 'transparent')}>
+                                      <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${c.color}20` }}>{c.icon}</span>
+                                      <span className="font-medium">{c.name}</span>
+                                    </button>
+                                  ))}
+                                </>
+                              )}
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
