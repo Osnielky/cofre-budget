@@ -79,6 +79,10 @@ export class Transaction {
   @JoinColumn({ name: 'projectCategoryId' })
   projectCategoryRef: ProjectCategory;
 
+  /* Asset this transaction is linked to (owned-asset income/expense tag) */
+  @Column({ type: 'uuid', nullable: true })
+  assetId: string | null;
+
   /* Plaid's category hierarchy, e.g. ["Food and Drink", "Restaurants"] */
   @Column({ type: 'simple-array', nullable: true })
   plaidCategory: string[];

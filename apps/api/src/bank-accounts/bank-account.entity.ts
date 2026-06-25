@@ -57,6 +57,11 @@ export class BankAccount {
   @Column({ nullable: true, length: 4 })
   last4: string;
 
+  /* Set when this account is auto-managed by an Asset (value or loan account).
+     Such accounts are hidden from the manual Accounts list. */
+  @Column({ type: 'uuid', nullable: true })
+  managedByAssetId: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
