@@ -54,18 +54,23 @@ export class BudgetsService {
     return Promise.all(
       budgets.map(async (b) => {
         // Income categories track earnings (positive amounts); the rest track spending.
-        const isIncome = b.category?.type === 'income';
-        const raw = await this.txRepo
+        const isIncome = b.category?.type === 'income' || !!b.projectCategoryId;
+        const qb = this.txRepo
           .createQueryBuilder('tx')
           .leftJoin('tx.bankAccount', 'ba')
           .select(isIncome ? 'COALESCE(SUM(tx.amount), 0)' : 'COALESCE(SUM(ABS(tx.amount)), 0)', 'spent')
           .where('tx.userId = :userId', { userId })
-          .andWhere('tx.categoryId = :categoryId', { categoryId: b.categoryId })
           .andWhere(isIncome ? 'tx.amount > 0' : 'tx.amount < 0')
           .andWhere('tx.date >= :startDate AND tx.date <= :endDate', { startDate, endDate })
-          // Tracking accounts (investment, mortgage, …) are net-worth only — keep them out of budget spend.
-          .andWhere('(ba."accountType" IS NULL OR ba."accountType" NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] })
-          .getRawOne<{ spent: string }>();
+          .andWhere('(ba."accountType" IS NULL OR ba."accountType" NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] });
+
+        if (b.projectCategoryId) {
+          qb.andWhere('tx.projectId = :projectId', { projectId: b.projectId })
+            .andWhere('tx.projectCategoryId = :pcid', { pcid: b.projectCategoryId });
+        } else {
+          qb.andWhere('tx.categoryId = :categoryId', { categoryId: b.categoryId });
+        }
+        const raw = await qb.getRawOne<{ spent: string }>();
 
         const spent      = parseFloat(raw?.spent ?? '0');
         const amount     = parseFloat(b.amount as any);
@@ -159,12 +164,26 @@ export class BudgetsService {
     }
   }
 
-  async create(userId: string, dto: { categoryId: string; amount: number; month: string; projectId?: string | null }): Promise<Budget> {
+  async create(userId: string, dto: { categoryId?: string | null; amount: number; month: string; projectId?: string | null; projectCategoryId?: string | null }): Promise<Budget> {
     if (dto.projectId) {
       const proj = await this.projectRepo.findOneBy({ id: dto.projectId });
       if (!proj || proj.userId !== userId) throw new ForbiddenException();
     }
-    // Explicitly set this month → the value now originates here.
+
+    // Project-category budgets: unique by (userId, projectId, projectCategoryId, month)
+    if (dto.projectCategoryId) {
+      const existing = await this.repo.findOne({ where: { userId, projectId: dto.projectId ?? null, projectCategoryId: dto.projectCategoryId, month: dto.month } });
+      if (existing) {
+        existing.amount = dto.amount;
+        existing.sourceMonth = dto.month;
+        await this.repo.save(existing);
+        return this.repo.findOne({ where: { id: existing.id } }) as Promise<Budget>;
+      }
+      const created = await this.repo.save(this.repo.create({ userId, categoryId: null, projectCategoryId: dto.projectCategoryId, amount: dto.amount, month: dto.month, sourceMonth: dto.month, projectId: dto.projectId ?? null }));
+      return this.repo.findOne({ where: { id: created.id } }) as Promise<Budget>;
+    }
+
+    // Regular category budget.
     const existing = await this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } });
     if (existing) {
       existing.amount = dto.amount;
@@ -174,7 +193,7 @@ export class BudgetsService {
     } else {
       await this.repo.save(this.repo.create({ ...dto, userId, sourceMonth: dto.month }));
     }
-    await this.propagateForward(userId, dto.categoryId, dto.amount, dto.month, dto.projectId);
+    await this.propagateForward(userId, dto.categoryId!, dto.amount, dto.month, dto.projectId);
     return this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } }) as Promise<Budget>;
   }
 

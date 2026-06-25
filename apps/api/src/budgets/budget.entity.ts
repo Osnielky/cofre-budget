@@ -15,12 +15,15 @@ export class Budget {
   @Column()
   userId: string;
 
-  @ManyToOne(() => Category, { eager: true, onDelete: 'CASCADE' })
+  @ManyToOne(() => Category, { nullable: true, eager: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'categoryId' })
-  category: Category;
+  category: Category | null;
 
-  @Column()
-  categoryId: string;
+  @Column({ nullable: true })
+  categoryId: string | null;
+
+  @Column({ nullable: true })
+  projectCategoryId: string | null;
 
   @Column({ default: '2026-06' })
   month: string;

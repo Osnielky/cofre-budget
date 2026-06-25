@@ -36,7 +36,7 @@ export class BudgetsController {
   }
 
   @Post()
-  create(@Request() req: any, @Body() body: { categoryId: string; amount: number; month?: string; projectId?: string | null }) {
+  create(@Request() req: any, @Body() body: { categoryId?: string | null; amount: number; month?: string; projectId?: string | null; projectCategoryId?: string | null }) {
     return this.service.create(req.user.id, { ...body, month: body.month ?? currentMonth() });
   }
 
