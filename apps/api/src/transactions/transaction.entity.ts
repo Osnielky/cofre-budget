@@ -100,4 +100,7 @@ export class Transaction {
 
   @Column({ default: false })
   isSplitParent: boolean;
+
+  @Column({ type: 'varchar', length: 500, nullable: true, default: null })
+  note: string | null;
 }

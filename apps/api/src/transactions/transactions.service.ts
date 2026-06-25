@@ -227,6 +227,7 @@ export class TransactionsService {
   async createManual(userId: string, dto: {
     name: string; amount: number; date: string;
     bankAccountId?: string | null; categoryId?: string | null; debtId?: string | null;
+    note?: string | null;
   }): Promise<Transaction> {
     if (dto.bankAccountId) {
       const account = await this.accountRepo.findOneBy({ id: dto.bankAccountId });
@@ -242,6 +243,7 @@ export class TransactionsService {
         name: dto.name,
         date: dto.date,
         pending: false,
+        note: dto.note ?? null,
         categoryId: dto.debtId ? undefined : (dto.categoryId ?? undefined),
         debtId: dto.debtId ?? undefined,
       }),
@@ -258,7 +260,7 @@ export class TransactionsService {
   }
 
   async updateManual(id: string, userId: string, dto: {
-    name?: string; amount?: number; date?: string; bankAccountId?: string | null;
+    name?: string; amount?: number; date?: string; bankAccountId?: string | null; note?: string | null;
   }): Promise<Transaction> {
     const tx = await this.repo.findOneBy({ id, userId });
     if (!tx) throw new NotFoundException();
@@ -273,6 +275,7 @@ export class TransactionsService {
     if (dto.name !== undefined) tx.name = dto.name;
     if (dto.amount !== undefined) tx.amount = dto.amount;
     if (dto.date !== undefined) tx.date = dto.date;
+    if (dto.note !== undefined) tx.note = dto.note ?? null;
     const saved = await this.repo.save(tx);
     return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'bankAccount'] });
   }
