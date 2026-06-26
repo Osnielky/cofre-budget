@@ -65,6 +65,8 @@ export default function BudgetsPage() {
   const [projects, setProjects]           = useState<Project[]>([]);
   const [projectDropOpen, setProjectDropOpen] = useState(false);
   const [formKind, setFormKind]     = useState<'expense' | 'income'>('expense');
+  const [formError, setFormError]   = useState<string | null>(null);
+  const [formSaving, setFormSaving] = useState(false);
 
   /* Expanded budget detail */
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -224,22 +226,32 @@ export default function BudgetsPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const amt = parseFloat(form.amount);
-    if (editingId) {
-      await fetch(`${API}/budgets/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ amount: amt, projectId: form.projectId || null }) });
-      const prev = budgets.find(b => b.id === editingId);
-      const spentAmt = prev?.spent ?? 0;
-      setBudgets(bs => bs.map(b => b.id === editingId ? { ...b, amount: amt, projectId: form.projectId || null, project: projects.find(p => p.id === form.projectId) ?? null, percentage: amt > 0 ? Math.round((spentAmt / amt) * 100) : 0, remaining: amt - spentAmt } : b));
-    } else {
-      const body = form.projectCategoryId
-        ? { projectCategoryId: form.projectCategoryId, amount: amt, month, projectId: form.projectId || null }
-        : { categoryId: form.categoryId, amount: amt, month, projectId: form.projectId || null };
-      const res = await fetch(`${API}/budgets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) });
-      const created = await res.json();
-      const cat = categories.find(c => c.id === form.categoryId);
-      const selProj = projects.find(p => p.id === form.projectId);
-      setBudgets(bs => [...bs, { ...created, category: cat ?? created.category, project: selProj ?? null, amount: amt, spent: 0, percentage: 0, remaining: amt }]);
+    setFormError(null);
+    setFormSaving(true);
+    try {
+      if (editingId) {
+        const res = await fetch(`${API}/budgets/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ amount: amt, projectId: form.projectId || null }) });
+        if (!res.ok) throw new Error('Failed to update budget');
+        const prev = budgets.find(b => b.id === editingId);
+        const spentAmt = prev?.spent ?? 0;
+        setBudgets(bs => bs.map(b => b.id === editingId ? { ...b, amount: amt, projectId: form.projectId || null, project: projects.find(p => p.id === form.projectId) ?? null, percentage: amt > 0 ? Math.round((spentAmt / amt) * 100) : 0, remaining: amt - spentAmt } : b));
+      } else {
+        const body = form.projectCategoryId
+          ? { projectCategoryId: form.projectCategoryId, amount: amt, month, projectId: form.projectId || null }
+          : { categoryId: form.categoryId, amount: amt, month, projectId: form.projectId || null };
+        const res = await fetch(`${API}/budgets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) });
+        if (!res.ok) throw new Error('Failed to save budget');
+        const created = await res.json();
+        const cat = categories.find(c => c.id === form.categoryId);
+        const selProj = projects.find(p => p.id === form.projectId);
+        setBudgets(bs => [...bs, { ...created, category: cat ?? created.category, project: selProj ?? null, amount: amt, spent: 0, percentage: 0, remaining: amt }]);
+      }
+      setShowForm(false); setEditingId(null); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' });
+    } catch {
+      setFormError('Something went wrong. Please try again.');
+    } finally {
+      setFormSaving(false);
     }
-    setShowForm(false); setEditingId(null); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' });
   }
 
   async function handleDelete(id: string) {
@@ -294,7 +306,7 @@ export default function BudgetsPage() {
               </svg>
               Set all
             </button>
-            <button onClick={() => { setFormKind('expense'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); }}
+            <button onClick={() => { setFormKind('expense'); setShowForm(true); setEditingId(null); setFormError(null); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); }}
               className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5"
               style={{ background: 'var(--color-card-violet)' }}>
               <span className="text-base leading-none">+</span> Add Budget
@@ -636,7 +648,7 @@ export default function BudgetsPage() {
                   </div>
                   {targets.length > 0 && (
                     <button type="button"
-                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); }}
+                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setFormError(null); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); }}
                       className="px-3 py-1.5 text-[11px] font-semibold rounded-xl hover:brightness-110 transition-all text-white flex items-center gap-1"
                       style={{ background: 'var(--color-green)' }}>
                       <span className="text-sm leading-none">+</span> Add Target
@@ -659,7 +671,7 @@ export default function BudgetsPage() {
                       </p>
                     </div>
                     <button type="button"
-                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); }}
+                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setFormError(null); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); }}
                       className="mt-1 px-4 py-2 text-xs font-semibold text-white rounded-xl hover:brightness-110 transition-all"
                       style={{ background: 'var(--color-green)' }}>
                       + Set your first target
@@ -709,7 +721,7 @@ export default function BudgetsPage() {
                         </div>
                         <div className="flex items-center gap-0.5 shrink-0">
                           <button type="button"
-                            onClick={() => { setFormKind('income'); setEditingId(t.id); setForm({ categoryId: t.categoryId ?? '', amount: String(t.amount), projectId: t.projectId ?? '', projectCategoryId: t.projectCategoryId ?? '' }); setShowForm(true); }}
+                            onClick={() => { setFormKind('income'); setEditingId(t.id); setFormError(null); setForm({ categoryId: t.categoryId ?? '', amount: String(t.amount), projectId: t.projectId ?? '', projectCategoryId: t.projectCategoryId ?? '' }); setShowForm(true); }}
                             className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors text-xs"
                             style={{ color: 'var(--color-text-muted)' }}>✏️</button>
                           <button type="button" onClick={() => handleDelete(t.id)} disabled={deletingId === t.id}
@@ -923,15 +935,20 @@ export default function BudgetsPage() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2 justify-end px-5 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-                    <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); }}
-                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
-                      style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
-                    <button type="submit"
-                      className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all"
-                      style={{ background: accent }}>
-                      {editingId ? 'Save Changes' : (formKind === 'income' ? 'Create Target' : 'Create Budget')}
-                    </button>
+                  <div className="flex flex-col gap-2 px-5 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
+                    {formError && (
+                      <p className="text-xs font-medium text-center" style={{ color: 'var(--color-rose)' }}>{formError}</p>
+                    )}
+                    <div className="flex gap-2 justify-end">
+                      <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); setFormError(null); }}
+                        className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
+                        style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
+                      <button type="submit" disabled={formSaving}
+                        className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all disabled:opacity-60"
+                        style={{ background: accent }}>
+                        {formSaving ? 'Saving…' : editingId ? 'Save Changes' : (formKind === 'income' ? 'Create Target' : 'Create Budget')}
+                      </button>
+                    </div>
                   </div>
                 </form>
               );

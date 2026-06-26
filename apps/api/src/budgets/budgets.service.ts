@@ -82,24 +82,31 @@ export class BudgetsService {
     );
   }
 
-  /** Copy budgets from the most recent prior month if none exist for the target month. */
+  /** Copy budgets from the most recent prior month if none exist for the target month.
+      Falls back to the nearest future month so past months (before the first entry)
+      still inherit a sensible set of budgets. */
   async ensureMonthBudgets(userId: string, month: string): Promise<void> {
     const existing = await this.repo.find({ where: { userId, month } });
     if (existing.length > 0) return;
 
-    const priorAnchor = await this.repo
+    const anchor = await this.repo
       .createQueryBuilder('b')
       .where('b.userId = :userId', { userId })
       .andWhere('b.month < :month', { month })
       .orderBy('b.month', 'DESC')
-      .getOne();
+      .getOne()
+      ?? await this.repo
+        .createQueryBuilder('b')
+        .where('b.userId = :userId', { userId })
+        .andWhere('b.month > :month', { month })
+        .orderBy('b.month', 'ASC')
+        .getOne();
 
-    if (!priorAnchor) return;
+    if (!anchor) return;
 
-    const priorBudgets = await this.repo.find({ where: { userId, month: priorAnchor.month } });
+    const sourceBudgets = await this.repo.find({ where: { userId, month: anchor.month } });
     await Promise.all(
-      priorBudgets.map(b =>
-        // Preserve where the value originated so the new month shows "from <month>".
+      sourceBudgets.map(b =>
         this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month, sourceMonth: b.sourceMonth ?? b.month, projectId: b.projectId ?? null }))
       ),
     );
