@@ -103,4 +103,7 @@ export class Transaction {
 
   @Column({ type: 'varchar', length: 500, nullable: true, default: null })
   note: string | null;
+
+  @Column({ type: 'uuid', nullable: true, default: null })
+  receiptId: string | null;
 }

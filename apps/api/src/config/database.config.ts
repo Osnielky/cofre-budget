@@ -13,6 +13,7 @@ import { ProjectCategory } from '../projects/project-category.entity';
 import { Debt } from '../debts/debt.entity';
 import { DebtPayment } from '../debts/debt-payment.entity';
 import { ConnectedApp } from '../connected-apps/connected-app.entity';
+import { Receipt } from '../receipts/receipt.entity';
 
 export default registerAs('database', (): TypeOrmModuleOptions => ({
   type: 'postgres',
@@ -21,7 +22,7 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   username: process.env.DB_USER ?? 'postgres',
   password: process.env.DB_PASS ?? 'postgres',
   database: process.env.DB_NAME ?? 'cofre_budget',
-  entities: [User, BankAccount, PlaidItem, Transaction, Category, Budget, Project, ProjectCategory, Debt, DebtPayment, ConnectedApp],
+  entities: [User, BankAccount, PlaidItem, Transaction, Category, Budget, Project, ProjectCategory, Debt, DebtPayment, ConnectedApp, Receipt],
   synchronize: true,
   logging: false,
   ssl: (() => {
