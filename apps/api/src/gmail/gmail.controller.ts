@@ -1,9 +1,8 @@
 import { Controller, Get, Delete, Query, Request, Res, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
+import * as crypto from 'crypto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GmailService } from './gmail.service';
-
-const FRONTEND = process.env.FRONTEND_URL ?? 'http://localhost:3000';
 
 @Controller('gmail')
 export class GmailController {
@@ -12,16 +11,34 @@ export class GmailController {
   @UseGuards(JwtAuthGuard)
   @Get('connect')
   connect(@Request() req: any, @Res() res: Response) {
-    const url = this.gmail.buildAuthUrl(req.user.id);
+    const nonce = crypto.randomBytes(16).toString('hex');
+    const url = this.gmail.buildAuthUrl(req.user.id, nonce);
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie('gmail_oauth_nonce', nonce, {
+      httpOnly: true,
+      sameSite: isProd ? 'none' : 'lax',
+      secure: isProd,
+      maxAge: 5 * 60 * 1000,
+      path: '/',
+    });
     return res.redirect(url);
   }
 
   @Get('callback')
-  async callback(@Query('code') code: string, @Query('state') state: string, @Res() res: Response) {
+  async callback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Request() req: any,
+    @Res() res: Response,
+  ) {
+    const FRONTEND = process.env.FRONTEND_URL ?? 'http://localhost:3000';
     try {
-      await this.gmail.handleCallback(code, state);
+      const cookieNonce = req.cookies?.['gmail_oauth_nonce'];
+      await this.gmail.handleCallback(code, state, cookieNonce);
+      res.clearCookie('gmail_oauth_nonce', { path: '/' });
       return res.redirect(`${FRONTEND}/settings?tab=integrations&status=connected`);
     } catch {
+      res.clearCookie('gmail_oauth_nonce', { path: '/' });
       return res.redirect(`${FRONTEND}/settings?tab=integrations&status=error`);
     }
   }

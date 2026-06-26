@@ -16,7 +16,8 @@ export class GmailService {
     private jwtService: JwtService,
     @InjectRepository(ConnectedApp) private repo: Repository<ConnectedApp>,
   ) {
-    const secret = this.config.get<string>('JWT_SECRET') ?? 'fallback-secret-32-chars-minimum!!';
+    const secret = this.config.get<string>('JWT_SECRET');
+    if (!secret) throw new Error('JWT_SECRET is required for GmailService token encryption');
     this.encKey = crypto.createHash('sha256').update(secret).digest();
   }
 
@@ -28,8 +29,8 @@ export class GmailService {
     );
   }
 
-  buildAuthUrl(userId: string): string {
-    const state = this.jwtService.sign({ userId }, { expiresIn: '5m' });
+  buildAuthUrl(userId: string, nonce: string): string {
+    const state = this.jwtService.sign({ userId, nonce }, { expiresIn: '5m' });
     const client = this.makeOAuth2Client();
     return client.generateAuthUrl({
       access_type: 'offline',
@@ -39,13 +40,18 @@ export class GmailService {
     });
   }
 
-  async handleCallback(code: string, state: string): Promise<void> {
+  async handleCallback(code: string, state: string, cookieNonce: string | undefined): Promise<void> {
     let userId: string;
+    let stateNonce: string;
     try {
-      const payload = this.jwtService.verify(state) as { userId: string };
+      const payload = this.jwtService.verify(state) as { userId: string; nonce: string };
       userId = payload.userId;
+      stateNonce = payload.nonce;
     } catch {
       throw new UnauthorizedException('Invalid or expired OAuth state');
+    }
+    if (!cookieNonce || !stateNonce || cookieNonce !== stateNonce) {
+      throw new UnauthorizedException('OAuth nonce mismatch — possible CSRF');
     }
 
     const client = this.makeOAuth2Client();
@@ -82,26 +88,39 @@ export class GmailService {
       refresh_token: this.decrypt(conn.refreshToken),
       expiry_date: conn.tokenExpiry ? Number(conn.tokenExpiry) : undefined,
     });
-    // Auto-refresh if expired
-    const { credentials } = await client.refreshAccessToken();
-    client.setCredentials(credentials);
-    if (credentials.access_token && credentials.access_token !== this.decrypt(conn.accessToken)) {
-      conn.accessToken = this.encrypt(credentials.access_token);
-      conn.tokenExpiry = credentials.expiry_date ?? conn.tokenExpiry;
-      await this.repo.save(conn);
+    // Only refresh if the token is expired or about to expire (within 60 seconds)
+    const isExpired = !conn.tokenExpiry || Date.now() >= Number(conn.tokenExpiry) - 60_000;
+    if (isExpired) {
+      const { credentials } = await client.refreshAccessToken();
+      client.setCredentials(credentials);
+      if (credentials.access_token && credentials.access_token !== this.decrypt(conn.accessToken)) {
+        conn.accessToken = this.encrypt(credentials.access_token);
+        conn.tokenExpiry = credentials.expiry_date ?? conn.tokenExpiry;
+        await this.repo.save(conn);
+      }
     }
     return client;
   }
 
   private encrypt(text: string): string {
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv('aes-256-cbc', this.encKey, iv);
-    return iv.toString('hex') + ':' + Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]).toString('hex');
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', this.encKey, iv);
+    const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return iv.toString('hex') + ':' + tag.toString('hex') + ':' + encrypted.toString('hex');
   }
 
   private decrypt(text: string): string {
-    const [ivHex, dataHex] = text.split(':');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', this.encKey, Buffer.from(ivHex, 'hex'));
-    return Buffer.concat([decipher.update(Buffer.from(dataHex, 'hex')), decipher.final()]).toString('utf8');
+    if (!text || !text.includes(':')) return '';
+    const parts = text.split(':');
+    if (parts.length !== 3) return '';
+    const [ivHex, tagHex, dataHex] = parts;
+    try {
+      const decipher = crypto.createDecipheriv('aes-256-gcm', this.encKey, Buffer.from(ivHex, 'hex'));
+      decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+      return Buffer.concat([decipher.update(Buffer.from(dataHex, 'hex')), decipher.final()]).toString('utf8');
+    } catch {
+      return '';
+    }
   }
 }
