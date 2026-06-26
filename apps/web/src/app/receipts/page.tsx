@@ -18,7 +18,6 @@ export default function ReceiptsPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Receipt | null>(null);
   const [itemCategories, setItemCategories] = useState<Record<number, string>>({});
-  const [itemAccounts, setItemAccounts] = useState<Record<number, string>>({});
   const [importing, setImporting] = useState(false);
   const [gmailConnected, setGmailConnected] = useState<boolean | null>(null);
 
@@ -43,7 +42,6 @@ export default function ReceiptsPage() {
   function openReceipt(r: Receipt) {
     setSelected(r);
     setItemCategories({});
-    setItemAccounts({});
   }
 
   function closeReceipt() { setSelected(null); }
@@ -83,7 +81,7 @@ export default function ReceiptsPage() {
     const splits = Object.entries(groups).map(([catId, indices]) => ({
       itemIndices: indices,
       categoryId: catId === '__uncategorized__' ? null : catId,
-      bankAccountId: itemAccounts[indices[0]] ?? null,
+      bankAccountId: null,
     }));
 
     try {
