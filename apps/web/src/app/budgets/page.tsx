@@ -196,8 +196,9 @@ export default function BudgetsPage() {
   useEffect(() => { if (expandedId) loadTxs(); }, [loadTxs, expandedId]);
 
   /* Derived stats — spending budgets vs income targets */
-  const spending     = budgets.filter(b => b.category?.type !== 'income');
-  const targets      = budgets.filter(b => b.category?.type === 'income')
+  const isIncomeBudget = (b: BudgetWithSpent) => b.category?.type === 'income' || !!b.projectCategoryId;
+  const spending     = budgets.filter(b => !isIncomeBudget(b));
+  const targets      = budgets.filter(isIncomeBudget)
     .sort((a, b) => b.percentage - a.percentage);
   const totalBudget  = spending.reduce((s, b) => s + Number(b.amount), 0);
   const totalSpent   = spending.reduce((s, b) => s + Number(b.spent), 0);

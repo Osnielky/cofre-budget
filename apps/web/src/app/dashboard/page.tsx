@@ -21,7 +21,7 @@ interface Transaction {
   categoryRef: Category | null; bankAccount: BankAccount | null; projectId: string | null;
   debtId?: string | null;
 }
-interface Budget { id: string; amount: number; spent: number; category: Category }
+interface Budget { id: string; amount: number; spent: number; category: Category | null; projectCategoryId?: string | null }
 interface Project { id: string; name: string; icon: string; color: string; type: string; status: string; expenses: number; income: number; costBasis: number; netGain: number | null; roi: number | null; purchasePrice: number }
 
 function currentMonth() { return new Date().toISOString().slice(0,7); }
@@ -159,8 +159,9 @@ export default function DashboardPage() {
   const expenses     = transactions.filter(t => Number(t.amount) < 0  && inCashFlow(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
   const net          = income - expenses;
   const savingsRate  = income > 0 ? (net / income * 100) : 0;
-  const spendingBudgets = budgets.filter(b => b.category?.type !== 'income');
-  const incomeTargets   = budgets.filter(b => b.category?.type === 'income');
+  const isIncomeBudget  = (b: Budget) => b.category?.type === 'income' || !!b.projectCategoryId;
+  const spendingBudgets = budgets.filter(b => !isIncomeBudget(b));
+  const incomeTargets   = budgets.filter(isIncomeBudget);
   const incomeTarget    = incomeTargets.reduce((s,b) => s + Number(b.amount), 0) || null;
   const targetPct       = incomeTarget ? Math.round((income / incomeTarget) * 100) : null;
   const totalBalance = accounts.reduce((s,a) => s + (isDebtAcc(a) ? -Math.abs(Number(a.balance||0)) : Number(a.balance||0)), 0);
