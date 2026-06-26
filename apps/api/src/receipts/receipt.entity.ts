@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
 
 @Entity('receipts')
+@Index('UQ_receipts_user_gmail_message', ['userId', 'gmailMessageId'], { unique: true })
 export class Receipt {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -8,7 +9,7 @@ export class Receipt {
   @Column()
   userId: string;
 
-  @Column({ unique: true })
+  @Column()
   gmailMessageId: string;
 
   @Column()
