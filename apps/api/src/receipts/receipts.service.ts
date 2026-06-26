@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Receipt } from './receipt.entity';
@@ -18,13 +18,6 @@ export class ReceiptsService {
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
     private gmail: GmailService,
   ) {}
-
-  async findByUser(userId: string): Promise<Receipt[]> {
-    return this.receiptRepo.find({
-      where: { userId },
-      order: { parsedAt: 'DESC' },
-    });
-  }
 
   async syncAndFind(userId: string): Promise<Receipt[]> {
     const existing = await this.receiptRepo.find({ where: { userId } });
@@ -72,7 +65,6 @@ export class ReceiptsService {
   async importToTransactions(receiptId: string, userId: string, splits: ImportSplit[]): Promise<Transaction[]> {
     const receipt = await this.receiptRepo.findOneBy({ id: receiptId, userId });
     if (!receipt) throw new NotFoundException('Receipt not found');
-    if (receipt.userId !== userId) throw new ForbiddenException();
 
     const created: Transaction[] = [];
 
