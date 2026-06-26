@@ -18,7 +18,7 @@ import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 type AccountType = string;
-type Tab = 'account' | 'banks' | 'categories' | 'projects' | 'appearance' | 'data';
+type Tab = 'account' | 'banks' | 'categories' | 'projects' | 'appearance' | 'integrations' | 'data';
 
 interface BankAccount {
   id: string;
@@ -154,6 +154,15 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    id: 'integrations',
+    label: 'Integrations',
+    icon: (
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+      </svg>
+    ),
+  },
+  {
     id: 'appearance',
     label: 'Appearance',
     icon: (
@@ -176,6 +185,8 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('banks');
+  const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string; connectedAt?: string } | null>(null);
+  const [gmailLoading, setGmailLoading] = useState(false);
   const { theme: activeTheme, setTheme } = useTheme();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -203,6 +214,24 @@ export default function SettingsPage() {
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab') as Tab | null;
+    if (tab && ['account', 'banks', 'categories', 'projects', 'appearance', 'integrations'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'integrations') return;
+    setGmailLoading(true);
+    fetch(`${API}/gmail/status`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then(setGmailStatus)
+      .catch(() => setGmailStatus({ connected: false }))
+      .finally(() => setGmailLoading(false));
+  }, [activeTab]);
 
   const [form, setForm] = useState({
     bankName: '', accountName: '', accountType: 'checking' as AccountType,
@@ -258,6 +287,12 @@ export default function SettingsPage() {
   });
 
   useEffect(() => { if (linkToken && linkReady) openLink(); }, [linkToken, linkReady, openLink]);
+
+  async function handleGmailDisconnect() {
+    if (!confirm('Disconnect Gmail? Cached receipts will remain.')) return;
+    await fetch(`${API}/gmail/disconnect`, { method: 'DELETE', credentials: 'include' });
+    setGmailStatus({ connected: false });
+  }
 
   async function handleAdd(e: FormEvent) {
     e.preventDefault(); setSubmitting(true); setError('');
@@ -797,6 +832,48 @@ export default function SettingsPage() {
 
           {/* ── PROJECT CATEGORIES TAB ── */}
           {activeTab === 'projects' && <ProjectCategoryManager />}
+
+          {/* ── INTEGRATIONS TAB ── */}
+          {activeTab === 'integrations' && (
+            <div style={{ maxWidth: 520 }}>
+              <p className="text-sm mb-6" style={{ color: 'rgba(174,180,194,0.8)' }}>
+                Connect external services so Cofre can pull in additional information.
+              </p>
+              {/* Gmail card */}
+              <div className="rounded-2xl p-5 flex items-center justify-between gap-4"
+                style={{ background: 'rgba(35,35,47,0.5)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                    ✉️
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm" style={{ color: '#F2F1EA' }}>Gmail</p>
+                    {gmailLoading
+                      ? <p className="text-xs mt-0.5" style={{ color: '#6b7488' }}>Checking…</p>
+                      : gmailStatus?.connected
+                        ? <p className="text-xs mt-0.5" style={{ color: '#4FBF7F' }}>{gmailStatus.email}</p>
+                        : <p className="text-xs mt-0.5" style={{ color: '#6b7488' }}>Not connected</p>
+                    }
+                  </div>
+                </div>
+                {gmailStatus?.connected
+                  ? (
+                    <button onClick={handleGmailDisconnect}
+                      className="text-xs px-3 py-1.5 rounded-xl font-medium transition-opacity hover:opacity-70"
+                      style={{ background: 'rgba(255,80,80,0.12)', color: '#F07A7A', border: '1px solid rgba(255,80,80,0.2)' }}>
+                      Disconnect
+                    </button>
+                  ) : (
+                    <a href={`${API}/gmail/connect`}
+                      className="text-xs px-3 py-1.5 rounded-xl font-medium transition-opacity hover:opacity-70"
+                      style={{ background: 'rgba(155,109,255,0.15)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.25)', textDecoration: 'none' }}>
+                      Connect
+                    </a>
+                  )
+                }
+              </div>
+            </div>
+          )}
 
           {/* ── APPEARANCE TAB ── */}
           {activeTab === 'appearance' && (
