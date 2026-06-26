@@ -53,7 +53,19 @@ export default function ReceiptsPage() {
   }
 
   function countGroups(): number {
-    return new Set(Object.values(itemCategories)).size || 1;
+    if (!selected) return 1;
+    const totalItems = selected.items.length;
+    const assigned = new Set<string>();
+    let hasUncategorized = false;
+    for (let idx = 0; idx < totalItems; idx++) {
+      const catId = itemCategories[idx];
+      if (catId && catId !== '') {
+        assigned.add(catId);
+      } else {
+        hasUncategorized = true;
+      }
+    }
+    return assigned.size + (hasUncategorized ? 1 : 0) || 1;
   }
 
   async function handleImport() {
@@ -63,7 +75,7 @@ export default function ReceiptsPage() {
     // Group item indices by categoryId
     const groups: Record<string, number[]> = {};
     selected.items.forEach((_, idx) => {
-      const catId = itemCategories[idx] ?? '__uncategorized__';
+      const catId = itemCategories[idx] || '__uncategorized__';
       if (!groups[catId]) groups[catId] = [];
       groups[catId].push(idx);
     });
