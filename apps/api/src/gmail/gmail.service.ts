@@ -5,11 +5,31 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { google } from 'googleapis';
 import * as crypto from 'crypto';
+import Anthropic from '@anthropic-ai/sdk';
 import { ConnectedApp } from '../connected-apps/connected-app.entity';
+
+export interface RawReceiptItem {
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+}
+
+export interface RawReceipt {
+  gmailMessageId: string;
+  subject: string;
+  merchant: string;
+  orderNumber: string | null;
+  orderDate: string | null;
+  currency: string;
+  total: number;
+  items: RawReceiptItem[];
+}
 
 @Injectable()
 export class GmailService {
   private readonly encKey: Buffer;
+  private readonly anthropic: Anthropic;
 
   constructor(
     private config: ConfigService,
@@ -19,6 +39,8 @@ export class GmailService {
     const secret = this.config.get<string>('JWT_SECRET');
     if (!secret) throw new Error('JWT_SECRET is required for GmailService token encryption');
     this.encKey = crypto.createHash('sha256').update(secret).digest();
+    const anthropicKey = this.config.get<string>('ANTHROPIC_API_KEY');
+    this.anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : new Anthropic();
   }
 
   private makeOAuth2Client() {
@@ -121,6 +143,95 @@ export class GmailService {
       return Buffer.concat([decipher.update(Buffer.from(dataHex, 'hex')), decipher.final()]).toString('utf8');
     } catch {
       return '';
+    }
+  }
+
+  async fetchAndParseReceipts(userId: string): Promise<RawReceipt[]> {
+    const client = await this.getAuthorizedClient(userId);
+    const gmail = google.gmail({ version: 'v1', auth: client });
+
+    const QUERY =
+      'from:(ship-confirm@amazon.com OR auto-confirm@amazon.com OR doordash.com OR ubereats.com OR order@walmart.com OR no-reply@apple.com OR noreply@doordash.com) newer_than:90d';
+
+    const listRes = await gmail.users.messages.list({
+      userId: 'me',
+      q: QUERY,
+      maxResults: 50,
+    });
+
+    const messages = listRes.data.messages ?? [];
+    const results: RawReceipt[] = [];
+
+    for (const msg of messages) {
+      if (!msg.id) continue;
+      const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
+      const subject = this.extractHeader(full.data.payload?.headers ?? [], 'Subject');
+      const body = this.extractBody(full.data.payload);
+      if (!body) continue;
+      const parsed = await this.parseWithClaude(body, subject);
+      if (parsed) {
+        results.push({ gmailMessageId: msg.id, subject, ...parsed });
+      }
+    }
+
+    return results;
+  }
+
+  private extractHeader(headers: any[], name: string): string {
+    return headers.find((h: any) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? '';
+  }
+
+  private extractBody(payload: any): string {
+    if (!payload) return '';
+    if (payload.mimeType === 'text/html' && payload.body?.data) {
+      return Buffer.from(payload.body.data, 'base64').toString('utf8');
+    }
+    if (payload.parts) {
+      for (const part of payload.parts) {
+        const text = this.extractBody(part);
+        if (text) return text;
+      }
+    }
+    return '';
+  }
+
+  private async parseWithClaude(
+    emailHtml: string,
+    subject: string,
+  ): Promise<Omit<RawReceipt, 'gmailMessageId' | 'subject'> | null> {
+    const truncated = emailHtml.slice(0, 8000);
+    const prompt = `You are a receipt parser. Extract purchase data from this merchant receipt email and return ONLY valid JSON (no markdown, no explanation).
+
+Email subject: ${subject}
+
+Email body (HTML):
+${truncated}
+
+Return this exact JSON shape:
+{
+  "merchant": "string (merchant name, e.g. Amazon)",
+  "orderNumber": "string or null",
+  "orderDate": "YYYY-MM-DD or null",
+  "currency": "USD",
+  "total": number,
+  "items": [
+    { "name": "string", "quantity": number, "unitPrice": number, "total": number }
+  ]
+}
+
+If you cannot find a clear order total or any items, return null.`;
+
+    try {
+      const response = await this.anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }],
+      });
+      const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
+      if (text === 'null' || !text) return null;
+      return JSON.parse(text);
+    } catch {
+      return null;
     }
   }
 }
