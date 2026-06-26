@@ -98,6 +98,16 @@ export class GmailService {
   }
 
   async disconnect(userId: string): Promise<void> {
+    const conn = await this.repo.findOneBy({ userId, provider: 'gmail' });
+    if (conn?.refreshToken) {
+      try {
+        const client = this.makeOAuth2Client();
+        client.setCredentials({ refresh_token: this.decrypt(conn.refreshToken) });
+        await client.revokeCredentials();
+      } catch {
+        // best-effort — still delete the local record even if revocation fails
+      }
+    }
     await this.repo.delete({ userId, provider: 'gmail' });
   }
 
@@ -171,6 +181,18 @@ export class GmailService {
       const parsed = await this.parseWithClaude(body, subject);
       if (parsed) {
         results.push({ gmailMessageId: msg.id, subject, ...parsed });
+      } else {
+        // Parse failed — store a fallback receipt so the email is not silently lost
+        results.push({
+          gmailMessageId: msg.id,
+          subject,
+          merchant: subject.slice(0, 100) || 'Unknown Merchant',
+          orderNumber: null,
+          orderDate: null,
+          currency: 'USD',
+          total: 0,
+          items: [{ name: 'Order total (parsing failed — check email for details)', quantity: 1, unitPrice: 0, total: 0 }],
+        });
       }
     }
 
