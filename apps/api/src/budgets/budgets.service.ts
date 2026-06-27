@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Budget } from './budget.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { Project } from '../projects/project.entity';
+import { Category } from '../categories/category.entity';
 import { TRACKING_TYPES } from '../bank-accounts/account-types';
 
 export interface BudgetWithSpent extends Budget {
@@ -18,6 +19,7 @@ export class BudgetsService {
     @InjectRepository(Budget) private repo: Repository<Budget>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
     @InjectRepository(Project) private projectRepo: Repository<Project>,
+    @InjectRepository(Category) private categoryRepo: Repository<Category>,
   ) {}
 
   /** Average monthly spend per category over the trailing `months` months,
@@ -47,7 +49,14 @@ export class BudgetsService {
   }
 
   async findWithSpent(userId: string, month: string): Promise<BudgetWithSpent[]> {
-    const budgets = await this.repo.find({ where: { userId, month } });
+    const all = await this.repo.find({ where: { userId, month } });
+    // Drop orphaned budgets whose category was deleted out from under them —
+    // they'd otherwise render as a phantom "Unknown" row. Self-heal by removing them.
+    const orphans = all.filter(b => !b.category);
+    if (orphans.length > 0) {
+      await this.repo.remove(orphans);
+    }
+    const budgets = all.filter(b => b.category);
     const startDate = `${month}-01`;
     const endDate   = lastDayOfMonth(month);
 
@@ -160,6 +169,11 @@ export class BudgetsService {
   }
 
   async create(userId: string, dto: { categoryId: string; amount: number; month: string; projectId?: string | null }): Promise<Budget> {
+    // Guard against orphan budgets: the category must exist and belong to this user.
+    // A stale id (e.g. a category deleted server-side but still in the client list)
+    // would otherwise create a budget with no category — a phantom "Unknown" row.
+    const cat = await this.categoryRepo.findOneBy({ id: dto.categoryId });
+    if (!cat || cat.userId !== userId) throw new NotFoundException('Category not found');
     if (dto.projectId) {
       const proj = await this.projectRepo.findOneBy({ id: dto.projectId });
       if (!proj || proj.userId !== userId) throw new ForbiddenException();

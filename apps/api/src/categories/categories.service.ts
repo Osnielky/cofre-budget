@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Category } from './category.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { Budget } from '../budgets/budget.entity';
 import { UpsertCategoryDto } from './dto/upsert-category.dto';
 
 const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'createdAt' | 'updatedAt'>[] = [
@@ -40,6 +41,7 @@ export class CategoriesService {
   constructor(
     @InjectRepository(Category) private repo: Repository<Category>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
+    @InjectRepository(Budget) private budgetRepo: Repository<Budget>,
   ) {}
 
   async findAllByUser(userId: string): Promise<Category[]> {
@@ -94,6 +96,10 @@ export class CategoriesService {
     if (reassignTo) {
       await this.txRepo.update({ categoryId: id }, { categoryId: reassignTo });
     }
+    // Budgets reference this category. Don't rely on a DB-level cascade (it isn't
+    // guaranteed across environments) — clean them up explicitly so the delete
+    // never leaves an orphaned budget that renders as a phantom "Unknown" row.
+    await this.budgetRepo.delete({ categoryId: id });
     await this.repo.remove(cat);
   }
 

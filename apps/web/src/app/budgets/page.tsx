@@ -191,9 +191,12 @@ export default function BudgetsPage() {
 
   useEffect(() => { if (expandedId) loadTxs(); }, [loadTxs, expandedId]);
 
-  /* Derived stats — spending budgets vs income targets */
-  const spending     = budgets.filter(b => b.category?.type !== 'income');
-  const targets      = budgets.filter(b => b.category?.type === 'income')
+  /* Derived stats — spending budgets vs income targets.
+     Guard: a budget whose category was deleted has no `category` and would
+     otherwise show as a phantom "Unknown" row in Spending — drop those. */
+  const withCategory = budgets.filter(b => b.category);
+  const spending     = withCategory.filter(b => b.category?.type !== 'income');
+  const targets      = withCategory.filter(b => b.category?.type === 'income')
     .sort((a, b) => b.percentage - a.percentage);
   const totalBudget  = spending.reduce((s, b) => s + Number(b.amount), 0);
   const totalSpent   = spending.reduce((s, b) => s + Number(b.spent), 0);
