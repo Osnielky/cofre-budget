@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Receipt } from './receipt.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { BankAccount } from '../bank-accounts/bank-account.entity';
+import { Category } from '../categories/category.entity';
 import { GmailService } from '../gmail/gmail.service';
 
 export interface ImportSplit {
@@ -16,6 +18,8 @@ export class ReceiptsService {
   constructor(
     @InjectRepository(Receipt) private receiptRepo: Repository<Receipt>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
+    @InjectRepository(BankAccount) private accountRepo: Repository<BankAccount>,
+    @InjectRepository(Category) private categoryRepo: Repository<Category>,
     private gmail: GmailService,
   ) {}
 
@@ -75,6 +79,17 @@ export class ReceiptsService {
       }, 0);
 
       if (splitTotal === 0) continue;
+
+      // Validate ownership of any referenced ids before creating the transaction,
+      // so a caller can't attach their receipt to another user's account/category.
+      if (split.bankAccountId) {
+        const acc = await this.accountRepo.findOneBy({ id: split.bankAccountId });
+        if (!acc || acc.userId !== userId) throw new ForbiddenException();
+      }
+      if (split.categoryId) {
+        const cat = await this.categoryRepo.findOneBy({ id: split.categoryId });
+        if (!cat || cat.userId !== userId) throw new ForbiddenException();
+      }
 
       const itemNames = split.itemIndices
         .map((idx) => receipt.items[idx]?.name)

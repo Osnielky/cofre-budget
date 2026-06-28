@@ -5,6 +5,7 @@ import { Budget } from './budget.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { Project } from '../projects/project.entity';
 import { Category } from '../categories/category.entity';
+import { ProjectCategory } from '../projects/project-category.entity';
 import { TRACKING_TYPES } from '../bank-accounts/account-types';
 
 export interface BudgetWithSpent extends Budget {
@@ -20,6 +21,7 @@ export class BudgetsService {
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
     @InjectRepository(Project) private projectRepo: Repository<Project>,
     @InjectRepository(Category) private categoryRepo: Repository<Category>,
+    @InjectRepository(ProjectCategory) private projectCategoryRepo: Repository<ProjectCategory>,
   ) {}
 
   /** Average monthly spend per category over the trailing `months` months,
@@ -198,6 +200,17 @@ export class BudgetsService {
     if (dto.projectId) {
       const proj = await this.projectRepo.findOneBy({ id: dto.projectId });
       if (!proj || proj.userId !== userId) throw new ForbiddenException();
+    }
+    // Guard against orphan/cross-tenant budgets: any referenced category must
+    // exist and belong to this user. A stale or foreign id would otherwise
+    // create a budget pointing at someone else's (or a deleted) category.
+    if (dto.categoryId) {
+      const cat = await this.categoryRepo.findOneBy({ id: dto.categoryId });
+      if (!cat || cat.userId !== userId) throw new NotFoundException('Category not found');
+    }
+    if (dto.projectCategoryId) {
+      const pc = await this.projectCategoryRepo.findOneBy({ id: dto.projectCategoryId });
+      if (!pc || pc.userId !== userId) throw new ForbiddenException();
     }
 
     // Project-category budgets: unique by (userId, projectId, projectCategoryId, month)
