@@ -50,6 +50,15 @@ export class ProjectsController {
     return this.service.create(req.user.id, dto);
   }
 
+  @Patch(':id/purchase-tx')
+  setPurchaseTx(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body('transactionId') transactionId: string | null,
+  ) {
+    return this.service.setPurchaseTx(id, req.user.id, transactionId);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Request() req: any, @Body() dto: Partial<ProjectDto>) {
     return this.service.update(id, req.user.id, dto);

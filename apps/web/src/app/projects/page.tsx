@@ -60,6 +60,7 @@ interface Project {
   expenses: number; income: number; costBasis: number;
   netGain: number | null; roi: number | null; txCount: number;
   imageUrl?: string | null;
+  purchaseTxId: string | null;
   transactions?: Transaction[];
   categories?: ProjectCategory[];
   categoryBreakdown?: CategoryBreakdown[];
@@ -116,6 +117,10 @@ export default function ProjectsPage() {
   const [savingCat, setSavingCat]       = useState(false);
   const [deletingCat, setDeletingCat]   = useState<string | null>(null);
   const [seedingCat, setSeedingCat]     = useState<string | null>(null);
+
+  /* Remove purchase transaction state */
+  const [removingPurchaseTx, setRemovingPurchaseTx] = useState<string | null>(null);
+  const [removePurchaseTxError, setRemovePurchaseTxError] = useState<Record<string, string | null>>({});
 
   /* Project form state */
   const emptyForm = { name: '', type: 'vehicle', icon: '🚗', color: PRESET_COLORS[0], description: '', purchasePrice: '', purchaseDate: '', imageUrl: '' };
@@ -325,6 +330,34 @@ export default function ProjectsPage() {
       await fetch(`${API}/projects/${projectId}/categories/${catId}`, { method: 'DELETE', credentials: 'include' });
       await loadDetail(projectId);
     } finally { setDeletingCat(null); }
+  }
+
+  async function removePurchaseTx(projectId: string) {
+    setRemovingPurchaseTx(projectId);
+    setRemovePurchaseTxError((prev) => ({ ...prev, [projectId]: null }));
+    try {
+      const res = await fetch(`${API}/projects/${projectId}/purchase-tx`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ transactionId: null }),
+      });
+      if (!res.ok) {
+        setRemovePurchaseTxError((prev) => ({ ...prev, [projectId]: 'Failed to remove purchase designation' }));
+        return;
+      }
+      const updated = await res.json();
+      setProjects((prev) => prev.map((p) =>
+        p.id === projectId
+          ? { ...p, purchaseTxId: null, costBasis: updated.costBasis }
+          : p,
+      ));
+      setRemovePurchaseTxError((prev) => ({ ...prev, [projectId]: null }));
+    } catch (error) {
+      setRemovePurchaseTxError((prev) => ({ ...prev, [projectId]: 'Failed to remove purchase designation' }));
+    } finally {
+      setRemovingPurchaseTx(null);
+    }
   }
 
   function openCreate() { setEditing(null); setForm(emptyForm); setShowForm(true); }
@@ -836,6 +869,27 @@ export default function ProjectsPage() {
                                   />
                                 </div>
                               </div>
+                              {tx.id === sel.purchaseTxId && (
+                                <div className="flex flex-col gap-0.5 items-end">
+                                  <button
+                                    onClick={() => removePurchaseTx(sel.id)}
+                                    disabled={removingPurchaseTx === sel.id}
+                                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    style={{
+                                      background: !removePurchaseTxError[sel.id] ? 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)' : 'color-mix(in srgb, #F07A3E 15%, transparent)',
+                                      color: !removePurchaseTxError[sel.id] ? 'var(--color-card-violet)' : '#F07A3E',
+                                      border: !removePurchaseTxError[sel.id] ? '1px solid color-mix(in srgb, var(--color-card-violet) 30%, transparent)' : '1px solid color-mix(in srgb, #F07A3E 30%, transparent)',
+                                    }}
+                                    title={removePurchaseTxError[sel.id] || "Remove purchase designation"}>
+                                    {removingPurchaseTx === sel.id ? '…' : '🏷 Purchase'}
+                                  </button>
+                                  {removePurchaseTxError[sel.id] && (
+                                    <p className="text-[9px] text-right" style={{ color: '#F07A3E' }}>
+                                      {removePurchaseTxError[sel.id]}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
                               <span className="text-sm font-semibold tabular-nums shrink-0"
                                 style={{ color: Number(tx.amount) >= 0 ? '#4FBF7F' : '#F07A3E' }}>
                                 {Number(tx.amount) >= 0 ? '+' : ''}${Math.abs(Number(tx.amount)).toFixed(2)}
@@ -1152,7 +1206,10 @@ export default function ProjectsPage() {
                   <p className="font-bold text-base">{showSell.name}</p>
                   <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                     Cost basis <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>${showSell.costBasis.toFixed(2)}</span>
-                    <span className="opacity-50"> = ${Number(showSell.purchasePrice).toFixed(2)} purchase + ${showSell.expenses.toFixed(2)} expenses</span>
+                    {showSell.purchaseTxId
+                      ? <span className="opacity-50"> = initial cost from transaction + ${showSell.expenses.toFixed(2)} expenses</span>
+                      : <span className="opacity-50"> = ${Number(showSell.purchasePrice).toFixed(2)} estimated purchase + ${showSell.expenses.toFixed(2)} expenses</span>
+                    }
                   </p>
                 </div>
                 <button type="button" onClick={() => setShowSell(null)}

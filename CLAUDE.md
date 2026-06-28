@@ -42,6 +42,10 @@ DATABASE_URL   # used by seed script
 JWT_SECRET
 JWT_EXPIRES_IN
 FRONTEND_URL   # defaults to http://localhost:3000
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+GOOGLE_GMAIL_REDIRECT_URI  # e.g. http://localhost:3333/api/gmail/callback
+ANTHROPIC_API_KEY
 ```
 
 `NEXT_PUBLIC_API_URL` in the web app defaults to `http://localhost:3333/api`.

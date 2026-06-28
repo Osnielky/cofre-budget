@@ -39,7 +39,7 @@ export class TransactionsController {
   }
 
   @Post()
-  create(@Request() req: any, @Body() body: { name: string; amount: number; date: string; bankAccountId?: string | null; categoryId?: string | null; debtId?: string | null }) {
+  create(@Request() req: any, @Body() body: { name: string; amount: number; date: string; bankAccountId?: string | null; categoryId?: string | null; debtId?: string | null; note?: string | null }) {
     return this.service.createManual(req.user.id, body);
   }
 
@@ -72,7 +72,7 @@ export class TransactionsController {
   updateManual(
     @Param('id') id: string,
     @Request() req: any,
-    @Body() body: { name?: string; amount?: number; date?: string; bankAccountId?: string | null },
+    @Body() body: { name?: string; amount?: number; date?: string; bankAccountId?: string | null; note?: string | null },
   ) {
     return this.service.updateManual(id, req.user.id, body);
   }

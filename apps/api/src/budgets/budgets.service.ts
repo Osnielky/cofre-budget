@@ -63,18 +63,23 @@ export class BudgetsService {
     return Promise.all(
       budgets.map(async (b) => {
         // Income categories track earnings (positive amounts); the rest track spending.
-        const isIncome = b.category?.type === 'income';
-        const raw = await this.txRepo
+        const isIncome = b.category?.type === 'income' || !!b.projectCategoryId;
+        const qb = this.txRepo
           .createQueryBuilder('tx')
           .leftJoin('tx.bankAccount', 'ba')
           .select(isIncome ? 'COALESCE(SUM(tx.amount), 0)' : 'COALESCE(SUM(ABS(tx.amount)), 0)', 'spent')
           .where('tx.userId = :userId', { userId })
-          .andWhere('tx.categoryId = :categoryId', { categoryId: b.categoryId })
           .andWhere(isIncome ? 'tx.amount > 0' : 'tx.amount < 0')
           .andWhere('tx.date >= :startDate AND tx.date <= :endDate', { startDate, endDate })
-          // Tracking accounts (investment, mortgage, …) are net-worth only — keep them out of budget spend.
-          .andWhere('(ba."accountType" IS NULL OR ba."accountType" NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] })
-          .getRawOne<{ spent: string }>();
+          .andWhere('(ba."accountType" IS NULL OR ba."accountType" NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] });
+
+        if (b.projectCategoryId) {
+          qb.andWhere('tx.projectId = :projectId', { projectId: b.projectId })
+            .andWhere('tx.projectCategoryId = :pcid', { pcid: b.projectCategoryId });
+        } else {
+          qb.andWhere('tx.categoryId = :categoryId', { categoryId: b.categoryId });
+        }
+        const raw = await qb.getRawOne<{ spent: string }>();
 
         const spent      = parseFloat(raw?.spent ?? '0');
         const amount     = parseFloat(b.amount as any);
@@ -86,25 +91,32 @@ export class BudgetsService {
     );
   }
 
-  /** Copy budgets from the most recent prior month if none exist for the target month. */
+  /** Copy budgets from the most recent prior month if none exist for the target month.
+      Falls back to the nearest future month so past months (before the first entry)
+      still inherit a sensible set of budgets. */
   async ensureMonthBudgets(userId: string, month: string): Promise<void> {
     const existing = await this.repo.find({ where: { userId, month } });
     if (existing.length > 0) return;
 
-    const priorAnchor = await this.repo
+    const anchor = await this.repo
       .createQueryBuilder('b')
       .where('b.userId = :userId', { userId })
       .andWhere('b.month < :month', { month })
       .orderBy('b.month', 'DESC')
-      .getOne();
+      .getOne()
+      ?? await this.repo
+        .createQueryBuilder('b')
+        .where('b.userId = :userId', { userId })
+        .andWhere('b.month > :month', { month })
+        .orderBy('b.month', 'ASC')
+        .getOne();
 
-    if (!priorAnchor) return;
+    if (!anchor) return;
 
-    const priorBudgets = await this.repo.find({ where: { userId, month: priorAnchor.month } });
+    const sourceBudgets = await this.repo.find({ where: { userId, month: anchor.month } });
     await Promise.all(
-      priorBudgets.map(b =>
-        // Preserve where the value originated so the new month shows "from <month>".
-        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month, sourceMonth: b.sourceMonth ?? b.month, projectId: b.projectId ?? null }))
+      sourceBudgets.map(b =>
+        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, projectCategoryId: b.projectCategoryId ?? null, amount: b.amount, month, sourceMonth: b.sourceMonth ?? b.month, projectId: b.projectId ?? null }))
       ),
     );
   }
@@ -116,7 +128,7 @@ export class BudgetsService {
     if (existing.length > 0) await this.repo.remove(existing);
     await Promise.all(
       source.map(b =>
-        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, amount: b.amount, month: toMonth, sourceMonth: b.sourceMonth ?? b.month, projectId: b.projectId ?? null }))
+        this.repo.save(this.repo.create({ userId, categoryId: b.categoryId, projectCategoryId: b.projectCategoryId ?? null, amount: b.amount, month: toMonth, sourceMonth: b.sourceMonth ?? b.month, projectId: b.projectId ?? null }))
       ),
     );
   }
@@ -143,19 +155,19 @@ export class BudgetsService {
     return this.repo.count({ where: { userId } });
   }
 
-  /** Apply an amount to every already-materialized future month for this category:
-      update where a record exists, insert where it's missing. This is why a budget
-      set (or added) this month also shows up next month — including categories that
-      a future month didn't previously have. Past months are never touched. */
-  private async propagateForward(userId: string, categoryId: string, amount: number, fromMonth: string, projectId?: string | null): Promise<void> {
-    const futureMonths = await this.repo
+  private async futureMonths(userId: string, fromMonth: string): Promise<string[]> {
+    const rows = await this.repo
       .createQueryBuilder('b')
       .select('DISTINCT b.month', 'month')
       .where('b.userId = :userId', { userId })
       .andWhere('b.month > :fromMonth', { fromMonth })
       .getRawMany<{ month: string }>();
+    return rows.map(r => r.month);
+  }
 
-    for (const { month } of futureMonths) {
+  /** Propagate a regular category budget amount to all future months that already exist. */
+  private async propagateForward(userId: string, categoryId: string, amount: number, fromMonth: string, projectId?: string | null): Promise<void> {
+    for (const month of await this.futureMonths(userId, fromMonth)) {
       const existing = await this.repo.findOne({ where: { userId, categoryId, month } });
       if (existing) {
         existing.amount = amount;
@@ -168,17 +180,41 @@ export class BudgetsService {
     }
   }
 
-  async create(userId: string, dto: { categoryId: string; amount: number; month: string; projectId?: string | null }): Promise<Budget> {
-    // Guard against orphan budgets: the category must exist and belong to this user.
-    // A stale id (e.g. a category deleted server-side but still in the client list)
-    // would otherwise create a budget with no category — a phantom "Unknown" row.
-    const cat = await this.categoryRepo.findOneBy({ id: dto.categoryId });
-    if (!cat || cat.userId !== userId) throw new NotFoundException('Category not found');
+  /** Propagate a project-category income target to all future months that already exist. */
+  private async propagateProjectCategoryForward(userId: string, projectCategoryId: string, projectId: string | null, amount: number, fromMonth: string): Promise<void> {
+    for (const month of await this.futureMonths(userId, fromMonth)) {
+      const existing = await this.repo.findOne({ where: { userId, projectCategoryId, projectId: projectId ?? null, month } });
+      if (existing) {
+        existing.amount = amount;
+        existing.sourceMonth = fromMonth;
+        await this.repo.save(existing);
+      } else {
+        await this.repo.save(this.repo.create({ userId, categoryId: null, projectCategoryId, amount, month, sourceMonth: fromMonth, projectId: projectId ?? null }));
+      }
+    }
+  }
+
+  async create(userId: string, dto: { categoryId?: string | null; amount: number; month: string; projectId?: string | null; projectCategoryId?: string | null }): Promise<Budget> {
     if (dto.projectId) {
       const proj = await this.projectRepo.findOneBy({ id: dto.projectId });
       if (!proj || proj.userId !== userId) throw new ForbiddenException();
     }
-    // Explicitly set this month → the value now originates here.
+
+    // Project-category budgets: unique by (userId, projectId, projectCategoryId, month)
+    if (dto.projectCategoryId) {
+      const existing = await this.repo.findOne({ where: { userId, projectId: dto.projectId ?? null, projectCategoryId: dto.projectCategoryId, month: dto.month } });
+      if (existing) {
+        existing.amount = dto.amount;
+        existing.sourceMonth = dto.month;
+        await this.repo.save(existing);
+      } else {
+        await this.repo.save(this.repo.create({ userId, categoryId: null, projectCategoryId: dto.projectCategoryId, amount: dto.amount, month: dto.month, sourceMonth: dto.month, projectId: dto.projectId ?? null }));
+      }
+      await this.propagateProjectCategoryForward(userId, dto.projectCategoryId, dto.projectId ?? null, dto.amount, dto.month);
+      return this.repo.findOne({ where: { userId, projectCategoryId: dto.projectCategoryId, projectId: dto.projectId ?? null, month: dto.month } }) as Promise<Budget>;
+    }
+
+    // Regular category budget.
     const existing = await this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } });
     if (existing) {
       existing.amount = dto.amount;
@@ -188,7 +224,7 @@ export class BudgetsService {
     } else {
       await this.repo.save(this.repo.create({ ...dto, userId, sourceMonth: dto.month }));
     }
-    await this.propagateForward(userId, dto.categoryId, dto.amount, dto.month, dto.projectId);
+    await this.propagateForward(userId, dto.categoryId!, dto.amount, dto.month, dto.projectId);
     return this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } }) as Promise<Budget>;
   }
 
@@ -201,10 +237,14 @@ export class BudgetsService {
       if (!proj || proj.userId !== userId) throw new ForbiddenException();
     }
     budget.amount = dto.amount;
-    budget.sourceMonth = budget.month; // edited here → originates here
+    budget.sourceMonth = budget.month;
     if (dto.projectId !== undefined) budget.projectId = dto.projectId ?? null;
     await this.repo.save(budget);
-    await this.propagateForward(userId, budget.categoryId, dto.amount, budget.month, dto.projectId);
+    if (budget.projectCategoryId) {
+      await this.propagateProjectCategoryForward(userId, budget.projectCategoryId, budget.projectId ?? null, dto.amount, budget.month);
+    } else {
+      await this.propagateForward(userId, budget.categoryId, dto.amount, budget.month, dto.projectId);
+    }
     return this.repo.findOneBy({ id }) as Promise<Budget>;
   }
 

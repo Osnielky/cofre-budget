@@ -104,4 +104,10 @@ export class Transaction {
 
   @Column({ default: false })
   isSplitParent: boolean;
+
+  @Column({ type: 'varchar', length: 500, nullable: true, default: null })
+  note: string | null;
+
+  @Column({ type: 'uuid', nullable: true, default: null })
+  receiptId: string | null;
 }

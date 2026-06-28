@@ -147,7 +147,7 @@ export class ProjectsService {
       const txs      = txByProject[p.id] ?? [];
       const expenses = txs.filter(t => Number(t.amount) < 0).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
       const income   = txs.filter(t => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
-      const costBasis = Number(p.purchasePrice) + expenses;
+      const costBasis = (p.purchaseTxId ? 0 : Number(p.purchasePrice)) + expenses;
       const netGain  = p.status === 'sold' && p.salePrice != null ? Number(p.salePrice) - costBasis : null;
       const roi      = netGain != null && costBasis > 0 ? (netGain / costBasis) * 100 : null;
       const stats    = { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length };
@@ -330,11 +330,24 @@ export class ProjectsService {
     const txs      = await this.txRepo.findBy({ projectId: p.id });
     const expenses = txs.filter((t) => Number(t.amount) < 0).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
     const income   = txs.filter((t) => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
-    const costBasis = Number(p.purchasePrice) + expenses;
+    const costBasis = (p.purchaseTxId ? 0 : Number(p.purchasePrice)) + expenses;
     const netGain  = p.status === 'sold' && p.salePrice != null
       ? Number(p.salePrice) - costBasis
       : null;
     const roi = netGain != null && costBasis > 0 ? (netGain / costBasis) * 100 : null;
     return { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length };
+  }
+
+  async setPurchaseTx(projectId: string, userId: string, transactionId: string | null): Promise<ProjectWithStats> {
+    const project = await this.repo.findOneByOrFail({ id: projectId, userId });
+
+    if (transactionId) {
+      const tx = await this.txRepo.findOneBy({ id: transactionId, userId, projectId });
+      if (!tx) throw new NotFoundException('Transaction not found or not linked to this project');
+    }
+
+    project.purchaseTxId = transactionId ?? null;
+    await this.repo.save(project);
+    return this.withStats(project);
   }
 }
