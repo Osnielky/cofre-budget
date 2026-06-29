@@ -102,6 +102,31 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
   const unreviewedList = recurringThisMonth.filter((r) => !subscriptions[r.normalized]);
   const unreviewedTotal = unreviewedList.reduce((sum, r) => sum + r.medianAmount, 0);
 
+  // Map each recurring merchant to its most common expense category
+  const merchantCategoryMap = new Map<string, { id: string; name: string; icon: string; color: string } | null>();
+  for (const r of recurringMap.values()) {
+    const counts = new Map<string, { count: number; ref: { id: string; name: string; icon: string; color: string } }>();
+    for (const t of transactions) {
+      if (normalize(t.name) !== r.normalized || !t.categoryRef || t.categoryRef.type !== 'expense') continue;
+      const existing = counts.get(t.categoryRef.id);
+      if (existing) existing.count++;
+      else counts.set(t.categoryRef.id, { count: 1, ref: t.categoryRef });
+    }
+    if (counts.size === 0) { merchantCategoryMap.set(r.normalized, null); continue; }
+    const top = [...counts.values()].sort((a, b) => b.count - a.count)[0];
+    merchantCategoryMap.set(r.normalized, top.ref);
+  }
+
+  // Group unreviewed recurring merchants by category; flag when 2+ share one
+  const catGroups = new Map<string, { cat: { id: string; name: string; icon: string; color: string }; merchants: typeof recurringThisMonth }>();
+  for (const r of unreviewedList) {
+    const cat = merchantCategoryMap.get(r.normalized);
+    if (!cat) continue;
+    if (!catGroups.has(cat.id)) catGroups.set(cat.id, { cat, merchants: [] });
+    catGroups.get(cat.id)!.merchants.push(r);
+  }
+  const duplicateGroups = [...catGroups.values()].filter((g) => g.merchants.length >= 2);
+
   const visible = showAll ? recurringThisMonth : recurringThisMonth.slice(0, 8);
   const hiddenCount = recurringThisMonth.length - 8;
   const toCancelList = Object.entries(subscriptions).filter(([, v]) => v.status === 'to-cancel');
@@ -139,6 +164,44 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
               </p>
             </>
           )}
+        </div>
+      )}
+
+      {/* Possible duplicates */}
+      {duplicateGroups.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold tracking-widest uppercase mb-2"
+            style={{ color: 'var(--color-card-amber)' }}>
+            Possible Duplicates
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {duplicateGroups.map(({ cat, merchants }) => (
+              <div key={cat.id} className="rounded-xl p-3"
+                style={{
+                  background: 'color-mix(in srgb, var(--color-card-amber) 8%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--color-card-amber) 20%, transparent)',
+                }}>
+                <p className="text-[10px] font-semibold mb-2"
+                  style={{ color: 'var(--color-card-amber)' }}>
+                  {cat.icon} {cat.name} — {merchants.length} services
+                </p>
+                {merchants.map((r) => (
+                  <div key={r.normalized} className="flex items-center justify-between py-0.5">
+                    <span className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+                      {r.displayName}
+                    </span>
+                    <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
+                      ${r.medianAmount.toFixed(2)}/mo
+                    </span>
+                  </div>
+                ))}
+                <p className="text-[10px] mt-2 pt-1.5 border-t"
+                  style={{ color: 'var(--color-text-muted)', borderColor: 'color-mix(in srgb, var(--color-card-amber) 20%, transparent)' }}>
+                  Do you need both? ${merchants.reduce((s, r) => s + r.medianAmount, 0).toFixed(2)}/mo total
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
