@@ -137,7 +137,7 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
     .filter((r) => {
       const sub = subscriptions[r.normalized];
       if (!sub || sub.status !== 'cancelled') return false;
-      if (!sub.cancelledAt) return true;
+      if (!sub.cancelledAt) return false;
       return !r.occurrences.some((o) => o.date > sub.cancelledAt!);
     })
     .reduce((sum, r) => sum + r.medianAmount, 0);
