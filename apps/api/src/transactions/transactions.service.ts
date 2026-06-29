@@ -281,6 +281,7 @@ export class TransactionsService {
   }
 
   async updateNote(id: string, userId: string, note: string | null): Promise<{ id: string; note: string | null }> {
+    if (note && note.length > 500) throw new BadRequestException('Note must be 500 characters or fewer');
     const tx = await this.repo.findOneBy({ id, userId });
     if (!tx) throw new NotFoundException();
     tx.note = note;

@@ -599,7 +599,12 @@ export default function TransactionsPage() {
     setCollapsedDates((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
   }
 
-  const recurringMap = useMemo(() => buildRecurringMap(transactions), [transactions]);
+  const recurringMap = useMemo(
+    () => buildRecurringMap(transactions.filter((t) => Number(t.amount) < 0)),
+    [transactions]
+  );
+
+  const insightsMonth = rangeMode === 'month' ? month : (from ? from.slice(0, 7) : currentMonth());
 
   function handleSubscriptionChange(next: SubscriptionStore) {
     setSubscriptions(next);
@@ -2586,6 +2591,9 @@ export default function TransactionsPage() {
           subscriptions={subscriptions}
           onSubscriptionChange={handleSubscriptionChange}
           onNoteUpdate={handleNoteUpdate}
+          currentMonth={insightsMonth}
+          showNotifications={showNotifications}
+          toggleNotifications={toggleNotifications}
         />
       </div>
 
@@ -2605,6 +2613,9 @@ export default function TransactionsPage() {
               subscriptions={subscriptions}
               onSubscriptionChange={handleSubscriptionChange}
               onNoteUpdate={handleNoteUpdate}
+              currentMonth={insightsMonth}
+              showNotifications={showNotifications}
+              toggleNotifications={toggleNotifications}
             />
           </div>
         </div>,

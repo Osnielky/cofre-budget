@@ -25,11 +25,15 @@ interface InsightsPanelProps {
   subscriptions: SubscriptionStore;
   onSubscriptionChange: (next: SubscriptionStore) => void;
   onNoteUpdate: (txId: string, note: string | null) => void;
+  currentMonth: string;
+  showNotifications?: boolean;
+  toggleNotifications?: () => void;
 }
 
 export function InsightsPanel({
   selectedTx, onClose, transactions, recurringMap,
   subscriptions, onSubscriptionChange, onNoteUpdate,
+  currentMonth, showNotifications, toggleNotifications,
 }: InsightsPanelProps) {
   return (
     <>
@@ -39,13 +43,22 @@ export function InsightsPanel({
         <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
           Insights
         </p>
-        {selectedTx && (
-          <button onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
-            style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
-            <XIcon />
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {toggleNotifications && (
+            <button onClick={toggleNotifications} title={showNotifications ? 'Hide notifications' : 'Show notifications'}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors shrink-0"
+              style={{ background: showNotifications ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'var(--color-elevated)', color: showNotifications ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+              <BellIcon />
+            </button>
+          )}
+          {selectedTx && (
+            <button onClick={onClose}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+              style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
+              <XIcon />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Body */}
@@ -64,6 +77,7 @@ export function InsightsPanel({
             recurringMap={recurringMap}
             subscriptions={subscriptions}
             onSubscriptionChange={onSubscriptionChange}
+            currentMonth={currentMonth}
           />
         )}
       </div>
@@ -73,18 +87,15 @@ export function InsightsPanel({
 
 /* ── Digest View (idle) ─────────────────────────────────────── */
 
-function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionChange }: {
+function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionChange, currentMonth }: {
   transactions: Transaction[];
   recurringMap: Map<string, RecurringInfo>;
   subscriptions: SubscriptionStore;
   onSubscriptionChange: (next: SubscriptionStore) => void;
+  currentMonth: string;
 }) {
   const [showAll, setShowAll] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-
-  const currentMonth = transactions.length > 0
-    ? transactions.reduce((max, t) => (t.date > max ? t.date : max), '').slice(0, 7)
-    : new Date().toISOString().slice(0, 7);
 
   const recurringThisMonth = [...recurringMap.values()]
     .filter((r) => r.occurrences.some((o) => o.month === currentMonth))
@@ -169,7 +180,9 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
                 style={{ background: 'color-mix(in srgb, var(--color-rose) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-rose) 18%, transparent)' }}>
                 <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: 'var(--color-rose)' }} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold truncate">{key}</p>
+                  <p className="text-xs font-semibold truncate">
+                    {recurringMap.get(key)?.displayName ?? key}
+                  </p>
                   {sub.note && (
                     <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{sub.note}</p>
                   )}
@@ -305,7 +318,7 @@ function TransactionDetailView({ tx, recurringMap, subscriptions, onSubscription
               {last4.map((o) => {
                 const isCurrent = o.date === tx.date;
                 return (
-                  <div key={o.date} className="flex items-center justify-between">
+                  <div key={`${o.date}-${o.amount}`} className="flex items-center justify-between">
                     <span className="text-[11px] flex items-center gap-1.5"
                       style={{ color: isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                       {new Date(o.month + '-01').toLocaleString('default', { month: 'short', year: 'numeric' })}
@@ -444,6 +457,14 @@ function XIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
     </svg>
   );
 }
