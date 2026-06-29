@@ -299,7 +299,7 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
                   )}
                 </div>
                 <button
-                  onClick={() => onSubscriptionChange({ ...subscriptions, [key]: { ...sub, status: 'cancelled' } })}
+                  onClick={() => onSubscriptionChange({ ...subscriptions, [key]: { ...sub, status: 'cancelled', cancelledAt: new Date().toISOString().slice(0, 10) } })}
                   className="text-[10px] font-semibold px-2 py-1 rounded-lg shrink-0 hover:brightness-110 transition-all"
                   style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 25%, transparent)' }}>
                   Done
@@ -321,7 +321,7 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
             {stillCharging.map((r) => {
               const sub = subscriptions[r.normalized]!;
               const postCharges = r.occurrences.filter((o) => o.date > sub.cancelledAt!);
-              const postTotal = postCharges.reduce((s, o) => s + o.amount, 0);
+              const postTotal = postCharges.reduce((s, o) => s + Math.abs(o.amount), 0);
               return (
                 <div key={r.normalized} className="rounded-xl px-3 py-2.5"
                   style={{
