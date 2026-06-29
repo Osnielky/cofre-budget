@@ -280,6 +280,14 @@ export class TransactionsService {
     return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'bankAccount'] });
   }
 
+  async updateNote(id: string, userId: string, note: string | null): Promise<{ id: string; note: string | null }> {
+    const tx = await this.repo.findOneBy({ id, userId });
+    if (!tx) throw new NotFoundException();
+    tx.note = note;
+    await this.repo.save(tx);
+    return { id, note };
+  }
+
   async deleteManual(id: string, userId: string): Promise<void> {
     const tx = await this.repo.findOneBy({ id, userId });
     if (!tx) throw new NotFoundException();
