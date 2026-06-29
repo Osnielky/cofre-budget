@@ -51,7 +51,10 @@ export function buildRecurringMap(transactions: TxSlice[]): Map<string, Recurrin
       avg <= 10 ? 'weekly' : avg <= 35 ? 'monthly' : 'irregular';
 
     const sortedAmts = [...g.amounts].sort((a, b) => a - b);
-    const medianAmount = sortedAmts[Math.floor(sortedAmts.length / 2)];
+    const mid = Math.floor(sortedAmts.length / 2);
+    const medianAmount = sortedAmts.length % 2 === 0
+      ? (sortedAmts[mid - 1] + sortedAmts[mid]) / 2
+      : sortedAmts[mid];
 
     const occurrences = g.dates
       .map((date, i) => ({ date, month: date.slice(0, 7), amount: g.amounts[i] }))
