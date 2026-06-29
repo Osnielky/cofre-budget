@@ -133,6 +133,15 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
       r.occurrences.some((o) => o.date > sub.cancelledAt!);
   });
 
+  const confirmedSavings = [...recurringMap.values()]
+    .filter((r) => {
+      const sub = subscriptions[r.normalized];
+      if (!sub || sub.status !== 'cancelled') return false;
+      if (!sub.cancelledAt) return true;
+      return !r.occurrences.some((o) => o.date > sub.cancelledAt!);
+    })
+    .reduce((sum, r) => sum + r.medianAmount, 0);
+
   const visible = showAll ? recurringThisMonth : recurringThisMonth.slice(0, 8);
   const hiddenCount = recurringThisMonth.length - 8;
   const toCancelList = Object.entries(subscriptions).filter(([, v]) => v.status === 'to-cancel');
@@ -352,13 +361,20 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
         </div>
       )}
 
-      {/* Monthly total */}
-      {totalRecurring > 0 && (
-        <div className="rounded-xl px-3 py-2.5 text-center"
+      {/* Monthly total + savings */}
+      {(totalRecurring > 0 || confirmedSavings > 0) && (
+        <div className="rounded-xl px-3 py-2.5 flex flex-col gap-1"
           style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-            ↻ <span className="font-bold">${totalRecurring.toFixed(2)}</span>/mo in recurring charges
-          </p>
+          {totalRecurring > 0 && (
+            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              ↻ <span className="font-bold tabular-nums">${totalRecurring.toFixed(2)}</span>/mo in recurring charges
+            </p>
+          )}
+          {confirmedSavings > 0 && (
+            <p className="text-[11px]" style={{ color: 'var(--color-green)' }}>
+              ✓ <span className="font-bold tabular-nums">${confirmedSavings.toFixed(2)}</span>/mo saved
+            </p>
+          )}
         </div>
       )}
     </div>
