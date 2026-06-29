@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RecurringInfo, normalize } from './recurring';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -35,7 +35,7 @@ export function InsightsPanel({
     <>
       {/* Header */}
       <div className="px-4 py-4 border-b shrink-0 flex items-center justify-between gap-2"
-        style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
+        style={{ borderColor: 'var(--color-border)', background: 'rgba(35,35,47,0.5)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
         <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
           Insights
         </p>
@@ -358,6 +358,10 @@ function SubscriptionControls({ merchantKey, sub, subscriptions, onSubscriptionC
   onSubscriptionChange: (next: SubscriptionStore) => void;
 }) {
   const [noteValue, setNoteValue] = useState(sub?.note ?? '');
+
+  useEffect(() => {
+    setNoteValue(sub?.note ?? '');
+  }, [sub?.note]);
 
   function update(patch: Partial<{ note: string; status: SubStatus }>) {
     onSubscriptionChange({
