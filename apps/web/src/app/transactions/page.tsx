@@ -10,12 +10,13 @@ import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiability } from '@/lib/accountTypes';
 import SplitTransactionModal from '@/components/SplitTransactionModal';
+import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
+import { buildRecurringMap } from './recurring';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null; last4?: string | null }
-interface Budget { id: string; categoryId: string | null; category: Category | null; projectCategoryId?: string | null; amount: string | number; spent: number }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
 interface Project { id: string; name: string; icon: string; color: string; status: string; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[] }
 interface TransferMatch { id: string; name: string; amount: number; date: string; bankAccount: BankAccount | null }
@@ -133,6 +134,8 @@ export default function TransactionsPage() {
   const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
   const [debts, setDebts] = useState<DebtLite[]>([]);
   const [splitTx, setSplitTx] = useState<Transaction | null>(null);
+  const [selectedTx, setSelectedTx]       = useState<Transaction | null>(null);
+  const [subscriptions, setSubscriptions] = useState<SubscriptionStore>({});
 
   const [importToast, setImportToast] = useState<{ imported: number; skipped: number; account: { bankName: string; accountName: string; accountType: string; color: string } } | null>(null);
   const importToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -148,6 +151,10 @@ export default function TransactionsPage() {
     const saved = localStorage.getItem('budgetWidth');
     if (saved) setBudgetWidth(Number(saved));
     setShowNotifications(localStorage.getItem('showNotifications') !== 'false');
+    try {
+      const subs = localStorage.getItem('cofre:subscriptions');
+      if (subs) setSubscriptions(JSON.parse(subs));
+    } catch { /* ignore malformed data */ }
   }, []);
   const dragRef = useRef<{ active: boolean; startX: number; startWidth: number }>({ active: false, startX: 0, startWidth: 0 });
 
@@ -197,20 +204,6 @@ export default function TransactionsPage() {
     }
   }, [from, to]);
 
-  const budgetMonth = rangeMode === 'month' ? month : (from ? from.slice(0, 7) : currentMonth());
-  const [budgets, setBudgets]             = useState<Budget[]>([]);
-  const [budgetsLoading, setBudgetsLoading] = useState(true);
-
-  const loadBudgets = useCallback(async () => {
-    setBudgetsLoading(true);
-    try {
-      const res = await fetch(`${API}/budgets?month=${budgetMonth}`, { credentials: 'include' });
-      const data = await res.json();
-      setBudgets(Array.isArray(data) ? data : []);
-    } catch {} finally {
-      setBudgetsLoading(false);
-    }
-  }, [budgetMonth]);
 
   useEffect(() => {
     Promise.all([
@@ -231,7 +224,6 @@ export default function TransactionsPage() {
   }, []);
 
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
-  useEffect(() => { loadBudgets(); }, [loadBudgets]);
 
   /* close pickers on outside click */
   useEffect(() => {
@@ -605,6 +597,18 @@ export default function TransactionsPage() {
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
   function toggleCollapseDate(key: string) {
     setCollapsedDates((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  }
+
+  const recurringMap = useMemo(() => buildRecurringMap(transactions), [transactions]);
+
+  function handleSubscriptionChange(next: SubscriptionStore) {
+    setSubscriptions(next);
+    localStorage.setItem('cofre:subscriptions', JSON.stringify(next));
+  }
+
+  function handleNoteUpdate(txId: string, note: string | null) {
+    setTransactions((ts) => ts.map((t) => t.id === txId ? { ...t, note } : t));
+    setSelectedTx((prev) => prev?.id === txId ? { ...prev, note } : prev);
   }
 
   /* ════════════════════════════════════════════════════════════ */
@@ -1183,8 +1187,15 @@ export default function TransactionsPage() {
                         const pickerCatsAlt = categories.filter((c) => c.type === secondaryType && (!searchQ || c.name.toLowerCase().includes(searchQ)));
 
                         return (
-                          <div key={tx.id} className="relative group"
-                            style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : {}}>
+                          <div key={tx.id} className="relative group cursor-pointer"
+                            style={{
+                              ...(i > 0 ? { borderTop: '1px solid var(--color-border)' } : {}),
+                              ...(selectedTx?.id === tx.id ? { background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)' } : {}),
+                            }}
+                            onClick={(e) => {
+                              if ((e.target as HTMLElement).closest('button,input,textarea,select,[role="button"]')) return;
+                              setSelectedTx((prev) => prev?.id === tx.id ? null : tx);
+                            }}>
                             <div className="flex items-center gap-3 px-4 py-3">
 
                               {/* Income/expense/transfer bar */}
@@ -2564,74 +2575,41 @@ export default function TransactionsPage() {
           style={{ background: 'color-mix(in srgb, var(--color-primary) 70%, transparent)' }} />
       </div>
 
-      {/* ── Budget column ── */}
-      <div className="shrink-0 flex flex-col overflow-hidden border-l"
+      {/* ── Insights column ── */}
+      <div className="hidden md:flex shrink-0 flex-col overflow-hidden border-l"
         style={{ width: budgetWidth, minWidth: 180, maxWidth: 480, borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
-
-        <div className="px-4 py-4 border-b shrink-0 flex items-center justify-between gap-2"
-          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
-          <div>
-            <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Budget</p>
-            <p className="text-sm font-semibold mt-0.5">{monthLabel(budgetMonth)}</p>
-          </div>
-          <button onClick={toggleNotifications} title={showNotifications ? 'Hide notifications' : 'Show notifications'}
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors shrink-0"
-            style={{ background: showNotifications ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'var(--color-elevated)', color: showNotifications ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
-            <BellIcon />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-2">
-          {budgetsLoading ? (
-            <p className="text-xs text-center py-10" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
-          ) : budgets.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-10 text-center">
-              <span className="text-3xl opacity-40">📊</span>
-              <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>No budgets set</p>
-              <p className="text-[10px]" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>Go to Budgets to create one</p>
-            </div>
-          ) : (
-            budgets.filter(b => !b.projectCategoryId && b.category).map((b) => {
-              const limit     = Number(b.amount);
-              const spent     = Math.abs(Number(b.spent));
-              const pct       = limit > 0 ? Math.min(spent / limit, 1) : 0;
-              const over      = spent > limit;
-              const barColor  = over ? 'var(--color-rose)' : 'var(--color-green)';
-              const remaining = limit - spent;
-              return (
-                <div key={b.id} className="rounded-xl p-3 flex flex-col gap-2"
-                  style={{ background: 'var(--color-elevated)', border: `1px solid ${over ? 'color-mix(in srgb, var(--color-rose) 18%, transparent)' : 'var(--color-elevated)'}` }}>
-                  <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                      style={{ background: `${b.category?.color ?? '#9B6DFF'}22` }}>{b.category?.icon ?? '📦'}</span>
-                    <span className="text-xs font-semibold flex-1 truncate">{b.category?.name ?? 'Unknown'}</span>
-                    {over && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
-                        style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)' }}>Over</span>
-                    )}
-                  </div>
-                  <div className="w-full h-2 rounded-full overflow-hidden"
-                    style={{ background: 'var(--color-elevated)' }}>
-                    <div className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${pct * 100}%`, background: barColor, boxShadow: `0 0 6px ${barColor}60` }} />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-semibold tabular-nums" style={{ color: over ? 'var(--color-rose)' : 'var(--color-green)' }}>
-                      ${spent.toFixed(0)} spent
-                    </span>
-                    <span className="text-[10px] tabular-nums" style={{ color: over ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
-                      {over ? `+$${Math.abs(remaining).toFixed(0)} over` : `$${remaining.toFixed(0)} left`}
-                    </span>
-                    <span className="text-[10px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
-                      /${limit.toFixed(0)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+        <InsightsPanel
+          selectedTx={selectedTx}
+          onClose={() => setSelectedTx(null)}
+          transactions={transactions}
+          recurringMap={recurringMap}
+          subscriptions={subscriptions}
+          onSubscriptionChange={handleSubscriptionChange}
+          onNoteUpdate={handleNoteUpdate}
+        />
       </div>
+
+      {/* ── Mobile bottom sheet (md and below only) ── */}
+      {selectedTx && createPortal(
+        <div
+          className="md:hidden fixed inset-0 z-50 flex items-end"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedTx(null); }}>
+          <div className="w-full rounded-t-2xl flex flex-col overflow-hidden"
+            style={{ maxHeight: '80dvh', background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+            <InsightsPanel
+              selectedTx={selectedTx}
+              onClose={() => setSelectedTx(null)}
+              transactions={transactions}
+              recurringMap={recurringMap}
+              subscriptions={subscriptions}
+              onSubscriptionChange={handleSubscriptionChange}
+              onNoteUpdate={handleNoteUpdate}
+            />
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ── Notifications column ── */}
       {showNotifications ? (
