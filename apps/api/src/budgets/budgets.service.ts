@@ -57,7 +57,9 @@ export class BudgetsService {
     // A project-category budget legitimately has categoryId=null (it references a
     // ProjectCategory), so we only treat a budget as orphaned when its categoryId
     // is non-null but the eager-loaded category relation resolved to null (deleted).
-    const orphans = all.filter(b => b.categoryId && !b.category);
+    // Also sweep out any budget with neither a real category nor a projectCategoryId
+    // (e.g. created with categoryId='' before the empty-string guard was added).
+    const orphans = all.filter(b => (b.categoryId && !b.category) || (!b.category && !b.projectCategoryId));
     if (orphans.length > 0) {
       await this.repo.remove(orphans);
     }
@@ -200,6 +202,16 @@ export class BudgetsService {
   }
 
   async create(userId: string, dto: { categoryId?: string | null; amount: number; month: string; projectId?: string | null; projectCategoryId?: string | null }): Promise<Budget> {
+    // Normalize empty strings to null so callers can't sneak in a budget with
+    // neither a real category nor a project category (which would render as "Unknown").
+    if (!dto.categoryId) dto = { ...dto, categoryId: null };
+    if (!dto.projectCategoryId) dto = { ...dto, projectCategoryId: null };
+
+    // Require exactly one of categoryId or projectCategoryId.
+    if (!dto.categoryId && !dto.projectCategoryId) {
+      throw new NotFoundException('A category or project category is required');
+    }
+
     if (dto.projectId) {
       const proj = await this.projectRepo.findOneBy({ id: dto.projectId });
       if (!proj || proj.userId !== userId) throw new ForbiddenException();
