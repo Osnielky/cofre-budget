@@ -682,10 +682,10 @@ export default function DashboardPage() {
                       const over = Number(b.spent) > Number(b.amount);
                       return (
                         <div key={b.id} className="flex items-center gap-2">
-                          <span className="text-base shrink-0">{b.category.icon}</span>
+                          <span className="text-base shrink-0">{b.category?.icon ?? '📦'}</span>
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between text-[10px] mb-0.5">
-                              <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{b.category.name}</span>
+                              <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{b.category?.name ?? 'Unknown'}</span>
                               <span style={{ color: over ? 'var(--color-rose)' : 'var(--color-amber)' }}>{pct}%</span>
                             </div>
                             <div className="h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-elevated)' }}>

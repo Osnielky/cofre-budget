@@ -15,7 +15,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null; last4?: string | null }
-interface Budget { id: string; categoryId: string; category: Category; amount: string | number; spent: number }
+interface Budget { id: string; categoryId: string | null; category: Category | null; projectCategoryId?: string | null; amount: string | number; spent: number }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
 interface Project { id: string; name: string; icon: string; color: string; status: string; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[] }
 interface TransferMatch { id: string; name: string; amount: number; date: string; bankAccount: BankAccount | null }
@@ -2591,7 +2591,7 @@ export default function TransactionsPage() {
               <p className="text-[10px]" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>Go to Budgets to create one</p>
             </div>
           ) : (
-            budgets.map((b) => {
+            budgets.filter(b => !b.projectCategoryId && b.category).map((b) => {
               const limit     = Number(b.amount);
               const spent     = Math.abs(Number(b.spent));
               const pct       = limit > 0 ? Math.min(spent / limit, 1) : 0;
@@ -2603,8 +2603,8 @@ export default function TransactionsPage() {
                   style={{ background: 'var(--color-elevated)', border: `1px solid ${over ? 'color-mix(in srgb, var(--color-rose) 18%, transparent)' : 'var(--color-elevated)'}` }}>
                   <div className="flex items-center gap-2">
                     <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                      style={{ background: `${b.category.color}22` }}>{b.category.icon}</span>
-                    <span className="text-xs font-semibold flex-1 truncate">{b.category.name}</span>
+                      style={{ background: `${b.category?.color ?? '#9B6DFF'}22` }}>{b.category?.icon ?? '📦'}</span>
+                    <span className="text-xs font-semibold flex-1 truncate">{b.category?.name ?? 'Unknown'}</span>
                     {over && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
                         style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)' }}>Over</span>
