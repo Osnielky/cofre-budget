@@ -216,6 +216,10 @@ function TransactionDetailView({ tx, recurringMap, subscriptions, onSubscription
   const [editingNote, setEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState(tx.note ?? '');
 
+  useEffect(() => {
+    setNoteValue(tx.note ?? '');
+  }, [tx.id, tx.note]);
+
   async function saveNote() {
     setEditingNote(false);
     const trimmed = noteValue.trim() || null;
