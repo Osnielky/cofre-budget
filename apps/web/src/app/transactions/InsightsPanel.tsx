@@ -229,6 +229,9 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
     .filter((t) => t.date.startsWith(thisYear))
     .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0);
   const displayOccurrences = allOccurrences.slice(0, 6);
+  const thisYearCount = allOccurrences.filter((t) => t.date.startsWith(thisYear)).length;
+  const allTimeTotal = allOccurrences.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState(tx.note ?? '');
 
@@ -307,22 +310,33 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
         )}
       </div>
 
-      {/* History */}
-      <div className="rounded-xl p-3"
+      {/* History — collapsible */}
+      <div className="rounded-xl overflow-hidden"
         style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-        <div className="flex items-center justify-between mb-2">
+        {/* Toggle row */}
+        <button
+          className="w-full flex items-center justify-between px-3 py-3 transition-colors hover:brightness-110"
+          onClick={() => setHistoryOpen((o) => !o)}>
           <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
             History
           </p>
-          {thisYearTotal > 0 && (
-            <span className="text-[10px] font-semibold tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>
-              ${thisYearTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} in {thisYear}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>
+              {allOccurrences.length} {allOccurrences.length === 1 ? 'transaction' : 'transactions'}
+              {thisYearTotal > 0 && ` · $${thisYearTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} in ${thisYear}`}
             </span>
-          )}
-        </div>
-        {allOccurrences.length > 1 ? (
-          <>
-            <div className="flex flex-col gap-2 mb-2">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+              strokeLinecap="round" strokeLinejoin="round"
+              style={{ color: 'var(--color-text-muted)', transform: historyOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </button>
+
+        {/* Expanded body */}
+        {historyOpen && (
+          <div className="px-3 pb-3 flex flex-col gap-2 border-t" style={{ borderColor: 'var(--color-border)' }}>
+            <div className="flex flex-col gap-2 pt-2">
               {displayOccurrences.map((o) => {
                 const isCurrent = o.id === tx.id;
                 return (
@@ -350,17 +364,17 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
                 +{allOccurrences.length - 6} more transactions
               </p>
             )}
-            {recInfo && (
-              <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
-                {recInfo.frequency === 'weekly' ? 'Weekly' : recInfo.frequency === 'monthly' ? 'Monthly' : 'Irregular'}
-                {' · '}avg ${recInfo.medianAmount.toFixed(2)}
-              </p>
-            )}
-          </>
-        ) : (
-          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-            First time we&apos;ve seen this merchant.
-          </p>
+            {/* Summary footer */}
+            <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: 'var(--color-border)' }}>
+              <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                {thisYearCount} this year
+                {recInfo ? ` · ${recInfo.frequency === 'weekly' ? 'weekly' : recInfo.frequency === 'monthly' ? 'monthly' : 'irregular'}` : ''}
+              </span>
+              <span className="text-[10px] font-semibold tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>
+                ${allTimeTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} total
+              </span>
+            </div>
+          </div>
         )}
       </div>
 
