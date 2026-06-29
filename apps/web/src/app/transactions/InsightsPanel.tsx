@@ -26,14 +26,12 @@ interface InsightsPanelProps {
   onSubscriptionChange: (next: SubscriptionStore) => void;
   onNoteUpdate: (txId: string, note: string | null) => void;
   currentMonth: string;
-  showNotifications?: boolean;
-  toggleNotifications?: () => void;
 }
 
 export function InsightsPanel({
   selectedTx, onClose, transactions, recurringMap,
   subscriptions, onSubscriptionChange, onNoteUpdate,
-  currentMonth, showNotifications, toggleNotifications,
+  currentMonth,
 }: InsightsPanelProps) {
   return (
     <>
@@ -44,13 +42,6 @@ export function InsightsPanel({
           Insights
         </p>
         <div className="flex items-center gap-1.5">
-          {toggleNotifications && (
-            <button onClick={toggleNotifications} title={showNotifications ? 'Hide notifications' : 'Show notifications'}
-              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors shrink-0"
-              style={{ background: showNotifications ? 'color-mix(in srgb, var(--color-primary) 15%, transparent)' : 'var(--color-elevated)', color: showNotifications ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
-              <BellIcon />
-            </button>
-          )}
           {selectedTx && (
             <button onClick={onClose}
               className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
@@ -66,6 +57,7 @@ export function InsightsPanel({
         {selectedTx ? (
           <TransactionDetailView
             tx={selectedTx}
+            transactions={transactions}
             recurringMap={recurringMap}
             subscriptions={subscriptions}
             onSubscriptionChange={onSubscriptionChange}
@@ -214,8 +206,9 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
 
 /* ── Transaction Detail View ────────────────────────────────── */
 
-function TransactionDetailView({ tx, recurringMap, subscriptions, onSubscriptionChange, onNoteUpdate }: {
+function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, onSubscriptionChange, onNoteUpdate }: {
   tx: Transaction;
+  transactions: Transaction[];
   recurringMap: Map<string, RecurringInfo>;
   subscriptions: SubscriptionStore;
   onSubscriptionChange: (next: SubscriptionStore) => void;
@@ -226,6 +219,16 @@ function TransactionDetailView({ tx, recurringMap, subscriptions, onSubscription
   const key = normalize(tx.name);
   const recInfo = recurringMap.get(key);
   const sub = subscriptions[key];
+
+  const thisYear = new Date().getFullYear().toString();
+  const merchantTxs = transactions
+    .filter((t) => normalize(t.name) === key && t.id !== tx.id)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const allOccurrences = [tx, ...merchantTxs];
+  const thisYearTotal = allOccurrences
+    .filter((t) => t.date.startsWith(thisYear))
+    .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0);
+  const displayOccurrences = allOccurrences.slice(0, 6);
   const [editingNote, setEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState(tx.note ?? '');
 
@@ -249,8 +252,6 @@ function TransactionDetailView({ tx, recurringMap, subscriptions, onSubscription
       // silently ignore — note will revert on next refresh
     }
   }
-
-  const last4 = recInfo?.occurrences.slice(0, 4) ?? [];
 
   return (
     <div className="flex flex-col gap-3">
@@ -306,41 +307,55 @@ function TransactionDetailView({ tx, recurringMap, subscriptions, onSubscription
         )}
       </div>
 
-      {/* Recurring history */}
+      {/* History */}
       <div className="rounded-xl p-3"
         style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-        <p className="text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: 'var(--color-text-muted)' }}>
-          History
-        </p>
-        {recInfo ? (
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
+            History
+          </p>
+          {thisYearTotal > 0 && (
+            <span className="text-[10px] font-semibold tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>
+              ${thisYearTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} in {thisYear}
+            </span>
+          )}
+        </div>
+        {allOccurrences.length > 1 ? (
           <>
             <div className="flex flex-col gap-2 mb-2">
-              {last4.map((o) => {
-                const isCurrent = o.date === tx.date;
+              {displayOccurrences.map((o) => {
+                const isCurrent = o.id === tx.id;
                 return (
-                  <div key={`${o.date}-${o.amount}`} className="flex items-center justify-between">
+                  <div key={o.id} className="flex items-center justify-between">
                     <span className="text-[11px] flex items-center gap-1.5"
                       style={{ color: isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                      {new Date(o.month + '-01').toLocaleString('default', { month: 'short', year: 'numeric' })}
+                      {new Date(o.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       {isCurrent && (
                         <span className="text-[9px] font-bold px-1 py-0.5 rounded"
                           style={{ background: 'var(--color-primary)', color: 'white' }}>
-                          now
+                          this
                         </span>
                       )}
                     </span>
                     <span className="text-[11px] tabular-nums font-semibold"
                       style={{ color: isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                      ${o.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      ${Math.abs(Number(o.amount)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 );
               })}
             </div>
-            <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
-              {recInfo.frequency === 'weekly' ? 'Weekly' : recInfo.frequency === 'monthly' ? 'Monthly' : 'Irregular'}
-              {' · '}avg ${recInfo.medianAmount.toFixed(2)}
-            </p>
+            {allOccurrences.length > 6 && (
+              <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                +{allOccurrences.length - 6} more transactions
+              </p>
+            )}
+            {recInfo && (
+              <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                {recInfo.frequency === 'weekly' ? 'Weekly' : recInfo.frequency === 'monthly' ? 'Monthly' : 'Irregular'}
+                {' · '}avg ${recInfo.medianAmount.toFixed(2)}
+              </p>
+            )}
           </>
         ) : (
           <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
@@ -457,14 +472,6 @@ function XIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
-function BellIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
     </svg>
   );
 }

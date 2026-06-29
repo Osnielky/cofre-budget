@@ -145,12 +145,10 @@ export default function TransactionsPage() {
   const [projectHints, setProjectHints]   = useState<Record<string, { projectId: string; projectCategoryId: string; catName: string; catIcon: string; catColor: string }>>({});
 
   const [budgetWidth, setBudgetWidth] = useState(256);
-  const [showNotifications, setShowNotifications] = useState(true);
 
   useEffect(() => {
     const saved = localStorage.getItem('budgetWidth');
     if (saved) setBudgetWidth(Number(saved));
-    setShowNotifications(localStorage.getItem('showNotifications') !== 'false');
     try {
       const subs = localStorage.getItem('cofre:subscriptions');
       if (subs) setSubscriptions(JSON.parse(subs));
@@ -175,14 +173,6 @@ export default function TransactionsPage() {
     }
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  }
-
-  function toggleNotifications() {
-    setShowNotifications((prev) => {
-      const next = !prev;
-      localStorage.setItem('showNotifications', String(next));
-      return next;
-    });
   }
 
   const ACC_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0'];
@@ -2592,8 +2582,6 @@ export default function TransactionsPage() {
           onSubscriptionChange={handleSubscriptionChange}
           onNoteUpdate={handleNoteUpdate}
           currentMonth={insightsMonth}
-          showNotifications={showNotifications}
-          toggleNotifications={toggleNotifications}
         />
       </div>
 
@@ -2614,43 +2602,10 @@ export default function TransactionsPage() {
               onSubscriptionChange={handleSubscriptionChange}
               onNoteUpdate={handleNoteUpdate}
               currentMonth={insightsMonth}
-              showNotifications={showNotifications}
-              toggleNotifications={toggleNotifications}
             />
           </div>
         </div>,
         document.body
-      )}
-
-      {/* ── Notifications column ── */}
-      {showNotifications ? (
-        <aside className="hidden 2xl:flex w-64 shrink-0 flex-col border-l"
-          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
-          <div className="px-4 py-4 border-b shrink-0 flex items-center justify-between gap-2"
-            style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
-            <div>
-              <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Notifications</p>
-            </div>
-            <button onClick={toggleNotifications} title="Hide notifications"
-              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors shrink-0"
-              style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
-              <CloseIcon />
-            </button>
-          </div>
-          <div className="flex-1 flex flex-col items-center justify-center gap-3 px-4 text-center">
-            <span className="text-4xl opacity-20">🔔</span>
-            <p className="text-xs" style={{ color: 'var(--color-text-muted)', opacity: 0.4 }}>Coming soon</p>
-          </div>
-        </aside>
-      ) : (
-        <div className="hidden 2xl:flex w-8 shrink-0 flex-col items-center border-l"
-          style={{ borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
-          <button onClick={toggleNotifications} title="Show notifications"
-            className="mt-4 w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
-            style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
-            <BellIcon />
-          </button>
-        </div>
       )}
     </div>
   );
@@ -2674,9 +2629,6 @@ function SyncIcon() {
 }
 function PlusIcon() {
   return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
-}
-function BellIcon() {
-  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
 }
 function CloseIcon() {
   return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
