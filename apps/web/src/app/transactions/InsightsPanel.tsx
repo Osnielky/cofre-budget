@@ -91,7 +91,16 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
 
   const recurringThisMonth = [...recurringMap.values()]
     .filter((r) => r.occurrences.some((o) => o.month === currentMonth))
-    .sort((a, b) => b.medianAmount - a.medianAmount);
+    .filter((r) => subscriptions[r.normalized]?.status !== 'cancelled')
+    .sort((a, b) => {
+      const pa = statusPriority(subscriptions[a.normalized]);
+      const pb = statusPriority(subscriptions[b.normalized]);
+      if (pa !== pb) return pa - pb;
+      return b.medianAmount - a.medianAmount;
+    });
+
+  const unreviewedList = recurringThisMonth.filter((r) => !subscriptions[r.normalized]);
+  const unreviewedTotal = unreviewedList.reduce((sum, r) => sum + r.medianAmount, 0);
 
   const visible = showAll ? recurringThisMonth : recurringThisMonth.slice(0, 8);
   const hiddenCount = recurringThisMonth.length - 8;
@@ -100,6 +109,39 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Burden header */}
+      {recurringThisMonth.length > 0 && (
+        <div className="rounded-xl px-3 py-2.5"
+          style={{
+            background: unreviewedList.length > 0
+              ? 'color-mix(in srgb, var(--color-card-amber) 8%, transparent)'
+              : 'color-mix(in srgb, var(--color-green) 8%, transparent)',
+            border: `1px solid ${unreviewedList.length > 0
+              ? 'color-mix(in srgb, var(--color-card-amber) 20%, transparent)'
+              : 'color-mix(in srgb, var(--color-green) 20%, transparent)'}`,
+          }}>
+          {unreviewedList.length > 0 ? (
+            <>
+              <p className="text-xs font-bold" style={{ color: 'var(--color-card-amber)' }}>
+                {unreviewedList.length} unreviewed subscription{unreviewedList.length !== 1 ? 's' : ''}
+              </p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                ${unreviewedTotal.toFixed(2)}/mo you haven&apos;t evaluated yet
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs font-bold" style={{ color: 'var(--color-green)' }}>
+                All subscriptions reviewed ✓
+              </p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                Nothing new to evaluate this month
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Recurring this month */}
       <div>
         <p className="text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: 'var(--color-text-muted)' }}>
@@ -127,12 +169,20 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
                         {' · '}avg ${r.medianAmount.toFixed(2)}
                       </p>
                     </div>
-                    {sub && sub.status !== 'cancelled' && (
+                    {!sub ? (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
-                        style={sub.status === 'to-cancel'
-                          ? { background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)' }
-                          : { background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>
-                        {sub.status === 'to-cancel' ? 'To cancel' : 'Tracked'}
+                        style={{ background: 'color-mix(in srgb, var(--color-card-amber) 15%, transparent)', color: 'var(--color-card-amber)' }}>
+                        Review
+                      </span>
+                    ) : sub.status === 'to-cancel' ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                        style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)' }}>
+                        To cancel
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                        style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>
+                        Tracked
                       </span>
                     )}
                   </button>
@@ -202,6 +252,13 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
       )}
     </div>
   );
+}
+
+function statusPriority(sub: { status: SubStatus } | undefined): number {
+  if (!sub) return 0;
+  if (sub.status === 'to-cancel') return 1;
+  if (sub.status === 'active') return 2;
+  return 3; // cancelled — filtered out below
 }
 
 /* ── Transaction Detail View ────────────────────────────────── */
