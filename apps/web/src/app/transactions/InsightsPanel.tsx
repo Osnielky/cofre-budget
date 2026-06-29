@@ -15,7 +15,7 @@ interface Transaction {
 }
 
 export type SubStatus = 'active' | 'to-cancel' | 'cancelled';
-export type SubscriptionStore = Record<string, { note: string; status: SubStatus }>;
+export type SubscriptionStore = Record<string, { note: string; status: SubStatus; cancelledAt?: string }>;
 
 interface InsightsPanelProps {
   selectedTx: Transaction | null;
@@ -126,6 +126,12 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
     catGroups.get(cat.id)!.merchants.push(r);
   }
   const duplicateGroups = [...catGroups.values()].filter((g) => g.merchants.length >= 2);
+
+  const stillCharging = [...recurringMap.values()].filter((r) => {
+    const sub = subscriptions[r.normalized];
+    return sub?.status === 'cancelled' && sub.cancelledAt &&
+      r.occurrences.some((o) => o.date > sub.cancelledAt!);
+  });
 
   const visible = showAll ? recurringThisMonth : recurringThisMonth.slice(0, 8);
   const hiddenCount = recurringThisMonth.length - 8;
@@ -304,6 +310,48 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
         </div>
       )}
 
+      {/* Still charging after cancellation */}
+      {stillCharging.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold tracking-widest uppercase mb-2"
+            style={{ color: 'var(--color-rose)' }}>
+            Still Charging!
+          </p>
+          <div className="flex flex-col gap-1.5">
+            {stillCharging.map((r) => {
+              const sub = subscriptions[r.normalized]!;
+              const postCharges = r.occurrences.filter((o) => o.date > sub.cancelledAt!);
+              const postTotal = postCharges.reduce((s, o) => s + o.amount, 0);
+              return (
+                <div key={r.normalized} className="rounded-xl px-3 py-2.5"
+                  style={{
+                    background: 'color-mix(in srgb, var(--color-rose) 10%, transparent)',
+                    border: '1px solid color-mix(in srgb, var(--color-rose) 25%, transparent)',
+                  }}>
+                  <p className="text-xs font-semibold truncate">{r.displayName}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {postCharges.length} charge{postCharges.length !== 1 ? 's' : ''} after cancellation · ${postTotal.toFixed(2)} total
+                  </p>
+                  <button
+                    onClick={() => onSubscriptionChange({
+                      ...subscriptions,
+                      [r.normalized]: { ...sub, status: 'to-cancel' },
+                    })}
+                    className="mt-2 text-[10px] font-semibold px-2 py-1 rounded-lg transition-all hover:brightness-110"
+                    style={{
+                      background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)',
+                      color: 'var(--color-rose)',
+                      border: '1px solid color-mix(in srgb, var(--color-rose) 25%, transparent)',
+                    }}>
+                    Re-open cancellation
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Monthly total */}
       {totalRecurring > 0 && (
         <div className="rounded-xl px-3 py-2.5 text-center"
@@ -351,6 +399,9 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
   const displayOccurrences = allOccurrences.slice(0, 6);
   const thisYearCount = allOccurrences.filter((t) => t.date.startsWith(thisYear)).length;
   const allTimeTotal = allOccurrences.reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0);
+  const postCancellationCharges = sub?.status === 'cancelled' && sub.cancelledAt
+    ? allOccurrences.filter((o) => o.date > sub.cancelledAt!)
+    : [];
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editingNote, setEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState(tx.note ?? '');
@@ -429,6 +480,22 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
           </button>
         )}
       </div>
+
+      {/* Post-cancellation warning */}
+      {postCancellationCharges.length > 0 && (
+        <div className="rounded-xl px-3 py-2.5"
+          style={{
+            background: 'color-mix(in srgb, var(--color-rose) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--color-rose) 25%, transparent)',
+          }}>
+          <p className="text-xs font-bold" style={{ color: 'var(--color-rose)' }}>
+            ⚠ Still charging after cancellation
+          </p>
+          <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+            {postCancellationCharges.length} charge{postCancellationCharges.length !== 1 ? 's' : ''} detected after {sub!.cancelledAt}
+          </p>
+        </div>
+      )}
 
       {/* History — collapsible */}
       <div className="rounded-xl overflow-hidden"
@@ -519,7 +586,7 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
 
 function SubscriptionControls({ merchantKey, sub, subscriptions, onSubscriptionChange }: {
   merchantKey: string;
-  sub: { note: string; status: SubStatus } | undefined;
+  sub: { note: string; status: SubStatus; cancelledAt?: string } | undefined;
   subscriptions: SubscriptionStore;
   onSubscriptionChange: (next: SubscriptionStore) => void;
 }) {
@@ -530,9 +597,18 @@ function SubscriptionControls({ merchantKey, sub, subscriptions, onSubscriptionC
   }, [sub?.note]);
 
   function update(patch: Partial<{ note: string; status: SubStatus }>) {
+    const cancelledAt = patch.status === 'cancelled'
+      ? new Date().toISOString().slice(0, 10)
+      : sub?.cancelledAt;
     onSubscriptionChange({
       ...subscriptions,
-      [merchantKey]: { note: noteValue, status: 'active', ...sub, ...patch },
+      [merchantKey]: {
+        note: noteValue,
+        status: 'active',
+        ...sub,
+        ...patch,
+        ...(cancelledAt ? { cancelledAt } : {}),
+      },
     });
   }
 
