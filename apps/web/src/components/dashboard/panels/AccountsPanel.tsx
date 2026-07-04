@@ -27,12 +27,12 @@ function BankLogo({ bankName, size = 28 }: { bankName: string; size?: number }) 
   );
 }
 
-export default function AccountsPanel({ accounts, loading }: { accounts: BankAccount[]; loading: boolean }) {
+export default function AccountsPanel({ accounts, netWorth, loading }: {
+  accounts: BankAccount[]; netWorth: number; loading: boolean;
+}) {
   const isDebtAcc    = (a: BankAccount) => isLiability(a.accountType);
-  const totalBalance = accounts.reduce((s,a) => s + (isDebtAcc(a) ? -Math.abs(Number(a.balance||0)) : Number(a.balance||0)), 0);
   const totalAssets  = accounts.filter(a => !isDebtAcc(a)).reduce((s,a) => s + Number(a.balance||0), 0);
   const totalDebt    = accounts.filter(a => isDebtAcc(a)).reduce((s,a) => s + Math.abs(Number(a.balance||0)), 0);
-  const netWorth     = totalBalance;
 
   return (
     <Panel title="Accounts" loading={loading}
