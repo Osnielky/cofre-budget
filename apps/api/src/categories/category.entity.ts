@@ -37,6 +37,10 @@ export class Category {
   @Column({ default: false })
   isDefault: boolean;
 
+  /* true = fixed expense (rent, insurance…), false = variable */
+  @Column({ default: false })
+  isFixed: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 

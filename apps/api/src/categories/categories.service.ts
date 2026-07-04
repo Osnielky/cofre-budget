@@ -6,7 +6,7 @@ import { Transaction } from '../transactions/transaction.entity';
 import { Budget } from '../budgets/budget.entity';
 import { UpsertCategoryDto } from './dto/upsert-category.dto';
 
-const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'createdAt' | 'updatedAt'>[] = [
+const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'createdAt' | 'updatedAt' | 'isFixed'>[] = [
   { name: 'Food & Dining',  icon: '🍔', color: '#F07A3E', type: 'expense',  description: 'Restaurants, groceries, coffee & snacks' },
   { name: 'Groceries',      icon: '🛒', color: '#4FBF7F', type: 'expense',  description: 'Supermarket & grocery store purchases' },
   { name: 'Transport',      icon: '🚗', color: '#4BA8D8', type: 'expense',  description: 'Gas, rideshare, parking & transit' },

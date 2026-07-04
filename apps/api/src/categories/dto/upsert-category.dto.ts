@@ -4,4 +4,5 @@ export class UpsertCategoryDto {
   color: string;
   type?: string;
   description?: string | null;
+  isFixed?: boolean;
 }

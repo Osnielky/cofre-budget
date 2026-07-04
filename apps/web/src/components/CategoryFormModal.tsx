@@ -8,6 +8,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 export interface Category {
   id: string; name: string; icon: string; color: string;
   type: string; isDefault: boolean; description: string | null;
+  isFixed?: boolean;
 }
 
 const PRESET_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0', '#5C5C78', '#FF6B6B'];
@@ -62,6 +63,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
     color: editing?.color ?? PRESET_COLORS[0],
     type: editing?.type ?? defaultType,
     description: editing?.description ?? '',
+    isFixed: editing?.isFixed ?? false,
   });
   const [saving, setSaving] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -207,6 +209,20 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               maxLength={100} className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
           </div>
+
+          {(form.type === 'expense' || form.type === 'both') && (
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <div>
+                <p className="text-sm font-medium">Fixed expense</p>
+                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                  Rent, insurance, loan payments — costs that don&apos;t change month to month.
+                </p>
+              </div>
+              <input type="checkbox" checked={form.isFixed}
+                onChange={(e) => setForm((f) => ({ ...f, isFixed: e.target.checked }))}
+                className="w-4 h-4 accent-[var(--color-card-violet)]" />
+            </label>
+          )}
 
         </div>
 
