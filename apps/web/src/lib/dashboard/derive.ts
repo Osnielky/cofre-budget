@@ -1,5 +1,5 @@
-import { isTrackingAccount } from '@/lib/accountTypes';
-import type { Transaction, Budget } from './types';
+import { isTrackingAccount, isLiability } from '@/lib/accountTypes';
+import type { Transaction, Budget, BankAccount, Debt } from './types';
 
 /** Transfers between own accounts + debt repayments — excluded everywhere. */
 export function isTransfer(t: Transaction): boolean {
@@ -182,5 +182,81 @@ export function spendingPace(budgets: Budget[], yearTx: Transaction[], monthKey:
     projected,
     overBy: +(projected - totalBudget).toFixed(2),
     hasBudgets: spendingBudgets.length > 0 && totalBudget > 0,
+  };
+}
+
+export interface FixedVariableSplit {
+  fixedTotal: number; variableTotal: number; fixedPct: number;
+  fixed: CategorySlice[]; variable: CategorySlice[];
+}
+
+export function fixedVariable(yearTx: Transaction[], monthKey: string): FixedVariableSplit {
+  const txs = txInMonth(yearTx, monthKey).filter((t) => inCashFlow(t) && Number(t.amount) < 0);
+  const fixed = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed === true), 'expense');
+  const variable = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed !== true), 'expense');
+  const fixedTotal = +fixed.reduce((s, x) => s + x.value, 0).toFixed(2);
+  const variableTotal = +variable.reduce((s, x) => s + x.value, 0).toFixed(2);
+  const all = fixedTotal + variableTotal;
+  return {
+    fixedTotal, variableTotal,
+    fixedPct: all > 0 ? +((fixedTotal / all) * 100).toFixed(1) : 0,
+    fixed, variable,
+  };
+}
+
+export interface SavingsPoint { month: string; actual: number; goal: number | null }
+export interface SavingsStats { points: SavingsPoint[]; current: number; goal: number | null; onTrackPct: number | null }
+
+export function savingsSeries(yearTx: Transaction[], now: Date, goal: number | null): SavingsStats {
+  const flow = monthlyCashFlow(yearTx, now);
+  let cum = 0;
+  const points: SavingsPoint[] = flow.map((m, i) => {
+    cum = +(cum + m.net).toFixed(2);
+    return { month: m.month, actual: cum, goal: goal != null ? +((goal * (i + 1)) / 12).toFixed(2) : null };
+  });
+  const current = points.length ? points[points.length - 1].actual : 0;
+  const goalNow = points.length && goal != null ? points[points.length - 1].goal! : null;
+  return {
+    points, current, goal,
+    onTrackPct: goalNow && goalNow > 0 ? +((current / goalNow) * 100).toFixed(1) : null,
+  };
+}
+
+export interface NetWorthItem { label: string; value: number; color: string }
+export interface NetWorthBreakdown {
+  total: number; assets: number; liabilities: number;
+  assetItems: NetWorthItem[]; liabilityItems: NetWorthItem[]; deltaPct: number | null;
+}
+
+/**
+ * Reproduces the net-worth math from `apps/web/src/app/dashboard/page.tsx`:
+ *   totalBalance = Σ(asset balances) − Σ|liability balances|
+ *   receivables  = Σ(open debts' remaining)
+ *   netWorth     = totalBalance + receivables  ≡  totalAssets − totalDebt
+ * Liability balances are taken by magnitude (Math.abs), matching the page's
+ * `isDebtAcc(a) ? -Math.abs(balance) : balance` — sign convention in the DB
+ * must not change the reported debt.
+ */
+export function netWorthBreakdown(
+  accounts: BankAccount[], debts: Debt[], yearTx: Transaction[], monthKey: string,
+): NetWorthBreakdown {
+  const assetAccts = accounts.filter((a) => !isLiability(a.accountType));
+  const liabAccts  = accounts.filter((a) => isLiability(a.accountType));
+  const receivables = debts.filter((d) => d.status === 'open').reduce((s, d) => s + Number(d.remaining), 0);
+  const assets = +(assetAccts.reduce((s, a) => s + Number(a.balance), 0) + receivables).toFixed(2);
+  const liabilities = +liabAccts.reduce((s, a) => s + Math.abs(Number(a.balance)), 0).toFixed(2);
+  const total = +(assets - liabilities).toFixed(2);
+  const monthNet = txInMonth(yearTx, monthKey).filter(inCashFlow)
+    .reduce((s, t) => s + Number(t.amount), 0);
+  const base = total - monthNet;
+  const assetItems: NetWorthItem[] = [
+    ...assetAccts.map((a) => ({ label: a.accountName, value: Number(a.balance), color: a.color })),
+    ...(receivables > 0 ? [{ label: 'Owed to you', value: receivables, color: '#6B6B8A' }] : []),
+  ];
+  return {
+    total, assets, liabilities,
+    assetItems,
+    liabilityItems: liabAccts.map((a) => ({ label: a.accountName, value: Math.abs(Number(a.balance)), color: a.color })),
+    deltaPct: base > 0 ? +((monthNet / base) * 100).toFixed(1) : null,
   };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace } from './derive';
+import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, savingsSeries, netWorthBreakdown } from './derive';
 import type { Transaction, Category, BankAccount } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
@@ -186,5 +186,76 @@ describe('spendingPace', () => {
   });
   it('views past months as fully elapsed', () => {
     expect(spendingPace([budget], [], '2026-06', new Date(2026, 6, 15)).monthPct).toBe(100);
+  });
+});
+
+describe('fixedVariable', () => {
+  it('splits on category.isFixed; unflagged goes variable', () => {
+    const rent = cat({ id: 'r', name: 'Rent', isFixed: true });
+    const out = fixedVariable([
+      tx({ date: '2026-07-01', amount: -1500, categoryRef: rent }),
+      tx({ date: '2026-07-02', amount: -500 }),           // Food, unflagged
+      tx({ date: '2026-07-03', amount: -100, categoryRef: null }),
+    ], '2026-07');
+    expect(out.fixedTotal).toBe(1500);
+    expect(out.variableTotal).toBe(600);
+    expect(out.fixedPct).toBeCloseTo(71.4, 1);
+    expect(out.fixed).toHaveLength(1);
+    expect(out.variable).toHaveLength(2);
+  });
+});
+
+describe('savingsSeries', () => {
+  const NOW = new Date(2026, 6, 3);
+  it('accumulates net and ramps the goal linearly', () => {
+    const out = savingsSeries([
+      tx({ date: '2026-01-05', amount: 2000 }), tx({ date: '2026-01-06', amount: -500 }),
+      tx({ date: '2026-02-05', amount: 1000 }),
+    ], NOW, 12000);
+    expect(out.points).toHaveLength(7);
+    expect(out.points[0].actual).toBe(1500);
+    expect(out.points[1].actual).toBe(2500);
+    expect(out.points[0].goal).toBe(1000);   // 12000 × 1/12
+    expect(out.points[6].goal).toBe(7000);   // 12000 × 7/12
+    expect(out.current).toBe(2500);
+    expect(out.onTrackPct).toBeCloseTo(35.7, 1); // 2500 / 7000
+  });
+  it('handles no goal', () => {
+    const out = savingsSeries([], NOW, null);
+    expect(out.goal).toBeNull();
+    expect(out.onTrackPct).toBeNull();
+    expect(out.points[0].goal).toBeNull();
+  });
+});
+
+describe('netWorthBreakdown', () => {
+  it('sums assets minus liabilities with receivables', () => {
+    const out = netWorthBreakdown(
+      [acct({ id: 'a1', accountName: 'Chk', accountType: 'checking', balance: 5000 }),
+       acct({ id: 'a2', accountName: 'CC', accountType: 'credit', balance: 1200 })],
+      [{ remaining: 300, status: 'open' }],
+      [], '2026-07',
+    );
+    expect(out.assets).toBe(5300);       // 5000 + 300 receivable
+    expect(out.liabilities).toBe(1200);
+    expect(out.total).toBe(4100);
+  });
+  it('approximates month delta from this month cash flow', () => {
+    const out = netWorthBreakdown(
+      [acct({ balance: 5000 })], [],
+      [tx({ date: '2026-07-01', amount: 1000 })], '2026-07',
+    );
+    expect(out.deltaPct).toBeCloseTo(25, 0); // 1000 / (5000-1000)
+  });
+  it('mirrors the dashboard page: liability balances are treated by magnitude regardless of sign', () => {
+    // If a credit-card balance is ever stored negative (owed amount as a negative number),
+    // the page's totalDebt = Math.abs(balance) must still be reproduced here.
+    const out = netWorthBreakdown(
+      [acct({ id: 'a1', accountName: 'Chk', accountType: 'checking', balance: 5000 }),
+       acct({ id: 'a2', accountName: 'CC', accountType: 'credit', balance: -1200 })],
+      [], [], '2026-07',
+    );
+    expect(out.liabilities).toBe(1200);
+    expect(out.total).toBe(3800);
   });
 });
