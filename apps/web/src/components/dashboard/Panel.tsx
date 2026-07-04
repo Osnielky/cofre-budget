@@ -10,7 +10,7 @@ const glass: React.CSSProperties = {
 
 interface PanelProps {
   title: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   legend?: React.ReactNode;
   colSpan?: 1 | 2;
   loading?: boolean;
