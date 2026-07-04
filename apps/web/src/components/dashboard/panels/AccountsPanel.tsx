@@ -31,8 +31,11 @@ export default function AccountsPanel({ accounts, netWorth, loading }: {
   accounts: BankAccount[]; netWorth: number; loading: boolean;
 }) {
   const isDebtAcc    = (a: BankAccount) => isLiability(a.accountType);
-  const totalAssets  = accounts.filter(a => !isDebtAcc(a)).reduce((s,a) => s + Number(a.balance||0), 0);
   const totalDebt    = accounts.filter(a => isDebtAcc(a)).reduce((s,a) => s + Math.abs(Number(a.balance||0)), 0);
+  /* netWorth already includes open-debt receivables (assets − debt), so back out
+     assets from it instead of summing accounts alone — keeps the split bar in
+     sync with the receivables-inclusive net worth shown in the header. */
+  const totalAssets  = netWorth + totalDebt;
 
   return (
     <Panel title="Accounts" loading={loading}

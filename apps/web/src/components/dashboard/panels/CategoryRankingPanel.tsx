@@ -1,12 +1,10 @@
 'use client';
 
-import { useThemeColors } from '@/components/ThemeProvider';
 import Panel, { PanelEmpty } from '../Panel';
 import { fmt } from '../chartTheme';
 import type { CategorySlice } from '@/lib/dashboard/derive';
 
 export default function CategoryRankingPanel({ slices, loading }: { slices: CategorySlice[]; loading: boolean }) {
-  const tc = useThemeColors();
   const max = slices[0]?.value || 1;
   return (
     <Panel title="Category Spending Ranking" subtitle="This month" loading={loading}>

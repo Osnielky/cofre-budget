@@ -21,7 +21,7 @@ export default function SpendingCalendarPanel({ cells, monthLabel, loading }: {
         <div className="flex flex-col gap-2">
           <div className="grid grid-cols-7 gap-1 text-center">
             {DOW.map((d, i) => (
-              <span key={i} className="text-[9px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>{d}</span>
+              <span key={`dow-${i}`} className="text-[9px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>{d}</span>
             ))}
             {cells.map((c, i) => (
               <div key={i}

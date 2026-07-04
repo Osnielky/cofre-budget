@@ -101,14 +101,15 @@ export default function DashboardPage() {
     const monthTx = txInMonth(yearTx, month);
     const goal = user?.savingsGoal != null ? Number(user.savingsGoal) : null;
     const expenseSlices = categoryTotals(monthTx, 'expense');
+    const incomeSlices = categoryTotals(yearTx, 'income');
     return {
       cashFlow: monthlyCashFlow(yearTx, now),
       trend: trendSeries(yearTx, now),
       expenseDonut: foldOther(expenseSlices, 7),
       expenseTotal: expenseSlices.reduce((s, x) => s + x.value, 0),
       ranking: expenseSlices.slice(0, 7),
-      incomeSlices: foldOther(categoryTotals(yearTx, 'income'), 6),
-      incomeTotal: categoryTotals(yearTx, 'income').reduce((s, x) => s + x.value, 0),
+      incomeSlices: foldOther(incomeSlices, 6),
+      incomeTotal: incomeSlices.reduce((s, x) => s + x.value, 0),
       calendar: calendarDays(yearTx, month),
       pace: spendingPace(budgets, yearTx, month, now),
       fixedVar: fixedVariable(yearTx, month),
@@ -136,6 +137,7 @@ export default function DashboardPage() {
   const receivables  = debts.filter(dbt => dbt.status === 'open').reduce((s,dbt) => s + Number(dbt.remaining || 0), 0);
   const netWorth     = totalBalance + receivables;
   const isCurrentMonth = month === currentMonth();
+  const isEarliestMonth = month <= `${new Date().getFullYear()}-01`;
 
   /* Prev month comparison from yearTx */
   const prevM    = prevMonth(month);
@@ -178,7 +180,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3.5 pb-2 flex-wrap">
               {loading && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-green)' }} />}
               <div className="flex items-center gap-0.5 rounded-full px-1.5 py-1.5" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                <button onClick={() => setMonth(prevMonth)} aria-label="Previous month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)]" style={{ color: 'var(--color-text-secondary)' }}>‹</button>
+                <button onClick={() => !isEarliestMonth && setMonth(prevMonth)} disabled={isEarliestMonth} aria-label="Previous month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: 'var(--color-text-secondary)' }}>‹</button>
                 <span className="text-[12.5px] font-semibold uppercase px-1 min-w-28 text-center" style={{ letterSpacing: '0.12em' }}>{monthLabel(month)}</span>
                 <button onClick={() => setMonth(nextMonth)} disabled={isCurrentMonth} aria-label="Next month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-default" style={{ color: 'var(--color-text-secondary)' }}>›</button>
               </div>
