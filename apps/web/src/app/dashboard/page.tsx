@@ -8,7 +8,7 @@ import { useThemeColors } from '@/components/ThemeProvider';
 import { BANKS } from '@/components/BankSelect';
 import {
   ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, Cell, PieChart, Pie, Area, AreaChart,
+  CartesianGrid, Cell, PieChart, Pie, Area, AreaChart, ReferenceLine,
 } from 'recharts';
 import { isLiability, isTrackingAccount } from '@/lib/accountTypes';
 
@@ -217,14 +217,19 @@ export default function DashboardPage() {
   const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const currentYear  = new Date().getFullYear();
   const currentMoIdx = new Date().getMonth();
-  let cumulativeNet  = 0;
   const monthlyChart = Array.from({ length: currentMoIdx + 1 }, (_,i) => {
     const key = `${currentYear}-${String(i+1).padStart(2,'0')}`;
     const txs = yearTx.filter(t => t.date.startsWith(key) && !isTransfer(t));
-    const rev = +txs.filter(t => Number(t.amount) > 0).reduce((s,t) => s + Number(t.amount), 0).toFixed(2);
-    const exp = +txs.filter(t => Number(t.amount) < 0).reduce((s,t) => s + Math.abs(Number(t.amount)), 0).toFixed(2);
-    cumulativeNet += (rev - exp);
-    return { month: MONTHS_SHORT[i], revenue: rev, expenses: exp, net: +cumulativeNet.toFixed(2) };
+    const sum = (pred: (t: Transaction) => boolean) =>
+      +txs.filter(pred).reduce((s,t) => s + Math.abs(Number(t.amount)), 0).toFixed(2);
+    const revPersonal = sum(t => Number(t.amount) > 0 && !t.projectId);
+    const revProject  = sum(t => Number(t.amount) > 0 && !!t.projectId);
+    const expPersonal = sum(t => Number(t.amount) < 0 && !t.projectId);
+    const expProject  = sum(t => Number(t.amount) < 0 && !!t.projectId);
+    return {
+      month: MONTHS_SHORT[i], revPersonal, revProject, expPersonal, expProject,
+      net: +(revPersonal + revProject - expPersonal - expProject).toFixed(2),
+    };
   });
 
   /* Revenue by category (donut) */
@@ -339,9 +344,11 @@ export default function DashboardPage() {
                   <p className="card-title">Cash Flow</p>
                   <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{currentYear} · year to date</p>
                 </div>
-                <div className="flex items-center gap-4 text-[10px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: tc.green }} />Revenue</span>
+                <div className="flex items-center gap-3.5 text-[10px] font-semibold flex-wrap" style={{ color: 'var(--color-text-secondary)' }}>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: tc.green }} />Income</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: tc.sky }} />Project income</span>
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: tc.orange }} />Expenses</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-1.5 rounded-sm" style={{ background: tc.amber }} />Project expenses</span>
                   <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 rounded-full" style={{ background: tc.violet }} />Net</span>
                 </div>
               </div>
@@ -352,19 +359,27 @@ export default function DashboardPage() {
                   <ComposedChart data={monthlyChart} barCategoryGap="30%" barGap={3}>
                     <CartesianGrid vertical={false} stroke={tc.border} />
                     <XAxis dataKey="month" tick={{ fill: tc.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis yAxisId="bar" tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`}
-                      tick={{ fill: tc.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} width={46} />
-                    <YAxis yAxisId="line" orientation="right" tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`}
+                    <YAxis tickFormatter={v => `${v < 0 ? '-' : ''}$${Math.abs(v) >= 1000 ? `${(Math.abs(v)/1000).toFixed(0)}k` : Math.abs(v)}`}
                       tick={{ fill: tc.textMuted, fontSize: 10 }} axisLine={false} tickLine={false} width={46} />
                     <Tooltip
                       cursor={{ fill: 'color-mix(in srgb, currentColor 5%, transparent)' }}
                       contentStyle={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 12, fontSize: 12 }}
                       labelStyle={{ color: tc.textPrimary, fontWeight: 700, marginBottom: 4 }}
-                      formatter={(v: unknown, name: unknown) => [`$${fmt(Number(v))}`, name === 'revenue' ? 'Revenue' : name === 'expenses' ? 'Expenses' : 'Cumulative Net']}
+                      formatter={(v: unknown, name: unknown) => {
+                        const labels: Record<string, string> = {
+                          revPersonal: 'Income', revProject: 'Project income',
+                          expPersonal: 'Expenses', expProject: 'Project expenses', net: 'Net',
+                        };
+                        const n = Number(v);
+                        return [`${n < 0 ? '-' : ''}$${fmt(Math.abs(n))}`, labels[String(name)] ?? String(name)];
+                      }}
                     />
-                    <Bar yAxisId="bar" dataKey="revenue"  fill={tc.green}  radius={[4,4,0,0]} fillOpacity={0.85} />
-                    <Bar yAxisId="bar" dataKey="expenses" fill={tc.orange} radius={[4,4,0,0]} fillOpacity={0.85} />
-                    <Line yAxisId="line" type="monotone" dataKey="net" stroke={tc.violet} strokeWidth={2} dot={{ fill: tc.violet, r: 3, strokeWidth: 0 }} />
+                    <ReferenceLine y={0} stroke={tc.border} />
+                    <Bar dataKey="revPersonal" stackId="rev" fill={tc.green}  fillOpacity={0.85} />
+                    <Bar dataKey="revProject"  stackId="rev" fill={tc.sky}    fillOpacity={0.85} radius={[4,4,0,0]} />
+                    <Bar dataKey="expPersonal" stackId="exp" fill={tc.orange} fillOpacity={0.85} />
+                    <Bar dataKey="expProject"  stackId="exp" fill={tc.amber}  fillOpacity={0.85} radius={[4,4,0,0]} />
+                    <Line type="monotone" dataKey="net" stroke={tc.violet} strokeWidth={2} dot={{ fill: tc.violet, r: 3, strokeWidth: 0 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
