@@ -228,6 +228,21 @@ export default function BudgetsPage() {
     e.preventDefault();
     const amt = parseFloat(form.amount);
     setFormError(null);
+
+    /* Validate: a category must always be selected */
+    const selProj = projects.find(p => p.id === form.projectId);
+    const isProjectCatMode = !!selProj && formKind === 'income';
+    if (!editingId) {
+      if (isProjectCatMode && !form.projectCategoryId) {
+        setFormError('Please select a project category.');
+        return;
+      }
+      if (!isProjectCatMode && !form.categoryId) {
+        setFormError('Please select a category.');
+        return;
+      }
+    }
+
     setFormSaving(true);
     try {
       if (editingId) {
