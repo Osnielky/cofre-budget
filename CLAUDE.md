@@ -78,9 +78,13 @@ NestJS modules wired in `app/app.module.ts`:
 
 Path alias `@/*` → `src/*` is defined in `apps/web/tsconfig.json`.
 
-### Styling
+### Styling & theming
 
-Tailwind v4 via `@tailwindcss/postcss`. Design tokens are declared in `apps/web/src/app/globals.css` inside `@theme {}` — no `tailwind.config` file. The body has three fixed ambient gradient blobs (violet, sky, green). Surfaces use `rgba` + `backdrop-filter: blur()` (glassmorphism). Never use a solid `--color-surface` background on cards; use `rgba(35,35,47,0.5x)` with a matching `backdropFilter`.
+Tailwind v4 via `@tailwindcss/postcss`. Shape/font tokens live in `apps/web/src/app/globals.css` inside `@theme {}` — no `tailwind.config` file.
+
+**Theme system.** All colors/surfaces come from CSS variables defined in `globals.css` `:root` (default theme: **Cobalt** — flat deep-navy base, SOLID cards, electric-blue accent). The theme registry is `src/lib/theme.ts` (`THEMES` array); `ThemeProvider` applies `data-theme` on `<html>` and persists to localStorage; the settings Appearance tab renders the registry. To add a theme: add a `THEMES` entry + an `html[data-theme="x"]` variable-override block in `globals.css`. Components must only consume the variables (`--color-surface`, `--glass-blur`, `--glass-border`, `--glass-shadow`, …) — never hardcode theme colors, so new themes never require component changes.
+
+**Color rules:** `--color-primary` (blue `#3B82F6`) is a UI accent only — never a chart series (CVD-indistinguishable from violet). Chart identity colors are green/sky/orange/amber/violet, resolved at runtime via `useThemeColors()` for recharts. The `.btn-gold` class name is legacy — it is the themed primary CTA button.
 
 Accent colors: `--color-card-violet #9B6DFF`, `--color-card-green #4FBF7F`, `--color-card-orange #F07A3E`, `--color-card-amber #F5C842`, `--color-card-sky #4BA8D8`.
 

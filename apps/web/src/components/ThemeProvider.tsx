@@ -1,10 +1,10 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import type { ThemeId } from '@/lib/theme';
+import { THEMES, type ThemeId } from '@/lib/theme';
 
 const STORAGE_KEY = 'cofre-theme';
-const DEFAULT_THEME: ThemeId = 'tropic';
+const DEFAULT_THEME: ThemeId = 'cobalt';
 
 interface ThemeContextValue {
   theme:    ThemeId;
@@ -29,10 +29,10 @@ export interface ThemeColors {
 }
 
 const FALLBACK: ThemeColors = {
-  primary: '#F5C842', green: '#22C55E', rose: '#F43F5E', amber: '#FBBF24',
-  orange: '#F97316', sky: '#38BDF8', violet: '#818CF8',
-  textPrimary: '#F0F4FF', textSecondary: '#8BA3C7', textMuted: '#3D5A80',
-  border: 'rgba(255,255,255,0.07)', elevated: 'rgba(12,30,72,0.68)',
+  primary: '#3B82F6', green: '#22C55E', rose: '#EF4444', amber: '#FBBF24',
+  orange: '#F97316', sky: '#38BDF8', violet: '#8B5CF6',
+  textPrimary: '#F1F5F9', textSecondary: '#94A3B8', textMuted: '#5B6B84',
+  border: 'rgba(148,163,184,0.10)', elevated: '#101A2E',
 };
 
 export function useThemeColors(): ThemeColors {
@@ -64,10 +64,12 @@ export function useThemeColors(): ThemeColors {
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>(DEFAULT_THEME);
 
-  /* Read saved preference on mount (client-only) */
+  /* Read saved preference on mount (client-only).
+     Saved ids from removed themes fall back to the default. */
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as ThemeId | null;
-    if (saved) applyTheme(saved);
+    const saved = localStorage.getItem(STORAGE_KEY);
+    applyTheme(THEMES.some((t) => t.id === saved) ? (saved as ThemeId) : DEFAULT_THEME);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function applyTheme(id: ThemeId) {
