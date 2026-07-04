@@ -10,9 +10,10 @@ import { isLiability } from '@/lib/accountTypes';
 import {
   monthlyCashFlow, trendSeries, categoryTotals, foldOther, txInMonth,
   calendarDays, spendingPace, fixedVariable, savingsSeries, netWorthBreakdown,
-  expenseChanges, topMerchants, isTransfer, inCashFlow,
+  expenseChanges, topMerchants, isTransfer, inCashFlow, dailyCumulative,
 } from '@/lib/dashboard/derive';
 import type { Budget } from '@/lib/dashboard/types';
+import StatCardsRow, { type StatCardDef } from '@/components/dashboard/StatCardsRow';
 import IncomeExpensesPanel from '@/components/dashboard/panels/IncomeExpensesPanel';
 import CashFlowTrendPanel from '@/components/dashboard/panels/CashFlowTrendPanel';
 import CategoryDonutPanel from '@/components/dashboard/panels/CategoryDonutPanel';
@@ -58,39 +59,6 @@ function greeting() {
   return 'Good evening';
 }
 
-const glass: React.CSSProperties = {
-  background: 'var(--color-surface)',
-  backdropFilter: 'var(--glass-blur)',
-  WebkitBackdropFilter: 'var(--glass-blur)',
-  border: 'var(--glass-border)',
-  boxShadow: 'var(--glass-shadow)',
-};
-
-function TrendBadge({ delta, inverse = false }: { delta: number; inverse?: boolean }) {
-  if (Math.abs(delta) < 0.5) return null;
-  const good = inverse ? delta < 0 : delta > 0;
-  const tone = good ? 'var(--color-green)' : 'var(--color-rose)';
-  return (
-    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
-      style={{ background: `color-mix(in srgb, ${tone} 14%, transparent)`, color: tone }}>
-      {delta > 0 ? '↑' : '↓'}{Math.abs(delta).toFixed(1)}%
-    </span>
-  );
-}
-
-function StatIcon({ d }: { d: string }) {
-  return (
-    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d={d} />
-    </svg>
-  );
-}
-const ICON_WALLET   = 'M21 12V7H5a2 2 0 0 1 0-4h14v4 M3 5v14a2 2 0 0 0 2 2h16v-5 M18 12a2 2 0 0 0 0 4h4v-4Z';
-const ICON_TRENDUP  = 'M22 7l-8.5 8.5-5-5L2 17 M16 7h6v6';
-const ICON_TRENDDN  = 'M22 17l-8.5-8.5-5 5L2 7 M16 17h6v-6';
-const ICON_SAVINGS  = 'M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z M2 9v1c0 1.1.9 2 2 2h1';
-
 export default function DashboardPage() {
   const { month, setMonth, transactions, yearTx, accounts, budgets, projects, debts, loading } = useDashboardData();
   const { user, refetch } = useUser();
@@ -117,6 +85,7 @@ export default function DashboardPage() {
       netWorth: netWorthBreakdown(accounts, debts, yearTx, month),
       changes: expenseChanges(yearTx, month),
       merchants: topMerchants(monthTx),
+      daily: dailyCumulative(yearTx, month, now),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [yearTx, month, budgets, accounts, debts, user?.savingsGoal]);
@@ -145,6 +114,27 @@ export default function DashboardPage() {
   const prevExp  = yearTx.filter(t => t.date.startsWith(prevM) && Number(t.amount) < 0  && !isTransfer(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
   const incDelta = prevInc > 0 ? ((income - prevInc) / prevInc * 100) : 0;
   const expDelta = prevExp > 0 ? ((expenses - prevExp) / prevExp * 100) : 0;
+  const prevNet  = prevInc - prevExp;
+  const savDelta = prevNet !== 0 ? ((net - prevNet) / Math.abs(prevNet) * 100) : null;
+
+  /* ── Stat cards (reference design: icon chip · value · delta · sparkline) ── */
+  const totalBudgeted   = spendingBudgets.reduce((s,b) => s + Number(b.amount), 0);
+  const totalSpent      = spendingBudgets.reduce((s,b) => s + Number(b.spent), 0);
+  const budgetRemaining = totalBudgeted - totalSpent;
+  const balanceBase     = netWorth - (d.daily.at(-1)?.net ?? 0);
+  const money           = (n: number) => `${n < 0 ? '-' : ''}$${fmt(Math.abs(n))}`;
+  const statCards: StatCardDef[] = [
+    { label: 'Total Balance',    value: money(netWorth), delta: d.netWorth.deltaPct, sub: receivables > 0 ? `incl. ${money(receivables)} owed to you` : 'vs last month',
+      accent: tc.sky, icon: 'wallet', spark: d.daily.map(p => balanceBase + p.net) },
+    { label: 'Monthly Income',   value: money(income), delta: incDelta, sub: targetPct != null ? `${targetPct}% of ${money(incomeTarget!)} target` : `vs ${monthShort(prevM)}: ${money(prevInc)}`,
+      accent: tc.green, icon: 'trendup', spark: d.daily.map(p => p.income) },
+    { label: 'Monthly Expenses', value: money(expenses), delta: expDelta, inverseDelta: true, sub: `vs ${monthShort(prevM)}: ${money(prevExp)}`,
+      accent: tc.orange, icon: 'trenddn', spark: d.daily.map(p => p.expenses) },
+    { label: 'Monthly Savings',  value: money(net), delta: savDelta, sub: income > 0 ? `${savingsRate.toFixed(1)}% savings rate` : 'vs last month',
+      accent: tc.violet, icon: 'savings', spark: d.daily.map(p => p.net) },
+    { label: 'Budget Remaining', value: money(budgetRemaining), delta: null, sub: totalBudgeted > 0 ? `of ${money(totalBudgeted)} budgeted` : 'no budgets set',
+      accent: tc.amber, icon: 'budget', spark: totalBudgeted > 0 ? d.daily.map(p => totalBudgeted - p.expenses) : [] },
+  ];
 
   /* ── Topbar summary line ── */
   const NUM_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
@@ -198,30 +188,7 @@ export default function DashboardPage() {
           </div>
 
           {/* ── Stat cards ── */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
-            {[
-              { label: 'Net Worth',    value: `$${fmt(netWorth)}`,                        sub: receivables > 0 ? `incl. $${fmt(receivables)} owed to you` : `${accounts.length} accounts`, accent: tc.violet, icon: ICON_WALLET,  delta: null,     inverseDelta: false },
-              { label: 'Income',       value: `$${fmt(income)}`,                          sub: targetPct != null ? `${targetPct}% of $${fmt(incomeTarget!)} target` : `vs ${monthShort(prevM)}: $${fmt(prevInc)}`, accent: tc.green,  icon: ICON_TRENDUP, delta: incDelta, inverseDelta: false },
-              { label: 'Expenses',     value: `$${fmt(expenses)}`,                        sub: `vs ${monthShort(prevM)}: $${fmt(prevExp)}`, accent: tc.orange, icon: ICON_TRENDDN, delta: expDelta, inverseDelta: true },
-              { label: 'Savings Rate', value: `${savingsRate >= 0 ? '' : '-'}${Math.abs(savingsRate).toFixed(1)}%`, sub: net >= 0 ? `$${fmt(net)} saved` : `$${fmt(Math.abs(net))} deficit`, accent: savingsRate >= 30 ? tc.green : savingsRate >= 0 ? tc.amber : tc.rose, icon: ICON_SAVINGS, delta: null, inverseDelta: false },
-            ].map(c => (
-              <div key={c.label} className="p-6 pt-7 flex flex-col gap-3 relative overflow-hidden rounded-2xl cursor-default select-none"
-                style={glass}>
-                <span className="absolute top-0 left-6 w-11 h-0.5 pointer-events-none" style={{ background: 'var(--color-primary)', opacity: 0.85 }} />
-                <div className="flex items-center gap-2.5">
-                  <span style={{ color: 'var(--color-primary)' }}><StatIcon d={c.icon} /></span>
-                  <span className="text-[11px] font-semibold uppercase" style={{ color: 'var(--color-text-muted)', letterSpacing: '0.26em' }}>{c.label}</span>
-                </div>
-                <div className="flex items-end gap-2 flex-wrap">
-                  <span className="stat-value" style={{ color: 'var(--color-text-primary)' }}>
-                    {loading ? <span className="opacity-30">—</span> : c.value}
-                  </span>
-                  {!loading && c.delta !== null && <TrendBadge delta={c.delta} inverse={c.inverseDelta} />}
-                </div>
-                <span className="text-[13px]" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>
-              </div>
-            ))}
-          </div>
+          <StatCardsRow cards={statCards} loading={loading} />
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <IncomeExpensesPanel data={d.cashFlow} loading={loading} />

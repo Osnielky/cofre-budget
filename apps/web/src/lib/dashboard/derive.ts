@@ -260,3 +260,30 @@ export function netWorthBreakdown(
     deltaPct: base > 0 ? +((monthNet / base) * 100).toFixed(1) : null,
   };
 }
+
+export interface DailyPoint { day: number; income: number; expenses: number; net: number }
+
+/** Cumulative income/expenses/net per day of the month — sparkline series.
+ *  Current month is capped at `now`'s day; past months cover every day. */
+export function dailyCumulative(yearTx: Transaction[], monthKey: string, now: Date): DailyPoint[] {
+  const [y, m] = monthKey.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const lastDay = monthKeyOf(now) === monthKey ? Math.min(now.getDate(), daysInMonth) : daysInMonth;
+  const perDay = new Map<number, { inc: number; exp: number }>();
+  for (const t of txInMonth(yearTx, monthKey)) {
+    if (!inCashFlow(t)) continue;
+    const day = Number(t.date.slice(8, 10));
+    const cur = perDay.get(day) ?? { inc: 0, exp: 0 };
+    const amt = Number(t.amount);
+    if (amt > 0) cur.inc += amt; else cur.exp += Math.abs(amt);
+    perDay.set(day, cur);
+  }
+  const points: DailyPoint[] = [];
+  let inc = 0, exp = 0;
+  for (let day = 1; day <= lastDay; day++) {
+    const p = perDay.get(day);
+    if (p) { inc += p.inc; exp += p.exp; }
+    points.push({ day, income: +inc.toFixed(2), expenses: +exp.toFixed(2), net: +(inc - exp).toFixed(2) });
+  }
+  return points;
+}

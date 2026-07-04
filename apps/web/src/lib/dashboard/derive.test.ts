@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, savingsSeries, netWorthBreakdown } from './derive';
+import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, savingsSeries, netWorthBreakdown, dailyCumulative } from './derive';
 import type { Transaction, Category, BankAccount } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
@@ -257,5 +257,29 @@ describe('netWorthBreakdown', () => {
     );
     expect(out.liabilities).toBe(1200);
     expect(out.total).toBe(3800);
+  });
+});
+
+describe('dailyCumulative', () => {
+  const NOW = new Date(2026, 6, 4); // Jul 4 2026
+  it('accumulates income and expenses by day, flat after last transaction', () => {
+    const out = dailyCumulative([
+      tx({ date: '2026-07-01', amount: 100 }),
+      tx({ date: '2026-07-03', amount: -40 }),
+    ], '2026-07', NOW);
+    expect(out).toHaveLength(4); // current month capped at Jul 4
+    expect(out[0]).toEqual({ day: 1, income: 100, expenses: 0, net: 100 });
+    expect(out[2]).toEqual({ day: 3, income: 100, expenses: 40, net: 60 });
+    expect(out[3].net).toBe(60);
+  });
+  it('covers the whole month for past months', () => {
+    expect(dailyCumulative([], '2026-06', NOW)).toHaveLength(30);
+  });
+  it('excludes transfers and tracking accounts', () => {
+    const out = dailyCumulative([
+      tx({ date: '2026-07-01', amount: 500, debtId: 'd1' }),
+      tx({ date: '2026-07-01', amount: 500, bankAccount: acct({ accountType: 'investment' }) }),
+    ], '2026-07', NOW);
+    expect(out[0].income).toBe(0);
   });
 });
