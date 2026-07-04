@@ -29,10 +29,10 @@ export interface ThemeColors {
 }
 
 const FALLBACK: ThemeColors = {
-  primary: '#3B82F6', green: '#22C55E', rose: '#EF4444', amber: '#FBBF24',
-  orange: '#F97316', sky: '#38BDF8', violet: '#8B5CF6',
-  textPrimary: '#F1F5F9', textSecondary: '#94A3B8', textMuted: '#5B6B84',
-  border: 'rgba(148,163,184,0.10)', elevated: '#101A2E',
+  primary: '#1E90FF', green: '#22C55E', rose: '#FF6B6B', amber: '#FBBF24',
+  orange: '#F97316', sky: '#38BDF8', violet: '#A855F7',
+  textPrimary: '#E6EDF7', textSecondary: '#94A3B8', textMuted: '#5E7095',
+  border: 'rgba(30,144,255,0.14)', elevated: 'rgba(21,36,68,0.80)',
 };
 
 export function useThemeColors(): ThemeColors {

@@ -19,7 +19,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
         style={{
           backgroundImage: [
             'radial-gradient(120% 90% at 50% 50%, transparent 52%, rgba(4,8,16,0.60) 100%)',
-            'radial-gradient(720px 540px at 32% 42%, rgba(59,130,246,0.12), transparent 62%)',
+            'radial-gradient(720px 540px at 32% 42%, rgba(30,144,255,0.12), transparent 62%)',
             'linear-gradient(180deg, rgba(5,9,18,0.38) 0%, rgba(5,9,18,0.16) 45%, rgba(5,9,18,0.68) 100%)',
             'url(/login-bg.jpg)',
           ].join(', '),
@@ -32,7 +32,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
 
         {/* Quote */}
         <div className="hidden lg:flex flex-col max-w-xl pb-10">
-          <span className="text-[11px] uppercase mb-7" style={{ color: 'rgba(96,165,250,0.75)', letterSpacing: '0.34em' }}>
+          <span className="text-[11px] uppercase mb-7" style={{ color: 'rgba(77,166,255,0.75)', letterSpacing: '0.34em' }}>
             Cofre · Wealth &amp; Budget
           </span>
           <p style={{
@@ -40,15 +40,15 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
             fontSize: 'clamp(38px, 4vw, 56px)',
             lineHeight: 1.16,
             letterSpacing: '-0.015em',
-            background: 'linear-gradient(115deg, #BFDBFE 0%, #60A5FA 40%, #3B82F6 70%, #8B5CF6 100%)',
+            background: 'linear-gradient(115deg, #9CC7FF 0%, #4DA6FF 40%, #1E90FF 70%, #A855F7 100%)',
             WebkitBackgroundClip: 'text',
             backgroundClip: 'text',
             color: 'transparent',
-            textShadow: '0 0 60px rgba(59,130,246,0.20)',
+            textShadow: '0 0 60px rgba(30,144,255,0.20)',
           }}>
             “If you can’t measure it, you can’t improve it.”
           </p>
-          <div className="rounded-full mt-8 mb-5" style={{ width: 56, height: 2, background: '#3B82F6', opacity: 0.8 }} />
+          <div className="rounded-full mt-8 mb-5" style={{ width: 56, height: 2, background: '#1E90FF', opacity: 0.8 }} />
           <span className="text-[11px] uppercase" style={{ color: 'rgba(242,241,234,0.45)', letterSpacing: '0.30em' }}>
             Peter Drucker
           </span>
@@ -62,16 +62,16 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
             backdropFilter: 'blur(18px) saturate(140%)',
             WebkitBackdropFilter: 'blur(18px) saturate(140%)',
             border: '1px solid rgba(255,255,255,0.11)',
-            boxShadow: '0 30px 80px rgba(0,0,0,0.55), 0 0 90px rgba(59,130,246,0.08), inset 0 1px 0 rgba(255,255,255,0.12)',
+            boxShadow: '0 30px 80px rgba(0,0,0,0.55), 0 0 90px rgba(30,144,255,0.08), inset 0 1px 0 rgba(255,255,255,0.12)',
           }}
         >
           {/* Emblem + wordmark (identical on every auth page) */}
           <span className="w-[72px] h-[72px] rounded-full flex items-center justify-center"
             style={{
-              border: '1px solid rgba(59,130,246,0.45)',
-              boxShadow: '0 0 0 4px rgba(59,130,246,0.10), 0 14px 40px rgba(59,130,246,0.20)',
-              background: 'rgba(59,130,246,0.08)',
-              color: '#60A5FA',
+              border: '1px solid rgba(30,144,255,0.45)',
+              boxShadow: '0 0 0 4px rgba(30,144,255,0.10), 0 14px 40px rgba(30,144,255,0.20)',
+              background: 'rgba(30,144,255,0.08)',
+              color: '#4DA6FF',
             }}>
             <Logo size={38} className="block" />
           </span>
@@ -79,7 +79,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
           <p className="mt-3 text-[10px] uppercase" style={{ color: 'rgba(242,241,234,0.55)', letterSpacing: '0.34em' }}>
             Wealth &amp; Budget
           </p>
-          <div className="rounded-full mt-5 mb-8" style={{ width: 56, height: 2, background: '#3B82F6', opacity: 0.9 }} />
+          <div className="rounded-full mt-5 mb-8" style={{ width: 56, height: 2, background: '#1E90FF', opacity: 0.9 }} />
 
           {children}
         </div>

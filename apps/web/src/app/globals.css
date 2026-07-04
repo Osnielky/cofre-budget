@@ -9,8 +9,10 @@
 
 /* ─────────────────────────────────────────────
    ROOT VARIABLES — Default theme: Cobalt
-   Electric-blue fintech. Flat deep-navy base,
-   SOLID cards (no blur), vivid data colors.
+   Electric-blue fintech (per docs/style guide):
+   navy gradient base, translucent cards with
+   light blur, thin cyan-blue glowing borders,
+   hover lift, vivid data colors.
 
    Adding a future theme:
      1. Add an entry to THEMES in src/lib/theme.ts
@@ -20,52 +22,54 @@
    theme never requires component changes.
 ───────────────────────────────────────────── */
 :root {
-  /* Surfaces — solid cards on a flat navy base */
-  --color-base:     #060B16;
-  --color-surface:  #0A101E;
-  --color-elevated: #101A2E;
-  --color-border:   rgba(148, 163, 184, 0.10);
+  /* Surfaces — translucent midnight-blue cards (light blur) on a navy gradient */
+  --color-base:     #0B1220;
+  --color-surface:  rgba(15, 27, 51, 0.55);
+  --color-elevated: rgba(21, 36, 68, 0.80);
+  --color-border:   rgba(30, 144, 255, 0.14);
 
   /* Text */
-  --color-text-primary:   #F1F5F9;
+  --color-text-primary:   #E6EDF7;
   --color-text-secondary: #94A3B8;
-  --color-text-muted:     #5B6B84;
+  --color-text-muted:     #5E7095;
 
-  /* Semantic. NOTE: --color-primary (blue) is a UI accent only —
-     never use it as a chart series; it is CVD-indistinguishable
-     from violet (deutan ΔE 3.8). Chart identity colors are
-     green / sky / orange / amber / violet (validated). */
-  --color-primary:  #3B82F6;
+  /* Semantic. NOTE: --color-primary (electric blue) and --color-indigo
+     are UI accents only — never chart series; blue/indigo/violet are
+     CVD-indistinguishable from each other (protan ΔE 3.2). Chart
+     identity colors are green / sky / orange / amber / violet
+     (validated: worst adjacent pair ΔE 16.2). Chart amber stays
+     #FBBF24 — the style guide's #F59E0B sits ΔE 8.7 from orange. */
+  --color-primary:  #1E90FF;
+  --color-indigo:   #6366F1;
   --color-green:    #22C55E;
-  --color-rose:     #EF4444;
+  --color-rose:     #FF6B6B;
   --color-amber:    #FBBF24;
   --color-orange:   #F97316;
   --color-sky:      #38BDF8;
-  --color-violet:   #8B5CF6;
+  --color-violet:   #A855F7;
 
   /* Card accents */
   --color-card-amber:  #FBBF24;
   --color-card-orange: #F97316;
-  --color-card-violet: #8B5CF6;
+  --color-card-violet: #A855F7;
   --color-card-green:  #22C55E;
   --color-card-sky:    #38BDF8;
-  --color-card-red:    #EF4444;
+  --color-card-red:    #FF6B6B;
 
   /* Nav */
-  --nav-active-bg:   rgba(59, 130, 246, 0.12);
-  --nav-active-bar:  linear-gradient(180deg, #3B82F6 0%, #8B5CF6 100%);
-  --nav-icon-active: #60A5FA;
+  --nav-active-bg:   rgba(30, 144, 255, 0.12);
+  --nav-active-bar:  linear-gradient(180deg, #1E90FF 0%, #6366F1 100%);
+  --nav-icon-active: #4DA6FF;
 
   /* Layout */
-  --sidebar-bg: #070D19;
-  --header-bg:  rgba(6, 11, 22, 0.94);
+  --sidebar-bg: rgba(9, 15, 30, 0.88);
+  --header-bg:  rgba(11, 18, 32, 0.92);
 
-  /* Surface treatment contract ("glass" vars kept for compatibility —
-     Cobalt is solid, so blur is off; a future theme may re-enable it) */
-  --glass-blur:   none;
-  --glass-border: 1px solid rgba(148, 163, 184, 0.10);
-  --glass-shadow: 0 10px 30px rgba(2, 6, 18, 0.50);
-  --popover-bg: #111B30;
+  /* Glass — light blur, thin cyan-blue border, soft glow */
+  --glass-blur:   blur(14px) saturate(140%);
+  --glass-border: 1px solid rgba(30, 144, 255, 0.16);
+  --glass-shadow: 0 12px 34px rgba(3, 8, 20, 0.55), 0 0 24px rgba(30, 144, 255, 0.05), inset 0 1px 0 rgba(230, 237, 247, 0.05);
+  --popover-bg: #13203C;
 }
 
 /* ── Reset ── */
@@ -82,8 +86,11 @@ body {
   margin: 0;
   min-height: 100dvh;
   background-color: var(--color-base);
-  /* Barely-there top glow keeps the flat navy from feeling dead */
-  background-image: radial-gradient(ellipse 90% 45% at 50% -10%, rgba(59, 130, 246, 0.08) 0%, transparent 70%);
+  /* Deep-navy gradient + faint electric-blue glow (style-guide visual language) */
+  background-image:
+    radial-gradient(ellipse 90% 45% at 50% -10%, rgba(30, 144, 255, 0.10) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(99, 102, 241, 0.06) 0%, transparent 60%),
+    linear-gradient(165deg, #0F1B33 0%, #0B1220 55%, #090E1C 100%);
   background-attachment: fixed;
 }
 body::before {
@@ -105,10 +112,22 @@ body::before {
 
 ::-webkit-scrollbar        { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(59, 130, 246, 0.25); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(59, 130, 246, 0.45); }
-:focus-visible { outline: 2px solid rgba(59, 130, 246, 0.60); outline-offset: 2px; border-radius: 6px; }
-::selection    { background: rgba(59, 130, 246, 0.30); color: #fff; }
+::-webkit-scrollbar-thumb  { background: rgba(30, 144, 255, 0.25); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(30, 144, 255, 0.45); }
+:focus-visible { outline: 2px solid rgba(30, 144, 255, 0.60); outline-offset: 2px; border-radius: 6px; }
+::selection    { background: rgba(30, 144, 255, 0.30); color: #fff; }
+
+/* ── Card hover lift (style guide §4) — slight rise + stronger glow ── */
+.card-lift {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(3, 8, 20, 0.60), 0 0 32px rgba(30, 144, 255, 0.10), inset 0 1px 0 rgba(230, 237, 247, 0.06);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-lift, .card-lift:hover { transform: none; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -159,11 +178,11 @@ body::before {
    Class name .btn-gold is legacy (pre-Cobalt); it is the themed
    primary CTA. Restyle per theme here rather than renaming call sites. */
 .btn-gold {
-  background: linear-gradient(180deg, #4F8DF8, #2E6FE8);
+  background: linear-gradient(180deg, #4DA6FF, #1E78E0);
   color: #FFFFFF;
-  box-shadow: 0 6px 22px rgba(59, 130, 246, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 6px 22px rgba(30, 144, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 .btn-gold:hover {
-  background: linear-gradient(180deg, #6AA0FA, #4F8DF8);
-  box-shadow: 0 8px 28px rgba(59, 130, 246, 0.50);
+  background: linear-gradient(180deg, #6BB5FF, #4DA6FF);
+  box-shadow: 0 8px 28px rgba(30, 144, 255, 0.50);
 }

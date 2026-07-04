@@ -61,13 +61,13 @@ const ICONS: Record<StatCardDef['icon'], string> = {
 export default function StatCardsRow({ cards, loading }: { cards: StatCardDef[]; loading: boolean }) {
   const tc = useThemeColors();
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-5">
       {cards.map((c) => {
         const good = c.delta == null ? true : (c.inverseDelta ? c.delta < 0 : c.delta > 0);
         const deltaTone = good ? tc.green : tc.rose;
         return (
           <div key={c.label}
-            className="p-4 flex flex-col gap-2.5 rounded-2xl min-w-0 cursor-default select-none overflow-hidden"
+            className="card-lift p-5 flex flex-col gap-2.5 rounded-2xl min-w-0 cursor-default select-none overflow-hidden"
             style={{
               background: `linear-gradient(140deg, color-mix(in srgb, ${c.accent} 9%, transparent), var(--color-surface) 60%)`,
               backdropFilter: 'var(--glass-blur)',

@@ -190,7 +190,7 @@ export default function DashboardPage() {
           {/* ── Stat cards ── */}
           <StatCardsRow cards={statCards} loading={loading} />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
             <IncomeExpensesPanel data={d.cashFlow} loading={loading} />
             <CashFlowTrendPanel data={d.trend} loading={loading} />
             <CategoryDonutPanel title="Expenses by Category" subtitle="This month"

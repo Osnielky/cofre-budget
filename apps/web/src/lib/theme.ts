@@ -29,16 +29,16 @@ export const THEMES: Theme[] = [
   {
     id: 'cobalt',
     name: 'Cobalt',
-    description: 'Deep navy · electric blue · vivid data colors',
+    description: 'Navy gradient · electric blue · glass cards · neon accents',
     dark: true,
     preview: {
-      bg:      '#060B16',
-      surface: '#0A101E',
-      accent:  '#3B82F6',
-      accent2: '#8B5CF6',
-      text:    '#F1F5F9',
+      bg:      '#0B1220',
+      surface: 'rgba(15,27,51,0.55)',
+      accent:  '#1E90FF',
+      accent2: '#A855F7',
+      text:    '#E6EDF7',
       textDim: '#94A3B8',
-      border:  'rgba(148,163,184,0.10)',
+      border:  'rgba(30,144,255,0.16)',
     },
   },
 ];

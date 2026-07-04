@@ -19,7 +19,7 @@ interface PanelProps {
 
 export default function Panel({ title, subtitle, legend, colSpan = 1, loading, children }: PanelProps) {
   return (
-    <div className={`flex flex-col gap-3 p-5 rounded-2xl min-w-0 ${colSpan === 2 ? 'xl:col-span-2' : ''}`} style={glass}>
+    <div className={`card-lift flex flex-col gap-3 p-6 rounded-2xl min-w-0 ${colSpan === 2 ? 'xl:col-span-2' : ''}`} style={glass}>
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
           <p className="card-title">{title}</p>
