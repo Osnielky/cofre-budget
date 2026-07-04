@@ -7,7 +7,8 @@
     "dev:api": "nx serve api",
     "build:web": "nx build web",
     "build:api": "nx build api",
-    "seed": "node -r dotenv/config dist/seed.js"
+    "seed": "node -r dotenv/config dist/seed.js",
+    "test:dashboard": "vitest run --root apps/web"
   },
   "devDependencies": {
     "@eslint/js": "^9.8.0",
@@ -52,6 +53,7 @@
     "tslib": "^2.3.0",
     "typescript": "~5.7.2",
     "typescript-eslint": "^8.40.0",
+    "vitest": "^4.1.9",
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
