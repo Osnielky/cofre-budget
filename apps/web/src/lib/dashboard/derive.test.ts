@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges } from './derive';
+import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace } from './derive';
 import type { Transaction, Category, BankAccount } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
@@ -147,5 +147,44 @@ describe('expenseChanges', () => {
   it('handles January (previous month = December prior year) without crashing', () => {
     const { changes } = expenseChanges([tx({ date: '2026-01-10', amount: -100, categoryRef: food })], '2026-01');
     expect(changes[0].pct).toBeNull(); // no previous data
+  });
+});
+
+describe('calendarDays', () => {
+  it('pads to full weeks, Sunday-first', () => {
+    const out = calendarDays([], '2026-07'); // Jul 1 2026 = Wednesday
+    expect(out.length % 7).toBe(0);
+    expect(out.slice(0, 3).every((c) => c.day === null)).toBe(true); // Sun,Mon,Tue pads
+    expect(out[3].day).toBe(1);
+  });
+  it('buckets intensity by quartile of max daily spend', () => {
+    const out = calendarDays([
+      tx({ date: '2026-07-01', amount: -100 }),
+      tx({ date: '2026-07-02', amount: -20 }),
+    ], '2026-07');
+    const d1 = out.find((c) => c.day === 1)!;
+    const d2 = out.find((c) => c.day === 2)!;
+    const d3 = out.find((c) => c.day === 3)!;
+    expect(d1.intensity).toBe(4);
+    expect(d2.intensity).toBe(1);
+    expect(d3.intensity).toBe(0);
+  });
+});
+
+describe('spendingPace', () => {
+  const budget = { id: 'b1', amount: 1000, spent: 0, category: cat() };
+  it('computes month vs budget percentages and projection', () => {
+    // Jul 15 of a 31-day month ≈ 48.4% elapsed; $600 spent of $1000 = 60%
+    const out = spendingPace([budget], [tx({ date: '2026-07-10', amount: -600 })], '2026-07', new Date(2026, 6, 15));
+    expect(out.monthPct).toBeCloseTo(48.4, 1);
+    expect(out.budgetPct).toBe(60);
+    expect(out.projected).toBeCloseTo(1240, 0);
+    expect(out.overBy).toBeCloseTo(240, 0);
+  });
+  it('flags missing budgets', () => {
+    expect(spendingPace([], [], '2026-07', new Date(2026, 6, 15)).hasBudgets).toBe(false);
+  });
+  it('views past months as fully elapsed', () => {
+    expect(spendingPace([budget], [], '2026-06', new Date(2026, 6, 15)).monthPct).toBe(100);
   });
 });

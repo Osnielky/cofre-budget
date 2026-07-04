@@ -1,5 +1,5 @@
 import { isTrackingAccount } from '@/lib/accountTypes';
-import type { Transaction } from './types';
+import type { Transaction, Budget } from './types';
 
 /** Transfers between own accounts + debt repayments — excluded everywhere. */
 export function isTransfer(t: Transaction): boolean {
@@ -134,5 +134,53 @@ export function expenseChanges(yearTx: Transaction[], monthKey: string): { chang
   return {
     changes: all.filter(meaningful).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)),
     unchanged: all.filter((c) => !meaningful(c)).length,
+  };
+}
+
+export interface CalendarCell { day: number | null; total: number; intensity: 0 | 1 | 2 | 3 | 4 }
+
+export function calendarDays(yearTx: Transaction[], monthKey: string): CalendarCell[] {
+  const [y, m] = monthKey.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const firstDow = new Date(y, m - 1, 1).getDay(); // 0 = Sunday
+  const perDay = new Map<number, number>();
+  for (const t of txInMonth(yearTx, monthKey)) {
+    if (!inCashFlow(t) || Number(t.amount) >= 0) continue;
+    const day = Number(t.date.slice(8, 10));
+    perDay.set(day, +(((perDay.get(day) ?? 0) + Math.abs(Number(t.amount)))).toFixed(2));
+  }
+  const max = Math.max(0, ...perDay.values());
+  const bucket = (v: number): CalendarCell['intensity'] =>
+    v <= 0 || max <= 0 ? 0 : v <= max * 0.25 ? 1 : v <= max * 0.5 ? 2 : v <= max * 0.75 ? 3 : 4;
+  const cells: CalendarCell[] = [];
+  for (let i = 0; i < firstDow; i++) cells.push({ day: null, total: 0, intensity: 0 });
+  for (let d = 1; d <= daysInMonth; d++) {
+    const total = perDay.get(d) ?? 0;
+    cells.push({ day: d, total, intensity: bucket(total) });
+  }
+  while (cells.length % 7 !== 0) cells.push({ day: null, total: 0, intensity: 0 });
+  return cells;
+}
+
+export interface PaceStats { monthPct: number; budgetPct: number; projected: number; overBy: number; hasBudgets: boolean }
+
+export function spendingPace(budgets: Budget[], yearTx: Transaction[], monthKey: string, now: Date): PaceStats {
+  const spendingBudgets = budgets.filter((b) => b.category ? b.category.type !== 'income' : true);
+  const totalBudget = spendingBudgets.reduce((s, b) => s + Number(b.amount), 0);
+  const spent = txInMonth(yearTx, monthKey)
+    .filter((t) => inCashFlow(t) && Number(t.amount) < 0)
+    .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+  const [y, m] = monthKey.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const isCurrent = monthKeyOf(now) === monthKey;
+  const isFuture = monthKey > monthKeyOf(now);
+  const frac = isFuture ? 0 : isCurrent ? now.getDate() / daysInMonth : 1;
+  const projected = frac > 0 ? +(spent / frac).toFixed(2) : 0;
+  return {
+    monthPct: +(frac * 100).toFixed(1),
+    budgetPct: totalBudget > 0 ? +((spent / totalBudget) * 100).toFixed(1) : 0,
+    projected,
+    overBy: +(projected - totalBudget).toFixed(2),
+    hasBudgets: spendingBudgets.length > 0 && totalBudget > 0,
   };
 }
