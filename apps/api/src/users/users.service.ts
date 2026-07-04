@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
@@ -81,9 +81,18 @@ export class UsersService {
     }));
   }
 
-  async updateProfile(id: string, data: { name?: string }): Promise<User> {
+  async updateProfile(id: string, data: { name?: string; savingsGoal?: number | null }): Promise<User> {
     const patch: Partial<User> = {};
     if (typeof data.name === 'string') patch.name = data.name.trim();
+    if (data.savingsGoal !== undefined) {
+      if (data.savingsGoal === null) {
+        patch.savingsGoal = null;
+      } else {
+        const n = Number(data.savingsGoal);
+        if (!Number.isFinite(n) || n < 0) throw new BadRequestException('savingsGoal must be a non-negative number');
+        patch.savingsGoal = n.toFixed(2);
+      }
+    }
     if (Object.keys(patch).length) await this.repo.update(id, patch);
     return this.repo.findOneByOrFail({ id });
   }

@@ -105,8 +105,8 @@ export class AuthController {
   @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @Patch('profile')
-  updateProfile(@Request() req: any, @Body() body: { name?: string }) {
-    return this.usersService.updateProfile(req.user.id, { name: body.name });
+  updateProfile(@Request() req: any, @Body() body: { name?: string; savingsGoal?: number | null }) {
+    return this.usersService.updateProfile(req.user.id, { name: body.name, savingsGoal: body.savingsGoal });
   }
 
   @Throttle({ default: { ttl: 900_000, limit: 10 } })

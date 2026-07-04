@@ -26,6 +26,10 @@ export class User {
   @Column({ default: 'free' })
   plan: 'free' | 'pro';
 
+  /* Yearly savings goal in dollars; null = not set */
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true, default: null })
+  savingsGoal: string | null;
+
   @Column({ default: false })
   emailVerified: boolean;
 

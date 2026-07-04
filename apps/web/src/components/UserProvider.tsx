@@ -13,6 +13,7 @@ interface User {
   plan?: 'free' | 'pro';
   emailVerified?: boolean;
   createdAt?: string;
+  savingsGoal?: string | number | null;
 }
 
 export type { User };
