@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries } from './derive';
+import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges } from './derive';
 import type { Transaction, Category, BankAccount } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
@@ -85,5 +85,67 @@ describe('trendSeries', () => {
   });
   it('clamps to January when fewer months exist', () => {
     expect(trendSeries([], new Date(2026, 2, 15))).toHaveLength(3); // Jan, Feb, Mar
+  });
+});
+
+describe('categoryTotals', () => {
+  it('groups expenses by category with pct', () => {
+    const food = cat({ id: 'f', name: 'Food' });
+    const gas  = cat({ id: 'g', name: 'Gas' });
+    const out = categoryTotals([
+      tx({ amount: -75, categoryRef: food }), tx({ amount: -25, categoryRef: gas }),
+      tx({ amount: 500, categoryRef: cat({ id: 'i', type: 'income' }) }), // ignored for dir=expense
+    ], 'expense');
+    expect(out.map((s) => [s.id, s.value, s.pct])).toEqual([['f', 75, 75], ['g', 25, 25]]);
+  });
+  it('folds uncategorized', () => {
+    const out = categoryTotals([tx({ amount: -10, categoryRef: null })], 'expense');
+    expect(out[0].id).toBe('uncat');
+  });
+});
+
+describe('foldOther', () => {
+  it('keeps top max-1 and sums the tail', () => {
+    const slices = [80, 10, 6, 4].map((v, i) => ({ id: `c${i}`, name: `C${i}`, icon: '', color: '', value: v, pct: v }));
+    const out = foldOther(slices, 3);
+    expect(out).toHaveLength(3);
+    expect(out[2]).toMatchObject({ id: 'other', value: 10 });
+  });
+  it('no-ops when under the cap', () => {
+    expect(foldOther([], 6)).toHaveLength(0);
+  });
+});
+
+describe('topMerchants', () => {
+  it('normalizes names case-insensitively and ranks by total', () => {
+    const out = topMerchants([
+      tx({ name: 'Amazon', amount: -50 }), tx({ name: 'AMAZON ', amount: -30 }),
+      tx({ name: 'Walmart', amount: -60 }),
+    ]);
+    expect(out[0]).toEqual({ name: 'Amazon', total: 80 });
+    expect(out[1]).toEqual({ name: 'Walmart', total: 60 });
+  });
+});
+
+describe('expenseChanges', () => {
+  const food = cat({ id: 'f', name: 'Food' });
+  it('computes per-category deltas vs previous month', () => {
+    const { changes } = expenseChanges([
+      tx({ date: '2026-06-10', amount: -100, categoryRef: food }),
+      tx({ date: '2026-07-10', amount: -150, categoryRef: food }),
+    ], '2026-07');
+    expect(changes[0]).toMatchObject({ id: 'f', current: 150, previous: 100, delta: 50, pct: 50 });
+  });
+  it('collapses trivial changes into unchanged count', () => {
+    const { changes, unchanged } = expenseChanges([
+      tx({ date: '2026-06-10', amount: -100, categoryRef: food }),
+      tx({ date: '2026-07-10', amount: -101, categoryRef: food }),
+    ], '2026-07');
+    expect(changes).toHaveLength(0);
+    expect(unchanged).toBe(1);
+  });
+  it('handles January (previous month = December prior year) without crashing', () => {
+    const { changes } = expenseChanges([tx({ date: '2026-01-10', amount: -100, categoryRef: food })], '2026-01');
+    expect(changes[0].pct).toBeNull(); // no previous data
   });
 });

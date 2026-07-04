@@ -57,3 +57,82 @@ export function trendSeries(yearTx: Transaction[], now: Date, months = 6): Trend
     return { month: MONTHS_SHORT[i], income, expenses, net: +(income - expenses).toFixed(2) };
   });
 }
+
+export interface CategorySlice { id: string; name: string; icon: string; color: string; value: number; pct: number }
+
+const UNCAT = { id: 'uncat', name: 'Uncategorized', icon: '❓', color: '#6B6B8A' };
+const OTHER = { id: 'other', name: 'Other', icon: '·', color: '#6B6B8A' };
+
+export function categoryTotals(txs: Transaction[], dir: 'income' | 'expense'): CategorySlice[] {
+  const sign = dir === 'income' ? 1 : -1;
+  const map = new Map<string, CategorySlice>();
+  for (const t of txs) {
+    if (!inCashFlow(t) || Math.sign(Number(t.amount)) !== sign) continue;
+    const c = t.categoryRef ?? UNCAT as never;
+    const key = t.categoryRef ? t.categoryRef.id : 'uncat';
+    const cur = map.get(key) ?? { id: key, name: c.name, icon: c.icon, color: c.color, value: 0, pct: 0 };
+    cur.value = +(cur.value + Math.abs(Number(t.amount))).toFixed(2);
+    map.set(key, cur);
+  }
+  const slices = [...map.values()].sort((a, b) => b.value - a.value);
+  const total = slices.reduce((s, x) => s + x.value, 0);
+  for (const s of slices) s.pct = total > 0 ? +((s.value / total) * 100).toFixed(1) : 0;
+  return slices;
+}
+
+export function foldOther(slices: CategorySlice[], max: number): CategorySlice[] {
+  if (slices.length <= max) return slices;
+  const head = slices.slice(0, max - 1);
+  const tail = slices.slice(max - 1);
+  const value = +tail.reduce((s, x) => s + x.value, 0).toFixed(2);
+  const pct = +tail.reduce((s, x) => s + x.pct, 0).toFixed(1);
+  return [...head, { ...OTHER, value, pct }];
+}
+
+export interface MerchantSlice { name: string; total: number }
+
+export function topMerchants(txs: Transaction[], n = 5): MerchantSlice[] {
+  const map = new Map<string, MerchantSlice>();
+  for (const t of txs) {
+    if (!inCashFlow(t) || Number(t.amount) >= 0) continue;
+    const display = t.name.trim();
+    const key = display.toLowerCase();
+    const cur = map.get(key) ?? { name: display, total: 0 };
+    cur.total = +(cur.total + Math.abs(Number(t.amount))).toFixed(2);
+    map.set(key, cur);
+  }
+  return [...map.values()].sort((a, b) => b.total - a.total).slice(0, n);
+}
+
+export interface ExpenseChange {
+  id: string; name: string; icon: string; color: string;
+  current: number; previous: number; delta: number; pct: number | null;
+}
+
+export function expenseChanges(yearTx: Transaction[], monthKey: string): { changes: ExpenseChange[]; unchanged: number } {
+  const [y, m] = monthKey.split('-').map(Number);
+  const prev = new Date(y, m - 2); // previous month
+  const prevKey = monthKeyOf(prev);
+  const cur = categoryTotals(txInMonth(yearTx, monthKey), 'expense');
+  const before = new Map(categoryTotals(txInMonth(yearTx, prevKey), 'expense').map((s) => [s.id, s]));
+  const all: ExpenseChange[] = [];
+  const seen = new Set<string>();
+  for (const s of cur) {
+    seen.add(s.id);
+    const p = before.get(s.id)?.value ?? 0;
+    all.push({
+      id: s.id, name: s.name, icon: s.icon, color: s.color,
+      current: s.value, previous: p, delta: +(s.value - p).toFixed(2),
+      pct: p > 0 ? +(((s.value - p) / p) * 100).toFixed(1) : null,
+    });
+  }
+  for (const [id, s] of before) {
+    if (seen.has(id)) continue; // category dropped to zero this month
+    all.push({ id, name: s.name, icon: s.icon, color: s.color, current: 0, previous: s.value, delta: -s.value, pct: -100 });
+  }
+  const meaningful = (c: ExpenseChange) => Math.abs(c.delta) >= 5 && (c.pct === null || Math.abs(c.pct) >= 2);
+  return {
+    changes: all.filter(meaningful).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)),
+    unchanged: all.filter((c) => !meaningful(c)).length,
+  };
+}
