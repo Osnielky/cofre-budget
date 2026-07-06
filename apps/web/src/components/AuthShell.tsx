@@ -13,21 +13,7 @@ export const authInputStyle: React.CSSProperties = {
 export default function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative flex items-center justify-center min-h-dvh px-4 py-10 sm:py-14 overflow-x-hidden">
-      <div
-        aria-hidden="true"
-        className="absolute inset-0"
-        style={{
-          backgroundImage: [
-            'radial-gradient(120% 90% at 50% 50%, transparent 52%, rgba(4,8,16,0.60) 100%)',
-            'radial-gradient(720px 540px at 32% 42%, rgba(30,144,255,0.12), transparent 62%)',
-            'linear-gradient(180deg, rgba(5,9,18,0.38) 0%, rgba(5,9,18,0.16) 45%, rgba(5,9,18,0.68) 100%)',
-            'url(/login-bg.jpg)',
-          ].join(', '),
-          backgroundSize: 'cover',
-          backgroundPosition: 'center 68%',
-          backgroundAttachment: 'fixed',
-        }}
-      />
+      <div aria-hidden="true" className="auth-bg absolute inset-0" />
       <div className="relative w-full max-w-6xl flex items-center justify-center lg:justify-between gap-12 lg:pl-12 lg:pr-0">
 
         {/* Quote */}
