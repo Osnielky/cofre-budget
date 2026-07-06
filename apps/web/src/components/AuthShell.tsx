@@ -37,14 +37,16 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
           </span>
           <p style={{
             fontWeight: 700,
-            fontSize: 'clamp(38px, 4vw, 56px)',
+            fontSize: ‘clamp(38px, 4vw, 56px)’,
             lineHeight: 1.16,
-            letterSpacing: '-0.015em',
-            background: 'linear-gradient(115deg, #9CC7FF 0%, #4DA6FF 40%, #1E90FF 70%, #A855F7 100%)',
-            WebkitBackgroundClip: 'text',
-            backgroundClip: 'text',
-            color: 'transparent',
-            textShadow: '0 0 60px rgba(30,144,255,0.20)',
+            letterSpacing: ‘-0.015em’,
+            fontStyle: ‘italic’,
+            fontFamily: ‘Georgia, “Times New Roman”, serif’,
+            background: ‘linear-gradient(115deg, #F5C842 0%, #FFD700 40%, #E6A817 70%, #F5C842 100%)’,
+            WebkitBackgroundClip: ‘text’,
+            backgroundClip: ‘text’,
+            color: ‘transparent’,
+            textShadow: ‘0 0 60px rgba(245,200,66,0.20)’,
           }}>
             “If you can’t measure it, you can’t improve it.”
           </p>
