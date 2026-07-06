@@ -42,11 +42,11 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
             letterSpacing: '-0.015em',
             fontStyle: 'italic',
             fontFamily: 'Georgia, serif',
-            background: 'linear-gradient(115deg, #F5C842 0%, #FFD700 40%, #E6A817 70%, #F5C842 100%)',
+            background: 'linear-gradient(160deg, #BF953F 0%, #FCF6BA 22%, #B38728 45%, #FBF5B7 60%, #AA771C 78%, #E8C84A 100%)',
             WebkitBackgroundClip: 'text',
             backgroundClip: 'text',
             color: 'transparent',
-            textShadow: '0 0 60px rgba(245,200,66,0.20)',
+            filter: 'drop-shadow(0 2px 12px rgba(184,134,11,0.55))',
           }}>
             "If you can't measure it, you can't improve it."
           </p>
