@@ -3,13 +3,17 @@
 import { useState, FormEvent, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import AuthShell, { authInputStyle } from '@/components/AuthShell';
+import AuthShell from '@/components/AuthShell';
 import { useUser } from '@/components/UserProvider';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-const labelCls = 'text-[10.5px] font-semibold uppercase';
-const labelStyle: React.CSSProperties = { color: 'rgba(221,184,119,0.85)', letterSpacing: '0.22em' };
+const fieldStyle: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.05)',
+  border: '1px solid rgba(255,255,255,0.13)',
+  borderRadius: 14,
+  color: '#F2F1EA',
+};
 
 function LoginInner() {
   const router = useRouter();
@@ -17,6 +21,7 @@ function LoginInner() {
   const { refetch } = useUser();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const [unverified, setUnverified] = useState(false);
   const [pendingEmail, setPendingEmail] = useState('');
   const [resent, setResent] = useState(false);
@@ -74,18 +79,50 @@ function LoginInner() {
         </p>
       )}
 
-      <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5" suppressHydrationWarning>
-        <label className="flex flex-col gap-2">
-          <span className={labelCls} style={labelStyle}>Email</span>
-          <input name="email" type="email" required autoComplete="email" placeholder="you@example.com"
-            className="px-4 py-3 text-sm outline-none transition-colors" style={authInputStyle} />
+      <div className="w-full mb-6">
+        <h2 className="text-[19px] font-bold" style={{ color: '#F2F1EA' }}>Welcome back</h2>
+        <p className="mt-1 text-[13px]" style={{ color: 'rgba(242,241,234,0.55)' }}>
+          Sign in to manage your money with clarity.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4" suppressHydrationWarning>
+        <label className="relative block">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'rgba(242,241,234,0.45)' }}>
+            <MailIcon />
+          </span>
+          <input name="email" type="email" required autoComplete="email" placeholder="Email address"
+            aria-label="Email address"
+            className="w-full pl-12 pr-4 py-3.5 text-sm outline-none transition-colors placeholder:text-[rgba(242,241,234,0.4)]"
+            style={fieldStyle} />
         </label>
 
-        <label className="flex flex-col gap-2">
-          <span className={labelCls} style={labelStyle}>Password</span>
-          <input name="password" type="password" required autoComplete="current-password" placeholder="••••••••"
-            className="px-4 py-3 text-sm outline-none transition-colors" style={authInputStyle} />
+        <label className="relative block">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: 'rgba(242,241,234,0.45)' }}>
+            <LockIcon />
+          </span>
+          <input name="password" type={showPw ? 'text' : 'password'} required autoComplete="current-password"
+            placeholder="Password" aria-label="Password"
+            className="w-full pl-12 pr-12 py-3.5 text-sm outline-none transition-colors placeholder:text-[rgba(242,241,234,0.4)]"
+            style={fieldStyle} />
+          <button type="button" onClick={() => setShowPw(v => !v)}
+            aria-label={showPw ? 'Hide password' : 'Show password'}
+            className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer transition-colors hover:opacity-80"
+            style={{ color: 'rgba(242,241,234,0.45)' }}>
+            {showPw ? <EyeOffIcon /> : <EyeIcon />}
+          </button>
         </label>
+
+        <div className="flex items-center justify-between text-[12.5px]">
+          <label className="flex items-center gap-2 cursor-pointer select-none" style={{ color: 'rgba(242,241,234,0.7)' }}>
+            <input type="checkbox" name="remember" className="w-4 h-4 rounded cursor-pointer"
+              style={{ accentColor: '#1E90FF' }} />
+            Remember me
+          </label>
+          <Link href="/forgot-password" className="no-underline hover:underline" style={{ color: '#4DA6FF' }}>
+            Forgot password?
+          </Link>
+        </div>
 
         {error && <p className="text-sm text-center" style={{ color: 'var(--color-rose)' }}>{error}</p>}
 
@@ -94,34 +131,36 @@ function LoginInner() {
             <span>Please verify your email before signing in.</span>
             {resent
               ? <span style={{ color: 'var(--color-green)' }}>New link sent — check your inbox.</span>
-              : <button type="button" onClick={resend} className="underline cursor-pointer" style={{ color: 'rgba(221,184,119,0.95)' }}>Resend verification email</button>}
+              : <button type="button" onClick={resend} className="underline cursor-pointer" style={{ color: '#4DA6FF' }}>Resend verification email</button>}
           </div>
         )}
 
         <button type="submit" disabled={loading}
-          className="btn-gold mt-2 py-4 rounded-full text-[12.5px] font-semibold uppercase transition-all disabled:opacity-60 cursor-pointer"
-          style={{ letterSpacing: '0.18em' }}>
-          {loading ? 'Signing in…' : 'Sign in'}
+          className="btn-gold mt-1 py-3.5 text-[15px] font-semibold transition-all disabled:opacity-60 cursor-pointer"
+          style={{ borderRadius: 14 }}>
+          {loading ? 'Signing in…' : 'Sign In'}
         </button>
       </form>
 
-      <div className="w-full flex items-center justify-between mt-4 text-[12px]">
-        <Link href="/signup" className="no-underline hover:underline" style={{ color: 'rgba(221,184,119,0.9)' }}>Create account</Link>
-        <Link href="/forgot-password" className="no-underline hover:underline" style={{ color: 'rgba(242,241,234,0.6)' }}>Forgot password?</Link>
-      </div>
-
       <div className="w-full flex items-center gap-4 my-6">
         <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.12)' }} />
-        <span className="text-[10px] uppercase" style={{ color: 'rgba(242,241,234,0.45)', letterSpacing: '0.28em' }}>or</span>
+        <span className="text-[12px]" style={{ color: 'rgba(242,241,234,0.5)' }}>or continue with</span>
         <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.12)' }} />
       </div>
 
       <a href={`${API}/auth/google`}
-        className="w-full flex items-center justify-center gap-3 py-4 rounded-full text-[12.5px] font-semibold uppercase no-underline transition-all hover:brightness-125"
-        style={{ letterSpacing: '0.14em', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.14)', color: '#F2F1EA' }}>
+        className="w-full flex items-center justify-center gap-3 py-3.5 text-[14.5px] font-semibold no-underline transition-all hover:brightness-125"
+        style={{ borderRadius: 14, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.14)', color: '#F2F1EA' }}>
         <GoogleIcon />
         Continue with Google
       </a>
+
+      <p className="mt-7 text-[13px]" style={{ color: 'rgba(242,241,234,0.55)' }}>
+        New here?{' '}
+        <Link href="/signup" className="no-underline hover:underline font-semibold" style={{ color: '#4DA6FF' }}>
+          Create account
+        </Link>
+      </p>
     </>
   );
 }
@@ -133,6 +172,43 @@ export default function LoginPage() {
         <LoginInner />
       </Suspense>
     </AuthShell>
+  );
+}
+
+function MailIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="4" width="20" height="16" rx="3" />
+      <path d="M2 7l9.1 6.1a2 2 0 0 0 2.2 0L22 7" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="11" width="16" height="10" rx="2.5" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3.5 8 10 8a9.74 9.74 0 0 0 5.39-1.61" />
+      <line x1="2" y1="2" x2="22" y2="22" />
+    </svg>
   );
 }
 
