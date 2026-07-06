@@ -41,7 +41,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
             lineHeight: 1.16,
             letterSpacing: ‘-0.015em’,
             fontStyle: ‘italic’,
-            fontFamily: ‘Georgia, “Times New Roman”, serif’,
+            fontFamily: ‘Georgia, serif’,
             background: ‘linear-gradient(115deg, #F5C842 0%, #FFD700 40%, #E6A817 70%, #F5C842 100%)’,
             WebkitBackgroundClip: ‘text’,
             backgroundClip: ‘text’,
