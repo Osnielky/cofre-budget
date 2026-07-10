@@ -4,12 +4,16 @@ import { useState, useEffect } from 'react';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-const PRESET_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0'];
+const PRESET_COLORS = [
+  '#818CF8', '#A855F7', '#D946EF', '#E879A0', '#F43F5E', '#EF4444', '#F97316',
+  '#F5C842', '#A3E635', '#22C55E', '#2DD4BF', '#38BDF8', '#3B82F6', '#94A3B8',
+];
 
 const PROJECT_TYPES = [
   { value: 'vehicle',  label: 'Vehicle',  icon: '🚗', accent: 'var(--color-sky)' },
   { value: 'property', label: 'Property', icon: '🏠', accent: 'var(--color-green)' },
   { value: 'business', label: 'Business', icon: '💼', accent: 'var(--color-primary)' },
+  { value: 'trading',  label: 'Trading',  icon: '📈', accent: 'var(--color-violet)' },
   { value: 'other',    label: 'Other',    icon: '📦', accent: 'var(--color-orange)' },
 ];
 
@@ -170,7 +174,7 @@ export default function ProjectCategoryManager() {
                       Inc
                     </button>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="grid grid-cols-7 gap-1 shrink-0">
                     {PRESET_COLORS.map((c) => (
                       <button key={c} type="button" onClick={() => setEditForm((f) => ({ ...f, color: c }))}
                         className="w-4 h-4 rounded-full transition-transform hover:scale-110"
@@ -245,7 +249,7 @@ export default function ProjectCategoryManager() {
                 Inc
               </button>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="grid grid-cols-7 gap-1 shrink-0">
               {PRESET_COLORS.map((c) => (
                 <button key={c} type="button" onClick={() => setAddForm((f) => ({ ...f, color: c }))}
                   className="w-4 h-4 rounded-full transition-transform hover:scale-110"
