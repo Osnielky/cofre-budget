@@ -16,6 +16,25 @@ interface DebtDetail extends Debt { payments: Payment[] }
 
 function fmt(n: number) { return Math.abs(Number(n)).toLocaleString('en-US', { minimumFractionDigits: 2 }); }
 function today() { return new Date().toISOString().slice(0, 10); }
+function fmtDate(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/* People-first: each person gets a stable avatar color derived from their name */
+const AVATAR_COLORS = [
+  'var(--color-card-violet)', 'var(--color-card-green)', 'var(--color-card-orange)',
+  'var(--color-card-amber)', 'var(--color-card-sky)', 'var(--color-rose)',
+];
+function avatarColor(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[h % AVATAR_COLORS.length];
+}
+function initials(name: string) {
+  return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') || '?';
+}
 
 export default function DebtsPage() {
   const [debts, setDebts] = useState<Debt[]>([]);
@@ -114,6 +133,8 @@ export default function DebtsPage() {
     load();
   }
 
+  const inputStyle: React.CSSProperties = { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' };
+
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
@@ -123,12 +144,14 @@ export default function DebtsPage() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <h1 className="text-xl font-bold tracking-tight">Debts</h1>
-              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Track money you lend and owe</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                Money lent to friends &amp; family — a ledger you keep by hand
+              </p>
             </div>
             <button onClick={() => setShowForm(true)}
               className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5"
               style={{ background: 'var(--color-card-violet)' }}>
-              <span className="text-base leading-none">+</span> Add Debt
+              <span className="text-base leading-none">+</span> Record a Loan
             </button>
           </div>
           <div className="flex gap-1 p-1 rounded-xl self-start" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
@@ -140,13 +163,31 @@ export default function DebtsPage() {
                   color: activeTab === tab ? 'var(--color-card-violet)' : 'var(--color-text-muted)',
                   border: activeTab === tab ? '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)' : '1px solid transparent',
                 }}>
-                {tab === 'lent' ? 'I Lent' : 'I Owe'}
+                {tab === 'lent' ? `I Lent (${lentDebts.length})` : `I Owe (${owedDebts.length})`}
               </button>
             ))}
           </div>
         </div>
 
         <div className="p-6 flex flex-col gap-5">
+
+          {/* ── What this page is for ── */}
+          <div className="flex items-start gap-3.5 px-4 py-3.5 rounded-2xl"
+            style={{
+              background: 'color-mix(in srgb, var(--color-card-violet) 8%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--color-card-violet) 25%, transparent)',
+            }}>
+            <span className="text-2xl leading-none mt-0.5">🤝</span>
+            <div>
+              <p className="text-sm font-bold" style={{ color: 'var(--color-card-violet)' }}>Personal loans, recorded by you</p>
+              <p className="text-xs mt-1 leading-relaxed max-w-2xl" style={{ color: 'var(--color-text-secondary)' }}>
+                This ledger is for money you lend to friends and family — or borrow from them.
+                Nothing here syncs from your bank: record each loan when it happens and log every
+                repayment as it arrives. Cofre keeps the running balance and can email receipts.
+              </p>
+            </div>
+          </div>
+
           {!loading && debts.length > 0 && (
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
               {(activeTab === 'lent' ? [
@@ -175,27 +216,45 @@ export default function DebtsPage() {
             <div className="py-16 flex flex-col items-center gap-4 text-center rounded-2xl" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
               <span className="text-5xl opacity-30">🤝</span>
               <div>
-                <p className="font-semibold text-base">No debts tracked</p>
-                <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="font-semibold text-base">
+                  {activeTab === 'lent' ? 'No loans recorded yet' : 'Nothing borrowed on record'}
+                </p>
+                <p className="text-sm mt-1 max-w-md px-4" style={{ color: 'var(--color-text-muted)' }}>
                   {activeTab === 'lent'
-                    ? 'Record money you lent so you can track repayments.'
-                    : 'Record money you owe so you can track payments.'}
+                    ? 'Lent money to a friend or family member? Record it here, then log each repayment as it arrives — the balance updates itself.'
+                    : 'Borrowed from someone you trust? Record it here and log what you pay back, so you always know where you stand.'}
                 </p>
               </div>
-              <button onClick={() => setShowForm(true)} className="mt-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl hover:brightness-110" style={{ background: 'var(--color-card-violet)' }}>+ Add Your First Debt</button>
+              <button onClick={() => setShowForm(true)} className="mt-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl hover:brightness-110" style={{ background: 'var(--color-card-violet)' }}>+ Record a Loan</button>
             </div>
           ) : (
             <div className="flex flex-col gap-3">
               {tabDebts.map(d => {
                 const open = openId === d.id;
                 const pct = Math.min(d.percentage, 100);
+                const ac = avatarColor(d.borrowerName);
+                const overdue = d.status === 'open' && !!d.dueDate && d.dueDate < today();
                 return (
                   <div key={d.id} className="rounded-2xl overflow-hidden transition-all"
-                    style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
+                    style={{
+                      background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
+                      border: '1px solid var(--color-border)', borderLeft: `3px solid ${ac}`,
+                    }}>
                     <div role="button" tabIndex={0} className="w-full text-left p-5 cursor-pointer"
                       onClick={() => setOpenId(open ? null : d.id)}
                       onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setOpenId(open ? null : d.id); } }}>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
+
+                        {/* Person avatar */}
+                        <div className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+                          style={{
+                            background: `color-mix(in srgb, ${ac} 20%, transparent)`,
+                            border: `1px solid color-mix(in srgb, ${ac} 40%, transparent)`,
+                            color: ac,
+                          }}>
+                          {initials(d.borrowerName)}
+                        </div>
+
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-semibold text-sm">{d.borrowerName}</p>
@@ -205,41 +264,64 @@ export default function DebtsPage() {
                                 : { background: 'color-mix(in srgb, var(--color-amber) 15%, transparent)', color: 'var(--color-amber)' }}>
                               {d.status === 'paid' ? 'PAID' : 'OPEN'}
                             </span>
+                            {overdue && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                                style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)' }}>
+                                OVERDUE
+                              </span>
+                            )}
                           </div>
-                          {(d.startDate || d.dueDate) && (
-                            <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                              {d.startDate ? `${d.direction === 'owed' ? 'Borrowed' : 'Lent'} ${d.startDate}` : ''}{d.startDate && d.dueDate ? ' · ' : ''}{d.dueDate ? `due ${d.dueDate}` : ''}
-                            </p>
-                          )}
-                          <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
-                            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: 'var(--color-green)' }} />
+                          <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
+                            {d.description ? `${d.description} · ` : ''}
+                            {d.startDate ? `${d.direction === 'owed' ? 'Borrowed' : 'Lent'} ${fmtDate(d.startDate)}` : ''}
+                            {d.startDate && d.dueDate ? ' · ' : ''}
+                            {d.dueDate ? `due ${fmtDate(d.dueDate)}` : ''}
+                          </p>
+                          <div className="flex items-center gap-3 mt-2.5">
+                            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: 'var(--color-green)' }} />
+                            </div>
+                            <span className="text-[10px] font-semibold tabular-nums shrink-0" style={{ color: 'var(--color-green)' }}>
+                              {d.direction === 'owed' ? 'paid back' : 'repaid'} ${fmt(d.paid)} · {Math.round(pct)}%
+                            </span>
                           </div>
                         </div>
+
                         <div className="text-right shrink-0">
                           <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Remaining</p>
                           <p className="text-lg font-extrabold tabular-nums" style={{ color: d.remaining > 0 ? 'var(--color-orange)' : 'var(--color-green)' }}>${fmt(d.remaining)}</p>
                           <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>of ${fmt(d.principal)}</p>
                         </div>
+                        <span className={`shrink-0 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+                          style={{ color: 'var(--color-text-muted)' }}>▾</span>
                       </div>
                     </div>
 
                     {open && detail && detail.id === d.id && (
                       <div className="px-5 pb-5 flex flex-col gap-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-                        <form onSubmit={recordPayment} className="flex flex-wrap items-end gap-2 pt-4">
+                        <form onSubmit={recordPayment} className="flex flex-wrap items-end gap-2.5 pt-4">
                           <div className="flex flex-col gap-1">
                             <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                              {d.direction === 'owed' ? 'Amount paid back' : 'Payment'}
+                              {d.direction === 'owed' ? 'Amount paid back' : 'Repayment received'}
                             </span>
                             <input required type="number" step="0.01" min="0.01" placeholder="0.00" value={pay.amount}
                               onChange={e => setPay(p => ({ ...p, amount: e.target.value }))}
-                              className="w-28 px-3 py-2 text-sm rounded-xl outline-none" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
+                              className="w-28 px-3 py-2 text-sm rounded-xl outline-none" style={inputStyle} />
                           </div>
                           <div className="flex flex-col gap-1">
                             <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Date</span>
                             <input type="date" value={pay.date} onChange={e => setPay(p => ({ ...p, date: e.target.value }))}
-                              className="px-3 py-2 text-sm rounded-xl outline-none" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
+                              className="px-3 py-2 text-sm rounded-xl outline-none" style={inputStyle} />
                           </div>
-                          <button type="submit" className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110" style={{ background: 'var(--color-green)' }}>Record</button>
+                          <div className="flex flex-col gap-1 flex-1 min-w-32">
+                            <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Note (optional)</span>
+                            <input value={pay.note} onChange={e => setPay(p => ({ ...p, note: e.target.value }))}
+                              placeholder="e.g. Zelle, cash"
+                              className="px-3 py-2 text-sm rounded-xl outline-none w-full" style={inputStyle} />
+                          </div>
+                          <button type="submit" className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110" style={{ background: 'var(--color-green)' }}>
+                            {d.direction === 'owed' ? 'Record payment' : 'Record repayment'}
+                          </button>
                           <label className="flex items-center gap-1.5 text-[11px]" style={{ color: d.borrowerEmail ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
                             <input type="checkbox" checked={pay.emailReceipt && !!d.borrowerEmail} disabled={!d.borrowerEmail}
                               onChange={e => setPay(p => ({ ...p, emailReceipt: e.target.checked }))} />
@@ -251,7 +333,7 @@ export default function DebtsPage() {
                           {confirmDeleteId === d.id ? (
                             <span className="flex items-center gap-1.5">
                               <span className="text-[11px]" style={{ color: 'var(--color-rose)' }}>
-                                Delete debt &amp; its payments?{(() => {
+                                Delete this record &amp; its payments?{(() => {
                                   const n = detail.payments.filter((p) => p.transactionId).length;
                                   return n > 0 ? ` ${n} linked transaction${n > 1 ? 's' : ''} will be kept as income.` : '';
                                 })()}
@@ -267,12 +349,17 @@ export default function DebtsPage() {
                         </form>
 
                         {detail.payments.length === 0 ? (
-                          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No payments yet.</p>
+                          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                            No repayments logged yet — record each one above as it arrives.
+                          </p>
                         ) : (
                           <div className="flex flex-col gap-1.5">
+                            <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
+                              Repayment history · {detail.payments.length}
+                            </p>
                             {detail.payments.map(p => (
                               <div key={p.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg" style={{ background: 'var(--color-elevated)' }}>
-                                <span style={{ color: 'var(--color-text-muted)' }}>{p.date}{p.note ? ` · ${p.note}` : ''}</span>
+                                <span style={{ color: 'var(--color-text-muted)' }}>{fmtDate(p.date)}{p.note ? ` · ${p.note}` : ''}</span>
                                 <span className="flex items-center gap-3">
                                   <span className="font-bold tabular-nums" style={{ color: d.direction === 'owed' ? 'var(--color-orange)' : 'var(--color-green)' }}>
                                     {d.direction === 'owed' ? '−' : '+'}${fmt(p.amount)}
@@ -304,10 +391,15 @@ export default function DebtsPage() {
             onMouseDown={e => { if (e.target === e.currentTarget) { setShowForm(false); resetForm(); } }}>
             <form onSubmit={createDebt} className="w-full max-w-sm flex flex-col rounded-2xl"
               style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)' }}>
-              <div className="px-5 py-4 flex items-center justify-between rounded-t-2xl" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <p className="font-bold text-sm">New Debt</p>
-                <button type="button" onClick={() => { setShowForm(false); resetForm(); }}
-                  className="w-8 h-8 rounded-lg hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-text-muted)' }}>✕</button>
+              <div className="px-5 py-4 flex flex-col gap-0.5 rounded-t-2xl" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                <div className="flex items-center justify-between">
+                  <p className="font-bold text-sm">Record a Loan</p>
+                  <button type="button" onClick={() => { setShowForm(false); resetForm(); }}
+                    className="w-8 h-8 rounded-lg hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-text-muted)' }}>✕</button>
+                </div>
+                <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                  A personal record between you and someone you trust — you&apos;ll log repayments yourself.
+                </p>
               </div>
               <div className="flex flex-col gap-3 px-5 py-4">
                 {/* Direction toggle */}
@@ -326,8 +418,8 @@ export default function DebtsPage() {
                 </div>
                 {/* Fields with direction-aware labels */}
                 {([
-                  ['borrowerName', formDir === 'lent' ? 'Borrower name' : 'Lender name', 'text', true],
-                  ['borrowerEmail', 'Email (optional)', 'email', false],
+                  ['borrowerName', formDir === 'lent' ? 'Who you lent to' : 'Who you borrowed from', 'text', true],
+                  ['borrowerEmail', 'Their email (optional, for receipts)', 'email', false],
                   ['principal', formDir === 'lent' ? 'Amount lent' : 'Amount owed', 'number', true],
                   ['description', 'Note (optional)', 'text', false],
                   ['startDate', formDir === 'lent' ? 'Date lent' : 'Date borrowed', 'date', false],
@@ -348,7 +440,7 @@ export default function DebtsPage() {
                   style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
                 <button type="submit" disabled={saving}
                   className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50"
-                  style={{ background: 'var(--color-card-violet)' }}>{saving ? 'Saving…' : 'Create'}</button>
+                  style={{ background: 'var(--color-card-violet)' }}>{saving ? 'Saving…' : 'Save record'}</button>
               </div>
             </form>
           </div>,
