@@ -13,7 +13,7 @@ export default function CashFlowTrendPanel({ data, loading }: { data: TrendPoint
   const th = makeChartTheme(tc);
   const empty = !loading && data.every((p) => p.income === 0 && p.expenses === 0);
   return (
-    <Panel title="Cash-Flow Trend" subtitle={`Last ${data.length} months`} loading={loading}
+    <Panel colSpan={2} title="Cash-Flow Trend" subtitle={`Last ${data.length} months`} loading={loading}
       legend={<Legend items={[
         { label: 'Income', color: tc.green, line: true },
         { label: 'Expenses', color: tc.orange, line: true },

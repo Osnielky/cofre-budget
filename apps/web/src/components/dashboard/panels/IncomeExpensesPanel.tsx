@@ -19,7 +19,7 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
   const net = +(income - expenses).toFixed(2);
   const empty = !loading && income === 0 && expenses === 0;
   return (
-    <Panel title="Income vs Expenses" subtitle={`${new Date().getFullYear()} · year to date`} loading={loading}
+    <Panel colSpan={2} title="Income vs Expenses" subtitle={`${new Date().getFullYear()} · year to date`} loading={loading}
       legend={<Legend items={[
         { label: 'Income', color: tc.green }, { label: 'Project income', color: tc.sky },
         { label: 'Expenses', color: tc.orange }, { label: 'Project expenses', color: tc.amber },
