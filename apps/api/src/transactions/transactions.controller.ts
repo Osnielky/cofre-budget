@@ -1,11 +1,15 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TransactionsService, CsvRow } from './transactions.service';
+import { ReceiptFinderService } from './receipt-finder.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('transactions')
 export class TransactionsController {
-  constructor(private service: TransactionsService) {}
+  constructor(
+    private service: TransactionsService,
+    private receiptFinder: ReceiptFinderService,
+  ) {}
 
   @Get('category-hints')
   getCategoryHints(@Request() req: any) {
@@ -112,6 +116,24 @@ export class TransactionsController {
     @Body() body: { note?: string | null },
   ) {
     return this.service.updateNote(id, req.user.id, body.note ?? null);
+  }
+
+  @Get(':id/receipt-candidates')
+  receiptCandidates(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Query('window') window?: string,
+  ) {
+    return this.receiptFinder.findCandidates(req.user.id, id, window ? parseInt(window) : 4);
+  }
+
+  @Patch(':id/receipt')
+  linkReceipt(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body('receiptId') receiptId: string | null,
+  ) {
+    return this.receiptFinder.linkReceipt(req.user.id, id, receiptId ?? null);
   }
 
   @Patch(':id/transfer-account')
