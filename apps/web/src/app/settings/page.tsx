@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment, FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { usePlaidLink } from 'react-plaid-link';
 import Sidebar from '@/components/Sidebar';
@@ -11,6 +11,7 @@ import AccountSettings from '@/components/AccountSettings';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import DataResetModal from '@/components/DataResetModal';
+import IntegrationsTab from '@/components/IntegrationsTab';
 import { useTheme } from '@/components/ThemeProvider';
 import { THEMES } from '@/lib/theme';
 import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
@@ -173,7 +174,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   },
   {
     id: 'data',
-    label: 'Data',
+    label: 'Data & Privacy',
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
@@ -392,19 +393,24 @@ export default function SettingsPage() {
 
           {/* Tab bar */}
           <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none' }}>
-          <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+          <div className="flex gap-1 p-1 rounded-xl w-full min-w-fit" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
             {TABS.map((tab) => (
-              <button key={tab.id}
-                onClick={() => tab.id === 'data' ? setShowResetModal(true) : setActiveTab(tab.id)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shrink-0 whitespace-nowrap"
-                style={tab.id === 'data'
-                  ? { color: 'var(--color-rose)', border: '1px solid rgba(255,80,80,0.28)', background: 'rgba(255,80,80,0.08)' }
-                  : activeTab === tab.id
-                    ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }
-                    : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
-                {tab.icon}
-                {tab.label}
-              </button>
+              <Fragment key={tab.id}>
+                {tab.id === 'data' && (
+                  <div className="ml-auto self-stretch my-1 w-px shrink-0" style={{ background: 'var(--color-border)' }} />
+                )}
+                <button
+                  onClick={() => tab.id === 'data' ? setShowResetModal(true) : setActiveTab(tab.id)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shrink-0 whitespace-nowrap"
+                  style={tab.id === 'data'
+                    ? { color: 'var(--color-rose)', border: '1px solid rgba(255,80,80,0.28)', background: 'rgba(255,80,80,0.08)' }
+                    : activeTab === tab.id
+                      ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }
+                      : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              </Fragment>
             ))}
           </div>
           </div>
@@ -835,44 +841,12 @@ export default function SettingsPage() {
 
           {/* ── INTEGRATIONS TAB ── */}
           {activeTab === 'integrations' && (
-            <div style={{ maxWidth: 520 }}>
-              <p className="text-sm mb-6" style={{ color: 'rgba(174,180,194,0.8)' }}>
-                Connect external services so Cofre can pull in additional information.
-              </p>
-              {/* Gmail card */}
-              <div className="rounded-2xl p-5 flex items-center justify-between gap-4"
-                style={{ background: 'rgba(35,35,47,0.5)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                    ✉️
-                  </div>
-                  <div>
-                    <p className="font-semibold text-sm" style={{ color: '#F2F1EA' }}>Gmail</p>
-                    {gmailLoading
-                      ? <p className="text-xs mt-0.5" style={{ color: '#6b7488' }}>Checking…</p>
-                      : gmailStatus?.connected
-                        ? <p className="text-xs mt-0.5" style={{ color: '#4FBF7F' }}>{gmailStatus.email}</p>
-                        : <p className="text-xs mt-0.5" style={{ color: '#6b7488' }}>Not connected</p>
-                    }
-                  </div>
-                </div>
-                {gmailStatus?.connected
-                  ? (
-                    <button onClick={handleGmailDisconnect}
-                      className="text-xs px-3 py-1.5 rounded-xl font-medium transition-opacity hover:opacity-70"
-                      style={{ background: 'rgba(255,80,80,0.12)', color: '#F07A7A', border: '1px solid rgba(255,80,80,0.2)' }}>
-                      Disconnect
-                    </button>
-                  ) : (
-                    <a href={`${API}/gmail/connect`}
-                      className="text-xs px-3 py-1.5 rounded-xl font-medium transition-opacity hover:opacity-70"
-                      style={{ background: 'rgba(155,109,255,0.15)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.25)', textDecoration: 'none' }}>
-                      Connect
-                    </a>
-                  )
-                }
-              </div>
-            </div>
+            <IntegrationsTab
+              status={gmailStatus}
+              loading={gmailLoading}
+              onDisconnect={handleGmailDisconnect}
+              onManageData={() => setShowResetModal(true)}
+            />
           )}
 
           {/* ── APPEARANCE TAB ── */}
