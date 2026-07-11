@@ -154,7 +154,7 @@ export default function DashboardPage() {
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
-        <div className="px-6 md:px-8 py-6 flex flex-col gap-4 max-w-[1800px]">
+        <div className="px-6 md:px-8 py-6 flex flex-col gap-4">
 
           {/* ── Topbar ── */}
           <div className="flex items-end justify-between gap-6 flex-wrap">
