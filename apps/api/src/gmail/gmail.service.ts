@@ -157,16 +157,20 @@ export class GmailService {
   }
 
   async fetchAndParseReceipts(userId: string): Promise<RawReceipt[]> {
+    const QUERY =
+      'from:(ship-confirm@amazon.com OR auto-confirm@amazon.com OR doordash.com OR ubereats.com OR order@walmart.com OR no-reply@apple.com OR noreply@doordash.com) newer_than:90d';
+    return this.searchReceipts(userId, QUERY, 50);
+  }
+
+  /** Search Gmail with an arbitrary query and parse each hit into a receipt. */
+  async searchReceipts(userId: string, query: string, maxResults = 10): Promise<RawReceipt[]> {
     const client = await this.getAuthorizedClient(userId);
     const gmail = google.gmail({ version: 'v1', auth: client });
 
-    const QUERY =
-      'from:(ship-confirm@amazon.com OR auto-confirm@amazon.com OR doordash.com OR ubereats.com OR order@walmart.com OR no-reply@apple.com OR noreply@doordash.com) newer_than:90d';
-
     const listRes = await gmail.users.messages.list({
       userId: 'me',
-      q: QUERY,
-      maxResults: 50,
+      q: query,
+      maxResults,
     });
 
     const messages = listRes.data.messages ?? [];
