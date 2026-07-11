@@ -19,16 +19,22 @@ interface Props {
   categories: Category[];
   onSave: (children: Transaction[]) => void;
   onClose: () => void;
+  /** Optional pre-seeded lines (e.g. from a linked receipt's items). Used as-is when ≥ 2 lines. */
+  initialLines?: SplitLine[];
 }
 
-export default function SplitTransactionModal({ tx, categories, onSave, onClose }: Props) {
+export default function SplitTransactionModal({ tx, categories, onSave, onClose, initialLines }: Props) {
   const absTotal = Math.abs(Number(tx.amount));
   const isExpense = Number(tx.amount) < 0;
 
-  const [lines, setLines] = useState<SplitLine[]>([
-    { categoryId: tx.categoryId ?? '', amount: absTotal.toFixed(2) },
-    { categoryId: '', amount: '' },
-  ]);
+  const [lines, setLines] = useState<SplitLine[]>(
+    initialLines && initialLines.length >= 2
+      ? initialLines
+      : [
+          { categoryId: tx.categoryId ?? '', amount: absTotal.toFixed(2) },
+          { categoryId: '', amount: '' },
+        ],
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [openPickerIdx, setOpenPickerIdx] = useState<number | null>(null);
