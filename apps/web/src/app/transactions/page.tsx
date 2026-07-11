@@ -10,6 +10,7 @@ import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiability } from '@/lib/accountTypes';
 import SplitTransactionModal from '@/components/SplitTransactionModal';
+import FindReceiptModal from '@/components/FindReceiptModal';
 import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
 import { buildRecurringMap } from './recurring';
 
@@ -33,6 +34,7 @@ interface Transaction {
   parentId: string | null;
   isSplitParent: boolean;
   note: string | null;
+  receiptId: string | null;
 }
 interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid'; direction: 'lent' | 'owed' }
 
@@ -134,6 +136,8 @@ export default function TransactionsPage() {
   const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
   const [debts, setDebts] = useState<DebtLite[]>([]);
   const [splitTx, setSplitTx] = useState<Transaction | null>(null);
+  const [receiptTx, setReceiptTx] = useState<Transaction | null>(null);
+  const [splitInitialLines, setSplitInitialLines] = useState<{ categoryId: string; amount: string }[] | null>(null);
   const [selectedTx, setSelectedTx]       = useState<Transaction | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionStore>({});
 
@@ -1842,6 +1846,18 @@ export default function TransactionsPage() {
                             )}
                           </div>
 
+                          {/* Find receipt in email */}
+                          {!tx.isSplitParent && (
+                            <button
+                              onClick={() => setReceiptTx(tx)}
+                              className={`${tx.receiptId ? '' : 'opacity-0 group-hover:opacity-100'} flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110 shrink-0`}
+                              style={{ background: 'color-mix(in srgb, var(--color-violet) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-violet) 25%, transparent)', color: 'var(--color-violet)' }}
+                              title={tx.receiptId ? 'View linked receipt' : 'Find receipt in email'}
+                            >
+                              ✉ {tx.receiptId ? 'Receipt ✓' : 'Receipt'}
+                            </button>
+                          )}
+
                           {/* Split / Unsplit */}
                           {!tx.debtId && !txIsTransfer && (
                             tx.parentId ? (
@@ -1992,11 +2008,27 @@ export default function TransactionsPage() {
           <SplitTransactionModal
             tx={splitTx}
             categories={categories}
+            initialLines={splitInitialLines ?? undefined}
             onSave={() => {
               loadTransactions();
               setSplitTx(null);
+              setSplitInitialLines(null);
             }}
-            onClose={() => setSplitTx(null)}
+            onClose={() => { setSplitTx(null); setSplitInitialLines(null); }}
+          />
+        )}
+
+        {/* Find receipt modal */}
+        {receiptTx && (
+          <FindReceiptModal
+            tx={receiptTx}
+            onLinked={() => { loadTransactions(); setReceiptTx(null); }}
+            onSplitFromItems={(lines) => {
+              setSplitInitialLines(lines);
+              setSplitTx(receiptTx);
+              setReceiptTx(null);
+            }}
+            onClose={() => setReceiptTx(null)}
           />
         )}
 
