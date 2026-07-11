@@ -86,6 +86,15 @@ const DEFAULT_CATEGORIES: Record<string, { name: string; icon: string; color: st
     { name: 'Supplies',        icon: '📦', color: '#4BA8D8', type: 'expense' },
     { name: 'Legal & Fees',    icon: '⚖️', color: '#5C5C78', type: 'expense' },
   ],
+  trading: [
+    { name: 'Trade Profits',      icon: '📈', color: '#4FBF7F', type: 'income'  },
+    { name: 'Prop Firm Payouts',  icon: '💵', color: '#4FBF7F', type: 'income'  },
+    { name: 'Trade Losses',       icon: '📉', color: '#F07A3E', type: 'expense' },
+    { name: 'Commissions & Fees', icon: '🧾', color: '#F5C842', type: 'expense' },
+    { name: 'Platform & Data',    icon: '💻', color: '#9B6DFF', type: 'expense' },
+    { name: 'Prop Firm Evals',    icon: '🏦', color: '#4BA8D8', type: 'expense' },
+    { name: 'Education & Tools',  icon: '📚', color: '#E879A0', type: 'expense' },
+  ],
   other: [
     { name: 'Materials',  icon: '📦', color: '#F07A3E', type: 'expense' },
     { name: 'Labor',      icon: '👷', color: '#F5C842', type: 'expense' },

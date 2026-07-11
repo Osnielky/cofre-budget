@@ -10,13 +10,17 @@ import Sidebar from '@/components/Sidebar';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-const PRESET_COLORS = ['#818CF8', '#22C55E', '#F97316', '#F5C842', '#38BDF8', '#F43F5E', '#E879A0'];
+const PRESET_COLORS = [
+  '#818CF8', '#A855F7', '#D946EF', '#E879A0', '#F43F5E', '#EF4444', '#F97316',
+  '#F5C842', '#A3E635', '#22C55E', '#2DD4BF', '#38BDF8', '#3B82F6', '#94A3B8',
+];
 
 const PROJECT_TYPES: { value: string; label: string; icon: string; placeholder: string; hint: string }[] = [
   { value: 'vehicle',  label: 'Vehicle',  icon: '🚗', placeholder: 'e.g. 2019 Honda Civic',      hint: 'Flip, fix or track a vehicle' },
   { value: 'property', label: 'Property', icon: '🏠', placeholder: 'e.g. Miami Rental Property', hint: 'Real estate & rentals' },
   { value: 'business', label: 'Business', icon: '💼', placeholder: 'e.g. Coffee Shop',           hint: 'Product-based business' },
   { value: 'service',  label: 'Business', icon: '💼', placeholder: 'e.g. Uber, Consulting, Freelance', hint: 'Service-based business' },
+  { value: 'trading',  label: 'Trading',  icon: '📈', placeholder: 'e.g. NQ Futures Account',    hint: 'Trading records only' },
   { value: 'other',    label: 'Other',    icon: '📦', placeholder: 'e.g. Camera Collection',     hint: 'Any investment or project' },
 ];
 
@@ -24,6 +28,7 @@ const MAIN_TYPES = [
   { value: 'vehicle',  label: 'Vehicle',  icon: '🚗' },
   { value: 'property', label: 'Property', icon: '🏠' },
   { value: 'business', label: 'Business', icon: '💼' },
+  { value: 'trading',  label: 'Trading',  icon: '📈' },
   { value: 'other',    label: 'Other',    icon: '📦' },
 ];
 
@@ -205,6 +210,29 @@ export default function ProjectsPage() {
         body: JSON.stringify({ projectCategoryId: pendingCatId || null }),
       });
       setAllTx((prev) => prev.map((t) => t.id === pendingLinkTx.id ? { ...t, projectId, projectCategoryId: pendingCatId || null } : t));
+      await loadDetail(projectId);
+      setPendingLinkTx(null); setPendingCatId('');
+    } finally { setLinking(false); }
+  }
+
+  /* Link + designate as the project's purchase/deposit tx — replaces the manual estimate */
+  async function confirmLinkAsPurchase(projectId: string) {
+    if (!pendingLinkTx) return;
+    setLinking(true);
+    try {
+      await fetch(`${API}/projects/${projectId}/link/${pendingLinkTx.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ projectCategoryId: null }),
+      });
+      await fetch(`${API}/projects/${projectId}/purchase-tx`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ transactionId: pendingLinkTx.id }),
+      });
+      setAllTx((prev) => prev.map((t) => t.id === pendingLinkTx.id ? { ...t, projectId, projectCategoryId: null } : t));
       await loadDetail(projectId);
       setPendingLinkTx(null); setPendingCatId('');
     } finally { setLinking(false); }
@@ -393,7 +421,7 @@ export default function ProjectsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Projects &amp; Assets</h1>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              Track cost basis and P&amp;L — cars, property, businesses.
+              Track cost basis and P&amp;L — cars, property, businesses, trading accounts.
             </p>
           </div>
           <button onClick={openCreate}
@@ -527,6 +555,12 @@ export default function ProjectsPage() {
                             : { background: 'color-mix(in srgb, var(--color-amber) 16%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 40%, transparent)' }}>
                           {sold ? '✓ Sold' : '● Active'}
                         </span>
+                        {sel.type === 'trading' && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+                            style={{ background: 'color-mix(in srgb, var(--color-violet) 14%, transparent)', color: 'var(--color-violet)', border: '1px solid color-mix(in srgb, var(--color-violet) 35%, transparent)' }}>
+                            📈 Trading records only
+                          </span>
+                        )}
                       </div>
                       {sel.description && (
                         <p className="text-xs mt-1 truncate" style={{ color: 'var(--color-text-secondary)' }}>{sel.description}</p>
@@ -560,7 +594,7 @@ export default function ProjectsPage() {
                     {/* P&L breakdown */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {[
-                        { label: 'Purchase Price', value: `$${Number(sel.purchasePrice).toFixed(2)}`, clr: 'var(--color-text-secondary)' },
+                        { label: sel.type === 'trading' ? 'Initial Deposit' : 'Purchase Price', value: `$${Number(sel.purchasePrice).toFixed(2)}`, clr: 'var(--color-text-secondary)' },
                         { label: 'Expenses',       value: `-$${sel.expenses.toFixed(2)}`,             clr: '#F07A3E' },
                         { label: 'Income',         value: `+$${sel.income.toFixed(2)}`,               clr: '#4FBF7F' },
                         sold && sel.salePrice != null
@@ -794,7 +828,7 @@ export default function ProjectsPage() {
                             style={inputStyle} maxLength={2} placeholder="📦" />
                           <input required value={catForm.name} onChange={(e) => setCatForm((f) => ({ ...f, name: e.target.value }))}
                             className="flex-1 px-2 py-1.5 text-xs outline-none rounded-lg" style={inputStyle} placeholder="Category name…" />
-                          <div className="flex items-center gap-1">
+                          <div className="grid grid-cols-7 gap-1 shrink-0">
                             {PRESET_COLORS.map((c) => (
                               <button key={c} type="button" onClick={() => setCatForm((f) => ({ ...f, color: c }))}
                                 className="w-4 h-4 rounded-full transition-transform hover:scale-110"
@@ -981,7 +1015,7 @@ export default function ProjectsPage() {
                 {/* ── Type selector ── */}
                 <div className="flex flex-col gap-2.5">
                   <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>Type</span>
-                  <div className="grid grid-cols-4 gap-2.5">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
                     {MAIN_TYPES.map((t) => {
                       const active = form.type === t.value || (t.value === 'business' && form.type === 'service');
                       return (
@@ -1022,6 +1056,22 @@ export default function ProjectsPage() {
                       ))}
                     </div>
                   )}
+                  {/* Trading-only notice */}
+                  {form.type === 'trading' && (
+                    <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl"
+                      style={{
+                        background: 'color-mix(in srgb, var(--color-violet) 10%, transparent)',
+                        border: '1px solid color-mix(in srgb, var(--color-violet) 30%, transparent)',
+                      }}>
+                      <span className="text-base leading-none mt-0.5">📈</span>
+                      <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                        <strong style={{ color: 'var(--color-violet)' }}>Trading records only.</strong>{' '}
+                        Use this project exclusively for your trading activity — profits, losses,
+                        commissions, platform fees and payouts. Your everyday income and expenses
+                        stay in the regular budget.
+                      </p>
+                    </div>
+                  )}
                   {!editing && (
                     <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
                       Categories will be pre-filled based on type.
@@ -1056,7 +1106,8 @@ export default function ProjectsPage() {
                   {form.type !== 'service' && (
                     <div className="flex flex-col gap-2">
                       <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-                        {form.type === 'property' || form.type === 'vehicle' ? 'Purchase Price' : 'Initial Investment'}
+                        {form.type === 'trading' ? 'Initial Deposit'
+                          : form.type === 'property' || form.type === 'vehicle' ? 'Purchase Price' : 'Initial Investment'}
                       </span>
                       <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid color-mix(in srgb, var(--color-text-primary) 14%, transparent)' }}>
                         <span className="flex items-center px-3 text-sm font-semibold shrink-0"
@@ -1067,8 +1118,13 @@ export default function ProjectsPage() {
                           style={{ background: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)', color: 'var(--color-text-primary)' }} />
                       </div>
                       <p className="text-[10px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
-                        💡 Use <strong style={{ color: 'var(--color-text-secondary)' }}>one method only</strong> to avoid double-counting:{' '}
-                        enter the price here <em>or</em> link the payment transaction later — not both.
+                        {form.type === 'trading' ? (
+                          <>💡 The amount you funded the account with. Use <strong style={{ color: 'var(--color-text-secondary)' }}>one method only</strong>:{' '}
+                          enter it here <em>or</em> link the transfer transaction as the deposit later — not both.</>
+                        ) : (
+                          <>💡 Use <strong style={{ color: 'var(--color-text-secondary)' }}>one method only</strong> to avoid double-counting:{' '}
+                          enter the price here <em>or</em> link the payment transaction later — not both.</>
+                        )}
                       </p>
                     </div>
                   )}
@@ -1078,7 +1134,7 @@ export default function ProjectsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-2">
                     <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
-                      {form.type === 'service' ? 'Start Date' : 'Purchase Date'}
+                      {form.type === 'service' || form.type === 'trading' ? 'Start Date' : 'Purchase Date'}
                     </span>
                     <input type="date" value={form.purchaseDate}
                       onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))}
@@ -1088,15 +1144,15 @@ export default function ProjectsPage() {
                   </div>
                   <div className="flex flex-col gap-2">
                     <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>Color</span>
-                    <div className="flex items-center gap-2.5 px-4 rounded-xl h-[50px]" style={inputStyle}>
+                    <div className="grid grid-cols-7 place-items-center gap-2 px-3 py-3 rounded-xl min-h-[50px]" style={inputStyle}>
                       {PRESET_COLORS.map((c) => (
                         <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
-                          className="w-6 h-6 rounded-full transition-all duration-150 shrink-0"
+                          className="w-5.5 h-5.5 rounded-full transition-all duration-150"
                           style={{
                             background: c,
                             cursor: 'pointer',
                             transform: form.color === c ? 'scale(1.2)' : 'scale(1)',
-                            boxShadow: form.color === c ? `0 0 0 2px rgba(6,12,38,0.9), 0 0 0 4px ${c}` : 'none',
+                            boxShadow: form.color === c ? `0 0 0 2px var(--color-elevated), 0 0 0 4px ${c}` : 'none',
                           }} />
                       ))}
                     </div>
@@ -1500,6 +1556,33 @@ export default function ProjectsPage() {
                       {Number(pendingLinkTx.amount) >= 0 ? '+' : ''}${Math.abs(Number(pendingLinkTx.amount)).toFixed(2)}
                     </span>
                   </div>
+
+                  {/* Purchase / deposit designation — avoids double-counting the manual estimate */}
+                  {(() => {
+                    const proj = projects.find((p) => p.id === showLinkPicker);
+                    if (!proj || Number(pendingLinkTx.amount) >= 0 || proj.purchaseTxId) return null;
+                    const noun = proj.type === 'trading' ? 'initial deposit'
+                      : proj.type === 'property' || proj.type === 'vehicle' ? 'purchase' : 'initial investment';
+                    return (
+                      <button onClick={() => confirmLinkAsPurchase(showLinkPicker!)} disabled={linking}
+                        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left shrink-0 transition-all hover:brightness-110 disabled:opacity-50"
+                        style={{
+                          background: 'color-mix(in srgb, var(--color-card-violet) 10%, transparent)',
+                          border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)',
+                          cursor: 'pointer',
+                        }}>
+                        <span className="text-base shrink-0">🏷️</span>
+                        <div>
+                          <p className="text-xs font-semibold" style={{ color: 'var(--color-card-violet)' }}>
+                            This is the {noun}
+                          </p>
+                          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                            Replaces the ${Number(proj.purchasePrice).toFixed(0)} estimate — no double-counting
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })()}
 
                   <p className="text-xs shrink-0" style={{ color: 'var(--color-text-muted)' }}>
                     Select a project category to tag this expense (optional):

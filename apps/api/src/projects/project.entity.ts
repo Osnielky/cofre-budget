@@ -11,7 +11,7 @@ export class Project {
   @Column()
   name: string;
 
-  /* vehicle | property | business | other */
+  /* vehicle | property | business | service | trading | other */
   @Column({ default: 'other' })
   type: string;
 

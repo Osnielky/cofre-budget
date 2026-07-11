@@ -174,6 +174,32 @@ body::before {
   letter-spacing: 0.06em;
 }
 
+/* ── Auth backdrop: artwork picked by viewport shape ──
+   The gradient overlays stay constant; only the photo (--auth-art) swaps.
+   Wide desktop → landscape art, tablets/small laptops → square crop,
+   phones → portrait crop. */
+.auth-bg {
+  --auth-art: url('/login-bg-wide.jpg');
+  background-image:
+    radial-gradient(120% 90% at 50% 50%, transparent 52%, rgba(4, 8, 16, 0.60) 100%),
+    radial-gradient(720px 540px at 32% 42%, rgba(30, 144, 255, 0.12), transparent 62%),
+    linear-gradient(180deg, rgba(5, 9, 18, 0.38) 0%, rgba(5, 9, 18, 0.16) 45%, rgba(5, 9, 18, 0.68) 100%),
+    var(--auth-art);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+@media (max-width: 1100px) {
+  .auth-bg { --auth-art: url('/login-bg-square.jpg'); }
+}
+@media (max-width: 640px) {
+  .auth-bg {
+    --auth-art: url('/login-bg-mobile.jpg');
+    /* fixed attachment is broken on iOS Safari */
+    background-attachment: scroll;
+  }
+}
+
 /* ── Primary pill button ──
    Class name .btn-gold is legacy (pre-Cobalt); it is the themed
    primary CTA. Restyle per theme here rather than renaming call sites. */

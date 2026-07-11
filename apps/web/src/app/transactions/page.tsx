@@ -18,7 +18,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null; last4?: string | null }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
-interface Project { id: string; name: string; icon: string; color: string; status: string; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[] }
+interface Project { id: string; name: string; icon: string; color: string; status: string; type?: string; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[] }
 interface TransferMatch { id: string; name: string; amount: number; date: string; bankAccount: BankAccount | null }
 interface Transaction {
   id: string; name: string; amount: number; date: string; source: string; pending: boolean;
@@ -1739,8 +1739,10 @@ export default function TransactionsPage() {
                                               style={{ border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)', background: 'color-mix(in srgb, var(--color-card-violet) 10%, transparent)' }}>
                                               <span className="text-base">🏷️</span>
                                               <div>
-                                                <p className="font-semibold" style={{ color: 'var(--color-card-violet)' }}>Initial purchase</p>
-                                                <p style={{ color: 'var(--color-text-muted)' }}>Replaces the ${Number(proj?.purchasePrice ?? 0).toFixed(0)} estimate</p>
+                                                <p className="font-semibold" style={{ color: 'var(--color-card-violet)' }}>
+                                                  {proj?.type === 'trading' ? 'Initial deposit' : 'Initial purchase'}
+                                                </p>
+                                                <p style={{ color: 'var(--color-text-muted)' }}>Replaces the ${Number(proj?.purchasePrice ?? 0).toFixed(0)} estimate — no double-counting</p>
                                               </div>
                                             </button>
                                           </div>
