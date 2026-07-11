@@ -6,10 +6,11 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 type Category = 'all' | 'email' | 'banks' | 'shopping' | 'payments' | 'storage';
 
+/* Bank integrations live in Settings → Bank Accounts (Plaid); no 'banks' filter here until
+   a bank integration card actually ships in this tab. */
 const FILTERS: { id: Category; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'email', label: 'Email & Receipts' },
-  { id: 'banks', label: 'Banks' },
   { id: 'shopping', label: 'Shopping' },
   { id: 'payments', label: 'Payments' },
   { id: 'storage', label: 'Storage' },
