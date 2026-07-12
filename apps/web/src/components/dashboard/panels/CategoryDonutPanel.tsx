@@ -48,8 +48,8 @@ export default function CategoryDonutPanel({ title, subtitle, slices, total, loa
         <div className="flex items-center gap-1.5">{toggleBtn('amount', '$ Amount')}{toggleBtn('percent', '% Percent')}</div>
       ) : undefined}>
       {slices.length === 0 ? <PanelEmpty message="Nothing categorized here yet." /> : (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center gap-5 flex-wrap sm:flex-nowrap">
+        <div className="flex flex-col gap-4 flex-1">
+          <div className="flex items-center gap-5 flex-wrap sm:flex-nowrap flex-1">
             {/* Donut */}
             <div className="relative shrink-0 mx-auto sm:mx-0" style={{ width: 190, height: 190 }}>
               <ResponsiveContainer width="100%" height="100%">
@@ -68,7 +68,7 @@ export default function CategoryDonutPanel({ title, subtitle, slices, total, loa
             </div>
 
             {/* Category table */}
-            <div className="flex-1 min-w-0 flex flex-col gap-1">
+            <div className="flex-1 min-w-0 flex flex-col gap-1 justify-evenly self-stretch">
               <div className="flex items-center gap-2.5 text-[10px] pb-1" style={{ color: 'var(--color-text-muted)' }}>
                 <span className="flex-1">Category</span>
                 <span className="w-20 text-right">{mode === 'amount' ? 'Amount' : 'Percent'}</span>
@@ -97,7 +97,7 @@ export default function CategoryDonutPanel({ title, subtitle, slices, total, loa
 
           {/* Footer stats — only the ones derivable from this panel's data */}
           {top && smallest && (
-            <div className="grid grid-cols-2 gap-2.5 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+            <div className="grid grid-cols-2 gap-2.5 pt-3 mt-auto" style={{ borderTop: '1px solid var(--color-border)' }}>
               {[{ label: 'Top category', s: top }, { label: 'Smallest category', s: smallest }].map(({ label, s }) => (
                 <div key={label} className="flex items-center gap-2.5 rounded-xl py-2 px-3 min-w-0"
                   style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${s.color} 4%, transparent)` }}>
