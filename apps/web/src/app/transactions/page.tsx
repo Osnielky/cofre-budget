@@ -12,7 +12,8 @@ import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiab
 import SplitTransactionModal from '@/components/SplitTransactionModal';
 import FindReceiptModal from '@/components/FindReceiptModal';
 import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
-import { buildRecurringMap } from './recurring';
+import { buildRecurringMap, normalize } from './recurring';
+import StatStrip from './StatStrip';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -38,7 +39,7 @@ interface Transaction {
 }
 interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid'; direction: 'lent' | 'owed' }
 
-type Filter    = 'all' | 'uncategorized' | 'expense' | 'income';
+type Filter    = 'all' | 'uncategorized' | 'expense' | 'income' | 'recurring';
 type RangeMode = 'month' | 'custom';
 
 const glass: React.CSSProperties = {
@@ -88,6 +89,9 @@ export default function TransactionsPage() {
   const [customTo, setCustomTo]     = useState('');
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [prevTransactions, setPrevTransactions] = useState<Transaction[]>([]);
+  const [sortMode, setSortMode] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
+  const [accountFilter, setAccountFilter] = useState<string>('all');
   const [categories, setCategories]     = useState<Category[]>([]);
   const [accounts, setAccounts]         = useState<BankAccount[]>([]);
   const [projects, setProjects]         = useState<Project[]>([]);
@@ -184,19 +188,42 @@ export default function TransactionsPage() {
   const from = rangeMode === 'month' ? monthFrom(month) : customFrom;
   const to   = rangeMode === 'month' ? monthTo(month)   : customTo;
 
+  /* Previous window (for stat deltas + insight card): previous month, or the
+     same-length span immediately before a custom range. */
+  const prevRange = useMemo(() => {
+    if (rangeMode === 'month') {
+      const pm = prevMonth(month);
+      return { from: monthFrom(pm), to: monthTo(pm), label: monthLabel(pm) };
+    }
+    if (customFrom && customTo) {
+      const f = new Date(`${customFrom}T00:00:00Z`);
+      const t = new Date(`${customTo}T00:00:00Z`);
+      const days = Math.max(1, Math.round((t.getTime() - f.getTime()) / 86400000) + 1);
+      const pf = new Date(f); pf.setUTCDate(pf.getUTCDate() - days);
+      const pt = new Date(f); pt.setUTCDate(pt.getUTCDate() - 1);
+      return { from: pf.toISOString().slice(0, 10), to: pt.toISOString().slice(0, 10), label: 'prior period' };
+    }
+    return null;
+  }, [rangeMode, month, customFrom, customTo]);
+
   const loadTransactions = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (from) params.set('from', from);
       if (to)   params.set('to', to);
-      const res = await fetch(`${API}/transactions?${params}`, { credentials: 'include' });
-      const data = await res.json();
+      const cur = fetch(`${API}/transactions?${params}`, { credentials: 'include' }).then((r) => r.json());
+      const prev = prevRange
+        ? fetch(`${API}/transactions?from=${prevRange.from}&to=${prevRange.to}`, { credentials: 'include' })
+            .then((r) => r.json()).catch(() => [])
+        : Promise.resolve([]);
+      const [data, prevData] = await Promise.all([cur, prev]);
       setTransactions(Array.isArray(data) ? data : []);
+      setPrevTransactions(Array.isArray(prevData) ? prevData : []);
     } finally {
       setLoading(false);
     }
-  }, [from, to]);
+  }, [from, to, prevRange]);
 
 
   useEffect(() => {
@@ -556,13 +583,37 @@ export default function TransactionsPage() {
   const isTransfer = (t: Transaction) => t.categoryRef?.type === 'transfer' || !!t.debtId;
   const openDebts = debts.filter((d) => d.status === 'open');
   const uncategorizedCount = transactions.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
+  /* Current + previous window: gives buildRecurringMap the ≥2 months it needs
+     to detect repeats even inside a one-month view. Declared before `visible`,
+     which calls isRecurringTx during the same render pass. */
+  const recurringMap = useMemo(
+    () => buildRecurringMap([...transactions, ...prevTransactions].filter((t) => Number(t.amount) < 0)),
+    [transactions, prevTransactions]
+  );
+  const statMonth = rangeMode === 'month' ? month : (from ? from.slice(0, 7) : currentMonth());
+  const prevStatMonth = prevRange ? prevRange.from.slice(0, 7) : '';
+  const recurringTotalIn = (mo: string) =>
+    [...recurringMap.values()]
+      .filter((r) => r.occurrences.some((o) => o.month === mo))
+      .reduce((s, r) => s + r.medianAmount, 0);
+  const recurringNowTotal  = recurringTotalIn(statMonth);
+  const recurringPrevTotal = prevStatMonth ? recurringTotalIn(prevStatMonth) : 0;
+
+  const isRecurringTx = (t: Transaction) => Number(t.amount) < 0 && recurringMap.has(normalize(t.name));
   const visible = transactions.filter((t) => {
     if (filter === 'uncategorized' && (t.categoryId || t.projectId || isTransfer(t))) return false;
     if (filter === 'expense'       && (Number(t.amount) >= 0 || isTransfer(t))) return false;
     if (filter === 'income'        && (Number(t.amount) < 0  || isTransfer(t))) return false;
+    if (filter === 'recurring'     && !isRecurringTx(t)) return false;
+    if (accountFilter !== 'all'    && t.bankAccountId !== accountFilter) return false;
     if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+  /* Sorting: date modes reorder the day groups; amount modes keep the day
+     grouping and reorder rows within each day. */
+  if (sortMode === 'date-asc') visible.sort((a, b) => a.date.localeCompare(b.date));
+  else if (sortMode === 'amount-desc') visible.sort((a, b) => b.date.localeCompare(a.date) || Math.abs(Number(b.amount)) - Math.abs(Number(a.amount)));
+  else if (sortMode === 'amount-asc')  visible.sort((a, b) => b.date.localeCompare(a.date) || Math.abs(Number(a.amount)) - Math.abs(Number(b.amount)));
 
   /* Group by account first, then by date within each account */
   const byAccount = visible.reduce<Map<string, Transaction[]>>((map, tx) => {
@@ -577,8 +628,6 @@ export default function TransactionsPage() {
   );
 
   const hasPlaid = accounts.some((a) => a.provider === 'plaid');
-  const totalIncome  = transactions.filter((t) => Number(t.amount) >= 0 && !isTransfer(t)).reduce((s, t) => s + Number(t.amount), 0);
-  const totalExpense = transactions.filter((t) => Number(t.amount) < 0  && !isTransfer(t)).reduce((s, t) => s + Number(t.amount), 0);
 
   /* Collapse state — accounts */
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -592,11 +641,6 @@ export default function TransactionsPage() {
   function toggleCollapseDate(key: string) {
     setCollapsedDates((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
   }
-
-  const recurringMap = useMemo(
-    () => buildRecurringMap(transactions.filter((t) => Number(t.amount) < 0)),
-    [transactions]
-  );
 
   const insightsMonth = rangeMode === 'month' ? month : (from ? from.slice(0, 7) : currentMonth());
 
@@ -899,23 +943,17 @@ export default function TransactionsPage() {
               {rangeMode === 'month' ? '📅 Custom range' : '← Month view'}
             </button>
 
-            {/* Summary chips */}
-            {!loading && (
-              <div className="flex items-center gap-2 ml-auto">
-                <span className="text-xs px-2.5 py-1 rounded-lg font-semibold"
-                  style={{ background: 'color-mix(in srgb, var(--color-green) 10%, transparent)', color: 'var(--color-green)' }}>
-                  +${totalIncome.toFixed(2)}
-                </span>
-                <span className="text-xs px-2.5 py-1 rounded-lg font-semibold"
-                  style={{ background: 'color-mix(in srgb, var(--color-orange) 10%, transparent)', color: 'var(--color-orange)' }}>
-                  -${Math.abs(totalExpense).toFixed(2)}
-                </span>
-                <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                  {transactions.length} transactions
-                </span>
-              </div>
-            )}
           </div>
+
+          {/* ── Stat strip ── */}
+          <StatStrip
+            transactions={transactions}
+            prev={prevTransactions}
+            recurringNow={recurringNowTotal}
+            recurringPrev={recurringPrevTotal}
+            prevLabel={prevRange?.label ?? 'prior period'}
+            loading={loading}
+          />
 
           {/* ── Uncategorized alert ── */}
           {!loading && uncategorizedCount > 0 && (
@@ -948,13 +986,32 @@ export default function TransactionsPage() {
                 className="w-full pl-9 pr-3 py-2 text-sm outline-none rounded-xl"
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
             </div>
+            <select value={sortMode} onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
+              aria-label="Sort transactions"
+              className="px-3 py-2 text-xs font-semibold rounded-xl outline-none cursor-pointer"
+              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+              <option value="date-desc">Sort: Date (newest)</option>
+              <option value="date-asc">Sort: Date (oldest)</option>
+              <option value="amount-desc">Sort: Amount (high → low)</option>
+              <option value="amount-asc">Sort: Amount (low → high)</option>
+            </select>
+            <select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}
+              aria-label="Filter by account"
+              className="px-3 py-2 text-xs font-semibold rounded-xl outline-none cursor-pointer max-w-52 truncate"
+              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+              <option value="all">Account: All accounts</option>
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.bankName} · {a.accountName}</option>
+              ))}
+            </select>
             <div className="flex gap-1 p-1 rounded-xl"
               style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               {([
                 { id: 'all',          label: 'All',           count: transactions.length },
-                { id: 'uncategorized',label: 'Uncategorized', count: uncategorizedCount, dot: true },
                 { id: 'expense',      label: 'Expenses',      count: transactions.filter((t) => Number(t.amount) < 0).length },
                 { id: 'income',       label: 'Income',        count: transactions.filter((t) => Number(t.amount) >= 0).length },
+                { id: 'uncategorized',label: 'Uncategorized', count: uncategorizedCount, dot: true },
+                { id: 'recurring',    label: 'Recurring',     count: transactions.filter(isRecurringTx).length },
               ] as { id: Filter; label: string; count: number; dot?: boolean }[]).map((f) => (
                 <button key={f.id} onClick={() => setFilter(f.id)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
@@ -1197,9 +1254,20 @@ export default function TransactionsPage() {
                             }}>
                             <div className="flex items-center gap-3 px-4 py-3">
 
-                              {/* Income/expense/transfer bar */}
-                              <div className="w-1 h-8 rounded-full shrink-0"
-                                style={{ background: tx.parentId ? 'var(--color-primary)' : txIsTransfer ? '#6B6B8A' : isIncome ? 'var(--color-green)' : 'var(--color-orange)' }} />
+                              {/* Category icon chip (direction color fallback) */}
+                              {(() => {
+                                const chipColor = tx.parentId ? 'var(--color-primary)'
+                                  : txIsTransfer ? '#6B6B8A'
+                                  : cat?.color || (isIncome ? 'var(--color-green)' : 'var(--color-orange)');
+                                return (
+                                  <span className="w-9 h-9 rounded-xl flex items-center justify-center text-[15px] shrink-0"
+                                    style={{ background: `color-mix(in srgb, ${chipColor} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${chipColor} 30%, transparent)` }}>
+                                    {cat?.icon
+                                      ? <span aria-hidden="true">{cat.icon}</span>
+                                      : <span className="font-bold text-xs" style={{ color: chipColor }}>{txIsTransfer ? '⇄' : isIncome ? '↑' : '↓'}</span>}
+                                  </span>
+                                );
+                              })()}
 
                               {/* Name + source */}
                               <div className="flex-1 min-w-0">
@@ -2612,6 +2680,7 @@ export default function TransactionsPage() {
           onClose={() => setSelectedTx(null)}
           transactions={transactions}
           recurringMap={recurringMap}
+          prevTransactions={prevTransactions}
           subscriptions={subscriptions}
           onSubscriptionChange={handleSubscriptionChange}
           onNoteUpdate={handleNoteUpdate}
@@ -2632,6 +2701,7 @@ export default function TransactionsPage() {
               onClose={() => setSelectedTx(null)}
               transactions={transactions}
               recurringMap={recurringMap}
+              prevTransactions={prevTransactions}
               subscriptions={subscriptions}
               onSubscriptionChange={handleSubscriptionChange}
               onNoteUpdate={handleNoteUpdate}

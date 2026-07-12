@@ -12,6 +12,7 @@ interface Transaction {
   categoryId: string | null; categoryRef: Category | null;
   bankAccountId: string; bankAccount: BankAccount | null;
   note: string | null;
+  debtId?: string | null;
 }
 
 export type SubStatus = 'active' | 'to-cancel' | 'cancelled';
@@ -21,6 +22,7 @@ interface InsightsPanelProps {
   selectedTx: Transaction | null;
   onClose: () => void;
   transactions: Transaction[];
+  prevTransactions: Transaction[];
   recurringMap: Map<string, RecurringInfo>;
   subscriptions: SubscriptionStore;
   onSubscriptionChange: (next: SubscriptionStore) => void;
@@ -29,7 +31,7 @@ interface InsightsPanelProps {
 }
 
 export function InsightsPanel({
-  selectedTx, onClose, transactions, recurringMap,
+  selectedTx, onClose, transactions, prevTransactions, recurringMap,
   subscriptions, onSubscriptionChange, onNoteUpdate,
   currentMonth,
 }: InsightsPanelProps) {
@@ -64,13 +66,17 @@ export function InsightsPanel({
             onNoteUpdate={onNoteUpdate}
           />
         ) : (
-          <DigestView
-            transactions={transactions}
-            recurringMap={recurringMap}
-            subscriptions={subscriptions}
-            onSubscriptionChange={onSubscriptionChange}
-            currentMonth={currentMonth}
-          />
+          <>
+            <SpendingInsight transactions={transactions} prevTransactions={prevTransactions} />
+            <SpendingByCategory transactions={transactions} />
+            <DigestView
+              transactions={transactions}
+              recurringMap={recurringMap}
+              subscriptions={subscriptions}
+              onSubscriptionChange={onSubscriptionChange}
+              currentMonth={currentMonth}
+            />
+          </>
         )}
       </div>
     </>
@@ -693,6 +699,117 @@ function SubscriptionControls({ merchantKey, sub, subscriptions, onSubscriptionC
 }
 
 /* ── Icon ───────────────────────────────────────────────────── */
+
+/* ── Computed insight: biggest category spend change vs previous window ── */
+function SpendingInsight({ transactions, prevTransactions }: { transactions: Transaction[]; prevTransactions: Transaction[] }) {
+  if (prevTransactions.length === 0) return null;
+
+  const totalsBy = (list: Transaction[]) => {
+    const m = new Map<string, { cat: Category; total: number }>();
+    for (const t of list) {
+      if (Number(t.amount) >= 0 || !t.categoryRef || t.categoryRef.type !== 'expense') continue;
+      const cur = m.get(t.categoryRef.id) ?? { cat: t.categoryRef, total: 0 };
+      cur.total += Math.abs(Number(t.amount));
+      m.set(t.categoryRef.id, cur);
+    }
+    return m;
+  };
+  const now = totalsBy(transactions);
+  const old = totalsBy(prevTransactions);
+
+  let best: { cat: Category; pct: number; diff: number } | null = null;
+  for (const [id, { cat, total }] of now) {
+    const prevTotal = old.get(id)?.total ?? 0;
+    if (prevTotal < 20) continue; // too small a base for a meaningful %
+    const diff = total - prevTotal;
+    const pct = +((diff / prevTotal) * 100).toFixed(0);
+    if (!best || Math.abs(diff) > Math.abs(best.diff)) best = { cat, pct, diff };
+  }
+  if (!best || Math.abs(best.pct) < 5) return null;
+
+  const up = best.diff > 0;
+  return (
+    <div className="rounded-xl px-3 py-2.5 mb-3"
+      style={{
+        background: 'color-mix(in srgb, var(--color-violet) 8%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--color-violet) 22%, transparent)',
+      }}>
+      <p className="text-[10px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--color-violet)' }}>
+        Insight
+      </p>
+      <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+        {best.cat.icon} <span className="font-bold" style={{ color: 'var(--color-text-primary)' }}>{best.cat.name}</span>{' '}
+        spending is <span className="font-bold" style={{ color: up ? 'var(--color-rose)' : 'var(--color-green)' }}>
+          {up ? 'up' : 'down'} {Math.abs(best.pct)}%
+        </span>{' '}
+        compared to the previous period.
+      </p>
+      {up && (
+        <a href="/budgets" className="text-[11px] font-semibold inline-block mt-1.5 no-underline" style={{ color: 'var(--color-violet)' }}>
+          Consider setting a budget →
+        </a>
+      )}
+    </div>
+  );
+}
+
+/* ── Mini donut + top-5 legend of this window's expenses ── */
+function SpendingByCategory({ transactions }: { transactions: Transaction[] }) {
+  const UNCAT = { id: 'uncat', name: 'Uncategorized', icon: '', color: '#6B6B8A' };
+  const m = new Map<string, { name: string; color: string; total: number }>();
+  for (const t of transactions) {
+    if (Number(t.amount) >= 0 || t.categoryRef?.type === 'transfer' || t.debtId) continue;
+    const c = t.categoryRef && t.categoryRef.type === 'expense' ? t.categoryRef : t.categoryRef ? null : UNCAT;
+    if (!c) continue;
+    const cur = m.get(c.id) ?? { name: c.name, color: c.color, total: 0 };
+    cur.total += Math.abs(Number(t.amount));
+    m.set(c.id, cur);
+  }
+  const slices = [...m.values()].sort((a, b) => b.total - a.total);
+  if (slices.length === 0) return null;
+  const total = slices.reduce((s, x) => s + x.total, 0);
+  const top = slices.slice(0, 5);
+  const otherTotal = slices.slice(5).reduce((s, x) => s + x.total, 0);
+  if (otherTotal > 0) top.push({ name: 'Other', color: '#6B6B8A', total: otherTotal });
+
+  /* Conic-gradient donut — no chart lib needed at this size. */
+  let acc = 0;
+  const stops = top.map((s) => {
+    const from = (acc / total) * 360;
+    acc += s.total;
+    const to = (acc / total) * 360;
+    return `${s.color} ${from.toFixed(1)}deg ${to.toFixed(1)}deg`;
+  }).join(', ');
+
+  return (
+    <div className="rounded-xl px-3 py-3 mb-3" style={{ border: '1px solid var(--color-border)' }}>
+      <p className="text-[10px] font-bold tracking-widest uppercase mb-2.5" style={{ color: 'var(--color-text-muted)' }}>
+        Spending by Category
+      </p>
+      <div className="flex items-center gap-3">
+        <div className="relative shrink-0 rounded-full" style={{ width: 72, height: 72, background: `conic-gradient(${stops})` }}>
+          <div className="absolute rounded-full flex flex-col items-center justify-center"
+            style={{ inset: 9, background: 'var(--color-elevated)' }}>
+            <p className="text-[10.5px] font-bold tabular-nums leading-tight">${total.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+            <p className="text-[8px]" style={{ color: 'var(--color-text-muted)' }}>Total</p>
+          </div>
+        </div>
+        <ul className="flex-1 min-w-0 flex flex-col gap-1">
+          {top.map((s) => (
+            <li key={s.name} className="flex items-center gap-1.5 text-[10px] min-w-0">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+              <span className="truncate flex-1" style={{ color: 'var(--color-text-secondary)' }}>{s.name}</span>
+              <span className="font-bold tabular-nums shrink-0">${Math.round(s.total)}</span>
+              <span className="tabular-nums shrink-0 w-7 text-right" style={{ color: 'var(--color-text-muted)' }}>
+                {Math.round((s.total / total) * 100)}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}
 
 function XIcon() {
   return (
