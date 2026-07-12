@@ -72,7 +72,7 @@ export default function DashboardPage() {
     const incomeSlices = categoryTotals(yearTx, 'income');
     return {
       cashFlow: monthlyCashFlow(yearTx, now),
-      trend: trendSeries(yearTx, now),
+      trend: trendSeries(yearTx, now, 12),   // full YTD; the panel slices per selected range
       expenseDonut: foldOther(expenseSlices, 7),
       expenseTotal: expenseSlices.reduce((s, x) => s + x.value, 0),
       ranking: expenseSlices.slice(0, 7),
