@@ -193,14 +193,14 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
             <IncomeExpensesPanel data={d.cashFlow} loading={loading} />
             <CashFlowTrendPanel data={d.trend} loading={loading} />
-            <CategoryDonutPanel title="Expenses by Category" subtitle="This month"
+            <CategoryDonutPanel title="Expenses by Category" subtitle="This month" colSpan={2}
               slices={d.expenseDonut} total={d.expenseTotal} loading={loading} />
             <CategoryRankingPanel slices={d.ranking} loading={loading} />
 
             <BudgetActualPanel budgets={spendingBudgets} loading={loading} />
             <SpendingCalendarPanel cells={d.calendar} monthLabel={monthLabel(month)} loading={loading} />
             <SpendingPacePanel pace={d.pace} loading={loading} />
-            <CategoryDonutPanel title="Income Sources" subtitle="Year to date"
+            <CategoryDonutPanel title="Income Sources" subtitle="Year to date" colSpan={2}
               slices={d.incomeSlices} total={d.incomeTotal} loading={loading} />
 
             <FixedVariablePanel split={d.fixedVar} loading={loading} />
