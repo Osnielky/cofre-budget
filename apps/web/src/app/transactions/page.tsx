@@ -1241,11 +1241,16 @@ export default function TransactionsPage() {
                         const searchQ       = pickerSearch.toLowerCase();
                         const pickerCats    = categories.filter((c) => (c.type === primaryType || c.type === 'transfer') && (!searchQ || c.name.toLowerCase().includes(searchQ)));
                         const pickerCatsAlt = categories.filter((c) => c.type === secondaryType && (!searchQ || c.name.toLowerCase().includes(searchQ)));
+                        const needsCategory = !tx.categoryId && !tx.projectId && !tx.debtId && !txIsTransfer;
 
                         return (
                           <div key={tx.id} className="relative group cursor-pointer"
                             style={{
                               ...(i > 0 ? { borderTop: '1px solid var(--color-border)' } : {}),
+                              ...(needsCategory ? {
+                                boxShadow: 'inset 3px 0 0 0 var(--color-amber)',
+                                background: 'color-mix(in srgb, var(--color-amber) 3%, transparent)',
+                              } : {}),
                               ...(selectedTx?.id === tx.id ? { background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)' } : {}),
                             }}
                             onClick={(e) => {
@@ -1258,10 +1263,14 @@ export default function TransactionsPage() {
                               {(() => {
                                 const chipColor = tx.parentId ? 'var(--color-primary)'
                                   : txIsTransfer ? '#6B6B8A'
+                                  : needsCategory ? 'var(--color-amber)'
                                   : cat?.color || (isIncome ? 'var(--color-green)' : 'var(--color-orange)');
                                 return (
                                   <span className="w-9 h-9 rounded-xl flex items-center justify-center text-[15px] shrink-0"
-                                    style={{ background: `color-mix(in srgb, ${chipColor} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${chipColor} 30%, transparent)` }}>
+                                    style={{
+                                      background: `color-mix(in srgb, ${chipColor} ${needsCategory ? 8 : 14}%, transparent)`,
+                                      border: `1px ${needsCategory ? 'dashed' : 'solid'} color-mix(in srgb, ${chipColor} ${needsCategory ? 45 : 30}%, transparent)`,
+                                    }}>
                                     {cat?.icon
                                       ? <span aria-hidden="true">{cat.icon}</span>
                                       : <span className="font-bold text-xs" style={{ color: chipColor }}>{txIsTransfer ? '⇄' : isIncome ? '↑' : '↓'}</span>}
@@ -1420,7 +1429,7 @@ export default function TransactionsPage() {
                                   return { background: `${_c}18`, border: `1px solid ${_c}35`, color: _c };
                                 }
                                 if (cat) return { background: `${cat.color}18`, border: `1px solid ${cat.color}35`, color: cat.color };
-                                return { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' };
+                                return { background: 'color-mix(in srgb, var(--color-amber) 10%, transparent)', border: '1px dashed color-mix(in srgb, var(--color-amber) 45%, transparent)', color: 'var(--color-amber)' };
                               })()}>
                               {updatingId === tx.id ? (
                                 <span>…</span>
