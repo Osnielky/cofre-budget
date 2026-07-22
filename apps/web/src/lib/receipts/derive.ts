@@ -84,6 +84,12 @@ export function filterReceipts<T extends ReceiptLite>(receipts: T[], filters: Re
   });
 }
 
+/** Shared dollar formatter for the receipts feature — always displays a
+    positive figure (callers never need to show a negative sign here). */
+export function money(n: number): string {
+  return `$${Math.abs(Number(n)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 /** Number of transactions creating a receipt's items will produce: one per
     distinct assigned category, plus one for any items left uncategorized. */
 export function countGroups(itemCount: number, itemCategories: Record<number, string>): number {

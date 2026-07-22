@@ -1,6 +1,6 @@
 'use client';
 
-import { countGroups, type Receipt } from '@/lib/receipts/derive';
+import { countGroups, money, type Receipt } from '@/lib/receipts/derive';
 
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 
@@ -12,10 +12,6 @@ interface Props {
   onImport: () => void;
   importing: boolean;
   onClose: () => void;
-}
-
-function money(n: number) {
-  return `$${Number(n).toFixed(2)}`;
 }
 
 export default function ReceiptDetailPanel({

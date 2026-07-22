@@ -80,7 +80,7 @@ The current `receipts/page.tsx` hardcodes hex/rgba colors (`#F2F1EA`, `#6b7488`,
 No test runner is configured in this repo. Verification is manual: run the dev server, load `/receipts` in a browser, and check:
 - Empty state (no receipts)
 - Loaded state with the stat strip, filters, and row list populated
-- Filter interactions (search, merchant, category, date range, status)
+- Filter interactions (search, merchant, date range, status)
 - Detail panel on both a desktop-width and mobile-width viewport
 - Theme switching (at least the default Cobalt theme) to confirm no hardcoded colors remain
 

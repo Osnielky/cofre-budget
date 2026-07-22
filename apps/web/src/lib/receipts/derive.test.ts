@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { statTotals, distinctMerchants, filterReceipts, countGroups, DEFAULT_FILTERS, type ReceiptLite } from './derive';
+import { statTotals, distinctMerchants, filterReceipts, countGroups, money, DEFAULT_FILTERS, type ReceiptLite } from './derive';
 
 function receipt(p: Partial<ReceiptLite> = {}): ReceiptLite {
   return {
@@ -88,6 +88,18 @@ describe('filterReceipts', () => {
     const inRange = filterReceipts(receipts, { ...DEFAULT_FILTERS, dateFrom: '2026-07-10', dateTo: '2026-07-31' });
     expect(inRange).toHaveLength(1);
     expect(inRange[0].orderDate).toBe('2026-07-15');
+  });
+});
+
+describe('money', () => {
+  it('formats a plain amount with two decimal places', () => {
+    expect(money(12.5)).toBe('$12.50');
+  });
+  it('adds a thousands separator', () => {
+    expect(money(1234.5)).toBe('$1,234.50');
+  });
+  it('takes the absolute value of negative amounts', () => {
+    expect(money(-42)).toBe('$42.00');
   });
 });
 

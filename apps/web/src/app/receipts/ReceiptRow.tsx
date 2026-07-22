@@ -1,14 +1,10 @@
 'use client';
 
-import type { Receipt } from '@/lib/receipts/derive';
+import { money, type Receipt } from '@/lib/receipts/derive';
 
 interface Props {
   receipt: Receipt;
   onClick: () => void;
-}
-
-function money(n: number) {
-  return `$${Number(n).toFixed(2)}`;
 }
 
 export default function ReceiptRow({ receipt: r, onClick }: Props) {

@@ -113,7 +113,7 @@ export default function ReceiptsPage() {
           )}
 
           <div className="mb-6">
-            <StatStrip receipts={receipts} loading={loading} />
+            <StatStrip receipts={visible} loading={loading} />
           </div>
 
           <div className="mb-6">

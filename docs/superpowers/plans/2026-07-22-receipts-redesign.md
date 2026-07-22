@@ -262,7 +262,7 @@ export function countGroups(itemCount: number, itemCategories: Record<number, st
 - [ ] **Step 5: Run tests to verify they pass**
 
 Run: `npx vitest run --root apps/web src/lib/receipts`
-Expected: PASS — all 13 tests green
+Expected: PASS — all 17 tests green
 
 - [ ] **Step 6: Commit**
 
