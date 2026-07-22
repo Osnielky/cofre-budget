@@ -3,7 +3,7 @@ import path from 'path';
 
 export default defineConfig({
   test: {
-    include: ['src/lib/dashboard/**/*.test.ts'],
+    include: ['src/lib/dashboard/**/*.test.ts', 'src/lib/receipts/**/*.test.ts'],
     environment: 'node',
   },
   resolve: {
