@@ -9,3 +9,5 @@ dist
 
 # TypeScript incremental build cache (generated)
 *.tsbuildinfo
+
+.worktrees/
