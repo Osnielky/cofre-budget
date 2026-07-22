@@ -41,15 +41,18 @@ No period-over-period deltas in v1 (unlike the Transactions stat strip) — defe
 
 - **Search** — free text over merchant name + raw subject
 - **Merchant** — dropdown of distinct merchants present in the current receipt list
-- **Category** — dropdown of expense categories (existing `/api/categories`, filtered to `type === 'expense'`)
 - **Date Range** — receipt `orderDate` range picker
 - **Status** — All / Imported / Pending Review
 
 **Explicitly deferred:** a "Source" filter (Gmail / Amazon / Manual Upload). With only one real source (Gmail) today, a source filter with a single option adds no value — it ships in sub-project 4 once Manual Upload (sub-project 3) creates a second real source.
 
+**Correction made during planning:** the original draft also listed a "Category" filter. `Receipt` never stores a category — categories are assigned per line-item at import time and live on the resulting `Transaction` (`receipts.service.ts:99-111`), not on the receipt itself. A category filter would have no real data for pending (not-yet-imported) receipts, and backing it properly would require a new backend endpoint — contradicting this sub-project's "no backend changes" scope. Dropped from v1; revisit once sub-project 2 (match/approve workflow) gives receipts a real category-bearing relationship.
+
 ## Row List
 
-Div-based rows (not a literal `<table>`, matching the convention already used on the Transactions page for responsive-friendliness) — columns: merchant, date, amount, category chip, status pill (green "Imported" / amber "Pending Review"). Clicking a row opens the detail panel.
+Div-based rows (not a literal `<table>`, matching the convention already used on the Transactions page for responsive-friendliness) — columns: merchant, date, amount, item-count chip (e.g. "3 items", from `items.length` — real data already on the `Receipt` entity, unlike a category which isn't), status pill (green "Imported" / amber "Pending Review"). Clicking a row opens the detail panel.
+
+**Correction made during planning:** the original draft listed a "category chip" here — same data-model gap as the dropped Category filter above (`GET /api/receipts` returns raw `Receipt` rows only, no joined transaction/category — confirmed in `receipts.controller.ts`). Replaced with an item-count chip, which is real, already-available data.
 
 **Mobile (< `md`):** collapses to a two-line stacked card — merchant + amount on the first line, date + status pill on the second — following the same responsive philosophy as the rest of the app.
 
