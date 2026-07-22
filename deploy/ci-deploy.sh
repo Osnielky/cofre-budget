@@ -31,9 +31,9 @@ gcloud run deploy cofre-web \
 WEB_URL="$(gcloud run services describe cofre-web --region "${REGION}" --format='value(status.url)')"
 echo "  Web at ${WEB_URL}"
 
-echo "▶ Syncing API FRONTEND_URL + Google callback → ${WEB_URL}…"
+echo "▶ Syncing API FRONTEND_URL + Google callback + Gmail redirect → ${WEB_URL}…"
 gcloud run services update cofre-api --region "${REGION}" \
-  --update-env-vars "FRONTEND_URL=${WEB_URL},GOOGLE_CALLBACK_URL=${WEB_URL}/api/auth/google/callback"
+  --update-env-vars "FRONTEND_URL=${WEB_URL},GOOGLE_CALLBACK_URL=${WEB_URL}/api/auth/google/callback,GOOGLE_GMAIL_REDIRECT_URI=${WEB_URL}/api/gmail/callback"
 
 echo ""
 echo "✅ Deployed."
