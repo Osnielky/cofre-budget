@@ -43,7 +43,7 @@ export const DEFAULT_FILTERS: ReceiptFilters = {
 };
 
 export function currentMonthPrefix(now = new Date()): string {
-  return now.toISOString().slice(0, 7);
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
 export interface StatTotals {

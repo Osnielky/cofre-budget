@@ -31,6 +31,17 @@ describe('statTotals', () => {
   it('returns zeroes for an empty list', () => {
     expect(statTotals([], NOW)).toEqual({ total: 0, imported: 0, pending: 0, thisMonthTotal: 0 });
   });
+
+  it('correctly includes receipts at month boundaries regardless of timezone', () => {
+    // Test with a "now" date at the last day of July (end of month)
+    const endOfMonth = new Date(2026, 6, 31); // Jul 31 2026 (local time)
+    const receipts = [
+      receipt({ orderDate: '2026-07-31', total: 25 }), // last day of current month — should be included
+      receipt({ orderDate: '2026-08-01', total: 100 }), // first day of next month — should be excluded
+    ];
+    const totals = statTotals(receipts, endOfMonth);
+    expect(totals.thisMonthTotal).toBe(25); // only Jul 31 receipt counted
+  });
 });
 
 describe('distinctMerchants', () => {
