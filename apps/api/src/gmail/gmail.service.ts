@@ -4,9 +4,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { google } from 'googleapis';
-import * as crypto from 'crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { ConnectedApp } from '../connected-apps/connected-app.entity';
+import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.util';
 
 export interface RawReceiptItem {
   name: string;
@@ -38,7 +38,7 @@ export class GmailService {
   ) {
     const secret = this.config.get<string>('JWT_SECRET');
     if (!secret) throw new Error('JWT_SECRET is required for GmailService token encryption');
-    this.encKey = crypto.createHash('sha256').update(secret).digest();
+    this.encKey = deriveKey(secret);
     const anthropicKey = this.config.get<string>('ANTHROPIC_API_KEY');
     this.anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : new Anthropic();
   }
@@ -87,8 +87,8 @@ export class GmailService {
     const existing = await this.repo.findOneBy({ userId, provider: 'gmail' });
     const record = existing ?? this.repo.create({ userId, provider: 'gmail' });
     record.email = email;
-    record.accessToken = this.encrypt(tokens.access_token ?? '');
-    record.refreshToken = this.encrypt(tokens.refresh_token ?? record.refreshToken ?? '');
+    record.accessToken = encryptToken(tokens.access_token ?? '', this.encKey);
+    record.refreshToken = encryptToken(tokens.refresh_token ?? record.refreshToken ?? '', this.encKey);
     record.tokenExpiry = tokens.expiry_date ?? null;
     await this.repo.save(record);
   }
@@ -102,7 +102,7 @@ export class GmailService {
     if (conn?.refreshToken) {
       try {
         const client = this.makeOAuth2Client();
-        client.setCredentials({ refresh_token: this.decrypt(conn.refreshToken) });
+        client.setCredentials({ refresh_token: decryptToken(conn.refreshToken, this.encKey) });
         await client.revokeCredentials();
       } catch {
         // best-effort — still delete the local record even if revocation fails
@@ -116,8 +116,8 @@ export class GmailService {
     if (!conn) throw new UnauthorizedException('Gmail not connected');
     const client = this.makeOAuth2Client();
     client.setCredentials({
-      access_token: this.decrypt(conn.accessToken),
-      refresh_token: this.decrypt(conn.refreshToken),
+      access_token: decryptToken(conn.accessToken, this.encKey),
+      refresh_token: decryptToken(conn.refreshToken, this.encKey),
       expiry_date: conn.tokenExpiry ? Number(conn.tokenExpiry) : undefined,
     });
     // Only refresh if the token is expired or about to expire (within 60 seconds)
@@ -125,35 +125,13 @@ export class GmailService {
     if (isExpired) {
       const { credentials } = await client.refreshAccessToken();
       client.setCredentials(credentials);
-      if (credentials.access_token && credentials.access_token !== this.decrypt(conn.accessToken)) {
-        conn.accessToken = this.encrypt(credentials.access_token);
+      if (credentials.access_token && credentials.access_token !== decryptToken(conn.accessToken, this.encKey)) {
+        conn.accessToken = encryptToken(credentials.access_token, this.encKey);
         conn.tokenExpiry = credentials.expiry_date ?? conn.tokenExpiry;
         await this.repo.save(conn);
       }
     }
     return client;
-  }
-
-  private encrypt(text: string): string {
-    const iv = crypto.randomBytes(12);
-    const cipher = crypto.createCipheriv('aes-256-gcm', this.encKey, iv);
-    const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
-    const tag = cipher.getAuthTag();
-    return iv.toString('hex') + ':' + tag.toString('hex') + ':' + encrypted.toString('hex');
-  }
-
-  private decrypt(text: string): string {
-    if (!text || !text.includes(':')) return '';
-    const parts = text.split(':');
-    if (parts.length !== 3) return '';
-    const [ivHex, tagHex, dataHex] = parts;
-    try {
-      const decipher = crypto.createDecipheriv('aes-256-gcm', this.encKey, Buffer.from(ivHex, 'hex'));
-      decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
-      return Buffer.concat([decipher.update(Buffer.from(dataHex, 'hex')), decipher.final()]).toString('utf8');
-    } catch {
-      return '';
-    }
   }
 
   async fetchAndParseReceipts(userId: string): Promise<RawReceipt[]> {

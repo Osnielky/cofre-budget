@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import Logo from './Logo';
 
 export const authInputStyle: React.CSSProperties = {
@@ -75,6 +76,13 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
           {children}
         </div>
 
+      </div>
+
+      <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-4 text-[11px]"
+        style={{ color: 'rgba(242,241,234,0.45)' }}>
+        <Link href="/privacy" className="no-underline hover:underline" style={{ color: 'inherit' }}>Privacy</Link>
+        <span>·</span>
+        <Link href="/terms" className="no-underline hover:underline" style={{ color: 'inherit' }}>Terms</Link>
       </div>
     </div>
   );
