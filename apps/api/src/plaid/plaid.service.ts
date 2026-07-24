@@ -12,11 +12,13 @@ import {
 import { PlaidItem } from './plaid-item.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.util';
 
 @Injectable()
 export class PlaidService {
   private readonly client: PlaidApi;
   private readonly logger = new Logger(PlaidService.name);
+  private readonly encKey: Buffer;
 
   constructor(
     private config: ConfigService,
@@ -24,6 +26,9 @@ export class PlaidService {
     @InjectRepository(BankAccount) private accountRepo: Repository<BankAccount>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
   ) {
+    const secret = this.config.get<string>('JWT_SECRET');
+    if (!secret) throw new Error('JWT_SECRET is required for PlaidService token encryption');
+    this.encKey = deriveKey(secret);
     const env = this.config.get<string>('PLAID_ENV', 'sandbox');
     const cfg = new Configuration({
       basePath: PlaidEnvironments[env],
@@ -62,7 +67,7 @@ export class PlaidService {
     if (!item) {
       item = this.itemRepo.create({ userId, itemId: item_id, institutionId, institutionName });
     }
-    item.accessToken = access_token;
+    item.accessToken = encryptToken(access_token, this.encKey);
     await this.itemRepo.save(item);
 
     /* Fetch accounts from Plaid and create BankAccount records */
@@ -92,7 +97,7 @@ export class PlaidService {
     }
 
     /* Kick off an initial transaction sync */
-    await this.syncTransactions(item);
+    await this.syncTransactions(item, access_token);
     return accounts;
   }
 
@@ -104,10 +109,11 @@ export class PlaidService {
       .getOne();
 
     if (!item) return;
-    await this.syncTransactions(item);
+    const accessToken = decryptToken(item.accessToken, this.encKey);
+    await this.syncTransactions(item, accessToken);
 
     /* Refresh balances */
-    const balanceRes = await this.client.accountsBalanceGet({ access_token: item.accessToken });
+    const balanceRes = await this.client.accountsBalanceGet({ access_token: accessToken });
     for (const pa of balanceRes.data.accounts) {
       const account = await this.accountRepo.findOneBy({ plaidAccountId: pa.account_id });
       if (account) {
@@ -117,13 +123,13 @@ export class PlaidService {
     }
   }
 
-  private async syncTransactions(item: PlaidItem): Promise<void> {
+  private async syncTransactions(item: PlaidItem, accessToken: string): Promise<void> {
     const endDate = new Date().toISOString().slice(0, 10);
     const startDate = new Date(Date.now() - 90 * 86400_000).toISOString().slice(0, 10);
 
     try {
       const res = await this.client.transactionsGet({
-        access_token: item.accessToken,
+        access_token: accessToken,
         start_date: startDate,
         end_date: endDate,
         options: { count: 500, offset: 0 },
