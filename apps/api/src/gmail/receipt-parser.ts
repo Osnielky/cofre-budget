@@ -79,15 +79,22 @@ export function extractOrderNumber(text: string): string | null {
   return m ? m[1] : null;
 }
 
+function toLocalDateString(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function extractOrderDate(text: string, emailDateHeader: string | null): string | null {
   const explicit = text.match(ORDER_DATE_RE);
   if (explicit) {
     const parsed = new Date(explicit[1]);
-    if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+    if (!isNaN(parsed.getTime())) return toLocalDateString(parsed);
   }
   if (emailDateHeader) {
     const parsed = new Date(emailDateHeader);
-    if (!isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+    if (!isNaN(parsed.getTime())) return toLocalDateString(parsed);
   }
   return null;
 }
