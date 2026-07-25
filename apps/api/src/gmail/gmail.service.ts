@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -30,6 +30,7 @@ export interface RawReceipt {
 export class GmailService {
   private readonly encKey: Buffer;
   private readonly anthropic: Anthropic;
+  private readonly logger = new Logger(GmailService.name);
 
   constructor(
     private config: ConfigService,
@@ -153,13 +154,17 @@ export class GmailService {
 
     const messages = listRes.data.messages ?? [];
     const results: RawReceipt[] = [];
+    this.logger.log(`Gmail search "${query}" matched ${messages.length} message(s) for user ${userId}`);
 
     for (const msg of messages) {
       if (!msg.id) continue;
       const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
       const subject = this.extractHeader(full.data.payload?.headers ?? [], 'Subject');
       const body = this.extractBody(full.data.payload);
-      if (!body) continue;
+      if (!body) {
+        this.logger.warn(`No text/html body extracted for message ${msg.id} ("${subject}"), mimeType=${full.data.payload?.mimeType}, skipping`);
+        continue;
+      }
       const parsed = await this.parseWithClaude(body, subject);
       if (parsed) {
         results.push({ gmailMessageId: msg.id, subject, ...parsed });
@@ -234,7 +239,8 @@ If you cannot find a clear order total or any items, return null.`;
       const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
       if (text === 'null' || !text) return null;
       return JSON.parse(text);
-    } catch {
+    } catch (err) {
+      this.logger.warn(`Claude receipt parse failed for "${subject}": ${(err as Error)?.message}`);
       return null;
     }
   }

@@ -17,7 +17,7 @@ gcloud run deploy cofre-api \
   --min-instances=0 --max-instances=2 --memory=512Mi \
   --add-cloudsql-instances "${SQL_CONN}" \
   --set-env-vars "NODE_ENV=production,DB_HOST=/cloudsql/${SQL_CONN},DB_PORT=5432,DB_USER=${DB_USER},DB_NAME=${DB_NAME},JWT_EXPIRES_IN=7d,GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},MAIL_FROM=${MAIL_FROM}" \
-  --set-secrets "DB_PASS=DB_PASS:latest,JWT_SECRET=JWT_SECRET:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,RESEND_API_KEY=RESEND_API_KEY:latest"
+  --set-secrets "DB_PASS=DB_PASS:latest,JWT_SECRET=JWT_SECRET:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,RESEND_API_KEY=RESEND_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest"
 
 API_URL="$(gcloud run services describe cofre-api --region "${REGION}" --format='value(status.url)')"
 echo "  API at ${API_URL}"

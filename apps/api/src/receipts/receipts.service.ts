@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Receipt } from './receipt.entity';
@@ -15,6 +15,8 @@ export interface ImportSplit {
 
 @Injectable()
 export class ReceiptsService {
+  private readonly logger = new Logger(ReceiptsService.name);
+
   constructor(
     @InjectRepository(Receipt) private receiptRepo: Repository<Receipt>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
@@ -30,8 +32,9 @@ export class ReceiptsService {
     let raw: Awaited<ReturnType<GmailService['fetchAndParseReceipts']>> = [];
     try {
       raw = await this.gmail.fetchAndParseReceipts(userId);
-    } catch {
+    } catch (err) {
       // Gmail not connected or fetch failed — return cached only
+      this.logger.error(`fetchAndParseReceipts failed for user ${userId}: ${(err as Error)?.message}`, (err as Error)?.stack);
       return existing;
     }
 
