@@ -98,3 +98,104 @@ export function extractOrderDate(text: string, emailDateHeader: string | null): 
   }
   return null;
 }
+
+const EXCLUDE_ROW_RE = /(sub\s*-?\s*total|^total$|order\s*total|grand\s*total|total\s*due|amount\s*charged|tax|shipping|discount|gift\s*card|promo)/i;
+const PRICE_CELL_RE = /\$\s*([\d,]+\.\d{2})/;
+const QTY_CELL_RE = /^\s*(?:qty\s*[:\-]?\s*)?(\d{1,3})\s*$/i;
+
+/** Returns each <table>'s rows as arrays of cell text, for structural line-item scanning. */
+export function extractTables(html: string): string[][][] {
+  const $ = cheerio.load(html);
+  const tables: string[][][] = [];
+  $('table').each((_, table) => {
+    const rows: string[][] = [];
+    $(table)
+      .find('tr')
+      .each((_, tr) => {
+        const cells: string[] = [];
+        $(tr)
+          .find('td, th')
+          .each((_, cell) => {
+            cells.push($(cell).text().replace(/\s+/g, ' ').trim());
+          });
+        if (cells.length) rows.push(cells);
+      });
+    if (rows.length) tables.push(rows);
+  });
+  return tables;
+}
+
+/** Best-effort: a "line item" row has one price-like cell and one description cell, and isn't a total/tax/shipping row. */
+export function extractLineItems(tables: string[][][]): ParsedItem[] {
+  const items: ParsedItem[] = [];
+
+  for (const rows of tables) {
+    for (const row of rows) {
+      if (EXCLUDE_ROW_RE.test(row.join(' '))) continue;
+
+      let priceCellIdx = -1;
+      let price = 0;
+      for (let i = 0; i < row.length; i++) {
+        const m = row[i].match(PRICE_CELL_RE);
+        if (m) {
+          priceCellIdx = i;
+          price = parseFloat(m[1].replace(/,/g, ''));
+          break;
+        }
+      }
+      if (priceCellIdx === -1) continue;
+
+      let quantity = 1;
+      for (let i = 0; i < row.length; i++) {
+        if (i === priceCellIdx) continue;
+        const m = row[i].match(QTY_CELL_RE);
+        if (m) {
+          quantity = parseInt(m[1], 10);
+          break;
+        }
+      }
+
+      const nameCell = row.find((cell, i) => i !== priceCellIdx && cell.length > 3 && !QTY_CELL_RE.test(cell));
+      if (!nameCell) continue;
+
+      // The cell price is assumed to be the row's line total (qty x unit price), not the per-unit price.
+      items.push({
+        name: nameCell.slice(0, 200),
+        quantity,
+        unitPrice: quantity > 0 ? Math.round((price / quantity) * 100) / 100 : price,
+        total: price,
+      });
+    }
+  }
+
+  return items;
+}
+
+export interface ReceiptEmailInput {
+  html: string;
+  subject: string;
+  from: string;
+  dateHeader: string | null;
+}
+
+/** Returns null when no total can be found — caller should treat that as "not a receipt" and skip it. */
+export function parseReceiptEmail(input: ReceiptEmailInput): ParsedReceipt | null {
+  const text = extractPlainText(input.html);
+  const total = extractTotal(text);
+  if (total === null) return null;
+
+  const merchant = extractMerchantName(input.from, input.subject);
+  let items = extractLineItems(extractTables(input.html));
+  if (items.length === 0) {
+    items = [{ name: `${merchant} order`, quantity: 1, unitPrice: total, total }];
+  }
+
+  return {
+    merchant,
+    orderNumber: extractOrderNumber(text),
+    orderDate: extractOrderDate(text, input.dateHeader),
+    currency: 'USD',
+    total,
+    items,
+  };
+}
