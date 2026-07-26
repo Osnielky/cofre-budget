@@ -36,10 +36,10 @@ export default function PrivacyPolicyPage() {
         to us in readable form.</p>
       <p><strong style={{ color: 'var(--color-text-primary)' }}>Gmail data</strong> — if you connect Gmail, Cofre
         requests read-only access (<code>gmail.readonly</code>) to search for receipt, order-confirmation, and
-        invoice emails from a known set of merchant senders, limited to the last 90 days. We read the matching
-        email&rsquo;s subject and body to extract the merchant, order number, date, total, and line items.
-        That extraction happens entirely on Cofre&rsquo;s own server — the email content is never sent to any
-        third-party AI or analysis service.
+        invoice emails whose subject line looks like a receipt, order confirmation, or invoice — regardless of
+        sender — limited to the last 90 days. We read the matching email&rsquo;s subject and body to extract
+        the merchant, order number, date, total, and line items. That extraction happens entirely on Cofre&rsquo;s
+        own server — the email content is never sent to any third-party AI or analysis service.
         <strong style={{ color: 'var(--color-text-primary)' }}> We do not store the raw email body or attachments</strong> —
         only the resulting structured receipt (merchant, items, total, and the subject line) is saved to your
         account. Your Gmail OAuth tokens are encrypted at rest (AES-256-GCM) and are only used to fetch the emails
