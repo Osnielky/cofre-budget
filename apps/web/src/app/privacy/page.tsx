@@ -37,8 +37,9 @@ export default function PrivacyPolicyPage() {
       <p><strong style={{ color: 'var(--color-text-primary)' }}>Gmail data</strong> — if you connect Gmail, Cofre
         requests read-only access (<code>gmail.readonly</code>) to search for receipt, order-confirmation, and
         invoice emails from a known set of merchant senders, limited to the last 90 days. We read the matching
-        email&rsquo;s subject and body to extract the merchant, order number, date, total, and line items. That
-        extraction is performed by sending the email content to Anthropic&rsquo;s Claude API for parsing.
+        email&rsquo;s subject and body to extract the merchant, order number, date, total, and line items.
+        That extraction happens entirely on Cofre&rsquo;s own server — the email content is never sent to any
+        third-party AI or analysis service.
         <strong style={{ color: 'var(--color-text-primary)' }}> We do not store the raw email body or attachments</strong> —
         only the resulting structured receipt (merchant, items, total, and the subject line) is saved to your
         account. Your Gmail OAuth tokens are encrypted at rest (AES-256-GCM) and are only used to fetch the emails
@@ -67,9 +68,6 @@ export default function PrivacyPolicyPage() {
           transaction data.</li>
         <li><strong style={{ color: 'var(--color-text-primary)' }}>Google</strong> — Gmail and Google Sign-In, as
           described above.</li>
-        <li><strong style={{ color: 'var(--color-text-primary)' }}>Anthropic</strong> — parses receipt email content
-          into structured data; the raw email is not retained by us or, to our knowledge, used by Anthropic to train
-          models.</li>
         <li><strong style={{ color: 'var(--color-text-primary)' }}>Resend</strong> — delivers transactional email
           (verification, password reset).</li>
         <li><strong style={{ color: 'var(--color-text-primary)' }}>Google Cloud</strong> — hosts our application and
