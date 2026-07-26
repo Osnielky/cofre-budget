@@ -51,8 +51,7 @@ export default function PrivacyPolicyPage() {
         <a href="https://developers.google.com/terms/api-services-user-data-policy" style={{ color: 'var(--color-primary)' }}>
           Google API Services User Data Policy
         </a>, including the Limited Use requirements. We do not use Gmail data for advertising, and we do not sell
-        or share Gmail data with third parties other than the AI provider used solely to parse receipt content, as
-        described above.
+        or share Gmail data with any third party.
       </p>
 
       <H2>3. How we use your data</H2>
