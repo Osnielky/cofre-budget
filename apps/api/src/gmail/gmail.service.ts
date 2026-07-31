@@ -1,12 +1,12 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { google } from 'googleapis';
-import Anthropic from '@anthropic-ai/sdk';
 import { ConnectedApp } from '../connected-apps/connected-app.entity';
 import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.util';
+import { parseReceiptEmail } from './receipt-parser';
 
 export interface RawReceiptItem {
   name: string;
@@ -29,7 +29,7 @@ export interface RawReceipt {
 @Injectable()
 export class GmailService {
   private readonly encKey: Buffer;
-  private readonly anthropic: Anthropic;
+  private readonly logger = new Logger(GmailService.name);
 
   constructor(
     private config: ConfigService,
@@ -39,8 +39,6 @@ export class GmailService {
     const secret = this.config.get<string>('JWT_SECRET');
     if (!secret) throw new Error('JWT_SECRET is required for GmailService token encryption');
     this.encKey = deriveKey(secret);
-    const anthropicKey = this.config.get<string>('ANTHROPIC_API_KEY');
-    this.anthropic = anthropicKey ? new Anthropic({ apiKey: anthropicKey }) : new Anthropic();
   }
 
   private makeOAuth2Client() {
@@ -136,7 +134,7 @@ export class GmailService {
 
   async fetchAndParseReceipts(userId: string): Promise<RawReceipt[]> {
     const QUERY =
-      'from:(ship-confirm@amazon.com OR auto-confirm@amazon.com OR doordash.com OR ubereats.com OR order@walmart.com OR no-reply@apple.com OR noreply@doordash.com) newer_than:90d';
+      'subject:(receipt OR invoice OR "order confirmation" OR "your order" OR "payment received") newer_than:90d';
     return this.searchReceipts(userId, QUERY, 50);
   }
 
@@ -153,29 +151,32 @@ export class GmailService {
 
     const messages = listRes.data.messages ?? [];
     const results: RawReceipt[] = [];
+    this.logger.log(`Gmail search "${query}" matched ${messages.length} message(s) for user ${userId}`);
 
     for (const msg of messages) {
       if (!msg.id) continue;
       const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
-      const subject = this.extractHeader(full.data.payload?.headers ?? [], 'Subject');
+      const headers = full.data.payload?.headers ?? [];
+      const subject = this.extractHeader(headers, 'Subject');
+      const from = this.extractHeader(headers, 'From');
+      const dateHeader = this.extractHeader(headers, 'Date') || null;
       const body = this.extractBody(full.data.payload);
-      if (!body) continue;
-      const parsed = await this.parseWithClaude(body, subject);
-      if (parsed) {
-        results.push({ gmailMessageId: msg.id, subject, ...parsed });
-      } else {
-        // Parse failed — store a fallback receipt so the email is not silently lost
-        results.push({
-          gmailMessageId: msg.id,
-          subject,
-          merchant: subject.slice(0, 100) || 'Unknown Merchant',
-          orderNumber: null,
-          orderDate: null,
-          currency: 'USD',
-          total: 0,
-          items: [{ name: 'Order total (parsing failed — check email for details)', quantity: 1, unitPrice: 0, total: 0 }],
-        });
+      if (!body) {
+        this.logger.warn(`No text/html body extracted for message ${msg.id} ("${subject}"), mimeType=${full.data.payload?.mimeType}, skipping`);
+        continue;
       }
+      let parsed: ReturnType<typeof parseReceiptEmail>;
+      try {
+        parsed = parseReceiptEmail({ html: body, subject, from, dateHeader });
+      } catch (err) {
+        this.logger.warn(`Failed to parse message ${msg.id} ("${subject}"): ${(err as Error)?.message}, skipping`);
+        continue;
+      }
+      if (!parsed) {
+        this.logger.warn(`No total found in message ${msg.id} ("${subject}"), skipping — likely not a receipt`);
+        continue;
+      }
+      results.push({ gmailMessageId: msg.id, subject, ...parsed });
     }
 
     return results;
@@ -197,45 +198,5 @@ export class GmailService {
       }
     }
     return '';
-  }
-
-  private async parseWithClaude(
-    emailHtml: string,
-    subject: string,
-  ): Promise<Omit<RawReceipt, 'gmailMessageId' | 'subject'> | null> {
-    const truncated = emailHtml.slice(0, 8000);
-    const prompt = `You are a receipt parser. Extract purchase data from this merchant receipt email and return ONLY valid JSON (no markdown, no explanation).
-
-Email subject: ${subject}
-
-Email body (HTML):
-${truncated}
-
-Return this exact JSON shape:
-{
-  "merchant": "string (merchant name, e.g. Amazon)",
-  "orderNumber": "string or null",
-  "orderDate": "YYYY-MM-DD or null",
-  "currency": "USD",
-  "total": number,
-  "items": [
-    { "name": "string", "quantity": number, "unitPrice": number, "total": number }
-  ]
-}
-
-If you cannot find a clear order total or any items, return null.`;
-
-    try {
-      const response = await this.anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }],
-      });
-      const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
-      if (text === 'null' || !text) return null;
-      return JSON.parse(text);
-    } catch {
-      return null;
-    }
   }
 }
