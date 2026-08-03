@@ -8,6 +8,8 @@ import ImportReconcileModal from '@/components/ImportReconcileModal';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
+import LinkIcon from '@/components/LinkIcon';
+import InfoIcon from '@/components/InfoIcon';
 import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiability } from '@/lib/accountTypes';
 import SplitTransactionModal from '@/components/SplitTransactionModal';
 import FindReceiptModal from '@/components/FindReceiptModal';
@@ -126,6 +128,8 @@ export default function TransactionsPage() {
   const [transferModalMatches, setTransferModalMatches] = useState<Transaction[]>([]);
   const [transferModalLoading, setTransferModalLoading] = useState(false);
   const [transferModalSelected, setTransferModalSelected] = useState<string | null>(null); // tx id
+  const [transferModalShowMore, setTransferModalShowMore] = useState(false);
+  const [transferModalInfoOpen, setTransferModalInfoOpen] = useState(false);
   const [markAsSaleConfirm, setMarkAsSaleConfirm]     = useState<string | null>(null); // projectId
   const [markAsSaleSaving, setMarkAsSaleSaving]       = useState(false);
 
@@ -1683,6 +1687,8 @@ export default function TransactionsPage() {
                                           setTransferModal({ tx, categoryId: c.id });
                                           setTransferModalSelected(null);
                                           setTransferModalMatches([]);
+                                          setTransferModalShowMore(false);
+                                          setTransferModalInfoOpen(false);
                                           setTransferModalLoading(true);
                                           fetch(`${API}/transactions/matches?amount=${tx.amount}&date=${tx.date}&excludeAccountId=${tx.bankAccountId}`, { credentials: 'include' })
                                             .then((r) => r.json())
@@ -2383,32 +2389,73 @@ export default function TransactionsPage() {
               const selMatch   = isTxSel ? transferModalMatches.find((m) => m.id === transferModalSelected) : null;
               const selAccId   = isAccSel ? transferModalSelected!.replace('acc:', '') : null;
               const selAcc     = selAccId ? accounts.find((a) => a.id === selAccId) : null;
-              const confirmColor = selMatch ? (selMatch.bankAccount?.color || '#9B6DFF') : selAcc ? (selAcc.color || '#9B6DFF') : '#6B6B8A';
+              const hasSelection = !!transferModalSelected;
+
+              const bestMatch  = transferModalMatches[0] ?? null;
+              const showList   = transferModalShowMore || !bestMatch;
+              const isBestSel  = !!bestMatch && transferModalSelected === bestMatch.id;
+              const dayDiff    = bestMatch ? Math.round(Math.abs(new Date(bestMatch.date).getTime() - new Date(srcTx.date).getTime()) / 86400000) : 0;
+              const matchReason = dayDiff === 0 ? 'Same amount and date' : `Same amount, ${dayDiff} day${dayDiff === 1 ? '' : 's'} apart`;
+              const otherAccounts = accounts.filter((a) => a.id !== srcTx.bankAccountId)
+                .sort((a, b) => (isLiability(a.accountType) ? 0 : 1) - (isLiability(b.accountType) ? 0 : 1));
+
+              const knownLabel = isOutgoing ? 'Payment sent' : 'Payment received';
+              const knownSign  = isOutgoing ? '−' : '+';
+              const knownWord  = isOutgoing ? 'payment' : 'deposit';
+              const otherSign  = selMatch ? (Number(selMatch.amount) >= 0 ? '+' : '−') : (isOutgoing ? '+' : '−');
+              const otherWord  = selMatch ? (Number(selMatch.amount) >= 0 ? 'deposit' : 'payment') : (isOutgoing ? 'deposit' : 'payment');
+              const otherAbsAmt = selMatch ? Math.abs(Number(selMatch.amount)) : absAmt;
 
               return (
                 <div className="w-full max-w-md flex flex-col rounded-2xl overflow-hidden"
                   style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
 
                   {/* Header */}
-                  <div className="flex items-center justify-between px-5 py-4"
+                  <div className="px-5 py-4"
                     style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <div>
-                      <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>Link Transfer</p>
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                        {isOutgoing ? 'Where did this money go?' : 'Where did this money come from?'}
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-bold text-base" style={{ color: 'var(--color-text-primary)' }}>Link a transfer</p>
+                        <button type="button" onClick={() => setTransferModalInfoOpen((v) => !v)}
+                          aria-label="What is this for?"
+                          className="w-4 h-4 rounded-full flex items-center justify-center shrink-0 hover:opacity-75 transition-opacity"
+                          style={{ color: transferModalInfoOpen ? 'var(--color-violet)' : 'var(--color-text-muted)' }}>
+                          <InfoIcon size={14} />
+                        </button>
+                      </div>
+                      <button onClick={() => setTransferModal(null)}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)]"
+                        style={{ color: 'var(--color-text-muted)' }}>✕</button>
                     </div>
-                    <button onClick={() => setTransferModal(null)}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)]"
-                      style={{ color: 'var(--color-text-muted)' }}>✕</button>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                      {isOutgoing ? 'Match this payment with the account it went to.' : 'Match this deposit with the account it came from.'}
+                    </p>
+                    {transferModalInfoOpen && (
+                      <p className="text-[11px] leading-snug mt-2 p-2.5 rounded-lg"
+                        style={{ background: 'color-mix(in srgb, var(--color-violet) 10%, transparent)', color: 'var(--color-text-secondary)' }}>
+                        A transfer is money moving between your own accounts — like paying a credit card from checking. Linking both sides keeps your budget accurate by keeping transfers out of your income and spending totals.
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-col px-5 py-4 gap-3">
 
-                    {/* FROM card */}
+                    {/* Reassurance banner */}
+                    <div className="flex items-center gap-3 p-3 rounded-xl"
+                      style={{ background: 'color-mix(in srgb, var(--color-violet) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-violet) 30%, transparent)' }}>
+                      <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+                        style={{ background: 'color-mix(in srgb, var(--color-violet) 22%, transparent)', color: 'var(--color-violet)' }}>
+                        <LinkIcon size={16} />
+                      </span>
+                      <p className="text-xs leading-snug" style={{ color: 'var(--color-text-secondary)' }}>
+                        This will not move money. It only connects two transactions in your records.
+                      </p>
+                    </div>
+
+                    {/* Known transaction card */}
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
-                        style={{ color: 'var(--color-text-muted)' }}>{isOutgoing ? 'Money leaving' : 'Money arriving at'}</p>
+                        style={{ color: 'var(--color-text-muted)' }}>{isOutgoing ? 'Payment sent' : 'Deposit received'}</p>
                       <div className="flex items-center gap-3 p-3 rounded-xl"
                         style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
@@ -2416,7 +2463,7 @@ export default function TransactionsPage() {
                           <AccountTypeIcon type={srcTx.bankAccount?.accountType ?? ''} size={18} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{srcTx.name}</p>
+                          <p className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>{knownLabel}</p>
                           <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
                             {srcTx.bankAccount?.accountName} · {srcTx.date}
                           </p>
@@ -2428,73 +2475,95 @@ export default function TransactionsPage() {
                       </div>
                     </div>
 
-                    {/* Flow arrow */}
+                    {/* Link connector */}
                     <div className="flex flex-col items-center gap-0.5">
-                      <div className="w-px h-3" style={{ background: 'var(--color-border)' }} />
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
-                        style={{ background: 'rgba(107,107,138,0.15)', border: '1px solid rgba(107,107,138,0.25)' }}>
-                        <span style={{ color: '#9B9BB8', fontSize: 11 }}>{isOutgoing ? '↓' : '↑'}</span>
-                        <span className="text-xs font-bold tabular-nums" style={{ color: '#9B9BB8' }}>${absAmt.toFixed(2)}</span>
-                        <span style={{ color: '#9B9BB8', fontSize: 11 }}>{isOutgoing ? '↓' : '↑'}</span>
-                      </div>
-                      <div className="w-px h-3" style={{ background: 'var(--color-border)' }} />
+                      <div className="w-px h-3" style={{ background: 'color-mix(in srgb, var(--color-violet) 45%, transparent)' }} />
+                      <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                        style={{ border: '1.5px solid var(--color-violet)', color: 'var(--color-violet)' }}>
+                        <LinkIcon size={13} />
+                      </span>
+                      <div className="w-px h-3" style={{ background: 'color-mix(in srgb, var(--color-violet) 45%, transparent)' }} />
                     </div>
 
-                    {/* TO section */}
+                    {/* Source / destination picker */}
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
-                        style={{ color: 'var(--color-text-muted)' }}>{isOutgoing ? 'Money arriving at' : 'Money coming from'}</p>
+                        style={{ color: 'var(--color-text-muted)' }}>{isOutgoing ? 'Choose the destination' : 'Choose the source'}</p>
 
-                      {/* Selected preview */}
-                      {(selMatch || selAcc) && (
-                        <div className="flex items-center gap-3 p-3 rounded-xl mb-2"
-                          style={{ background: `${confirmColor}15`, border: `1px solid ${confirmColor}44` }}>
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                            style={{ background: `${confirmColor}25` }}>
-                            <AccountTypeIcon type={selMatch?.bankAccount?.accountType ?? selAcc?.accountType ?? ''} size={18} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold truncate" style={{ color: confirmColor }}>
-                              {selMatch ? selMatch.name : selAcc?.accountName}
-                            </p>
-                            <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
-                              {selMatch ? `${selMatch.bankAccount?.accountName} · ${selMatch.date}` : selAcc?.bankName}
-                            </p>
-                          </div>
-                          {selMatch && (
-                            <p className="text-sm font-black tabular-nums shrink-0"
-                              style={{ color: Number(selMatch.amount) >= 0 ? 'var(--color-green)' : 'var(--color-rose)' }}>
-                              {Number(selMatch.amount) >= 0 ? '+' : '−'}${Math.abs(Number(selMatch.amount)).toFixed(2)}
-                            </p>
-                          )}
-                          <span className="text-xs shrink-0" style={{ color: confirmColor }}>✓</span>
-                        </div>
-                      )}
-
-                      {/* Matches / picker */}
                       {transferModalLoading ? (
                         <p className="text-xs py-3 text-center" style={{ color: 'var(--color-text-muted)' }}>Searching for matches…</p>
+                      ) : !showList ? (
+                        <>
+                          {/* Best match card */}
+                          <button type="button" onClick={() => setTransferModalSelected(isBestSel ? null : bestMatch!.id)}
+                            className="w-full text-left p-3 rounded-xl transition-all"
+                            style={{
+                              background: 'color-mix(in srgb, var(--color-violet) 10%, transparent)',
+                              border: `1.5px solid ${isBestSel ? 'var(--color-violet)' : 'color-mix(in srgb, var(--color-violet) 35%, transparent)'}`,
+                            }}>
+                            <span className="inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full mb-2"
+                              style={{ background: 'color-mix(in srgb, var(--color-violet) 25%, transparent)', color: 'var(--color-violet)' }}>
+                              Best match
+                            </span>
+                            <div className="flex items-center gap-3">
+                              <span className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                                style={{ border: `2px solid ${isBestSel ? 'var(--color-violet)' : 'var(--color-text-muted)'}` }}>
+                                {isBestSel && <span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--color-violet)' }} />}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>{bestMatch!.name}</p>
+                                <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                                  {bestMatch!.bankAccount?.accountName} · {bestMatch!.date}
+                                </p>
+                              </div>
+                              <p className="text-sm font-black tabular-nums shrink-0"
+                                style={{ color: Number(bestMatch!.amount) >= 0 ? 'var(--color-green)' : 'var(--color-rose)' }}>
+                                {Number(bestMatch!.amount) >= 0 ? '+' : '−'}${Math.abs(Number(bestMatch!.amount)).toFixed(2)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-2 pl-8">
+                              <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center shrink-0" style={{ background: 'var(--color-green)' }}>
+                                <span style={{ fontSize: 9, color: '#06210F' }}>✓</span>
+                              </span>
+                              <span className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>{matchReason}</span>
+                            </div>
+                          </button>
+
+                          <button type="button" onClick={() => setTransferModalShowMore(true)}
+                            className="w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2.5 mt-1 hover:opacity-80 transition-opacity"
+                            style={{ color: 'var(--color-violet)' }}>
+                            Choose a different account
+                            <span style={{ fontSize: 10 }}>⌄</span>
+                          </button>
+                        </>
                       ) : (
-                        <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto overflow-x-hidden">
-                          {/* Auto matches */}
+                        <div className="flex flex-col gap-1.5 max-h-56 overflow-y-auto overflow-x-hidden">
+                          {bestMatch && (
+                            <button type="button" onClick={() => setTransferModalShowMore(false)}
+                              className="w-full flex items-center gap-1.5 text-xs font-semibold pb-1 hover:opacity-80 transition-opacity"
+                              style={{ color: 'var(--color-violet)' }}>
+                              <span style={{ fontSize: 10 }}>⌃</span> Back to best match
+                            </button>
+                          )}
                           {transferModalMatches.length > 0 && (
                             <>
-                              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-green)' }}>✦ Suggested matches</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Suggested matches</p>
                               {transferModalMatches.map((m) => {
-                                const acc = m.bankAccount;
-                                const c   = acc?.color || '#9B6DFF';
                                 const sel = transferModalSelected === m.id;
                                 return (
                                   <button key={m.id} type="button" onClick={() => setTransferModalSelected(sel ? null : m.id)}
                                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
-                                    style={{ background: sel ? `${c}18` : 'color-mix(in srgb, var(--color-green) 5%, transparent)', border: `1px solid ${sel ? c + '55' : 'color-mix(in srgb, var(--color-green) 20%, transparent)'}` }}>
+                                    style={{
+                                      background: sel ? 'color-mix(in srgb, var(--color-violet) 16%, transparent)' : 'var(--color-elevated)',
+                                      border: `1px solid ${sel ? 'var(--color-violet)' : 'var(--color-border)'}`,
+                                    }}>
                                     <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                                      style={{ background: `${c}20` }}>
-                                      <AccountTypeIcon type={acc?.accountType ?? ''} size={14} />
+                                      style={{ background: 'color-mix(in srgb, var(--color-violet) 18%, transparent)', color: 'var(--color-violet)' }}>
+                                      <AccountTypeIcon type={m.bankAccount?.accountType ?? ''} size={14} />
                                     </span>
                                     <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-semibold truncate" style={{ color: sel ? c : 'var(--color-text-primary)' }}>{m.name}</p>
-                                      <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{acc?.accountName} · {m.date}</p>
+                                      <p className="text-xs font-semibold truncate" style={{ color: sel ? 'var(--color-violet)' : 'var(--color-text-primary)' }}>{m.name}</p>
+                                      <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{m.bankAccount?.accountName} · {m.date}</p>
                                     </div>
                                     <p className="text-xs font-bold tabular-nums shrink-0"
                                       style={{ color: Number(m.amount) >= 0 ? 'var(--color-green)' : 'var(--color-rose)' }}>
@@ -2506,41 +2575,51 @@ export default function TransactionsPage() {
                               <div className="my-1" style={{ borderTop: '1px solid var(--color-border)' }} />
                             </>
                           )}
-                          {/* Account picker */}
                           <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                            {transferModalMatches.length > 0 ? 'Or pick account only' : 'Select destination account'}
+                            {transferModalMatches.length > 0 ? 'Or pick an account' : 'Select destination account'}
                           </p>
-                          {accounts.filter((a) => a.id !== srcTx.bankAccountId)
-                            .sort((a, b) => {
-                              const aCredit = isLiability(a.accountType) ? 0 : 1;
-                              const bCredit = isLiability(b.accountType) ? 0 : 1;
-                              return aCredit - bCredit;
-                            })
-                            .map((a) => {
-                              const c   = a.color || '#9B6DFF';
-                              const sel = transferModalSelected === `acc:${a.id}`;
-                              return (
-                                <button key={a.id} type="button" onClick={() => setTransferModalSelected(sel ? null : `acc:${a.id}`)}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
-                                  style={{ background: sel ? `${c}18` : 'var(--color-elevated)', border: `1px solid ${sel ? c + '55' : 'var(--color-elevated)'}` }}>
-                                  <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                                    style={{ background: `${c}20` }}>
-                                    <AccountTypeIcon type={a.accountType} size={14} />
-                                  </span>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-semibold truncate" style={{ color: sel ? c : 'var(--color-text-primary)' }}>{a.accountName}</p>
-                                    <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.bankName}</p>
-                                  </div>
-                                  {(() => { const tc = accountTypeMeta(a.accountType).accent; return (
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded capitalize shrink-0"
-                                    style={{ background: `color-mix(in srgb, ${tc} 16%, transparent)`, color: tc }}>{a.accountType}</span>
-                                  ); })()}
-                                </button>
-                              );
-                            })}
+                          {otherAccounts.map((a) => {
+                            const sel = transferModalSelected === `acc:${a.id}`;
+                            return (
+                              <button key={a.id} type="button" onClick={() => setTransferModalSelected(sel ? null : `acc:${a.id}`)}
+                                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
+                                style={{
+                                  background: sel ? 'color-mix(in srgb, var(--color-violet) 16%, transparent)' : 'var(--color-elevated)',
+                                  border: `1px solid ${sel ? 'var(--color-violet)' : 'var(--color-border)'}`,
+                                }}>
+                                <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                                  style={{ background: 'color-mix(in srgb, var(--color-violet) 18%, transparent)', color: 'var(--color-violet)' }}>
+                                  <AccountTypeIcon type={a.accountType} size={14} />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-semibold truncate" style={{ color: sel ? 'var(--color-violet)' : 'var(--color-text-primary)' }}>{a.accountName}</p>
+                                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.bankName}</p>
+                                </div>
+                                {(() => { const tc = accountTypeMeta(a.accountType).accent; return (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded capitalize shrink-0"
+                                  style={{ background: `color-mix(in srgb, ${tc} 16%, transparent)`, color: tc }}>{a.accountType}</span>
+                                ); })()}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
+
+                    {/* Ready to link summary */}
+                    {hasSelection && (
+                      <div className="flex items-center gap-3 p-3 rounded-xl"
+                        style={{ background: 'color-mix(in srgb, var(--color-green) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 28%, transparent)' }}>
+                        <span className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm font-bold"
+                          style={{ background: 'var(--color-green)', color: '#06210F' }}>✓</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold" style={{ color: 'var(--color-text-primary)' }}>Ready to link</p>
+                          <p className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
+                            {knownSign}${absAmt.toFixed(2)} {knownWord} <span style={{ opacity: 0.6 }}>↔</span> {otherSign}${otherAbsAmt.toFixed(2)} {otherWord}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Footer */}
@@ -2548,7 +2627,7 @@ export default function TransactionsPage() {
                     style={{ borderTop: '1px solid var(--color-border)' }}>
                     <button onClick={() => setTransferModal(null)}
                       className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
-                      style={{ color: 'var(--color-text-secondary)' }}>Skip</button>
+                      style={{ color: 'var(--color-text-secondary)' }}>Cancel</button>
                     <button disabled={!transferModalSelected}
                       onClick={async () => {
                         if (!transferModalSelected) return;
@@ -2561,8 +2640,8 @@ export default function TransactionsPage() {
                         setTransferModalSelected(null);
                       }}
                       className="px-5 py-2 text-sm font-bold text-white rounded-xl hover:brightness-110 disabled:opacity-40 transition-all"
-                      style={{ background: transferModalSelected ? confirmColor : '#6B6B8A' }}>
-                      {transferModalSelected ? 'Confirm Link ⇄' : 'Select destination'}
+                      style={{ background: transferModalSelected ? 'var(--color-violet)' : '#6B6B8A' }}>
+                      {transferModalSelected ? 'Link transactions' : 'Select an account'}
                     </button>
                   </div>
                 </div>
