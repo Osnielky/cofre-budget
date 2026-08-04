@@ -168,7 +168,7 @@ export class TransactionsService {
       const externalId = row.referenceNumber ? `csv_${row.referenceNumber}` : null;
 
       if (externalId) {
-        const exists = await this.repo.findOneBy({ externalId });
+        const exists = await this.repo.findOneBy({ externalId, userId });
         if (exists) { skipped++; continue; }
       }
 

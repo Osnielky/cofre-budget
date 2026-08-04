@@ -139,7 +139,7 @@ export class PlaidService {
         const account = await this.accountRepo.findOneBy({ plaidAccountId: pt.account_id });
         if (!account) continue;
 
-        const existing = await this.txRepo.findOneBy({ externalId: pt.transaction_id });
+        const existing = await this.txRepo.findOneBy({ externalId: pt.transaction_id, userId: item.userId });
         if (existing) {
           existing.pending = pt.pending;
           await this.txRepo.save(existing);

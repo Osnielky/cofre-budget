@@ -1,13 +1,19 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
-  ManyToOne, JoinColumn,
+  ManyToOne, JoinColumn, Index,
   CreateDateColumn, UpdateDateColumn,
 } from 'typeorm';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Category } from '../categories/category.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
 
+/* externalId (Plaid transaction_id, or a CSV reference/composite key) is only
+   guaranteed unique per user — two different users' CSV imports can produce
+   the identical composite fallback key (same date/name/amount, e.g. a Schwab
+   MoneyLink transfer with no reference-number column), so uniqueness must be
+   scoped to the owning user, not global. */
 @Entity('transactions')
+@Index(['userId', 'externalId'], { unique: true })
 export class Transaction {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -22,8 +28,9 @@ export class Transaction {
   @Column({ nullable: true })
   bankAccountId: string;
 
-  /* External dedup key — Plaid transaction_id or CSV reference number */
-  @Column({ nullable: true, unique: true })
+  /* External dedup key — Plaid transaction_id or CSV reference number.
+     Uniqueness is enforced per-user via the composite index above. */
+  @Column({ nullable: true })
   externalId: string;
 
   /* 'plaid' | 'csv' | 'manual' */
