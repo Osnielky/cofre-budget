@@ -5,10 +5,12 @@ import Panel, { PanelEmpty } from '../Panel';
 import { fmt } from '../chartTheme';
 import type { Budget } from '@/lib/dashboard/types';
 
-export default function BudgetActualPanel({ budgets, loading }: { budgets: Budget[]; loading: boolean }) {
+export default function BudgetActualPanel({ budgets, monthLabel, loading }: {
+  budgets: Budget[]; monthLabel: string; loading: boolean;
+}) {
   const tc = useThemeColors();
   return (
-    <Panel title="Budget vs Actual" subtitle="This month" loading={loading}>
+    <Panel title="Budget vs Actual" subtitle={monthLabel} loading={loading}>
       {budgets.length === 0 ? <PanelEmpty message="No budgets set. Create budgets to track spending against targets." /> : (
         <ul className="flex flex-col gap-2.5">
           {budgets.map((b) => {

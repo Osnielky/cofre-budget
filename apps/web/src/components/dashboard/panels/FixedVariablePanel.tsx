@@ -5,11 +5,13 @@ import Panel, { PanelEmpty } from '../Panel';
 import { fmt } from '../chartTheme';
 import type { FixedVariableSplit } from '@/lib/dashboard/derive';
 
-export default function FixedVariablePanel({ split, loading }: { split: FixedVariableSplit; loading: boolean }) {
+export default function FixedVariablePanel({ split, monthLabel, loading }: {
+  split: FixedVariableSplit; monthLabel: string; loading: boolean;
+}) {
   const tc = useThemeColors();
   const total = split.fixedTotal + split.variableTotal;
   return (
-    <Panel title="Fixed vs Variable" subtitle="This month" loading={loading}>
+    <Panel title="Fixed vs Variable" subtitle={monthLabel} loading={loading}>
       {total === 0 ? <PanelEmpty message="No expenses this month. Mark categories as fixed in Settings → Categories." /> : (
         <div className="flex flex-col gap-3">
           <div className="flex h-9 rounded-xl overflow-hidden text-[10px] font-bold">

@@ -195,20 +195,21 @@ export default function DashboardPage() {
             <CashFlowTrendPanel data={d.trend} loading={loading} />
             <CategoryDonutPanel title="Income Sources" subtitle="Year to date" colSpan={2}
               slices={d.incomeSlices} total={d.incomeTotal} loading={loading} />
-            <CategoryDonutPanel title="Expenses by Category" subtitle="This month" colSpan={2}
+            <CategoryDonutPanel title="Expenses by Category" subtitle={monthLabel(month)} colSpan={2}
               slices={d.expenseDonut} total={d.expenseTotal} loading={loading} />
 
             <CategoryRankingPanel slices={d.ranking} loading={loading} />
-            <BudgetActualPanel budgets={spendingBudgets} loading={loading} />
+            <BudgetActualPanel budgets={spendingBudgets} monthLabel={monthLabel(month)} loading={loading} />
             <SpendingCalendarPanel cells={d.calendar} monthLabel={monthLabel(month)} loading={loading} />
-            <SpendingPacePanel pace={d.pace} loading={loading} />
+            <SpendingPacePanel pace={d.pace} monthLabel={monthLabel(month)} loading={loading} />
 
-            <FixedVariablePanel split={d.fixedVar} loading={loading} />
+            <FixedVariablePanel split={d.fixedVar} monthLabel={monthLabel(month)} loading={loading} />
             <RecurringTimelinePanel />
             <SavingsGrowthPanel stats={d.savings} loading={loading} onGoalSaved={refetch} />
             <NetWorthPanel data={d.netWorth} loading={loading} />
 
-            <ExpenseChangePanel changes={d.changes.changes} unchanged={d.changes.unchanged} loading={loading} />
+            <ExpenseChangePanel changes={d.changes.changes} unchanged={d.changes.unchanged}
+              monthLabel={monthLabel(month)} prevMonthLabel={monthLabel(prevM)} loading={loading} />
             <TopMerchantsPanel merchants={d.merchants} loading={loading} />
             <SubscriptionsPanel />
 
