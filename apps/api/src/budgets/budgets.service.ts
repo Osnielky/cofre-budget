@@ -140,6 +140,26 @@ export class BudgetsService {
     );
   }
 
+  /** Spending-budget totals vs. actual spend for each of the last N calendar months
+      (ending at the current month), for the plan-history sparkline. */
+  async history(userId: string, months = 6): Promise<{ month: string; budget: number; spent: number }[]> {
+    const n = Math.min(Math.max(months, 1), 24);
+    const now = new Date();
+    const keys = Array.from({ length: n }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (n - 1 - i), 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    return Promise.all(keys.map(async (month) => {
+      const rows = await this.findWithSpent(userId, month);
+      const spending = rows.filter((b) => (b.category ? b.category.type !== 'income' : true) && !b.projectCategoryId);
+      return {
+        month,
+        budget: +spending.reduce((s, b) => s + Number(b.amount), 0).toFixed(2),
+        spent: +spending.reduce((s, b) => s + Number(b.spent), 0).toFixed(2),
+      };
+    }));
+  }
+
   async getMonthSummaries(userId: string): Promise<{ month: string; total: number; count: number }[]> {
     // Count only spending budgets (exclude income targets) so the total matches
     // the "Total Budget" shown on the page.

@@ -1,32 +1,24 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Sidebar from '@/components/Sidebar';
-import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import {
+  daysInMonth, dayOfMonth, elapsedPct, splitBudgets, monthTotals,
+  unbudgetedSpending, burnSeries, categoryTrend,
+} from '@/lib/budgets/derive';
+import type { CategoryTrendPoint } from '@/lib/budgets/derive';
+import type { Category, Project, BudgetWithSpent, Transaction, MonthSummary, HistoryPoint } from '@/lib/budgets/types';
+import PlanFlow from '@/components/budgets/PlanFlow';
+import BurnChart from '@/components/budgets/BurnChart';
+import ActionsPanel from '@/components/budgets/ActionsPanel';
+import BudgetTable from '@/components/budgets/BudgetTable';
+import type { SortKey } from '@/components/budgets/BudgetTable';
+import TargetsPanel from '@/components/budgets/TargetsPanel';
+import PlanHistory from '@/components/budgets/PlanHistory';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-interface Category { id: string; name: string; icon: string; color: string; type: string }
-interface MonthSummary { month: string; total: number; count: number }
-interface ProjectCategory { id: string; name: string; icon: string; color: string }
-interface Project { id: string; name: string; icon: string; color?: string | null; type: string; status: string; categories?: ProjectCategory[] }
-interface BudgetWithSpent {
-  id: string; categoryId: string | null; category: Category | null; month?: string; sourceMonth?: string | null;
-  amount: number; spent: number; percentage: number; remaining: number;
-  projectId?: string | null; project?: Project | null;
-  projectCategoryId?: string | null;
-}
-interface Transaction {
-  id: string; name: string; amount: number; date: string;
-  categoryRef: Category | null; bankAccount: { accountName: string; bankName: string } | null;
-}
-
-function progressColor(pct: number) {
-  if (pct >= 100) return 'var(--color-rose)';
-  if (pct >= 80)  return 'var(--color-amber)';
-  return 'var(--color-green)';
-}
 function monthLabel(m: string) {
   const [y, mo] = m.split('-');
   return new Date(Number(y), Number(mo) - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -41,49 +33,55 @@ function nextMonth(m: string) {
   const d = new Date(y, mo);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
+function monthsAgoKey(m: string, n: number) {
+  const [y, mo] = m.split('-').map(Number);
+  const d = new Date(y, mo - 1 - n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
 function monthFrom(m: string) { return `${m}-01`; }
 function monthTo(m: string) {
   const [y, mo] = m.split('-').map(Number);
   return new Date(y, mo, 0).toISOString().slice(0, 10);
 }
 function fmt(n: number) { return Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2 }); }
-function fmtDate(d: string) {
-  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+function lastDayLabel(m: string) {
+  const [y, mo] = m.split('-').map(Number);
+  return new Date(y, mo - 1, daysInMonth(m)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 export default function BudgetsPage() {
+  const now = useMemo(() => new Date(), []);
   const [month, setMonth]           = useState(() => new Date().toISOString().slice(0, 7));
   const [budgets, setBudgets]       = useState<BudgetWithSpent[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [projects, setProjects]     = useState<Project[]>([]);
   const [loading, setLoading]       = useState(true);
+
+  const [wideTxs, setWideTxs]       = useState<Transaction[]>([]);
+  const [history, setHistory]       = useState<HistoryPoint[]>([]);
+  const [categoryAverages, setCategoryAverages] = useState<Record<string, number>>({});
+
   const [showForm, setShowForm]     = useState(false);
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [form, setForm]             = useState({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' });
-  const [sort, setSort]             = useState<'pct' | 'spent' | 'name'>('pct');
+  const [sort, setSort]             = useState<SortKey>('risk');
   const [catDropOpen, setCatDropOpen] = useState(false);
-  const [projects, setProjects]           = useState<Project[]>([]);
   const [projectDropOpen, setProjectDropOpen] = useState(false);
   const [formKind, setFormKind]     = useState<'expense' | 'income'>('expense');
   const [formError, setFormError]   = useState<string | null>(null);
   const [formSaving, setFormSaving] = useState(false);
 
-  /* Expanded budget detail */
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [budgetTxs, setBudgetTxs]   = useState<Transaction[]>([]);
-  const [txLoading, setTxLoading]   = useState(false);
 
-  /* Import plan from another month */
   const [importOpen, setImportOpen]       = useState(false);
   const [importTarget, setImportTarget]   = useState('');
   const [importing, setImporting]         = useState(false);
   const [monthList, setMonthList]         = useState<MonthSummary[]>([]);
   const [loadingMonths, setLoadingMonths] = useState(false);
 
-  /* Set-all-at-once budget table */
   const [setAllOpen, setSetAllOpen]     = useState(false);
   const [setAllRows, setSetAllRows]     = useState<{ categoryId: string; amount: string }[]>([]);
-  const [setAllAvgs, setSetAllAvgs]     = useState<Record<string, number>>({});
   const [setAllSaving, setSetAllSaving] = useState(false);
 
   useEffect(() => {
@@ -123,12 +121,7 @@ export default function BudgetsPage() {
       categoryId: c.id,
       amount: byCat.has(c.id) ? String(byCat.get(c.id)) : '',
     })));
-    setSetAllAvgs({});
     setSetAllOpen(true);
-    fetch(`${API}/budgets/category-averages?months=3`, { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : {}))
-      .then((d) => setSetAllAvgs(d && typeof d === 'object' ? (d as Record<string, number>) : {}))
-      .catch(() => {});
   }
 
   function setRowAmount(categoryId: string, amount: string) {
@@ -137,7 +130,7 @@ export default function BudgetsPage() {
 
   function fillAllFromAverage() {
     setSetAllRows((rows) => rows.map((r) => {
-      const avg = setAllAvgs[r.categoryId];
+      const avg = categoryAverages[r.categoryId];
       return avg && avg > 0 ? { ...r, amount: String(Math.round(avg)) } : r;
     }));
   }
@@ -160,8 +153,6 @@ export default function BudgetsPage() {
 
   useEffect(() => {
     setLoading(true);
-    // Months are independent; if this month has no budgets yet, the API copies
-    // them from the most recent prior month before we fetch.
     fetch(`${API}/budgets/ensure-month`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -173,50 +164,62 @@ export default function BudgetsPage() {
         fetch(`${API}/budgets?month=${month}`, { credentials: 'include' }).then(r => r.json()),
         fetch(`${API}/categories`, { credentials: 'include' }).then(r => r.json()),
         fetch(`${API}/projects`, { credentials: 'include' }).then(r => r.json()),
+        fetch(`${API}/transactions?from=${monthFrom(monthsAgoKey(month, 5))}&to=${monthTo(month)}&limit=3000`, { credentials: 'include' }).then(r => r.json()),
+        fetch(`${API}/budgets/history?months=6`, { credentials: 'include' }).then(r => r.json()),
+        fetch(`${API}/budgets/category-averages?months=3`, { credentials: 'include' }).then((r): Promise<Record<string, number>> => (r.ok ? r.json() : Promise.resolve({}))),
       ]))
-      .then(([b, c, p]) => {
+      .then(([b, c, p, tx, h, avgs]) => {
         setBudgets(Array.isArray(b) ? b : []);
         setCategories(Array.isArray(c) ? c : []);
         setProjects(Array.isArray(p) ? p : []);
+        setWideTxs(Array.isArray(tx) ? tx : []);
+        setHistory(Array.isArray(h) ? h : []);
+        setCategoryAverages(avgs && typeof avgs === 'object' ? avgs : {});
       }).catch(() => {}).finally(() => setLoading(false));
   }, [month]);
 
-  const expandedBudget = budgets.find(b => b.id === expandedId);
+  /* ── Derived data ── */
+  const { spending, targets } = useMemo(() => splitBudgets(budgets), [budgets]);
+  const monthTxs = useMemo(() => wideTxs.filter((t) => t.date.startsWith(month)), [wideTxs, month]);
+  const unbudgeted = useMemo(() => unbudgetedSpending(monthTxs, budgets), [monthTxs, budgets]);
+  const burn = useMemo(() => burnSeries(monthTxs, budgets, month, now), [monthTxs, budgets, month, now]);
+  const totals = useMemo(() => monthTotals(spending, month, now), [spending, month, now]);
 
-  const loadTxs = useCallback(async () => {
-    if (!expandedBudget) return;
-    setTxLoading(true);
-    try {
-      const res = await fetch(`${API}/transactions?from=${monthFrom(month)}&to=${monthTo(month)}&limit=500`, { credentials: 'include' });
-      const all: Transaction[] = await res.json();
-      setBudgetTxs(Array.isArray(all) ? all.filter(t => t.categoryRef?.id === expandedBudget.categoryId) : []);
-    } catch {} finally { setTxLoading(false); }
-  }, [expandedBudget, month]);
+  const txsByCategory = useMemo(() => {
+    const map = new Map<string, Transaction[]>();
+    for (const t of monthTxs) {
+      const id = t.categoryRef?.id;
+      if (!id) continue;
+      const list = map.get(id) ?? [];
+      list.push(t);
+      map.set(id, list);
+    }
+    return map;
+  }, [monthTxs]);
 
-  useEffect(() => { if (expandedId) loadTxs(); }, [loadTxs, expandedId]);
+  const trendByCategory = useMemo(() => {
+    const map = new Map<string, CategoryTrendPoint[]>();
+    for (const b of spending) {
+      if (!b.categoryId || map.has(b.categoryId)) continue;
+      map.set(b.categoryId, categoryTrend(wideTxs, b.categoryId, month, 6));
+    }
+    return map;
+  }, [spending, wideTxs, month]);
 
-  /* Derived stats — spending budgets vs income targets */
-  const isIncomeBudget = (b: BudgetWithSpent) => b.category?.type === 'income' || !!b.projectCategoryId;
-  const spending     = budgets.filter(b => !isIncomeBudget(b));
-  const targets      = budgets.filter(isIncomeBudget)
-    .sort((a, b) => b.percentage - a.percentage);
-  const totalBudget  = spending.reduce((s, b) => s + Number(b.amount), 0);
-  const totalSpent   = spending.reduce((s, b) => s + Number(b.spent), 0);
-  const overBudget   = spending.filter(b => b.percentage >= 100);
-  const nearBudget   = spending.filter(b => b.percentage >= 80 && b.percentage < 100);
-  const onTrack      = spending.filter(b => b.percentage < 80);
-  const overallPct   = totalBudget > 0 ? Math.min((totalSpent / totalBudget) * 100, 100) : 0;
-  const totalTarget  = targets.reduce((s, b) => s + Number(b.amount), 0);
-  const totalEarned  = targets.reduce((s, b) => s + Number(b.spent), 0);
-  const earnPct      = totalTarget > 0 ? Math.round((totalEarned / totalTarget) * 100) : 0;
-  const plannedNet   = totalTarget - totalBudget;
+  const unbudgetedTotal = +unbudgeted.reduce((s, u) => s + u.total, 0).toFixed(2);
+  const combinedSpent = +(totals.totalSpent + unbudgetedTotal).toFixed(2);
+  const combinedRemaining = +(totals.totalBudget - combinedSpent).toFixed(2);
+  const dLeft = daysInMonth(month) - dayOfMonth(month, now);
+  const combinedPerDay = dLeft > 0 ? +(combinedRemaining / dLeft).toFixed(2) : 0;
+
+  const totalTarget = targets.reduce((s, b) => s + Number(b.amount), 0);
+  const totalEarned = targets.reduce((s, b) => s + Number(b.spent), 0);
+  const earnPct = totalTarget > 0 ? Math.round((totalEarned / totalTarget) * 100) : 0;
+  const plannedSavings = totalTarget - totals.totalBudget;
+  const actualSoFar = totalEarned - combinedSpent;
+  const projectedSavings = totalTarget - (totals.totalProjected + unbudgetedTotal);
+
   const isCurrentMonth = month === new Date().toISOString().slice(0, 7);
-
-  const sorted = [...spending].sort((a, b) => {
-    if (sort === 'pct')   return b.percentage - a.percentage;
-    if (sort === 'spent') return Number(b.amount) - Number(a.amount);
-    return (a.category?.name ?? '').localeCompare(b.category?.name ?? '');
-  });
 
   const usedIds   = new Set(budgets.map(b => b.categoryId));
   const available = categories.filter(c => (formKind === 'income'
@@ -224,12 +227,17 @@ export default function BudgetsPage() {
     : c.type !== 'transfer' && c.type !== 'income')
     && (!usedIds.has(c.id) || c.id === form.categoryId));
 
+  function openAddBudget(prefillCategoryId?: string) {
+    setFormKind('expense'); setEditingId(null); setFormError(null);
+    setForm({ categoryId: prefillCategoryId ?? '', amount: '', projectId: '', projectCategoryId: '' });
+    setShowForm(true);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const amt = parseFloat(form.amount);
     setFormError(null);
 
-    /* Validate: a category must always be selected */
     const selProj = projects.find(p => p.id === form.projectId);
     const isProjectCatMode = !!selProj && formKind === 'income';
     if (!editingId) {
@@ -259,8 +267,8 @@ export default function BudgetsPage() {
         if (!res.ok) throw new Error('Failed to save budget');
         const created = await res.json();
         const cat = categories.find(c => c.id === form.categoryId);
-        const selProj = projects.find(p => p.id === form.projectId);
-        setBudgets(bs => [...bs, { ...created, category: cat ?? created.category, project: selProj ?? null, amount: amt, spent: 0, percentage: 0, remaining: amt }]);
+        const selProj2 = projects.find(p => p.id === form.projectId);
+        setBudgets(bs => [...bs, { ...created, category: cat ?? created.category, project: selProj2 ?? null, amount: amt, spent: 0, percentage: 0, remaining: amt }]);
       }
       setShowForm(false); setEditingId(null); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' });
     } catch {
@@ -278,14 +286,17 @@ export default function BudgetsPage() {
     setDeletingId(null);
   }
 
-  /* Spend trend for expanded budget */
-  const spendTrend = (() => {
-    const byDay: Record<string, number> = {};
-    budgetTxs.filter(t => Number(t.amount) < 0).forEach(t => {
-      byDay[t.date] = (byDay[t.date] || 0) + Math.abs(Number(t.amount));
+  async function handleRaise(b: BudgetWithSpent, newAmount: number) {
+    const res = await fetch(`${API}/budgets/${b.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ amount: newAmount, projectId: b.projectId ?? null }),
     });
-    return Object.entries(byDay).sort(([a],[b]) => a.localeCompare(b)).map(([date, total]) => ({ date: fmtDate(date), total: +total.toFixed(2) }));
-  })();
+    if (!res.ok) return;
+    const spentAmt = Number(b.spent);
+    setBudgets(bs => bs.map(x => x.id === b.id
+      ? { ...x, amount: newAmount, percentage: newAmount > 0 ? Math.round((spentAmt / newAmount) * 100) : 0, remaining: newAmount - spentAmt }
+      : x));
+  }
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -297,10 +308,11 @@ export default function BudgetsPage() {
           style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
           <div>
             <h1 className="text-xl font-bold tracking-tight">Budgets &amp; Targets</h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Spending limits &amp; income goals by category</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              Day {dayOfMonth(month, now)} of {daysInMonth(month)} · {spending.length} spending budget{spending.length === 1 ? '' : 's'} · {targets.length} income target{targets.length === 1 ? '' : 's'}
+            </p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Month nav */}
             <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               <button onClick={() => setMonth(prevMonth(month))} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors" style={{ color: 'var(--color-text-muted)' }}>‹</button>
               <span className="text-sm font-semibold px-2 min-w-36 text-center">{monthLabel(month)}</span>
@@ -322,7 +334,7 @@ export default function BudgetsPage() {
               </svg>
               Set all
             </button>
-            <button onClick={() => { setFormKind('expense'); setShowForm(true); setEditingId(null); setFormError(null); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); }}
+            <button onClick={() => openAddBudget()}
               className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5"
               style={{ background: 'var(--color-card-violet)' }}>
               <span className="text-base leading-none">+</span> Add Budget
@@ -330,444 +342,53 @@ export default function BudgetsPage() {
           </div>
         </div>
 
-        <div className="p-6 flex flex-col gap-5">
-
-          {/* ── KPI cards: the month plan at a glance ── */}
-          {!loading && budgets.length > 0 && (
-            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-              {[
-                { label: 'Expected Income', value: totalTarget > 0 ? `$${fmt(totalTarget)}` : '—',
-                  sub: totalTarget > 0 ? `$${fmt(totalEarned)} earned` : 'no targets set',
-                  color: 'var(--color-green)', icon: '💵',
-                  bar: totalTarget > 0 ? { pct: earnPct, color: earnPct >= 100 ? 'var(--color-green)' : 'var(--color-amber)' } : null },
-                { label: 'Total Budget', value: spending.length > 0 ? `$${fmt(totalBudget)}` : '—',
-                  sub: spending.length > 0 ? `${spending.length} categor${spending.length === 1 ? 'y' : 'ies'}` : 'no budgets set',
-                  color: 'var(--color-card-violet)', icon: '🎯', bar: null },
-                { label: 'Total Spent',  value: `$${fmt(totalSpent)}`,  sub: `${Math.round(overallPct)}% of budget used`,
-                  color: overallPct >= 100 ? 'var(--color-rose)' : 'var(--color-orange)', icon: '💸',
-                  bar: spending.length > 0 ? { pct: overallPct, color: overallPct >= 100 ? 'var(--color-rose)' : overallPct >= 80 ? 'var(--color-amber)' : 'var(--color-orange)' } : null },
-                totalTarget > 0
-                  ? { label: 'Planned Savings', value: `${plannedNet < 0 ? '−' : '+'}$${fmt(Math.abs(plannedNet))}`,
-                      sub: 'expected income − budget',
-                      color: plannedNet >= 0 ? 'var(--color-card-sky)' : 'var(--color-rose)', icon: '🏦', bar: null }
-                  : { label: 'Health', value: `${onTrack.length}/${spending.length}`,
-                      sub: `${overBudget.length} over · ${nearBudget.length} near limit`,
-                      color: overBudget.length > 0 ? 'var(--color-rose)' : nearBudget.length > 0 ? 'var(--color-amber)' : 'var(--color-green)',
-                      icon: overBudget.length > 0 ? '⚠️' : '✅', bar: null },
-              ].map(s => (
-                <div key={s.label} className="p-4 rounded-2xl flex flex-col gap-1.5 relative overflow-hidden"
-                  style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: s.color }}>{s.label}</span>
-                    <span className="text-base">{s.icon}</span>
-                  </div>
-                  <span className="text-xl font-extrabold leading-none tabular-nums" style={{ color: 'var(--color-text-primary)' }}>{s.value}</span>
-                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{s.sub}</span>
-                  {s.bar && (
-                    <div className="h-1 rounded-full overflow-hidden mt-0.5" style={{ background: 'var(--color-border)' }}>
-                      <div className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${Math.min(s.bar.pct, 100)}%`, background: s.bar.color }} />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── Overall progress bar ── */}
-          {!loading && spending.length > 0 && (
-            <div className="p-4 rounded-2xl flex flex-col gap-2.5"
-              style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Overall Spending</span>
-                <div className="flex items-center gap-3">
-                  <span className="font-bold tabular-nums" style={{ color: progressColor(overallPct) }}>{Math.round(overallPct)}%</span>
-                  <span style={{ color: 'var(--color-text-muted)' }}>${fmt(totalSpent)} of ${fmt(totalBudget)}</span>
-                </div>
-              </div>
-              {/* Segmented bar */}
-              <div className="h-2.5 rounded-full overflow-hidden flex gap-px" style={{ background: 'var(--color-border)' }}>
-                {sorted.filter(b => Number(b.spent) > 0).map(b => (
-                  <div key={b.id} className="h-full transition-all duration-700"
-                    style={{ width: `${totalBudget > 0 ? Number(b.spent)/totalBudget*100 : 0}%`, background: b.category?.color ?? 'var(--color-card-violet)', minWidth: 3 }} />
-                ))}
-              </div>
-              {/* Legend */}
-              <div className="flex items-center gap-4 flex-wrap">
-                <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: 'var(--color-green)' }}>
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-green)' }} /> {onTrack.length} on track
-                </span>
-                {nearBudget.length > 0 && (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: 'var(--color-amber)' }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-amber)' }} /> {nearBudget.length} near limit
-                  </span>
-                )}
-                {overBudget.length > 0 && (
-                  <span className="flex items-center gap-1 text-[11px] font-semibold" style={{ color: 'var(--color-rose)' }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-rose)' }} /> {overBudget.length} over budget
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ── Budgets + Targets columns ── */}
-          <div className="grid lg:grid-cols-2 gap-5 items-start">
-
-          {/* ── Budgets column ── */}
-          <div className="flex flex-col gap-5 min-w-0">
+        <div className="p-6 flex flex-col gap-4">
           {loading ? (
             <p className="text-xs text-center py-12" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
-          ) : spending.length === 0 ? (
-            <div className="py-16 flex flex-col items-center gap-4 text-center rounded-2xl"
-              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-              <span className="text-5xl opacity-30">🎯</span>
-              <div>
-                <p className="font-semibold text-base">No budgets yet</p>
-                <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>Set monthly spending limits to stay on track.</p>
-              </div>
-              <button onClick={() => setShowForm(true)} className="mt-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl hover:brightness-110" style={{ background: 'var(--color-card-violet)' }}>
-                + Add Your First Budget
-              </button>
-            </div>
           ) : (
-            <div className="flex flex-col gap-3">
-              {/* Sort controls */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-card-violet)' }}>Spending Budgets</span>
-                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums"
-                    style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                    {spending.length}
-                  </span>
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4 items-start">
+
+              {/* Row 1, left — plan flow + burn chart */}
+              <div className="flex flex-col gap-4 p-5 rounded-2xl"
+                style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
+                <div className="flex items-center justify-between flex-wrap gap-1">
+                  <span className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>The plan, and where it stands</span>
+                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>every figure below is for {monthLabel(month).split(' ')[0]}</span>
                 </div>
-                <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                  {([['pct','% Usage'],['spent','Amount'],['name','A–Z']] as const).map(([k,l]) => (
-                    <button key={k} onClick={() => setSort(k)}
-                      className="px-3 py-1 rounded-lg text-[11px] font-semibold transition-colors"
-                      style={sort === k
-                        ? { background: 'var(--color-card-violet)', color: 'white' }
-                        : { color: 'var(--color-text-muted)' }}>
-                      {l}
-                    </button>
-                  ))}
-                </div>
+                <PlanFlow
+                  totalTarget={totalTarget} totalEarned={totalEarned} earnPct={earnPct}
+                  totalBudget={totals.totalBudget} spendingCount={spending.length}
+                  combinedSpent={combinedSpent} budgetedSpent={totals.totalSpent} unbudgetedTotal={unbudgetedTotal}
+                  plannedSavings={plannedSavings} actualSoFar={actualSoFar} projectedSavings={projectedSavings} />
+                <BurnChart month={month} now={now} series={burn}
+                  totalBudget={totals.totalBudget} overallPct={totals.overallPct} totalProjected={totals.totalProjected} />
               </div>
 
-              {/* Budget cards */}
-              {sorted.map(b => {
-                const pct      = b.percentage;
-                const catColor = b.category?.color ?? '#818CF8';
-                const spent    = Number(b.spent);
-                const amount   = Number(b.amount);
-                const remaining = amount - spent;
-                const isExpanded = expandedId === b.id;
+              {/* Row 1, right — actions */}
+              <ActionsPanel spending={spending} unbudgeted={unbudgeted} month={month} now={now}
+                daysLeft={dLeft} totalRemaining={combinedRemaining} budgetPerDay={combinedPerDay}
+                onRaise={handleRaise} onSetUnbudgeted={(categoryId) => openAddBudget(categoryId)} />
 
-                return (
-                  <div key={b.id} className="rounded-2xl overflow-hidden transition-all"
-                    style={{
-                      background: 'var(--color-surface)',
-                      backdropFilter: 'var(--glass-blur)',
-                      WebkitBackdropFilter: 'var(--glass-blur)',
-                      border: isExpanded ? `1px solid ${catColor}50` : '1px solid var(--color-border)',
-                      boxShadow: isExpanded ? `0 0 0 1px ${catColor}20, var(--glass-shadow)` : 'none',
-                    }}>
+              {/* Row 2, left — table */}
+              <BudgetTable spending={spending} unbudgeted={unbudgeted} month={month} now={now}
+                sort={sort} onSortChange={setSort} expandedId={expandedId} onToggleExpand={(id) => setExpandedId((cur) => cur === id ? null : id)}
+                txsByCategory={txsByCategory} trendByCategory={trendByCategory} categoryAverages={categoryAverages}
+                onEdit={(b) => { setFormKind('expense'); setEditingId(b.id); setForm({ categoryId: b.categoryId ?? '', amount: String(b.amount), projectId: b.projectId ?? '', projectCategoryId: '' }); setShowForm(true); }}
+                onDelete={handleDelete} onRaise={handleRaise} deletingId={deletingId}
+                onSetUnbudgeted={(categoryId) => openAddBudget(categoryId)} />
 
-                    {/* Card row */}
-                    <div role="button" tabIndex={0} aria-expanded={isExpanded}
-                      className="w-full text-left p-5 cursor-pointer"
-                      onClick={() => setExpandedId(isExpanded ? null : b.id)}
-                      onKeyDown={e => {
-                        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
-                          e.preventDefault();
-                          setExpandedId(isExpanded ? null : b.id);
-                        }
-                      }}>
-
-                      <div className="flex items-center gap-4">
-                        {/* Icon */}
-                        <div className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0"
-                          style={{ background: `${catColor}20`, border: `1px solid ${catColor}30` }}>
-                          {b.category?.icon ?? '📦'}
-                        </div>
-
-                        {/* Name + meta */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-semibold text-sm">{b.category?.name ?? 'Unknown'}</p>
-                            {b.sourceMonth && b.sourceMonth < month && (
-                              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1"
-                                style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}
-                                title={`Carried over from ${monthLabel(b.sourceMonth)}. Editing here updates this month onward — past months stay as they were.`}>
-                                ↪ from {monthLabel(b.sourceMonth)}
-                              </span>
-                            )}
-                            {pct >= 100 && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                                style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)' }}>
-                                OVER BUDGET
-                              </span>
-                            )}
-                            {pct >= 80 && pct < 100 && (
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                                style={{ background: 'color-mix(in srgb, var(--color-amber) 15%, transparent)', color: 'var(--color-amber)' }}>
-                                NEAR LIMIT
-                              </span>
-                            )}
-                          </div>
-                          {/* Progress bar */}
-                          <div className="mt-2 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
-                            <div className="h-full rounded-full transition-all duration-700"
-                              style={{ width: `${Math.min(pct, 100)}%`, background: progressColor(pct) }} />
-                          </div>
-                        </div>
-
-                        {/* Stats */}
-                        <div className="hidden sm:flex items-center gap-6 shrink-0 text-right">
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Spent</p>
-                            <p className="text-sm font-bold tabular-nums mt-0.5" style={{ color: progressColor(pct) }}>${fmt(spent)}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Budget</p>
-                            <p className="text-sm font-bold tabular-nums mt-0.5" style={{ color: 'var(--color-text-primary)' }}>${fmt(amount)}</p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Remaining</p>
-                            <p className="text-sm font-bold tabular-nums mt-0.5"
-                              style={{ color: remaining < 0 ? 'var(--color-rose)' : 'var(--color-green)' }}>
-                              {remaining < 0 ? '−' : '+'}${fmt(Math.abs(remaining))}
-                            </p>
-                          </div>
-                          <div className="w-14">
-                            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Usage</p>
-                            <p className="text-lg font-black tabular-nums mt-0.5" style={{ color: progressColor(pct) }}>{pct}%</p>
-                          </div>
-                        </div>
-
-                        {/* Edit/delete + chevron */}
-                        <div className="flex items-center gap-1 shrink-0">
-                          <button type="button" onClick={e => { e.stopPropagation(); setFormKind('expense'); setEditingId(b.id); setForm({ categoryId: b.categoryId ?? '', amount: String(b.amount), projectId: b.projectId ?? '', projectCategoryId: '' }); setShowForm(true); }}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors text-xs"
-                            style={{ color: 'var(--color-text-muted)' }}>✏️</button>
-                          <button type="button" onClick={e => { e.stopPropagation(); handleDelete(b.id); }} disabled={deletingId === b.id}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-500/20 transition-colors text-xs disabled:opacity-40"
-                            style={{ color: 'var(--color-text-muted)' }}>{deletingId === b.id ? '…' : '🗑️'}</button>
-                          <div className="w-6 h-6 flex items-center justify-center transition-transform duration-200"
-                            style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', color: 'var(--color-text-muted)' }}>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="6 9 12 15 18 9"/>
-                            </svg>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* ── Expanded: transaction detail ── */}
-                    {isExpanded && (
-                      <div style={{ borderTop: '1px solid var(--color-border)' }}>
-
-                        {/* Trend chart + stats */}
-                        {txLoading ? (
-                          <p className="text-xs p-4 text-center" style={{ color: 'var(--color-text-muted)' }}>Loading transactions…</p>
-                        ) : budgetTxs.length === 0 ? (
-                          <div className="p-6 text-center">
-                            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No {b.category?.name} transactions this month.</p>
-                          </div>
-                        ) : (
-                          <>
-                            {/* Mini header */}
-                            <div className="px-5 py-3 flex items-center gap-6"
-                              style={{ background: `linear-gradient(135deg, ${catColor}08 0%, transparent 100%)`, borderBottom: '1px solid var(--color-border)' }}>
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Transactions</p>
-                                <p className="text-lg font-black" style={{ color: catColor }}>{budgetTxs.length}</p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Total Spent</p>
-                                <p className="text-lg font-black" style={{ color: 'var(--color-orange)' }}>
-                                  ${fmt(budgetTxs.filter(t => Number(t.amount) < 0).reduce((s,t) => s + Math.abs(Number(t.amount)), 0))}
-                                </p>
-                              </div>
-                              {spendTrend.length > 1 && (
-                                <div className="flex-1 h-12">
-                                  <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={spendTrend}>
-                                      <defs>
-                                        <linearGradient id={`grad-${b.id}`} x1="0" y1="0" x2="0" y2="1">
-                                          <stop offset="5%"  stopColor={catColor} stopOpacity={0.3}/>
-                                          <stop offset="95%" stopColor={catColor} stopOpacity={0}/>
-                                        </linearGradient>
-                                      </defs>
-                                      <XAxis dataKey="date" hide />
-                                      <Tooltip
-                                        contentStyle={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 11, color: 'var(--color-text-primary)' }}
-                                        formatter={(v: unknown) => [`$${fmt(Number(v))}`, 'Spent']} />
-                                      <Area type="monotone" dataKey="total" stroke={catColor} strokeWidth={2} fill={`url(#grad-${b.id})`} dot={false} />
-                                    </AreaChart>
-                                  </ResponsiveContainer>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Transaction rows */}
-                            <div className="flex flex-col max-h-64 overflow-y-auto">
-                              {[...budgetTxs].sort((a, b) => b.date.localeCompare(a.date)).map((tx, i) => {
-                                const amt   = Number(tx.amount);
-                                const isInc = amt >= 0;
-                                return (
-                                  <div key={tx.id} className="flex items-center gap-3 px-5 py-3"
-                                    style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : {}}>
-                                    <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0"
-                                      style={{ background: `${catColor}18` }}>
-                                      {b.category?.icon ?? '📦'}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-semibold truncate">{tx.name}</p>
-                                      <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{fmtDate(tx.date)}</span>
-                                        {tx.bankAccount && <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>· {tx.bankAccount.accountName}</span>}
-                                      </div>
-                                    </div>
-                                    <span className="text-sm font-bold tabular-nums shrink-0"
-                                      style={{ color: isInc ? 'var(--color-green)' : 'var(--color-text-primary)' }}>
-                                      {isInc ? '+' : '−'}${fmt(Math.abs(amt))}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {/* Row 2, right rail */}
+              <div className="flex flex-col gap-4">
+                <TargetsPanel targets={targets} projects={projects} totalTarget={totalTarget} totalEarned={totalEarned} earnPct={earnPct}
+                  lastDayLabel={lastDayLabel(month)}
+                  onAdd={() => { setFormKind('income'); setEditingId(null); setFormError(null); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); setShowForm(true); }}
+                  onEdit={(t) => { setFormKind('income'); setEditingId(t.id); setFormError(null); setForm({ categoryId: t.categoryId ?? '', amount: String(t.amount), projectId: t.projectId ?? '', projectCategoryId: t.projectCategoryId ?? '' }); setShowForm(true); }}
+                  onDelete={handleDelete} deletingId={deletingId} />
+                <PlanHistory history={history} currentMonth={month} elapsedPct={elapsedPct(month, now)}
+                  onImport={() => setImportOpen(true)} onSetAll={openSetAll} />
+              </div>
             </div>
           )}
-          </div>{/* end budgets column */}
-
-          {/* ── Targets column ── */}
-          <div className="flex flex-col gap-3 order-first lg:order-none">
-            {!loading && (
-              <>
-                <div className="flex items-center justify-between gap-2 min-h-[30px]">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-green)' }}>Income Targets</span>
-                    {targets.length > 0 && (
-                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums"
-                        style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                        {targets.length}
-                      </span>
-                    )}
-                  </div>
-                  {targets.length > 0 && (
-                    <button type="button"
-                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setFormError(null); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); }}
-                      className="px-3 py-1.5 text-[11px] font-semibold rounded-xl hover:brightness-110 transition-all text-white flex items-center gap-1"
-                      style={{ background: 'var(--color-green)' }}>
-                      <span className="text-sm leading-none">+</span> Add Target
-                    </button>
-                  )}
-                </div>
-
-                {targets.length === 0 ? (
-                  <div className="px-6 py-8 rounded-2xl flex flex-col items-center text-center gap-3"
-                    style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px dashed var(--color-border)' }}>
-                    <span className="w-12 h-12 rounded-full flex items-center justify-center text-xl"
-                      style={{
-                        background: 'color-mix(in srgb, var(--color-green) 12%, transparent)',
-                        border: '1px solid color-mix(in srgb, var(--color-green) 30%, transparent)',
-                      }}>💵</span>
-                    <div>
-                      <p className="text-sm font-semibold">No income targets yet</p>
-                      <p className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
-                        Forecast what each income category should bring in, and watch it fill as the month unfolds.
-                      </p>
-                    </div>
-                    <button type="button"
-                      onClick={() => { setFormKind('income'); setShowForm(true); setEditingId(null); setFormError(null); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); }}
-                      className="mt-1 px-4 py-2 text-xs font-semibold text-white rounded-xl hover:brightness-110 transition-all"
-                      style={{ background: 'var(--color-green)' }}>
-                      + Set your first target
-                    </button>
-                  </div>
-                ) : targets.map(t => {
-                  const earned  = Number(t.spent);
-                  const goal    = Number(t.amount);
-                  const pct     = t.percentage;
-                  const reached = pct >= 100;
-                  const projCat = t.projectCategoryId
-                    ? projects.find(p => p.id === t.projectId)?.categories?.find(c => c.id === t.projectCategoryId)
-                    : null;
-                  const displayCat = projCat ?? t.category;
-                  const tColor  = displayCat?.color ?? 'var(--color-green)';
-                  return (
-                    <div key={t.id} className="p-4 rounded-2xl flex flex-col gap-2.5 relative overflow-hidden"
-                      style={{
-                        background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
-                        border: reached ? '1px solid color-mix(in srgb, var(--color-green) 35%, transparent)' : '1px solid var(--color-border)',
-                      }}>
-                      <span className="absolute top-0 left-4 w-10 h-0.5 pointer-events-none"
-                        style={{ background: reached ? 'var(--color-green)' : tColor, opacity: 0.9 }} />
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
-                            style={{ background: `${tColor}20`, border: `1px solid ${tColor}30` }}>
-                            {displayCat?.icon ?? '💼'}
-                          </span>
-                          <div className="flex flex-col min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-sm font-semibold truncate">{displayCat?.name ?? 'Unknown'}</span>
-                              {reached && (
-                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                                  style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>
-                                  GOAL MET
-                                </span>
-                              )}
-                            </div>
-                            {t.project && (
-                              <span className="text-[11px] truncate flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
-                                <span>{t.project.icon}</span>
-                                <span>{t.project.name}</span>
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-0.5 shrink-0">
-                          <button type="button"
-                            onClick={() => { setFormKind('income'); setEditingId(t.id); setFormError(null); setForm({ categoryId: t.categoryId ?? '', amount: String(t.amount), projectId: t.projectId ?? '', projectCategoryId: t.projectCategoryId ?? '' }); setShowForm(true); }}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors text-xs"
-                            style={{ color: 'var(--color-text-muted)' }}>✏️</button>
-                          <button type="button" onClick={() => handleDelete(t.id)} disabled={deletingId === t.id}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-red-500/20 transition-colors text-xs disabled:opacity-40"
-                            style={{ color: 'var(--color-text-muted)' }}>{deletingId === t.id ? '…' : '🗑️'}</button>
-                        </div>
-                      </div>
-                      <div className="flex items-baseline gap-1.5 flex-wrap">
-                        <span className="text-lg font-extrabold leading-none tabular-nums"
-                          style={{ color: reached ? 'var(--color-green)' : 'var(--color-text-primary)' }}>${fmt(earned)}</span>
-                        <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>of ${fmt(goal)} expected</span>
-                      </div>
-                      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
-                        <div className="h-full rounded-full transition-all duration-700"
-                          style={{ width: `${Math.min(pct, 100)}%`, background: reached ? 'var(--color-green)' : tColor }} />
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-semibold" style={{ color: reached ? 'var(--color-green)' : 'var(--color-text-muted)' }}>
-                          {reached ? `+$${fmt(earned - goal)} above goal` : `$${fmt(goal - earned)} to go`}
-                        </span>
-                        <span className="text-[10px] font-bold tabular-nums" style={{ color: reached ? 'var(--color-green)' : 'var(--color-text-secondary)' }}>{pct}%</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </>
-            )}
-          </div>{/* end targets column */}
-
-          </div>{/* end columns grid */}
         </div>
 
         {/* ── Add / Edit modal ── */}
@@ -817,16 +438,16 @@ export default function BudgetsPage() {
                         </span>
                         <div style={{ position: 'relative' }}>
                           {(() => {
-                            const selProj = projects.find(p => p.id === form.projectId);
-                            const projColor = selProj?.color ?? '#9B6DFF';
+                            const selProj2 = projects.find(p => p.id === form.projectId);
+                            const projColor = selProj2?.color ?? '#9B6DFF';
                             return (
                               <>
                                 <button type="button" onClick={() => setProjectDropOpen(o => !o)}
                                   className="w-full px-3 py-2.5 text-sm flex items-center gap-2.5 rounded-xl outline-none text-left"
-                                  style={{ background: 'var(--color-surface)', border: `1px solid ${selProj ? projColor + '44' : 'var(--color-border)'}`, color: selProj ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                                  {selProj ? (
-                                    <><span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${projColor}20` }}>{selProj.icon}</span>
-                                    <span className="flex-1 font-medium" style={{ color: projColor }}>{selProj.name}</span></>
+                                  style={{ background: 'var(--color-surface)', border: `1px solid ${selProj2 ? projColor + '44' : 'var(--color-border)'}`, color: selProj2 ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                                  {selProj2 ? (
+                                    <><span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${projColor}20` }}>{selProj2.icon}</span>
+                                    <span className="flex-1 font-medium" style={{ color: projColor }}>{selProj2.name}</span></>
                                   ) : <span className="flex-1">Select a project…</span>}
                                   <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0, transform: projectDropOpen ? 'rotate(180deg)' : undefined }}>
                                     <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -835,7 +456,6 @@ export default function BudgetsPage() {
                                 {projectDropOpen && (
                                   <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
                                     style={{ background: 'var(--popover-bg)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)', zIndex: 10, maxHeight: '50vh' }}>
-                                    {/* None option */}
                                     <button type="button"
                                       onClick={() => { setForm(f => ({ ...f, projectId: '', categoryId: '' })); setProjectDropOpen(false); }}
                                       className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
@@ -870,11 +490,11 @@ export default function BudgetsPage() {
 
                     {/* Category picker */}
                     {(() => {
-                      const selProj = formKind === 'income' ? projects.find(p => p.id === form.projectId) : null;
-                      const projCats: ProjectCategory[] = selProj?.categories ?? [];
+                      const selProj2 = formKind === 'income' ? projects.find(p => p.id === form.projectId) : null;
+                      const projCats = selProj2?.categories ?? [];
                       const catList: { id: string; name: string; icon: string; color: string }[] =
-                        selProj ? projCats : available;
-                      const isProjectCatMode = !!selProj && formKind === 'income';
+                        selProj2 ? projCats : available;
+                      const isProjectCatMode = !!selProj2 && formKind === 'income';
                       const activeCatId = isProjectCatMode ? form.projectCategoryId : form.categoryId;
                       return (
                     <div className="flex flex-col gap-1.5">
@@ -981,7 +601,6 @@ export default function BudgetsPage() {
             <div className="w-full max-w-sm flex flex-col rounded-2xl"
               style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)' }}>
 
-              {/* Header */}
               <div className="px-5 py-4 flex items-center justify-between gap-3"
                 style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <div>
@@ -995,7 +614,6 @@ export default function BudgetsPage() {
                   style={{ color: 'var(--color-text-muted)' }}>✕</button>
               </div>
 
-              {/* Month list */}
               <div className="px-5 py-4 flex flex-col gap-1.5 max-h-72 overflow-y-auto">
                 {loadingMonths ? (
                   <p className="text-xs text-center py-6" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
@@ -1030,7 +648,6 @@ export default function BudgetsPage() {
                 })}
               </div>
 
-              {/* Actions */}
               <div className="flex gap-2 justify-end px-5 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
                 <button type="button" onClick={() => setImportOpen(false)}
                   className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-surface)] transition-colors"
@@ -1054,7 +671,6 @@ export default function BudgetsPage() {
             <div className="w-full max-w-2xl flex flex-col rounded-2xl overflow-hidden"
               style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '88vh' }}>
 
-              {/* Header */}
               <div className="px-5 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>Set monthly budgets</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
@@ -1062,7 +678,6 @@ export default function BudgetsPage() {
                 </p>
               </div>
 
-              {/* Toolbar */}
               <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <button type="button" onClick={fillAllFromAverage}
                   className="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all hover:brightness-110 flex items-center gap-1.5"
@@ -1077,7 +692,6 @@ export default function BudgetsPage() {
                 </span>
               </div>
 
-              {/* Rows */}
               <div className="overflow-y-auto px-2 py-2" style={{ flex: 1 }}>
                 {setAllRows.length === 0 ? (
                   <p className="text-xs text-center py-10" style={{ color: 'var(--color-text-muted)' }}>
@@ -1085,7 +699,7 @@ export default function BudgetsPage() {
                   </p>
                 ) : setAllRows.map((row) => {
                   const cat = categories.find((c) => c.id === row.categoryId);
-                  const avg = setAllAvgs[row.categoryId];
+                  const avg = categoryAverages[row.categoryId];
                   const c   = cat?.color || 'var(--color-card-violet)';
                   return (
                     <div key={row.categoryId} className="flex items-center gap-3 px-3 py-2 rounded-xl transition-colors hover:bg-[var(--color-surface)]">
@@ -1117,7 +731,6 @@ export default function BudgetsPage() {
                 })}
               </div>
 
-              {/* Actions */}
               <div className="flex gap-2 justify-end px-5 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
                 <button type="button" onClick={() => setSetAllOpen(false)} disabled={setAllSaving}
                   className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
