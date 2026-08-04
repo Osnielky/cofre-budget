@@ -12,7 +12,10 @@ interface BankAccount {
   last4?: string | null; balance?: number;
 }
 
-interface ImportResult { imported: number; skipped: number; account: BankAccount; }
+interface ImportResult {
+  imported: number; skipped: number; account: BankAccount;
+  dateRange: { from: string; to: string } | null;
+}
 
 interface Props {
   account: BankAccount;
@@ -118,7 +121,9 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
       if (!res.ok) throw new Error();
       const data = await res.json();
       setResult(data);
-      onImported({ imported: data.imported, skipped: data.skipped, account });
+      const dates = rows.map((r) => r.date).sort();
+      const dateRange = dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null;
+      onImported({ imported: data.imported, skipped: data.skipped, account, dateRange });
     } catch {
       setError('Import failed. Please try again.');
     } finally { setImporting(false); }
@@ -346,14 +351,21 @@ function validate(rows: CsvRow[], account: BankAccount, fileName: string, rawTex
 
   /* ── Primary: bank format fingerprint ── */
   const { bank: csvBank, type: csvType } = detectCsvFingerprint(rawText);
-  const acctIsCredit = isLiability(account.accountType);
-  const acctIsBank   = ['checking', 'savings', 'cash', 'debit', 'paypal', 'merchant'].includes(account.accountType);
+  const acctIsCredit     = isLiability(account.accountType);
+  const acctIsBank       = ['checking', 'savings', 'cash', 'debit', 'paypal', 'merchant'].includes(account.accountType);
+  const acctIsInvestment = account.accountType === 'investment';
 
-  // Wrong account TYPE (credit vs bank)
+  // Wrong account TYPE (credit vs bank vs investment)
   if (csvType === 'bank' && acctIsCredit) {
     warnings.push({ level: 'error', message: 'These transactions do not belong to this account.' });
   }
   if (csvType === 'credit' && acctIsBank) {
+    warnings.push({ level: 'error', message: 'These transactions do not belong to this account.' });
+  }
+  if (csvType === 'investment' && !acctIsInvestment) {
+    warnings.push({ level: 'error', message: 'These transactions do not belong to this account.' });
+  }
+  if (csvType !== 'investment' && csvType !== 'unknown' && acctIsInvestment) {
     warnings.push({ level: 'error', message: 'These transactions do not belong to this account.' });
   }
 

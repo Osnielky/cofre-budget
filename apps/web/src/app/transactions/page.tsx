@@ -192,6 +192,21 @@ export default function TransactionsPage() {
   const from = rangeMode === 'month' ? monthFrom(month) : customFrom;
   const to   = rangeMode === 'month' ? monthTo(month)   : customTo;
 
+  /* A bulk import (e.g. six months of brokerage history) often lands entirely
+     outside the currently-viewed month — switch to a custom range covering it
+     and scope the account filter to what was just imported, so the list isn't
+     left showing "No transactions found" right after a successful import. */
+  function jumpToImportedRange(result: { account: { id: string }; dateRange: { from: string; to: string } | null }) {
+    if (!result.dateRange) return;
+    const alreadyVisible = result.dateRange.from >= from && result.dateRange.to <= to;
+    if (!alreadyVisible) {
+      setRangeMode('custom');
+      setCustomFrom(result.dateRange.from);
+      setCustomTo(result.dateRange.to);
+    }
+    setAccountFilter(result.account.id);
+  }
+
   /* Previous window (for stat deltas + insight card): previous month, or the
      same-length span immediately before a custom range. */
   const prevRange = useMemo(() => {
@@ -2725,6 +2740,7 @@ export default function TransactionsPage() {
             onClose={() => setImportAccount(null)}
             onImported={(result) => {
               setImportAccount(null);
+              jumpToImportedRange(result);
               loadTransactions();
               setImportToast(result);
               if (importToastTimer.current) clearTimeout(importToastTimer.current);
@@ -2741,6 +2757,7 @@ export default function TransactionsPage() {
             onAccountCreated={(a) => setAccounts((prev) => prev.some((x) => x.id === a.id) ? prev : [...prev, a as BankAccount])}
             onImported={(result) => {
               setShowFileImport(false);
+              jumpToImportedRange(result);
               loadTransactions();
               setImportToast(result);
               if (importToastTimer.current) clearTimeout(importToastTimer.current);

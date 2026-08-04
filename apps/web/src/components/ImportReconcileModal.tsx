@@ -14,6 +14,7 @@ export interface ImportReconcileResult {
   imported: number;
   skipped: number;
   account: MatchAccount;
+  dateRange: { from: string; to: string } | null;
 }
 
 interface Props {
@@ -112,7 +113,8 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
         // from the BANKS registry so the saved account matches a known logo
         // (detection yields e.g. "bank of america" / "citi"; the registry has
         // "Bank of America" / "Citibank").
-        const detectedType = fingerprint.type === 'credit' ? 'credit' : 'checking';
+        const detectedType = fingerprint.type === 'credit' ? 'credit'
+          : fingerprint.type === 'investment' ? 'investment' : 'checking';
         const bank = canonicalBankName(fingerprint.bank);
         const typeLabel = detectedType.charAt(0).toUpperCase() + detectedType.slice(1);
         setNewAcc({
@@ -208,7 +210,9 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
       }
 
       setResult({ imported, skipped });
-      onImported({ imported, skipped, account });
+      const dates = rows.map((r) => r.date).sort();
+      const dateRange = dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null;
+      onImported({ imported, skipped, account, dateRange });
     } catch (err: any) {
       setError(err.message ?? 'Import failed. Please try again.');
     } finally { setImporting(false); }
@@ -286,7 +290,7 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
                   </p>
                   {!rows.length && !dragging && (
                     <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                      Supports Chase, Bank of America, Wells Fargo & most banks
+                      Supports Chase, Bank of America, Wells Fargo, Schwab & most banks
                     </p>
                   )}
                 </div>

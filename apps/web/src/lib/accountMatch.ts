@@ -28,6 +28,7 @@ export interface RankResult {
 function typeMatches(csvType: CsvType, accountType: string): boolean {
   if (csvType === 'credit') return accountType === 'credit';
   if (csvType === 'bank') return ['checking', 'savings', 'debit', 'cash'].includes(accountType);
+  if (csvType === 'investment') return accountType === 'investment';
   return false; // 'unknown' agrees with nothing
 }
 
