@@ -5,7 +5,7 @@
    receipts list via statTotals(). No period-over-period deltas (unlike
    the transactions StatStrip) — not enough historical signal yet. */
 
-import { statTotals, money, type ReceiptLite } from '@/lib/receipts/derive';
+import { statTotals, type ReceiptLite } from '@/lib/receipts/derive';
 
 interface Props {
   receipts: ReceiptLite[];
@@ -23,7 +23,7 @@ function MiniIcon({ d }: { d: string }) {
 const I_DOC    = 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z M14 3v6h6 M9 13h6 M9 17h6';
 const I_CHECK  = 'M4 12l5 5L20 6';
 const I_CLOCK  = 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M12 8v4l3 3';
-const I_DOLLAR = 'M12 2v20 M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6';
+const I_LINK   = 'M9 17H7a5 5 0 0 1 0-10h2 M15 7h2a5 5 0 0 1 0 10h-2 M8 12h8';
 
 export default function StatStrip({ receipts, loading }: Props) {
   const t = statTotals(receipts);
@@ -32,7 +32,7 @@ export default function StatStrip({ receipts, loading }: Props) {
     { label: 'Total Receipts', value: String(t.total), color: 'var(--color-sky)', icon: I_DOC },
     { label: 'Auto-imported', value: String(t.imported), color: 'var(--color-green)', icon: I_CHECK },
     { label: 'Pending Review', value: String(t.pending), color: 'var(--color-amber)', icon: I_CLOCK },
-    { label: 'This Month', value: money(t.thisMonthTotal), color: 'var(--color-violet)', icon: I_DOLLAR },
+    { label: 'Matched to Transactions', value: `${t.matchedCount} · ${t.matchRate}%`, color: 'var(--color-violet)', icon: I_LINK },
   ];
 
   return (
