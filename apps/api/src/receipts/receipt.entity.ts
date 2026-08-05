@@ -36,6 +36,15 @@ export class Receipt {
   @Column({ default: false })
   imported: boolean;
 
+  @Column({ default: 'gmail' })
+  source: string;
+
+  @Column({ type: 'bytea', nullable: true })
+  imageData: Buffer | null;
+
+  @Column({ nullable: true })
+  imageMimeType: string | null;
+
   @CreateDateColumn()
   parsedAt: Date;
 }
