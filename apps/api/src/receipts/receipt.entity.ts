@@ -42,7 +42,7 @@ export class Receipt {
   @Column({ type: 'bytea', nullable: true, select: false })
   imageData: Buffer | null;
 
-  @Column({ nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   imageMimeType: string | null;
 
   @CreateDateColumn()
