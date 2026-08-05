@@ -1,6 +1,7 @@
 'use client';
 
 import { countGroups, money, type Receipt } from '@/lib/receipts/derive';
+import MatchTransactionSection from './MatchTransactionSection';
 
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 
@@ -12,10 +13,11 @@ interface Props {
   onImport: () => void;
   importing: boolean;
   onClose: () => void;
+  onReceiptChanged: () => void;
 }
 
 export default function ReceiptDetailPanel({
-  receipt, categories, itemCategories, onSetCategory, onImport, importing, onClose,
+  receipt, categories, itemCategories, onSetCategory, onImport, importing, onClose, onReceiptChanged,
 }: Props) {
   const groups = countGroups(receipt.items.length, itemCategories);
 
@@ -32,8 +34,25 @@ export default function ReceiptDetailPanel({
 
       <span className="inline-flex items-center gap-1.5 text-[11px] font-medium mb-4 px-2 py-1 rounded-full self-start"
         style={{ background: 'color-mix(in srgb, var(--color-sky) 12%, transparent)', color: 'var(--color-sky)' }}>
-        Imported via Gmail
+        {receipt.source === 'manual' ? 'Manually uploaded' : 'Imported via Gmail'}
       </span>
+
+      {receipt.imageMimeType && (
+        receipt.imageMimeType === 'application/pdf' ? (
+          <a href={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api'}/receipts/${receipt.id}/image`}
+            target="_blank" rel="noreferrer"
+            className="mb-4 inline-block text-xs font-medium underline" style={{ color: 'var(--color-sky)' }}>
+            View attached PDF
+          </a>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={`${process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api'}/receipts/${receipt.id}/image`}
+            alt={`${receipt.merchant} receipt`} className="mb-4 rounded-xl w-full object-cover"
+            style={{ maxHeight: 220, border: '1px solid var(--color-border)' }} />
+        )
+      )}
+
+      <MatchTransactionSection receipt={receipt} onChanged={onReceiptChanged} />
 
       <p className="text-xs mb-4" style={{ color: 'var(--color-text-secondary)' }}>
         Assign a category to each item. Items with the same category become one transaction.
