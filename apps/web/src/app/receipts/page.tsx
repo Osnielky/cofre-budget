@@ -20,6 +20,7 @@ export default function ReceiptsPage() {
   const [itemCategories, setItemCategories] = useState<Record<number, string>>({});
   const [importing, setImporting] = useState(false);
   const [gmailConnected, setGmailConnected] = useState<boolean | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ReceiptFilters>(DEFAULT_FILTERS);
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export default function ReceiptsPage() {
 
     fetch(`${API}/receipts`, { credentials: 'include' })
       .then((r) => r.json())
-      .then(setReceipts)
+      .then((d) => { setReceipts(d.receipts); setSyncError(d.syncError); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -98,6 +99,16 @@ export default function ReceiptsPage() {
             </p>
           </div>
 
+          {gmailConnected === true && syncError && (
+            <div className="rounded-2xl p-4 mb-6 flex items-start gap-3"
+              style={{ background: 'color-mix(in srgb, var(--color-card-orange) 10%, var(--color-surface))', border: '1px solid color-mix(in srgb, var(--color-card-orange) 25%, transparent)' }}>
+              <p className="text-sm" style={{ color: 'var(--color-card-orange)' }}>
+                <span className="font-medium">Gmail sync failed:</span> {syncError}
+                {receipts.length > 0 && ' Showing previously synced receipts.'}
+              </p>
+            </div>
+          )}
+
           {gmailConnected === false && (
             <div className="rounded-2xl p-6 mb-6 text-center"
               style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)' }}>
@@ -124,7 +135,7 @@ export default function ReceiptsPage() {
             <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Loading receipts…</p>
           )}
 
-          {!loading && receipts.length === 0 && gmailConnected && (
+          {!loading && receipts.length === 0 && gmailConnected && !syncError && (
             <div className="rounded-2xl p-8 text-center"
               style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)' }}>
               <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>No receipt emails found in the last 90 days.</p>

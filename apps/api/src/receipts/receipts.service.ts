@@ -25,7 +25,7 @@ export class ReceiptsService {
     private gmail: GmailService,
   ) {}
 
-  async syncAndFind(userId: string): Promise<Receipt[]> {
+  async syncAndFind(userId: string): Promise<{ receipts: Receipt[]; syncError: string | null }> {
     const existing = await this.receiptRepo.find({ where: { userId } });
     const existingIds = new Set(existing.map((r) => r.gmailMessageId));
 
@@ -33,9 +33,10 @@ export class ReceiptsService {
     try {
       raw = await this.gmail.fetchAndParseReceipts(userId);
     } catch (err) {
-      // Gmail not connected or fetch failed — return cached only
-      this.logger.error(`fetchAndParseReceipts failed for user ${userId}: ${(err as Error)?.message}`, (err as Error)?.stack);
-      return existing;
+      // Gmail not connected or fetch failed — return cached results plus the reason, so the UI can surface it
+      const message = (err as Error)?.message ?? 'Unknown error';
+      this.logger.error(`fetchAndParseReceipts failed for user ${userId}: ${message}`, (err as Error)?.stack);
+      return { receipts: existing, syncError: message };
     }
 
     const newReceipts = raw.filter((r) => !existingIds.has(r.gmailMessageId));
@@ -66,7 +67,8 @@ export class ReceiptsService {
       );
     }
 
-    return this.receiptRepo.find({ where: { userId }, order: { parsedAt: 'DESC' } });
+    const receipts = await this.receiptRepo.find({ where: { userId }, order: { parsedAt: 'DESC' } });
+    return { receipts, syncError: null };
   }
 
   async importToTransactions(receiptId: string, userId: string, splits: ImportSplit[]): Promise<Transaction[]> {
