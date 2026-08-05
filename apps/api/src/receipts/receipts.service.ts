@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not, IsNull } from 'typeorm';
+import * as crypto from 'crypto';
 import { Receipt } from './receipt.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
@@ -11,6 +12,15 @@ export interface ImportSplit {
   itemIndices: number[];
   categoryId: string | null;
   bankAccountId?: string | null;
+}
+
+export interface CreateManualReceiptInput {
+  merchant: string;
+  total: number;
+  currency: string;
+  orderDate: string | null;
+  orderNumber: string | null;
+  items: { name: string; quantity: number; unitPrice: number; total: number }[];
 }
 
 export type MatchStatus = 'matched' | 'pending';
@@ -179,5 +189,31 @@ export class ReceiptsService {
     }
 
     return created;
+  }
+
+  async createManual(
+    userId: string, input: CreateManualReceiptInput, file: Express.Multer.File | undefined,
+  ): Promise<Receipt> {
+    const items = input.items.length > 0
+      ? input.items
+      : [{ name: `${input.merchant} purchase`, quantity: 1, unitPrice: input.total, total: input.total }];
+
+    return this.receiptRepo.save(
+      this.receiptRepo.create({
+        userId,
+        gmailMessageId: `manual:${crypto.randomUUID()}`,
+        merchant: input.merchant,
+        orderNumber: input.orderNumber ?? undefined,
+        orderDate: input.orderDate ?? undefined,
+        total: input.total,
+        currency: input.currency || 'USD',
+        items,
+        rawSubject: input.merchant,
+        imported: false,
+        source: 'manual',
+        imageData: file ? file.buffer : null,
+        imageMimeType: file ? file.mimetype : null,
+      }),
+    );
   }
 }

@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Param, Body, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, Request, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ReceiptsService, ImportSplit } from './receipts.service';
+import { ReceiptsService, ImportSplit, CreateManualReceiptInput } from './receipts.service';
 import { ReceiptFinderService } from '../transactions/receipt-finder.service';
 
 @UseGuards(JwtAuthGuard)
@@ -32,5 +33,44 @@ export class ReceiptsController {
     @Request() req: any,
   ) {
     return this.receiptFinder.findTransactionCandidates(req.user.id, id, window ? parseInt(window, 10) : 4);
+  }
+
+  @Post('manual')
+  @UseInterceptors(FileInterceptor('image', {
+    limits: { fileSize: 8 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowed = ['image/jpeg', 'image/png', 'image/heic', 'application/pdf'];
+      if (!allowed.includes(file.mimetype)) return cb(new BadRequestException('Unsupported file type'), false);
+      cb(null, true);
+    },
+  }))
+  uploadManual(
+    @Request() req: any,
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Body() body: { merchant: string; total: string; currency?: string; orderDate?: string; orderNumber?: string; items?: string },
+  ) {
+    if (!body.merchant?.trim()) throw new BadRequestException('merchant is required');
+    const total = Number(body.total);
+    if (!Number.isFinite(total) || total <= 0) throw new BadRequestException('total must be a positive number');
+
+    let items: CreateManualReceiptInput['items'] = [];
+    if (body.items) {
+      try {
+        const parsed = JSON.parse(body.items);
+        if (Array.isArray(parsed)) items = parsed;
+      } catch {
+        throw new BadRequestException('items must be valid JSON');
+      }
+    }
+
+    const input: CreateManualReceiptInput = {
+      merchant: body.merchant.trim(),
+      total,
+      currency: body.currency || 'USD',
+      orderDate: body.orderDate || null,
+      orderNumber: body.orderNumber || null,
+      items,
+    };
+    return this.service.createManual(req.user.id, input, file);
   }
 }
