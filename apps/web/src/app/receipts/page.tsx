@@ -6,6 +6,7 @@ import StatStrip from './StatStrip';
 import FilterBar from './FilterBar';
 import ReceiptRow from './ReceiptRow';
 import ReceiptDetailPanel from './ReceiptDetailPanel';
+import UploadReceiptModal from './UploadReceiptModal';
 import { filterReceipts, distinctMerchants, DEFAULT_FILTERS, type Receipt, type ReceiptFilters } from '@/lib/receipts/derive';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -22,6 +23,13 @@ export default function ReceiptsPage() {
   const [gmailConnected, setGmailConnected] = useState<boolean | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ReceiptFilters>(DEFAULT_FILTERS);
+  const [showUpload, setShowUpload] = useState(false);
+
+  function refetchReceipts() {
+    return fetch(`${API}/receipts`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((d) => { setReceipts(d.receipts); setSyncError(d.syncError); });
+  }
 
   useEffect(() => {
     fetch(`${API}/gmail/status`, { credentials: 'include' })
@@ -34,9 +42,7 @@ export default function ReceiptsPage() {
       .then(setCategories)
       .catch(() => {});
 
-    fetch(`${API}/receipts`, { credentials: 'include' })
-      .then((r) => r.json())
-      .then((d) => { setReceipts(d.receipts); setSyncError(d.syncError); })
+    refetchReceipts()
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
@@ -92,12 +98,26 @@ export default function ReceiptsPage() {
 
       <main className="flex-1 overflow-y-auto min-w-0 pt-14 md:pt-0">
         <div className="p-6 md:p-8">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>Receipts</h1>
-            <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-              Browse merchant receipts from your Gmail and create transactions.
-            </p>
+          <div className="mb-6 flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>Receipts</h1>
+              <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+                Browse merchant receipts from your Gmail and create transactions.
+              </p>
+            </div>
+            <button onClick={() => setShowUpload(true)}
+              className="px-4 py-2 rounded-xl text-sm font-medium"
+              style={{ background: 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)', color: 'var(--color-card-violet)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 25%, transparent)' }}>
+              Upload Receipt
+            </button>
           </div>
+
+          {showUpload && (
+            <UploadReceiptModal
+              onClose={() => setShowUpload(false)}
+              onCreated={() => { setShowUpload(false); refetchReceipts(); }}
+            />
+          )}
 
           {gmailConnected === true && syncError && (
             <div className="rounded-2xl p-4 mb-6 flex items-start gap-3"
@@ -169,6 +189,7 @@ export default function ReceiptsPage() {
             onImport={handleImport}
             importing={importing}
             onClose={closeReceipt}
+            onReceiptChanged={refetchReceipts}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center p-6 text-center">
@@ -188,6 +209,7 @@ export default function ReceiptsPage() {
             onImport={handleImport}
             importing={importing}
             onClose={closeReceipt}
+            onReceiptChanged={refetchReceipts}
           />
         </div>
       )}
