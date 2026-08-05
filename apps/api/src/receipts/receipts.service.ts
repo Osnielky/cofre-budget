@@ -216,4 +216,10 @@ export class ReceiptsService {
       }),
     );
   }
+
+  async getImage(userId: string, receiptId: string): Promise<{ data: Buffer; mimeType: string } | null> {
+    const receipt = await this.receiptRepo.findOneBy({ id: receiptId, userId });
+    if (!receipt?.imageData || !receipt.imageMimeType) return null;
+    return { data: receipt.imageData, mimeType: receipt.imageMimeType };
+  }
 }

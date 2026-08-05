@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Param, Body, Query, Request, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, Request, Res, UseGuards, UseInterceptors, UploadedFile, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ReceiptsService, ImportSplit, CreateManualReceiptInput } from './receipts.service';
@@ -72,5 +73,13 @@ export class ReceiptsController {
       items,
     };
     return this.service.createManual(req.user.id, input, file);
+  }
+
+  @Get(':id/image')
+  async image(@Param('id') id: string, @Request() req: any, @Res() res: Response) {
+    const img = await this.service.getImage(req.user.id, id);
+    if (!img) throw new NotFoundException();
+    res.set('Content-Type', img.mimeType);
+    res.send(img.data);
   }
 }
