@@ -14,6 +14,6 @@ import { GmailModule } from '../gmail/gmail.module';
   imports: [TypeOrmModule.forFeature([Transaction, BankAccount, ProjectCategory, Receipt]), DebtsModule, GmailModule],
   providers: [TransactionsService, ReceiptFinderService],
   controllers: [TransactionsController],
-  exports: [TransactionsService],
+  exports: [TransactionsService, ReceiptFinderService],
 })
 export class TransactionsModule {}

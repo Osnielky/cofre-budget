@@ -7,9 +7,10 @@ import { Category } from '../categories/category.entity';
 import { ReceiptsService } from './receipts.service';
 import { ReceiptsController } from './receipts.controller';
 import { GmailModule } from '../gmail/gmail.module';
+import { TransactionsModule } from '../transactions/transactions.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Receipt, Transaction, BankAccount, Category]), GmailModule],
+  imports: [TypeOrmModule.forFeature([Receipt, Transaction, BankAccount, Category]), GmailModule, TransactionsModule],
   controllers: [ReceiptsController],
   providers: [ReceiptsService],
 })
