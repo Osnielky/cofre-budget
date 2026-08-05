@@ -1,48 +1,35 @@
 import { describe, it, expect } from 'vitest';
-import { statTotals, distinctMerchants, filterReceipts, countGroups, money, DEFAULT_FILTERS, type ReceiptLite } from './derive';
+import { statTotals, distinctMerchants, filterReceipts, countGroups, money, statusLabel, DEFAULT_FILTERS, type ReceiptLite } from './derive';
 
 function receipt(p: Partial<ReceiptLite> = {}): ReceiptLite {
   return {
     id: 'r1', merchant: 'Amazon', rawSubject: 'Your order has shipped',
-    total: 42.5, imported: false, orderDate: '2026-07-10', ...p,
+    total: 42.5, imported: false, orderDate: '2026-07-10', matchStatus: 'pending', ...p,
   };
 }
-
-const NOW = new Date(2026, 6, 20); // Jul 20 2026
 
 describe('statTotals', () => {
   it('counts total, imported, and pending', () => {
     const receipts = [receipt({ imported: true }), receipt({ imported: false }), receipt({ imported: false })];
-    const totals = statTotals(receipts, NOW);
+    const totals = statTotals(receipts);
     expect(totals.total).toBe(3);
     expect(totals.imported).toBe(1);
     expect(totals.pending).toBe(2);
   });
 
-  it('sums totals only for receipts dated in the current month', () => {
+  it('counts matchedCount as imported-or-matched, and computes matchRate', () => {
     const receipts = [
-      receipt({ orderDate: '2026-07-05', total: 10 }),
-      receipt({ orderDate: '2026-06-30', total: 100 }), // previous month — excluded
-      receipt({ orderDate: null, total: 50 }),           // no date — excluded
+      receipt({ imported: true, matchStatus: 'pending' }),   // counts via imported
+      receipt({ imported: false, matchStatus: 'matched' }),  // counts via matchStatus
+      receipt({ imported: false, matchStatus: 'pending' }),  // neither
     ];
-    expect(statTotals(receipts, NOW).thisMonthTotal).toBe(10);
+    const totals = statTotals(receipts);
+    expect(totals.matchedCount).toBe(2);
+    expect(totals.matchRate).toBe(67); // 2/3 rounded
   });
 
   it('returns zeroes for an empty list', () => {
-    expect(statTotals([], NOW)).toEqual({ total: 0, imported: 0, pending: 0, thisMonthTotal: 0 });
-  });
-
-  it('correctly includes receipts at month boundaries regardless of timezone', () => {
-    // Test with a "now" date at the last day of July (end of month, late evening)
-    // Late evening time (23:30) discriminates the bug: old UTC-based formula would yield "2026-08"
-    // for timezones behind UTC, while correct local-time formula correctly yields "2026-07"
-    const endOfMonth = new Date(2026, 6, 31, 23, 30); // Jul 31 2026 23:30 (local time)
-    const receipts = [
-      receipt({ orderDate: '2026-07-31', total: 25 }), // last day of current month — should be included
-      receipt({ orderDate: '2026-08-01', total: 100 }), // first day of next month — should be excluded
-    ];
-    const totals = statTotals(receipts, endOfMonth);
-    expect(totals.thisMonthTotal).toBe(25); // only Jul 31 receipt counted
+    expect(statTotals([])).toEqual({ total: 0, imported: 0, pending: 0, matchedCount: 0, matchRate: 0 });
   });
 });
 
@@ -73,9 +60,14 @@ describe('filterReceipts', () => {
     expect(filterReceipts(receipts, { ...DEFAULT_FILTERS, merchant: 'Costco' })).toHaveLength(1);
   });
 
-  it('filters by status', () => {
-    const receipts = [receipt({ imported: true }), receipt({ imported: false })];
+  it('filters by status: imported takes priority, then matched, then pending', () => {
+    const receipts = [
+      receipt({ imported: true, matchStatus: 'matched' }),
+      receipt({ imported: false, matchStatus: 'matched' }),
+      receipt({ imported: false, matchStatus: 'pending' }),
+    ];
     expect(filterReceipts(receipts, { ...DEFAULT_FILTERS, status: 'imported' })).toHaveLength(1);
+    expect(filterReceipts(receipts, { ...DEFAULT_FILTERS, status: 'matched' })).toHaveLength(1);
     expect(filterReceipts(receipts, { ...DEFAULT_FILTERS, status: 'pending' })).toHaveLength(1);
   });
 
@@ -88,6 +80,11 @@ describe('filterReceipts', () => {
     const inRange = filterReceipts(receipts, { ...DEFAULT_FILTERS, dateFrom: '2026-07-10', dateTo: '2026-07-31' });
     expect(inRange).toHaveLength(1);
     expect(inRange[0].orderDate).toBe('2026-07-15');
+  });
+
+  it('filters by source', () => {
+    const receipts = [receipt({ source: 'gmail' }), receipt({ source: 'manual' })];
+    expect(filterReceipts(receipts, { ...DEFAULT_FILTERS, source: 'manual' })).toHaveLength(1);
   });
 });
 
@@ -115,5 +112,18 @@ describe('countGroups', () => {
   });
   it('never returns zero for an empty item list', () => {
     expect(countGroups(0, {})).toBe(1);
+  });
+});
+
+describe('statusLabel', () => {
+  it('returns Imported when imported is true, regardless of matchStatus', () => {
+    expect(statusLabel({ imported: true, matchStatus: 'pending' })).toBe('Imported');
+    expect(statusLabel({ imported: true, matchStatus: 'matched' })).toBe('Imported');
+  });
+  it('returns Matched when not imported but matchStatus is matched', () => {
+    expect(statusLabel({ imported: false, matchStatus: 'matched' })).toBe('Matched');
+  });
+  it('returns Pending when neither imported nor matched', () => {
+    expect(statusLabel({ imported: false, matchStatus: 'pending' })).toBe('Pending');
   });
 });
