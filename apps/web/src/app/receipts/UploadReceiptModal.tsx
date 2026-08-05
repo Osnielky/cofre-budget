@@ -38,6 +38,8 @@ export default function UploadReceiptModal({ onCreated, onClose }: Props) {
       const res = await fetch(`${API}/receipts/manual`, { method: 'POST', credentials: 'include', body: form });
       if (!res.ok) { setError('Could not save the receipt.'); return; }
       onCreated();
+    } catch {
+      setError('Could not reach the server.');
     } finally {
       setSubmitting(false);
     }
