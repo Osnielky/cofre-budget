@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReceiptFilters, ReceiptStatus } from '@/lib/receipts/derive';
+import type { ReceiptFilters, ReceiptStatus, ReceiptSource } from '@/lib/receipts/derive';
 import { DEFAULT_FILTERS } from '@/lib/receipts/derive';
 
 interface Props {
@@ -21,7 +21,8 @@ export default function FilterBar({ filters, onChange, merchants }: Props) {
   }
 
   const isDefault =
-    !filters.search && !filters.merchant && !filters.dateFrom && !filters.dateTo && filters.status === 'all';
+    !filters.search && !filters.merchant && !filters.dateFrom && !filters.dateTo &&
+    filters.status === 'all' && !filters.source;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -33,6 +34,12 @@ export default function FilterBar({ filters, onChange, merchants }: Props) {
         className="flex-1 min-w-[180px] px-3 py-2 text-sm rounded-xl outline-none"
         style={inputStyle}
       />
+      <select value={filters.source} onChange={(e) => set('source', e.target.value as '' | ReceiptSource)}
+        className="px-3 py-2 text-sm rounded-xl outline-none" style={inputStyle}>
+        <option value="">All Sources</option>
+        <option value="gmail">Gmail</option>
+        <option value="manual">Manual Upload</option>
+      </select>
       <select value={filters.merchant} onChange={(e) => set('merchant', e.target.value)}
         className="px-3 py-2 text-sm rounded-xl outline-none" style={inputStyle}>
         <option value="">All Merchants</option>
@@ -47,6 +54,7 @@ export default function FilterBar({ filters, onChange, merchants }: Props) {
         className="px-3 py-2 text-sm rounded-xl outline-none" style={inputStyle}>
         <option value="all">All Statuses</option>
         <option value="imported">Imported</option>
+        <option value="matched">Matched</option>
         <option value="pending">Pending Review</option>
       </select>
       {!isDefault && (
