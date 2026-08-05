@@ -20,6 +20,15 @@ export interface ReceiptCandidate {
   linked: boolean;
 }
 
+export interface TransactionCandidate {
+  id: string;
+  name: string;
+  date: string;
+  amount: number;
+  amountDelta: number;
+  linked: boolean;
+}
+
 /** tx.name → Gmail search term. First alias hit wins; fallback = first word ≥ 4 letters. */
 const MERCHANT_ALIASES: [RegExp, string][] = [
   [/\bAMZN\b|\bAMAZON\b/i, 'amazon.com'],
@@ -108,6 +117,27 @@ export class ReceiptFinderService {
     return this.rank(fresh, tx, absAmount, 'gmail');
   }
 
+  async findTransactionCandidates(
+    userId: string, receiptId: string, windowDays = 4,
+  ): Promise<TransactionCandidate[]> {
+    const receipt = await this.receiptRepo.findOneBy({ id: receiptId, userId });
+    if (!receipt) throw new NotFoundException('Receipt not found');
+
+    const absTotal = Math.abs(Number(receipt.total));
+    const from = receipt.orderDate ? shiftDate(receipt.orderDate, -windowDays) : null;
+    const to = receipt.orderDate ? shiftDate(receipt.orderDate, windowDays) : null;
+
+    const qb = this.txRepo.createQueryBuilder('t').where('t.userId = :userId', { userId });
+    if (from && to) {
+      qb.andWhere('(t.date BETWEEN :from AND :to OR t.receiptId = :receiptId)', { from, to, receiptId });
+    }
+    // Exclude transactions already linked to a *different* receipt.
+    qb.andWhere('(t.receiptId IS NULL OR t.receiptId = :receiptId)', { receiptId });
+    const candidates = await qb.getMany();
+
+    return this.rankTransactions(candidates, receipt, absTotal);
+  }
+
   /* The already-linked receipt is always surfaced (prepended even when outside the window). */
   private async rank(
     receipts: Receipt[], tx: Transaction, absAmount: number, source: 'cache' | 'gmail',
@@ -137,6 +167,29 @@ export class ReceiptFinderService {
         amountDelta: +Math.abs(Number(r.total) - absAmount).toFixed(2),
         source,
         linked: r.id === tx.receiptId,
+      }))
+      .sort((a, b) =>
+        Number(b.linked) - Number(a.linked) ||
+        a.amountDelta - b.amountDelta ||
+        (dateDist.get(a.id) ?? 0) - (dateDist.get(b.id) ?? 0),
+      );
+  }
+
+  private rankTransactions(txs: Transaction[], receipt: Receipt, absTotal: number): TransactionCandidate[] {
+    const receiptTime = receipt.orderDate ? new Date(`${receipt.orderDate}T00:00:00Z`).getTime() : null;
+    const dateDist = new Map(txs.map((t) => [
+      t.id,
+      receiptTime !== null ? Math.abs(new Date(`${t.date}T00:00:00Z`).getTime() - receiptTime) : Number.MAX_SAFE_INTEGER,
+    ]));
+
+    return txs
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        date: t.date,
+        amount: Number(t.amount),
+        amountDelta: +Math.abs(Math.abs(Number(t.amount)) - absTotal).toFixed(2),
+        linked: t.receiptId === receipt.id,
       }))
       .sort((a, b) =>
         Number(b.linked) - Number(a.linked) ||
