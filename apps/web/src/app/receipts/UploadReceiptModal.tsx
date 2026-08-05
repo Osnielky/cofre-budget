@@ -50,9 +50,9 @@ export default function UploadReceiptModal({ onCreated, onClose }: Props) {
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
-      <div className="w-full max-w-md rounded-2xl p-6"
-        style={{ background: 'var(--color-surface)', border: 'var(--glass-border)' }}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl p-6 max-h-[85vh] overflow-y-auto"
+        style={{ background: 'var(--color-surface)', border: 'var(--glass-border)' }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-lg" style={{ color: 'var(--color-text-primary)' }}>Upload Receipt</h2>
           <button onClick={onClose} className="w-8 h-8 rounded-lg" style={{ color: 'var(--color-text-muted)' }}>✕</button>

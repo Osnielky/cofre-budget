@@ -31,6 +31,15 @@ describe('statTotals', () => {
   it('returns zeroes for an empty list', () => {
     expect(statTotals([])).toEqual({ total: 0, imported: 0, pending: 0, matchedCount: 0, matchRate: 0 });
   });
+
+  it('excludes matched (but not imported) receipts from the pending count, matching statusLabel', () => {
+    const receipts = [
+      receipt({ imported: false, matchStatus: 'matched' }),
+      receipt({ imported: false, matchStatus: 'pending' }),
+    ];
+    const totals = statTotals(receipts);
+    expect(totals.pending).toBe(1); // only the truly-pending one
+  });
 });
 
 describe('distinctMerchants', () => {

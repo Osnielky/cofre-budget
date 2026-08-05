@@ -39,7 +39,7 @@ export class Receipt {
   @Column({ default: 'gmail' })
   source: string;
 
-  @Column({ type: 'bytea', nullable: true })
+  @Column({ type: 'bytea', nullable: true, select: false })
   imageData: Buffer | null;
 
   @Column({ nullable: true })

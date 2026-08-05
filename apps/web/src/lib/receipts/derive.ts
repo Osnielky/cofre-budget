@@ -70,11 +70,12 @@ export interface StatTotals {
 
 export function statTotals(receipts: ReceiptLite[]): StatTotals {
   const imported = receipts.filter((r) => r.imported).length;
+  const pending = receipts.filter((r) => statusLabel(r) === 'Pending').length;
   const matchedCount = receipts.filter((r) => r.imported || r.matchStatus === 'matched').length;
   return {
     total: receipts.length,
     imported,
-    pending: receipts.length - imported,
+    pending,
     matchedCount,
     matchRate: receipts.length ? Math.round((matchedCount / receipts.length) * 100) : 0,
   };

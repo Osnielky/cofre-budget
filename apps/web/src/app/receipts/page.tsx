@@ -28,7 +28,11 @@ export default function ReceiptsPage() {
   function refetchReceipts() {
     return fetch(`${API}/receipts`, { credentials: 'include' })
       .then((r) => r.json())
-      .then((d) => { setReceipts(d.receipts); setSyncError(d.syncError); });
+      .then((d) => {
+        setReceipts(d.receipts);
+        setSyncError(d.syncError);
+        setSelected((prev) => (prev ? d.receipts.find((r: Receipt) => r.id === prev.id) ?? null : null));
+      });
   }
 
   useEffect(() => {

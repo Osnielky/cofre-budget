@@ -218,7 +218,11 @@ export class ReceiptsService {
   }
 
   async getImage(userId: string, receiptId: string): Promise<{ data: Buffer; mimeType: string } | null> {
-    const receipt = await this.receiptRepo.findOneBy({ id: receiptId, userId });
+    const receipt = await this.receiptRepo
+      .createQueryBuilder('r')
+      .where('r.id = :receiptId AND r.userId = :userId', { receiptId, userId })
+      .addSelect('r.imageData')
+      .getOne();
     if (!receipt?.imageData || !receipt.imageMimeType) return null;
     return { data: receipt.imageData, mimeType: receipt.imageMimeType };
   }
