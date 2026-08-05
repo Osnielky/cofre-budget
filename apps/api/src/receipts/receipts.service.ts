@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not, IsNull } from 'typeorm';
 import { Receipt } from './receipt.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
@@ -11,6 +11,21 @@ export interface ImportSplit {
   itemIndices: number[];
   categoryId: string | null;
   bankAccountId?: string | null;
+}
+
+export type MatchStatus = 'matched' | 'pending';
+
+export interface MatchedTransaction {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  category: { id: string; name: string; icon: string; color: string } | null;
+}
+
+export interface ReceiptListItem extends Receipt {
+  matchStatus: MatchStatus;
+  matchedTransaction: MatchedTransaction | null;
 }
 
 @Injectable()
@@ -25,7 +40,7 @@ export class ReceiptsService {
     private gmail: GmailService,
   ) {}
 
-  async syncAndFind(userId: string): Promise<{ receipts: Receipt[]; syncError: string | null }> {
+  async syncAndFind(userId: string): Promise<{ receipts: ReceiptListItem[]; syncError: string | null }> {
     const existing = await this.receiptRepo.find({ where: { userId } });
     const existingIds = new Set(existing.map((r) => r.gmailMessageId));
 
@@ -36,7 +51,7 @@ export class ReceiptsService {
       // Gmail not connected or fetch failed — return cached results plus the reason, so the UI can surface it
       const message = (err as Error)?.message ?? 'Unknown error';
       this.logger.error(`fetchAndParseReceipts failed for user ${userId}: ${message}`, (err as Error)?.stack);
-      return { receipts: existing, syncError: message };
+      return { receipts: await this.withMatchStatus(userId, existing), syncError: message };
     }
 
     const newReceipts = raw.filter((r) => !existingIds.has(r.gmailMessageId));
@@ -68,7 +83,48 @@ export class ReceiptsService {
     }
 
     const receipts = await this.receiptRepo.find({ where: { userId }, order: { parsedAt: 'DESC' } });
-    return { receipts, syncError: null };
+    return { receipts: await this.withMatchStatus(userId, receipts), syncError: null };
+  }
+
+  /** Annotates receipts with match status by loading every linked transaction for this
+      user once and grouping by receiptId — avoids one query per receipt. When a receipt
+      has more than one linked transaction (e.g. a multi-category "Create Transactions"
+      import), the highest-amount one represents it for display. */
+  private async withMatchStatus(userId: string, receipts: Receipt[]): Promise<ReceiptListItem[]> {
+    const linkedTxs = await this.txRepo.find({
+      where: { userId, receiptId: Not(IsNull()) },
+      relations: ['categoryRef'],
+      order: { amount: 'DESC' },
+    });
+
+    const byReceiptId = new Map<string, Transaction[]>();
+    for (const tx of linkedTxs) {
+      if (!tx.receiptId) continue;
+      const list = byReceiptId.get(tx.receiptId) ?? [];
+      list.push(tx);
+      byReceiptId.set(tx.receiptId, list);
+    }
+
+    return receipts.map((receipt) => {
+      const linked = byReceiptId.get(receipt.id) ?? [];
+      const top = linked[0] ?? null;
+      const matchedTransaction: MatchedTransaction | null = top
+        ? {
+            id: top.id,
+            name: top.name,
+            amount: Number(top.amount),
+            date: top.date,
+            category: top.categoryRef
+              ? { id: top.categoryRef.id, name: top.categoryRef.name, icon: top.categoryRef.icon, color: top.categoryRef.color }
+              : null,
+          }
+        : null;
+      return {
+        ...receipt,
+        matchStatus: (linked.length > 0 ? 'matched' : 'pending') as MatchStatus,
+        matchedTransaction,
+      };
+    });
   }
 
   async importToTransactions(receiptId: string, userId: string, splits: ImportSplit[]): Promise<Transaction[]> {
