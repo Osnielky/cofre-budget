@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Sidebar from '@/components/Sidebar';
 import StatStrip from './StatStrip';
 import FilterBar from './FilterBar';
-import ReceiptRow from './ReceiptRow';
+import ReceiptRow, { GRID_CLASSES } from './ReceiptRow';
 import ReceiptDetailPanel from './ReceiptDetailPanel';
 import UploadReceiptModal from './UploadReceiptModal';
 import { filterReceipts, distinctMerchants, DEFAULT_FILTERS, type Receipt, type ReceiptFilters } from '@/lib/receipts/derive';
@@ -170,6 +170,18 @@ export default function ReceiptsPage() {
             <div className="rounded-2xl p-8 text-center"
               style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)' }}>
               <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>No receipts match these filters.</p>
+            </div>
+          )}
+
+          {visible.length > 0 && (
+            <div className={`hidden md:grid items-center gap-2 px-4 py-2 mb-2 text-[10px] font-bold uppercase tracking-wider ${GRID_CLASSES}`}
+              style={{ color: 'var(--color-text-muted)' }}>
+              <span>Source</span>
+              <span>Merchant</span>
+              <span>Date</span>
+              <span className="text-right">Amount</span>
+              <span>Category</span>
+              <span>Match Status</span>
             </div>
           )}
 
