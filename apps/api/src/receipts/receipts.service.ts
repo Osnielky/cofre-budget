@@ -217,6 +217,13 @@ export class ReceiptsService {
     );
   }
 
+  async approve(userId: string, receiptId: string): Promise<Receipt> {
+    const receipt = await this.receiptRepo.findOneBy({ id: receiptId, userId });
+    if (!receipt) throw new NotFoundException('Receipt not found');
+    receipt.reviewed = true;
+    return this.receiptRepo.save(receipt);
+  }
+
   async getImage(userId: string, receiptId: string): Promise<{ data: Buffer; mimeType: string } | null> {
     const receipt = await this.receiptRepo
       .createQueryBuilder('r')

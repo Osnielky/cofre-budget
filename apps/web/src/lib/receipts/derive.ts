@@ -26,6 +26,7 @@ export interface Receipt {
   items: ReceiptItem[];
   rawSubject: string;
   imported: boolean;
+  reviewed: boolean;
   parsedAt: string;
   source: ReceiptSource;
   matchStatus: MatchStatus;

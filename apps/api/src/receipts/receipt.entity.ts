@@ -36,6 +36,9 @@ export class Receipt {
   @Column({ default: false })
   imported: boolean;
 
+  @Column({ default: false })
+  reviewed: boolean;
+
   @Column({ default: 'gmail' })
   source: string;
 

@@ -9,19 +9,24 @@ interface Props {
 
 export const GRID_CLASSES = 'grid-cols-1 md:grid-cols-[24px_minmax(140px,1fr)_90px_90px_130px_130px]';
 
-function SourceIcon({ source }: { source: Receipt['source'] }) {
+const SOURCE_COLOR: Record<Receipt['source'], string> = {
+  gmail: 'var(--color-sky)',
+  manual: 'var(--color-violet)',
+};
+
+export function SourceIcon({ source, size = 13 }: { source: Receipt['source']; size?: number }) {
   const d = source === 'manual'
     ? 'M12 16V4 M7 9l5-5 5 5 M4 20h16' // upload arrow
     : 'M4 6h16v12H4z M4 6l8 7 8-7';    // envelope
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={SOURCE_COLOR[source]}
       strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={d} />
     </svg>
   );
 }
 
-const STATUS_COLOR: Record<ReturnType<typeof statusLabel>, string> = {
+export const STATUS_COLOR: Record<ReturnType<typeof statusLabel>, string> = {
   Imported: 'var(--color-green)',
   Matched: 'var(--color-sky)',
   Pending: 'var(--color-amber)',
@@ -35,12 +40,10 @@ export default function ReceiptRow({ receipt: r, onClick }: Props) {
     <button onClick={onClick}
       className={`w-full text-left rounded-2xl px-4 py-3 gap-2 transition-colors hover:brightness-110 grid items-center ${GRID_CLASSES}`}
       style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)' }}>
-      <span className="hidden md:inline-flex" style={{ color: 'var(--color-text-muted)' }}>
-        <SourceIcon source={r.source} />
-      </span>
+      <span className="hidden md:inline-flex"><SourceIcon source={r.source} /></span>
 
       <div className="min-w-0 flex items-center gap-1.5">
-        <span className="md:hidden" style={{ color: 'var(--color-text-muted)' }}><SourceIcon source={r.source} /></span>
+        <span className="md:hidden"><SourceIcon source={r.source} /></span>
         <p className="font-semibold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{r.merchant}</p>
       </div>
 

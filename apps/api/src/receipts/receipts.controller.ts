@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Query, Request, Res, UseGuards, UseInterceptors, UploadedFile, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, Request, Res, UseGuards, UseInterceptors, UploadedFile, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -73,6 +73,11 @@ export class ReceiptsController {
       items,
     };
     return this.service.createManual(req.user.id, input, file);
+  }
+
+  @Patch(':id/approve')
+  approve(@Param('id') id: string, @Request() req: any) {
+    return this.service.approve(req.user.id, id);
   }
 
   @Get(':id/image')
