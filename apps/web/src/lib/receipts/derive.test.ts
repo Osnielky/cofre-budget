@@ -185,7 +185,7 @@ describe('groupItemsByCategory', () => {
 
   it('orders categorized groups by total descending, with Uncategorized always last', () => {
     const groups = groupItemsByCategory(items, { 0: 'cat-shopping', 1: 'cat-groceries' }, categories);
-    expect(groups.map((g) => g.categoryId)).toEqual(['cat-shopping', 'cat-groceries', null]);
+    expect(groups.map((g) => g.categoryId)).toEqual(['cat-groceries', 'cat-shopping', null]);
   });
 
   it('returns a single Uncategorized group when nothing is assigned', () => {

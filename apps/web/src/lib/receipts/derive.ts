@@ -182,6 +182,6 @@ export function groupItemsByCategory(
   return [...groups.values()].sort((a, b) => {
     if (a.categoryId === null) return 1;
     if (b.categoryId === null) return -1;
-    return a.total - b.total;
+    return b.total - a.total;
   });
 }
