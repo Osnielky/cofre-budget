@@ -80,6 +80,11 @@ export class ReceiptsController {
     return this.service.approve(req.user.id, id);
   }
 
+  @Get(':id/suggestion')
+  suggestion(@Param('id') id: string, @Request() req: any) {
+    return this.service.getMerchantSuggestion(req.user.id, id);
+  }
+
   @Get(':id/image')
   async image(@Param('id') id: string, @Request() req: any, @Res() res: Response) {
     const img = await this.service.getImage(req.user.id, id);

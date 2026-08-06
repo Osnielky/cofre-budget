@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not, IsNull } from 'typeorm';
+import { Repository, Not, IsNull, In } from 'typeorm';
 import * as crypto from 'crypto';
 import { Receipt } from './receipt.entity';
 import { Transaction } from '../transactions/transaction.entity';
@@ -31,6 +31,14 @@ export interface MatchedTransaction {
   amount: number;
   date: string;
   category: { id: string; name: string; icon: string; color: string } | null;
+}
+
+export interface MerchantSuggestion {
+  categoryId: string;
+  categoryName: string;
+  icon: string;
+  color: string;
+  receiptsConsidered: number;
 }
 
 export interface ReceiptListItem extends Receipt {
@@ -222,6 +230,47 @@ export class ReceiptsService {
     if (!receipt) throw new NotFoundException('Receipt not found');
     receipt.reviewed = true;
     return this.receiptRepo.save(receipt);
+  }
+
+  /** Suggests a category for a receipt based on how the user has categorized
+      their own past transactions from the same merchant (via Transaction.receiptId
+      -> Receipt.merchant). Returns null when there's no prior categorized history. */
+  async getMerchantSuggestion(userId: string, receiptId: string): Promise<MerchantSuggestion | null> {
+    const receipt = await this.receiptRepo.findOneBy({ id: receiptId, userId });
+    if (!receipt) throw new NotFoundException('Receipt not found');
+
+    const pastReceipts = await this.receiptRepo.find({
+      where: { userId, merchant: receipt.merchant },
+      select: ['id'],
+    });
+    const pastReceiptIds = pastReceipts.map((r) => r.id).filter((id) => id !== receiptId);
+    if (pastReceiptIds.length === 0) return null;
+
+    const pastTxs = await this.txRepo.find({
+      where: { receiptId: In(pastReceiptIds), categoryId: Not(IsNull()) },
+      relations: ['categoryRef'],
+    });
+    if (pastTxs.length === 0) return null;
+
+    const byCategoryId = new Map<string, { receiptIds: Set<string>; category: Category }>();
+    for (const tx of pastTxs) {
+      if (!tx.categoryRef || !tx.receiptId) continue;
+      const entry = byCategoryId.get(tx.categoryId) ?? { receiptIds: new Set<string>(), category: tx.categoryRef };
+      entry.receiptIds.add(tx.receiptId);
+      byCategoryId.set(tx.categoryId, entry);
+    }
+    if (byCategoryId.size === 0) return null;
+
+    const [topCategoryId, top] = [...byCategoryId.entries()]
+      .sort((a, b) => b[1].receiptIds.size - a[1].receiptIds.size)[0];
+
+    return {
+      categoryId: topCategoryId,
+      categoryName: top.category.name,
+      icon: top.category.icon,
+      color: top.category.color,
+      receiptsConsidered: top.receiptIds.size,
+    };
   }
 
   async getImage(userId: string, receiptId: string): Promise<{ data: Buffer; mimeType: string } | null> {
