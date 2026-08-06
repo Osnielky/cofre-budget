@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Sidebar from '@/components/Sidebar';
+import { avatarColor, initials } from '@/lib/avatar';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -20,20 +21,6 @@ function fmtDate(iso: string) {
   const [y, m, d] = iso.split('-').map(Number);
   if (!y || !m || !d) return iso;
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-/* People-first: each person gets a stable avatar color derived from their name */
-const AVATAR_COLORS = [
-  'var(--color-card-violet)', 'var(--color-card-green)', 'var(--color-card-orange)',
-  'var(--color-card-amber)', 'var(--color-card-sky)', 'var(--color-rose)',
-];
-function avatarColor(name: string) {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
-function initials(name: string) {
-  return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') || '?';
 }
 
 export default function DebtsPage() {
