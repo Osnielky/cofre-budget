@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { countGroups, money, statusLabel, type Receipt } from '@/lib/receipts/derive';
+import { countGroups, money, statusLabel, type Receipt, type MerchantSuggestion } from '@/lib/receipts/derive';
 import { SourceIcon, STATUS_COLOR } from './ReceiptRow';
 import MatchTransactionSection from './MatchTransactionSection';
 
@@ -14,6 +14,8 @@ interface Props {
   categories: Category[];
   itemCategories: Record<number, string>;
   onSetCategory: (idx: number, categoryId: string) => void;
+  onApplyAll: (categoryId: string) => void;
+  suggestion: MerchantSuggestion | null;
   onImport: () => void;
   importing: boolean;
   onClose: () => void;
@@ -30,7 +32,7 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 }
 
 export default function ReceiptDetailPanel({
-  receipt, categories, itemCategories, onSetCategory, onImport, importing, onClose, onReceiptChanged,
+  receipt, categories, itemCategories, onSetCategory, onApplyAll, suggestion, onImport, importing, onClose, onReceiptChanged,
 }: Props) {
   const [approving, setApproving] = useState(false);
   const groups = countGroups(receipt.items.length, itemCategories);

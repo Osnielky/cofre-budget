@@ -7,7 +7,7 @@ import FilterBar from './FilterBar';
 import ReceiptRow, { GRID_CLASSES } from './ReceiptRow';
 import ReceiptDetailPanel from './ReceiptDetailPanel';
 import UploadReceiptModal from './UploadReceiptModal';
-import { filterReceipts, distinctMerchants, DEFAULT_FILTERS, type Receipt, type ReceiptFilters } from '@/lib/receipts/derive';
+import { filterReceipts, distinctMerchants, DEFAULT_FILTERS, type Receipt, type ReceiptFilters, type MerchantSuggestion } from '@/lib/receipts/derive';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -19,6 +19,7 @@ export default function ReceiptsPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Receipt | null>(null);
   const [itemCategories, setItemCategories] = useState<Record<number, string>>({});
+  const [suggestion, setSuggestion] = useState<MerchantSuggestion | null>(null);
   const [importing, setImporting] = useState(false);
   const [gmailConnected, setGmailConnected] = useState<boolean | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -58,10 +59,24 @@ export default function ReceiptsPage() {
   function openReceipt(r: Receipt) {
     setSelected(r);
     setItemCategories({});
+    setSuggestion(null);
+    if (!r.matchedTransaction && !r.imported) {
+      fetch(`${API}/receipts/${r.id}/suggestion`, { credentials: 'include' })
+        .then((res) => (res.ok ? res.json() : null))
+        .then(setSuggestion)
+        .catch(() => setSuggestion(null));
+    }
   }
   function closeReceipt() { setSelected(null); }
   function setCategory(idx: number, categoryId: string) {
     setItemCategories((prev) => ({ ...prev, [idx]: categoryId }));
+  }
+
+  function applyAll(categoryId: string) {
+    if (!selected) return;
+    const next: Record<number, string> = {};
+    selected.items.forEach((_, idx) => { next[idx] = categoryId; });
+    setItemCategories(next);
   }
 
   async function handleImport() {
@@ -202,6 +217,8 @@ export default function ReceiptsPage() {
             categories={expenseCategories}
             itemCategories={itemCategories}
             onSetCategory={setCategory}
+            onApplyAll={applyAll}
+            suggestion={suggestion}
             onImport={handleImport}
             importing={importing}
             onClose={closeReceipt}
@@ -222,6 +239,8 @@ export default function ReceiptsPage() {
             categories={expenseCategories}
             itemCategories={itemCategories}
             onSetCategory={setCategory}
+            onApplyAll={applyAll}
+            suggestion={suggestion}
             onImport={handleImport}
             importing={importing}
             onClose={closeReceipt}
