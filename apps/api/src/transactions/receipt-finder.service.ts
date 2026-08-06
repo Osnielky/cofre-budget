@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Receipt } from '../receipts/receipt.entity';
 import { Transaction } from './transaction.entity';
 import { GmailService } from '../gmail/gmail.service';
@@ -115,6 +115,26 @@ export class ReceiptFinderService {
           .getMany()
       : [];
     return this.rank(fresh, tx, absAmount, 'gmail');
+  }
+
+  /** Row-indicator support: which of the user's unlinked transactions have at least one
+      cached receipt in their date window — local-cache-only, no Gmail calls, so it's cheap
+      enough to run for every row at once instead of per-transaction on demand. */
+  async findCachedMatchIds(userId: string, windowDays = 4): Promise<string[]> {
+    const txs = await this.txRepo.find({ where: { userId, isSplitParent: false, receiptId: IsNull() } });
+    if (txs.length === 0) return [];
+
+    const receipts = await this.receiptRepo.find({ where: { userId } });
+    if (receipts.length === 0) return [];
+
+    const matched: string[] = [];
+    for (const tx of txs) {
+      const from = shiftDate(tx.date, -windowDays);
+      const to = shiftDate(tx.date, windowDays);
+      const hasCandidate = receipts.some((r) => !r.orderDate || (r.orderDate >= from && r.orderDate <= to));
+      if (hasCandidate) matched.push(tx.id);
+    }
+    return matched;
   }
 
   async findTransactionCandidates(

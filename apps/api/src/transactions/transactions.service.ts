@@ -502,6 +502,7 @@ export class TransactionsService {
           categoryId: piece.categoryId ?? undefined,
           pending: tx.pending,
           isSplitParent: false,
+          receiptId: tx.receiptId ?? undefined,
         });
         const saved = await em.save(child);
         ids.push(saved.id);

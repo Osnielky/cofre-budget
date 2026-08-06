@@ -31,6 +31,11 @@ export class TransactionsController {
     return this.service.findTransferMatches(req.user.id, parseFloat(amount), date, excludeAccountId);
   }
 
+  @Get('receipt-matches')
+  receiptMatches(@Request() req: any) {
+    return this.receiptFinder.findCachedMatchIds(req.user.id);
+  }
+
   @Get()
   list(
     @Request() req: any,
