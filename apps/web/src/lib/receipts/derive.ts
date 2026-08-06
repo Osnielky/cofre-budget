@@ -32,6 +32,7 @@ export interface Receipt {
   matchStatus: MatchStatus;
   matchedTransaction: MatchedTransaction | null;
   imageMimeType: string | null;
+  gmailMessageId: string | null;
 }
 
 /** Subset of Receipt needed by stat/filter logic — any Receipt satisfies this structurally. */
@@ -125,4 +126,62 @@ export function countGroups(itemCount: number, itemCategories: Record<number, st
     else hasUncategorized = true;
   }
   return assigned.size + (hasUncategorized ? 1 : 0) || 1;
+}
+
+export interface CategoryLite { id: string; name: string; icon: string; color: string }
+
+export interface MerchantSuggestion {
+  categoryId: string;
+  categoryName: string;
+  icon: string;
+  color: string;
+  receiptsConsidered: number;
+}
+
+export interface CategoryGroup {
+  categoryId: string | null; // null = uncategorized
+  categoryName: string;
+  icon: string;
+  color: string;
+  itemIndices: number[];
+  total: number;
+}
+
+/** Groups a receipt's line items by their currently-assigned category (client-side
+    itemCategories state, not persisted). Uncategorized items always form one trailing
+    group. Categorized groups sort by total descending — used both for the "group by
+    category" list view and the "this will create" transaction preview. */
+export function groupItemsByCategory(
+  items: ReceiptItem[],
+  itemCategories: Record<number, string>,
+  categories: CategoryLite[],
+): CategoryGroup[] {
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  const groups = new Map<string, CategoryGroup>();
+
+  items.forEach((item, idx) => {
+    const catId = itemCategories[idx] || null;
+    const key = catId ?? '__uncategorized__';
+    const cat = catId ? byId.get(catId) : undefined;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.itemIndices.push(idx);
+      existing.total += item.total;
+    } else {
+      groups.set(key, {
+        categoryId: catId,
+        categoryName: cat?.name ?? 'Uncategorized',
+        icon: cat?.icon ?? '❔',
+        color: cat?.color ?? 'var(--color-text-muted)',
+        itemIndices: [idx],
+        total: item.total,
+      });
+    }
+  });
+
+  return [...groups.values()].sort((a, b) => {
+    if (a.categoryId === null) return 1;
+    if (b.categoryId === null) return -1;
+    return a.total - b.total;
+  });
 }

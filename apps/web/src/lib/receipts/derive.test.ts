@@ -1,10 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { statTotals, distinctMerchants, filterReceipts, countGroups, money, statusLabel, DEFAULT_FILTERS, type ReceiptLite } from './derive';
+import {
+  statTotals,
+  distinctMerchants,
+  filterReceipts,
+  countGroups,
+  money,
+  statusLabel,
+  DEFAULT_FILTERS,
+  groupItemsByCategory,
+  type ReceiptLite,
+  type ReceiptItem,
+  type CategoryLite,
+} from './derive';
 
 function receipt(p: Partial<ReceiptLite> = {}): ReceiptLite {
   return {
-    id: 'r1', merchant: 'Amazon', rawSubject: 'Your order has shipped',
-    total: 42.5, imported: false, orderDate: '2026-07-10', matchStatus: 'pending', ...p,
+    id: 'r1',
+    merchant: 'Amazon',
+    rawSubject: 'Your order has shipped',
+    total: 42.5,
+    imported: false,
+    orderDate: '2026-07-10',
+    matchStatus: 'pending',
+    ...p,
   };
 }
 
@@ -19,9 +37,9 @@ describe('statTotals', () => {
 
   it('counts matchedCount as imported-or-matched, and computes matchRate', () => {
     const receipts = [
-      receipt({ imported: true, matchStatus: 'pending' }),   // counts via imported
-      receipt({ imported: false, matchStatus: 'matched' }),  // counts via matchStatus
-      receipt({ imported: false, matchStatus: 'pending' }),  // neither
+      receipt({ imported: true, matchStatus: 'pending' }), // counts via imported
+      receipt({ imported: false, matchStatus: 'matched' }), // counts via matchStatus
+      receipt({ imported: false, matchStatus: 'pending' }), // neither
     ];
     const totals = statTotals(receipts);
     expect(totals.matchedCount).toBe(2);
@@ -81,11 +99,7 @@ describe('filterReceipts', () => {
   });
 
   it('filters by date range, excluding receipts with no orderDate when a bound is set', () => {
-    const receipts = [
-      receipt({ orderDate: '2026-07-01' }),
-      receipt({ orderDate: '2026-07-15' }),
-      receipt({ orderDate: null }),
-    ];
+    const receipts = [receipt({ orderDate: '2026-07-01' }), receipt({ orderDate: '2026-07-15' }), receipt({ orderDate: null })];
     const inRange = filterReceipts(receipts, { ...DEFAULT_FILTERS, dateFrom: '2026-07-10', dateTo: '2026-07-31' });
     expect(inRange).toHaveLength(1);
     expect(inRange[0].orderDate).toBe('2026-07-15');
@@ -134,5 +148,50 @@ describe('statusLabel', () => {
   });
   it('returns Pending when neither imported nor matched', () => {
     expect(statusLabel({ imported: false, matchStatus: 'pending' })).toBe('Pending');
+  });
+});
+
+describe('groupItemsByCategory', () => {
+  const items: ReceiptItem[] = [
+    { name: 'Bananas', quantity: 1, unitPrice: 3.49, total: 3.49 },
+    { name: 'Bread', quantity: 1, unitPrice: 5.99, total: 5.99 },
+    { name: 'USB cable', quantity: 1, unitPrice: 12.99, total: 12.99 },
+  ];
+  const categories: CategoryLite[] = [
+    { id: 'cat-groceries', name: 'Groceries', icon: '🛒', color: '#4FBF7F' },
+    { id: 'cat-shopping', name: 'Shopping', icon: '🛍️', color: '#9B6DFF' },
+  ];
+
+  it('groups items sharing a category and sums their totals', () => {
+    const groups = groupItemsByCategory(
+      items,
+      { 0: 'cat-groceries', 1: 'cat-groceries', 2: 'cat-shopping' },
+      categories,
+    );
+    expect(groups).toHaveLength(2);
+    const groceries = groups.find((g) => g.categoryId === 'cat-groceries');
+    expect(groceries?.itemIndices).toEqual([0, 1]);
+    expect(groceries?.total).toBeCloseTo(9.48);
+    expect(groceries?.categoryName).toBe('Groceries');
+  });
+
+  it('puts unassigned items into a trailing Uncategorized group', () => {
+    const groups = groupItemsByCategory(items, { 0: 'cat-groceries' }, categories);
+    const uncategorized = groups[groups.length - 1];
+    expect(uncategorized.categoryId).toBeNull();
+    expect(uncategorized.categoryName).toBe('Uncategorized');
+    expect(uncategorized.itemIndices).toEqual([1, 2]);
+  });
+
+  it('orders categorized groups by total descending, with Uncategorized always last', () => {
+    const groups = groupItemsByCategory(items, { 0: 'cat-shopping', 1: 'cat-groceries' }, categories);
+    expect(groups.map((g) => g.categoryId)).toEqual(['cat-shopping', 'cat-groceries', null]);
+  });
+
+  it('returns a single Uncategorized group when nothing is assigned', () => {
+    const groups = groupItemsByCategory(items, {}, categories);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].categoryId).toBeNull();
+    expect(groups[0].itemIndices).toEqual([0, 1, 2]);
   });
 });
