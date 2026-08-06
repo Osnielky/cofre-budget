@@ -118,8 +118,16 @@ export class ReceiptFinderService {
   }
 
   /** Row-indicator support: which of the user's unlinked transactions have at least one
-      cached receipt in their date window — local-cache-only, no Gmail calls, so it's cheap
-      enough to run for every row at once instead of per-transaction on demand. */
+      cached receipt that's both in their date window AND an exact amount match —
+      local-cache-only, no Gmail calls, so it's cheap enough to run for every row at once
+      instead of per-transaction on demand.
+
+      Date proximity alone isn't enough here: findCandidates' own cache lookup is
+      deliberately loose (date-only) because it feeds a browsable list the user visually
+      sanity-checks before linking. This feeds a bare "Receipt found" claim on every row,
+      so a same-week receipt from a completely different merchant would otherwise read as
+      a false positive on every transaction near it — amount must match too (the same
+      amountDelta === 0 bar the UI already uses to show its own ✓). */
   async findCachedMatchIds(userId: string, windowDays = 4): Promise<string[]> {
     const txs = await this.txRepo.find({ where: { userId, isSplitParent: false, receiptId: IsNull() } });
     if (txs.length === 0) return [];
@@ -131,7 +139,11 @@ export class ReceiptFinderService {
     for (const tx of txs) {
       const from = shiftDate(tx.date, -windowDays);
       const to = shiftDate(tx.date, windowDays);
-      const hasCandidate = receipts.some((r) => !r.orderDate || (r.orderDate >= from && r.orderDate <= to));
+      const absAmount = Math.abs(Number(tx.amount));
+      const hasCandidate = receipts.some((r) => {
+        const inWindow = !r.orderDate || (r.orderDate >= from && r.orderDate <= to);
+        return inWindow && Math.abs(Number(r.total) - absAmount) < 0.01;
+      });
       if (hasCandidate) matched.push(tx.id);
     }
     return matched;
