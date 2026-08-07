@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Sidebar from '@/components/Sidebar';
 import StatStrip from './StatStrip';
 import FilterBar from './FilterBar';
@@ -25,6 +25,7 @@ export default function ReceiptsPage() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [filters, setFilters] = useState<ReceiptFilters>(DEFAULT_FILTERS);
   const [showUpload, setShowUpload] = useState(false);
+  const selectedIdRef = useRef<string | null>(null);
 
   function refetchReceipts() {
     return fetch(`${API}/receipts`, { credentials: 'include' })
@@ -60,11 +61,12 @@ export default function ReceiptsPage() {
     setSelected(r);
     setItemCategories({});
     setSuggestion(null);
+    selectedIdRef.current = r.id;
     if (!r.matchedTransaction && !r.imported) {
       fetch(`${API}/receipts/${r.id}/suggestion`, { credentials: 'include' })
         .then((res) => (res.ok ? res.json() : null))
-        .then(setSuggestion)
-        .catch(() => setSuggestion(null));
+        .then((s) => { if (selectedIdRef.current === r.id) setSuggestion(s); })
+        .catch(() => { if (selectedIdRef.current === r.id) setSuggestion(null); });
     }
   }
   function closeReceipt() { setSelected(null); }
@@ -77,6 +79,7 @@ export default function ReceiptsPage() {
     const next: Record<number, string> = {};
     selected.items.forEach((_, idx) => { next[idx] = categoryId; });
     setItemCategories(next);
+    setSuggestion(null);
   }
 
   async function handleImport() {
@@ -213,6 +216,7 @@ export default function ReceiptsPage() {
         style={{ width: 400, borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
         {selected ? (
           <ReceiptDetailPanel
+            key={selected.id}
             receipt={selected}
             categories={expenseCategories}
             itemCategories={itemCategories}
@@ -235,6 +239,7 @@ export default function ReceiptsPage() {
       {selected && (
         <div className="md:hidden fixed inset-0 z-50" style={{ background: 'var(--color-base)' }}>
           <ReceiptDetailPanel
+            key={selected.id}
             receipt={selected}
             categories={expenseCategories}
             itemCategories={itemCategories}
