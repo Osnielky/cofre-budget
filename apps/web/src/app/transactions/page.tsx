@@ -46,7 +46,8 @@ type RangeMode = 'month' | 'custom';
 
 type RuleToast =
   | { kind: 'created'; matchLabel: string; appliedCount: number }
-  | { kind: 'duplicate'; matchLabel: string };
+  | { kind: 'duplicate'; matchLabel: string }
+  | { kind: 'error'; matchLabel: string; reason?: string };
 
 const glass: React.CSSProperties = {
   background: 'var(--color-surface)',
@@ -304,8 +305,11 @@ export default function TransactionsPage() {
     setPickerMakePermanent(false);
   }, [openPickerId]);
 
-  /* ── category assign ── */
-  async function assignCategory(txId: string, categoryId: string | null, keepOpen = false) {
+  /* ── category assign ──
+     Returns true if the assignment request succeeded, false otherwise, so
+     callers (e.g. chooseCategory) can decide whether it's safe to proceed
+     with a dependent action like creating a categorization rule. */
+  async function assignCategory(txId: string, categoryId: string | null, keepOpen = false): Promise<boolean> {
     setUpdatingId(txId);
     if (!keepOpen) setOpenPickerId(null);
 
@@ -327,6 +331,10 @@ export default function TransactionsPage() {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       credentials: 'include', body: JSON.stringify({ categoryId }),
     });
+    if (!res.ok) {
+      setUpdatingId(null);
+      return false;
+    }
     const updated: Transaction = await res.json();
     const counterpartId = !categoryId ? txBefore?.counterpartTxId : null;
     setTransactions((prev) => prev.map((t) => {
@@ -351,12 +359,13 @@ export default function TransactionsPage() {
       }
     }
     setUpdatingId(null);
+    return true;
   }
 
   async function chooseCategory(tx: Transaction, categoryId: string) {
     const makePermanent = pickerMakePermanent;
-    await assignCategory(tx.id, categoryId);
-    if (makePermanent) {
+    const assigned = await assignCategory(tx.id, categoryId);
+    if (makePermanent && assigned) {
       await createRule(tx, categoryId);
     }
   }
@@ -373,7 +382,11 @@ export default function TransactionsPage() {
       ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
       return;
     }
-    if (!res.ok) return;
+    if (!res.ok) {
+      setRuleToast({ kind: 'error', matchLabel });
+      ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+      return;
+    }
     const { appliedCount } = await res.json();
     setRuleToast({ kind: 'created', matchLabel, appliedCount });
     ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
@@ -1751,6 +1764,17 @@ export default function TransactionsPage() {
                                         const isTransfer = c.type === 'transfer';
                                         setPickerProjectDrill(null);
                                         if (isTransfer) {
+                                          if (pickerMakePermanent) {
+                                            setOpenPickerId(null);
+                                            if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current);
+                                            setRuleToast({
+                                              kind: 'error',
+                                              matchLabel: tx.merchantName || tx.name,
+                                              reason: "Rules can't be created for transfer categories",
+                                            });
+                                            ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+                                            return;
+                                          }
                                           setOpenPickerId(null);
                                           setTransferModal({ tx, categoryId: c.id });
                                           setTransferModalSelected(null);
@@ -2804,8 +2828,12 @@ export default function TransactionsPage() {
               animation: 'slideUp 0.25s ease-out',
             }}>
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
-              style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>
-              📌
+              style={{
+                background: ruleToast.kind === 'error'
+                  ? 'color-mix(in srgb, var(--color-card-orange) 20%, transparent)'
+                  : 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)',
+              }}>
+              {ruleToast.kind === 'error' ? '⚠️' : '📌'}
             </div>
             <div className="flex-1 min-w-0">
               {ruleToast.kind === 'created' ? (
@@ -2817,12 +2845,19 @@ export default function TransactionsPage() {
                       : `"${ruleToast.matchLabel}" will auto-categorize from now on.`}
                   </p>
                 </>
-              ) : (
+              ) : ruleToast.kind === 'duplicate' ? (
                 <>
                   <p className="text-sm font-semibold">Rule already exists</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                     A rule for "{ruleToast.matchLabel}" already exists.{' '}
                     <a href="/settings?tab=rules" className="underline" style={{ color: 'var(--color-sky)' }}>Edit it in Settings</a>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold">Couldn't create rule</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {ruleToast.reason || `Something went wrong creating a rule for "${ruleToast.matchLabel}".`}
                   </p>
                 </>
               )}

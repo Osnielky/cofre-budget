@@ -59,7 +59,12 @@ export class CategorizationRulesService {
       throw new ConflictException({ message: 'A rule for this merchant already exists', existingRuleId: existing.id });
     }
 
-    const rule = await this.repo.save(this.repo.create({ userId, matchType, matchValue, categoryId }));
+    let rule: CategorizationRule;
+    try {
+      rule = await this.repo.save(this.repo.create({ userId, matchType, matchValue, categoryId }));
+    } catch (err) {
+      throw await this.toConflictOrRethrow(err, userId, matchType, matchValue);
+    }
     const appliedCount = await this.applyToUncategorized(userId, matchType, matchValue, categoryId);
     return { rule: await this.repo.findOne({ where: { id: rule.id }, relations: ['category'] }), appliedCount };
   }
@@ -90,7 +95,11 @@ export class CategorizationRulesService {
       rule.matchValue = matchValue;
     }
 
-    await this.repo.save(rule);
+    try {
+      await this.repo.save(rule);
+    } catch (err) {
+      throw await this.toConflictOrRethrow(err, userId, rule.matchType, rule.matchValue, rule.id);
+    }
     const appliedCount = await this.applyToUncategorized(userId, rule.matchType, rule.matchValue, rule.categoryId);
     return { rule: await this.repo.findOne({ where: { id: rule.id }, relations: ['category'] }), appliedCount };
   }
@@ -102,6 +111,35 @@ export class CategorizationRulesService {
     await this.repo.remove(rule);
   }
 
+  /* A concurrent duplicate create/update can race past the case-insensitive
+     pre-check above (two case-variant merchant strings both pass it) and both
+     hit the DB's case-sensitive unique constraint. Map that driver error
+     ('23505') to the same 409 shape the pre-check throws; anything else rethrows. */
+  private async toConflictOrRethrow(
+    err: unknown,
+    userId: string,
+    matchType: 'merchant' | 'name',
+    matchValue: string,
+    excludeId?: string,
+  ): Promise<Error> {
+    const code = (err as { code?: string })?.code;
+    if (code !== '23505') return err as Error;
+
+    let qb = this.repo
+      .createQueryBuilder('rule')
+      .where('rule.userId = :userId', { userId })
+      .andWhere('rule.matchType = :matchType', { matchType })
+      .andWhere('LOWER(rule.matchValue) = LOWER(:matchValue)', { matchValue });
+    if (excludeId) qb = qb.andWhere('rule.id != :excludeId', { excludeId });
+    const existing = await qb.getOne();
+
+    if (existing) {
+      return new ConflictException({ message: 'A rule for this merchant already exists', existingRuleId: existing.id });
+    }
+    // Unique violation but no matching row found (shouldn't normally happen) — surface the original error.
+    return err as Error;
+  }
+
   private async applyToUncategorized(userId: string, matchType: 'merchant' | 'name', matchValue: string, categoryId: string): Promise<number> {
     const column = matchType === 'merchant' ? 'merchantName' : 'name';
     const result = await this.txRepo
@@ -110,7 +148,7 @@ export class CategorizationRulesService {
       .set({ categoryId })
       .where('userId = :userId', { userId })
       .andWhere('categoryId IS NULL')
-      .andWhere(`LOWER(${column}) = LOWER(:matchValue)`, { matchValue })
+      .andWhere(`LOWER(TRIM("${column}")) = LOWER(:matchValue)`, { matchValue })
       .execute();
     return result.affected ?? 0;
   }

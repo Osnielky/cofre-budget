@@ -98,11 +98,44 @@ export class CategoriesService {
     if (reassignTo) {
       await this.txRepo.update({ categoryId: id }, { categoryId: reassignTo });
     }
-    // Budgets and categorization rules reference this category. Don't rely on a
-    // DB-level cascade (it isn't guaranteed across environments) — clean them up
-    // explicitly so the delete never leaves an orphaned budget/rule behind.
+    // Budgets reference this category. Don't rely on a DB-level cascade (it
+    // isn't guaranteed across environments) — clean it up explicitly so the
+    // delete never leaves an orphaned budget behind.
     await this.budgetRepo.delete({ categoryId: id });
-    await this.rulesRepo.delete({ categoryId: id });
+
+    if (reassignTo) {
+      // Retarget rather than delete: a rule that used to fire for this category
+      // should keep firing, just pointed at the category transactions were
+      // reassigned to. Guard against the unique(userId, matchType, matchValue)
+      // constraint — if the user already has a separate rule with the same
+      // match pointing at reassignTo, drop the now-redundant rule(s) on the
+      // deleted category before retargeting the rest.
+      const [deletedRules, targetRules] = await Promise.all([
+        this.rulesRepo.find({ where: { categoryId: id } }),
+        this.rulesRepo.find({ where: { categoryId: reassignTo } }),
+      ]);
+      const targetKeys = new Set(targetRules.map((r) => `${r.matchType}::${r.matchValue.toLowerCase()}`));
+      const colliding = deletedRules.filter((r) => targetKeys.has(`${r.matchType}::${r.matchValue.toLowerCase()}`));
+      if (colliding.length > 0) {
+        await this.rulesRepo.delete(colliding.map((r) => r.id));
+      }
+      try {
+        await this.rulesRepo.update({ categoryId: id }, { categoryId: reassignTo });
+      } catch (err) {
+        // Fallback for any collision the pre-check above didn't catch (e.g. a
+        // race, or case-variant match values) — don't let the whole category
+        // delete fail because of a rule conflict.
+        if ((err as { code?: string })?.code === '23505') {
+          await this.rulesRepo.delete({ categoryId: id });
+        } else {
+          throw err;
+        }
+      }
+    } else {
+      // No sensible category left for the rule to point at — remove it, as before.
+      await this.rulesRepo.delete({ categoryId: id });
+    }
+
     await this.repo.remove(cat);
   }
 
