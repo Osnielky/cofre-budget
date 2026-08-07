@@ -25,7 +25,7 @@ interface ProjectCategory { id: string; name: string; icon: string; color: strin
 interface Project { id: string; name: string; icon: string; color: string; status: string; type?: string; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[] }
 interface TransferMatch { id: string; name: string; amount: number; date: string; bankAccount: BankAccount | null }
 interface Transaction {
-  id: string; name: string; amount: number; date: string; source: string; pending: boolean;
+  id: string; name: string; merchantName: string | null; amount: number; date: string; source: string; pending: boolean;
   categoryId: string | null; categoryRef: Category | null;
   bankAccountId: string; bankAccount: BankAccount | null;
   projectId: string | null;
@@ -43,6 +43,10 @@ interface DebtLite { id: string; borrowerName: string; remaining: number; status
 
 type Filter    = 'all' | 'uncategorized' | 'expense' | 'income' | 'recurring';
 type RangeMode = 'month' | 'custom';
+
+type RuleToast =
+  | { kind: 'created'; matchLabel: string; appliedCount: number }
+  | { kind: 'duplicate'; matchLabel: string };
 
 const glass: React.CSSProperties = {
   background: 'var(--color-surface)',
@@ -119,6 +123,7 @@ export default function TransactionsPage() {
   const [pickerShowPurchasePrompt, setPickerShowPurchasePrompt] = useState(false);
   const [pickerTransferStep, setPickerTransferStep]   = useState(false);
   const [pickerSearch, setPickerSearch]               = useState('');
+  const [pickerMakePermanent, setPickerMakePermanent] = useState(false);
   const [transferMatches, setTransferMatches]         = useState<TransferMatch[]>([]);
   const [transferMatchesLoading, setTransferMatchesLoading] = useState(false);
   const [linkingProj, setLinkingProj]                 = useState(false);
@@ -151,6 +156,9 @@ export default function TransactionsPage() {
 
   const [importToast, setImportToast] = useState<{ imported: number; skipped: number; account: { bankName: string; accountName: string; accountType: string; color: string } } | null>(null);
   const importToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [ruleToast, setRuleToast] = useState<RuleToast | null>(null);
+  const ruleToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* name → most-recently-used category (cross-period, loaded once) */
   const [categoryHints, setCategoryHints] = useState<Record<string, { id: string; name: string; icon: string; color: string }>>({});
@@ -292,6 +300,10 @@ export default function TransactionsPage() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [openPickerId, showImportPicker]);
 
+  useEffect(() => {
+    setPickerMakePermanent(false);
+  }, [openPickerId]);
+
   /* ── category assign ── */
   async function assignCategory(txId: string, categoryId: string | null, keepOpen = false) {
     setUpdatingId(txId);
@@ -339,6 +351,33 @@ export default function TransactionsPage() {
       }
     }
     setUpdatingId(null);
+  }
+
+  async function chooseCategory(tx: Transaction, categoryId: string) {
+    const makePermanent = pickerMakePermanent;
+    await assignCategory(tx.id, categoryId);
+    if (makePermanent) {
+      await createRule(tx, categoryId);
+    }
+  }
+
+  async function createRule(tx: Transaction, categoryId: string) {
+    const matchLabel = tx.merchantName || tx.name;
+    const res = await fetch(`${API}/categorization-rules`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', body: JSON.stringify({ transactionId: tx.id, categoryId }),
+    });
+    if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current);
+    if (res.status === 409) {
+      setRuleToast({ kind: 'duplicate', matchLabel });
+      ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+      return;
+    }
+    if (!res.ok) return;
+    const { appliedCount } = await res.json();
+    setRuleToast({ kind: 'created', matchLabel, appliedCount });
+    ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+    if (appliedCount > 0) loadTransactions();
   }
 
   async function assignDebt(txId: string, debtId: string | null) {
@@ -1696,6 +1735,17 @@ export default function TransactionsPage() {
                                 ) : !pickerProjectDrill ? (
                                   /* ── Normal categories ── */
                                   <>
+                                    <label className="flex items-center gap-2 px-3 py-2 text-[11px] cursor-pointer"
+                                      style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                      <input type="checkbox" checked={pickerMakePermanent}
+                                        onChange={(e) => setPickerMakePermanent(e.target.checked)}
+                                        disabled={!tx.merchantName && !tx.name.trim()}
+                                        className="rounded" />
+                                      <span style={{ color: 'var(--color-text-secondary)' }}>
+                                        Always categorize <strong>{tx.merchantName || tx.name}</strong> as this
+                                      </span>
+                                    </label>
+
                                     {pickerCats.map((c) => (
                                       <button key={c.id} onClick={() => {
                                         const isTransfer = c.type === 'transfer';
@@ -1714,7 +1764,7 @@ export default function TransactionsPage() {
                                             .catch(() => {})
                                             .finally(() => setTransferModalLoading(false));
                                         } else {
-                                          assignCategory(tx.id, c.id);
+                                          chooseCategory(tx, c.id);
                                         }
                                       }}
                                         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-[var(--color-elevated)]"
@@ -1742,7 +1792,7 @@ export default function TransactionsPage() {
                                           {isIncome ? 'Refund / Expense' : 'Income'}
                                         </p>
                                         {pickerCatsAlt.map((c) => (
-                                          <button key={c.id} onClick={() => assignCategory(tx.id, c.id)}
+                                          <button key={c.id} onClick={() => chooseCategory(tx, c.id)}
                                             className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-[var(--color-elevated)]"
                                             style={tx.categoryId === c.id ? { background: `${c.color}15` } : {}}>
                                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
@@ -2732,6 +2782,52 @@ export default function TransactionsPage() {
             </div>
             {/* Dismiss */}
             <button onClick={() => { setImportToast(null); if (importToastTimer.current) clearTimeout(importToastTimer.current); }}
+              className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] shrink-0 mt-0.5"
+              style={{ color: 'var(--color-text-muted)' }}>
+              <CloseIcon />
+            </button>
+          </div>,
+          document.body
+        )}
+
+        {/* ── Categorization rule toast ── */}
+        {ruleToast && createPortal(
+          <div
+            className="fixed bottom-6 right-6 z-50 flex items-start gap-3 px-4 py-3.5 rounded-2xl"
+            style={{
+              background: 'var(--color-surface)',
+              border: 'var(--glass-border)',
+              boxShadow: 'var(--glass-shadow)',
+              backdropFilter: 'var(--glass-blur)',
+              minWidth: '260px',
+              maxWidth: '360px',
+              animation: 'slideUp 0.25s ease-out',
+            }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+              style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>
+              📌
+            </div>
+            <div className="flex-1 min-w-0">
+              {ruleToast.kind === 'created' ? (
+                <>
+                  <p className="text-sm font-semibold">Rule created</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {ruleToast.appliedCount > 0
+                      ? `Applied to ${ruleToast.appliedCount} other transaction${ruleToast.appliedCount !== 1 ? 's' : ''}.`
+                      : `"${ruleToast.matchLabel}" will auto-categorize from now on.`}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold">Rule already exists</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    A rule for "{ruleToast.matchLabel}" already exists.{' '}
+                    <a href="/settings?tab=rules" className="underline" style={{ color: 'var(--color-sky)' }}>Edit it in Settings</a>
+                  </p>
+                </>
+              )}
+            </div>
+            <button onClick={() => { setRuleToast(null); if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current); }}
               className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] shrink-0 mt-0.5"
               style={{ color: 'var(--color-text-muted)' }}>
               <CloseIcon />
