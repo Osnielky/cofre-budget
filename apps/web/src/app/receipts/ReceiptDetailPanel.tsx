@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { countGroups, money, statusLabel, type Receipt, type MerchantSuggestion } from '@/lib/receipts/derive';
 import { SourceIcon, STATUS_COLOR } from './ReceiptRow';
+import { avatarColor, initials } from '@/lib/avatar';
 import MatchTransactionSection from './MatchTransactionSection';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -52,47 +53,45 @@ export default function ReceiptDetailPanel({
     }
   }
 
+
   return (
     <div className="flex flex-col h-full p-6 overflow-y-auto">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex items-start gap-3 min-w-0">
-          {receipt.imageMimeType && (
-            isPdf ? (
-              <a href={imageUrl} target="_blank" rel="noreferrer"
-                className="shrink-0 w-16 h-20 rounded-lg flex items-center justify-center text-xs font-medium text-center"
-                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-sky)' }}>
-                View PDF
-              </a>
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl} alt={`${receipt.merchant} receipt`}
-                className="shrink-0 w-16 h-20 rounded-lg object-cover" style={{ border: '1px solid var(--color-border)' }} />
-            )
-          )}
+          <div className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center font-bold text-sm"
+            style={{ background: `color-mix(in srgb, ${avatarColor(receipt.merchant)} 20%, transparent)`, color: avatarColor(receipt.merchant) }}>
+            {initials(receipt.merchant)}
+          </div>
           <div className="min-w-0">
             <h2 className="font-bold text-lg truncate" style={{ color: 'var(--color-text-primary)' }}>{receipt.merchant}</h2>
-            <p className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              Imported via <SourceIcon source={receipt.source} size={11} />
-              <span>{receipt.source === 'manual' ? 'Manual Upload' : 'Gmail'}</span>
+            <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
+              {receipt.orderNumber ? `Order ${receipt.orderNumber} · ` : ''}
+              {parsedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </p>
-            {receipt.source === 'gmail' && receipt.rawSubject && (
-              <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
-                Email subject: {receipt.rawSubject}
-              </p>
-            )}
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              {parsedAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} at{' '}
-              {parsedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-            </p>
-            {receipt.orderNumber && (
-              <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Order {receipt.orderNumber}</p>
-            )}
+            <div className="flex items-center gap-2 flex-wrap mt-2">
+              <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium"
+                style={{ background: 'var(--color-elevated)', color: 'var(--color-text-secondary)' }}>
+                <SourceIcon source={receipt.source} size={10} />
+                {receipt.source === 'manual' ? 'Manual Upload' : 'From Gmail'}
+              </span>
+              {receipt.source === 'gmail' && receipt.gmailMessageId && (
+                <a href={`https://mail.google.com/mail/u/0/#inbox/${receipt.gmailMessageId}`} target="_blank" rel="noreferrer"
+                  className="text-[11px] font-medium hover:underline" style={{ color: 'var(--color-sky)' }}>
+                  View email ↗
+                </a>
+              )}
+              {receipt.imageMimeType && (
+                <a href={imageUrl} target="_blank" rel="noreferrer"
+                  className="text-[11px] font-medium hover:underline" style={{ color: 'var(--color-sky)' }}>
+                  {isPdf ? 'View PDF' : 'View receipt'} ↗
+                </a>
+              )}
+            </div>
           </div>
         </div>
         <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
           style={{ color: 'var(--color-text-muted)' }}>✕</button>
       </div>
-
       {receipt.matchedTransaction && (
         <div className="mb-4" style={{ borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)' }}>
           <FieldRow label="Category (suggested)">
