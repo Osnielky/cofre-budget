@@ -49,7 +49,12 @@ export class CategorizationRulesService {
     const matchValue = (tx.merchantName || tx.name || '').trim();
     if (!matchValue) throw new BadRequestException('This transaction has no merchant or name to match on');
 
-    const existing = await this.repo.findOne({ where: { userId, matchType, matchValue } });
+    const existing = await this.repo
+      .createQueryBuilder('rule')
+      .where('rule.userId = :userId', { userId })
+      .andWhere('rule.matchType = :matchType', { matchType })
+      .andWhere('LOWER(rule.matchValue) = LOWER(:matchValue)', { matchValue })
+      .getOne();
     if (existing) {
       throw new ConflictException({ message: 'A rule for this merchant already exists', existingRuleId: existing.id });
     }
@@ -73,7 +78,12 @@ export class CategorizationRulesService {
     if (dto.matchValue !== undefined) {
       const matchValue = dto.matchValue.trim();
       if (!matchValue) throw new BadRequestException('Match text cannot be empty');
-      const existing = await this.repo.findOne({ where: { userId, matchType: rule.matchType, matchValue } });
+      const existing = await this.repo
+        .createQueryBuilder('rule')
+        .where('rule.userId = :userId', { userId })
+        .andWhere('rule.matchType = :matchType', { matchType: rule.matchType })
+        .andWhere('LOWER(rule.matchValue) = LOWER(:matchValue)', { matchValue })
+        .getOne();
       if (existing && existing.id !== rule.id) {
         throw new ConflictException({ message: 'A rule for this merchant already exists', existingRuleId: existing.id });
       }
