@@ -36,8 +36,19 @@ export default function ReceiptDetailPanel({
   receipt, categories, itemCategories, onSetCategory, onApplyAll, suggestion, onImport, importing, onClose, onReceiptChanged,
 }: Props) {
   const [approving, setApproving] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const [grouped, setGrouped] = useState(false);
   const transactionCount = countGroups(receipt.items.length, itemCategories);
   const categoryGroups = groupItemsByCategory(receipt.items, itemCategories, categories);
+
+  const itemCount = receipt.items.length;
+  const visibleCount = showAll ? itemCount : Math.min(itemCount, 6);
+  const hiddenCount = itemCount - visibleCount;
+  const hiddenIndices = Array.from({ length: hiddenCount }, (_, i) => visibleCount + i);
+  const hiddenCategoryIds = new Set(hiddenIndices.map((idx) => itemCategories[idx] ?? ''));
+  const hiddenCategoryLabel = hiddenCount > 0 && hiddenCategoryIds.size === 1 && [...hiddenCategoryIds][0]
+    ? categories.find((c) => c.id === [...hiddenCategoryIds][0])?.name ?? null
+    : null;
   const label = statusLabel(receipt);
   const category = receipt.matchedTransaction?.category;
   const parsedAt = new Date(receipt.parsedAt);
@@ -190,9 +201,41 @@ export default function ReceiptDetailPanel({
             </div>
           )}
 
-          <div className="space-y-2 mb-4">
-            {receipt.items.map((item, idx) => renderItemRow(item, idx))}
+          {categoryGroups.length > 1 && (
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                {itemCount} item{itemCount !== 1 ? 's' : ''}
+              </span>
+              <button onClick={() => setGrouped((g) => !g)} className="text-[11px] font-medium hover:underline" style={{ color: 'var(--color-sky)' }}>
+                {grouped ? 'Show original order' : 'Group by category'}
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-2 mb-2">
+            {grouped ? (
+              categoryGroups.map((group) => (
+                <div key={group.categoryId ?? 'uncategorized'}>
+                  <div className="flex items-center justify-between px-1 mb-1">
+                    <span className="text-[11px] font-semibold" style={{ color: group.color }}>{group.icon} {group.categoryName}</span>
+                    <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{money(group.total)}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {group.itemIndices.map((idx) => renderItemRow(receipt.items[idx], idx))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              Array.from({ length: visibleCount }, (_, idx) => renderItemRow(receipt.items[idx], idx))
+            )}
           </div>
+
+          {!grouped && hiddenCount > 0 && (
+            <button onClick={() => setShowAll(true)} className="text-xs font-medium mb-4 hover:underline block" style={{ color: 'var(--color-sky)' }}>
+              {hiddenCount} more item{hiddenCount !== 1 ? 's' : ''}{hiddenCategoryLabel ? ` · all ${hiddenCategoryLabel}` : ''} · Show all
+            </button>
+          )}
+          {(grouped || hiddenCount === 0) && <div className="mb-4" />}
 
           <div className="rounded-xl p-3 mb-4"
             style={{ background: 'color-mix(in srgb, var(--color-card-violet) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 15%, transparent)' }}>
