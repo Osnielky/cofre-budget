@@ -6,6 +6,7 @@ import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
 import { DebtsService } from '../debts/debts.service';
 import { isLiabilityType } from '../bank-accounts/account-types';
+import { CategorizationRulesService } from '../categorization-rules/categorization-rules.service';
 
 export interface CsvRow {
   date: string;        // MM/DD/YYYY or YYYY-MM-DD
@@ -21,6 +22,7 @@ export class TransactionsService {
     @InjectRepository(BankAccount) private accountRepo: Repository<BankAccount>,
     @InjectRepository(ProjectCategory) private projCatRepo: Repository<ProjectCategory>,
     private debtsService: DebtsService,
+    private rulesService: CategorizationRulesService,
   ) {}
 
   async getCategoryHints(userId: string): Promise<Record<string, { id: string; name: string; icon: string; color: string }>> {
@@ -163,6 +165,7 @@ export class TransactionsService {
 
     let imported = 0;
     let skipped = 0;
+    const rules = await this.rulesService.getActiveRules(userId);
 
     for (const row of rows) {
       const externalId = row.referenceNumber ? `csv_${row.referenceNumber}` : null;
@@ -192,6 +195,7 @@ export class TransactionsService {
           name: row.name,
           date: normalizeDate(row.date),
           pending: false,
+          categoryId: this.rulesService.matchRule(rules, { name: row.name }) ?? undefined,
         }),
       );
       imported++;
@@ -234,6 +238,11 @@ export class TransactionsService {
       if (!account || account.userId !== userId) throw new ForbiddenException();
     }
     if (dto.debtId && !(Math.abs(dto.amount) > 0)) throw new BadRequestException('A debt repayment amount must be non-zero.');
+
+    const matchedCategoryId = dto.debtId || dto.categoryId
+      ? null
+      : this.rulesService.matchRule(await this.rulesService.getActiveRules(userId), { name: dto.name });
+
     const saved = await this.repo.save(
       this.repo.create({
         userId,
@@ -244,7 +253,7 @@ export class TransactionsService {
         date: dto.date,
         pending: false,
         note: dto.note ?? null,
-        categoryId: dto.debtId ? undefined : (dto.categoryId ?? undefined),
+        categoryId: dto.debtId ? undefined : (dto.categoryId ?? matchedCategoryId ?? undefined),
         debtId: dto.debtId ?? undefined,
       }),
     );

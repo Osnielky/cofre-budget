@@ -5,9 +5,10 @@ import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { PlaidService } from './plaid.service';
 import { PlaidController } from './plaid.controller';
+import { CategorizationRulesModule } from '../categorization-rules/categorization-rules.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PlaidItem, BankAccount, Transaction])],
+  imports: [TypeOrmModule.forFeature([PlaidItem, BankAccount, Transaction]), CategorizationRulesModule],
   providers: [PlaidService],
   controllers: [PlaidController],
   exports: [PlaidService],

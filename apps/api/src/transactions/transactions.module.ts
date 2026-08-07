@@ -9,9 +9,10 @@ import { ReceiptFinderService } from './receipt-finder.service';
 import { TransactionsController } from './transactions.controller';
 import { DebtsModule } from '../debts/debts.module';
 import { GmailModule } from '../gmail/gmail.module';
+import { CategorizationRulesModule } from '../categorization-rules/categorization-rules.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Transaction, BankAccount, ProjectCategory, Receipt]), DebtsModule, GmailModule],
+  imports: [TypeOrmModule.forFeature([Transaction, BankAccount, ProjectCategory, Receipt]), DebtsModule, GmailModule, CategorizationRulesModule],
   providers: [TransactionsService, ReceiptFinderService],
   controllers: [TransactionsController],
   exports: [TransactionsService, ReceiptFinderService],

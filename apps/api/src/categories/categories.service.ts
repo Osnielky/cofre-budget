@@ -5,6 +5,7 @@ import { Category } from './category.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { Budget } from '../budgets/budget.entity';
 import { UpsertCategoryDto } from './dto/upsert-category.dto';
+import { CategorizationRule } from '../categorization-rules/categorization-rule.entity';
 
 const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'createdAt' | 'updatedAt' | 'isFixed'>[] = [
   { name: 'Food & Dining',  icon: '🍔', color: '#F07A3E', type: 'expense',  description: 'Restaurants, groceries, coffee & snacks' },
@@ -42,6 +43,7 @@ export class CategoriesService {
     @InjectRepository(Category) private repo: Repository<Category>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
     @InjectRepository(Budget) private budgetRepo: Repository<Budget>,
+    @InjectRepository(CategorizationRule) private rulesRepo: Repository<CategorizationRule>,
   ) {}
 
   async findAllByUser(userId: string): Promise<Category[]> {
@@ -96,10 +98,11 @@ export class CategoriesService {
     if (reassignTo) {
       await this.txRepo.update({ categoryId: id }, { categoryId: reassignTo });
     }
-    // Budgets reference this category. Don't rely on a DB-level cascade (it isn't
-    // guaranteed across environments) — clean them up explicitly so the delete
-    // never leaves an orphaned budget that renders as a phantom "Unknown" row.
+    // Budgets and categorization rules reference this category. Don't rely on a
+    // DB-level cascade (it isn't guaranteed across environments) — clean them up
+    // explicitly so the delete never leaves an orphaned budget/rule behind.
     await this.budgetRepo.delete({ categoryId: id });
+    await this.rulesRepo.delete({ categoryId: id });
     await this.repo.remove(cat);
   }
 

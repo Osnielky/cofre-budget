@@ -13,6 +13,7 @@ import { PlaidItem } from './plaid-item.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.util';
+import { CategorizationRulesService } from '../categorization-rules/categorization-rules.service';
 
 @Injectable()
 export class PlaidService {
@@ -25,6 +26,7 @@ export class PlaidService {
     @InjectRepository(PlaidItem) private itemRepo: Repository<PlaidItem>,
     @InjectRepository(BankAccount) private accountRepo: Repository<BankAccount>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
+    private rulesService: CategorizationRulesService,
   ) {
     const secret = this.config.get<string>('JWT_SECRET');
     if (!secret) throw new Error('JWT_SECRET is required for PlaidService token encryption');
@@ -135,6 +137,8 @@ export class PlaidService {
         options: { count: 500, offset: 0 },
       });
 
+      const rules = await this.rulesService.getActiveRules(item.userId);
+
       for (const pt of res.data.transactions) {
         const account = await this.accountRepo.findOneBy({ plaidAccountId: pt.account_id });
         if (!account) continue;
@@ -158,6 +162,7 @@ export class PlaidService {
             plaidCategory: pt.category ?? [],
             date: pt.date,
             pending: pt.pending,
+            categoryId: this.rulesService.matchRule(rules, { merchantName: pt.merchant_name, name: pt.name }) ?? undefined,
           }),
         );
       }
