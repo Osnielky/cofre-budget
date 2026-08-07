@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { countGroups, money, statusLabel, type Receipt, type MerchantSuggestion } from '@/lib/receipts/derive';
+import { countGroups, groupItemsByCategory, money, statusLabel, type Receipt, type MerchantSuggestion } from '@/lib/receipts/derive';
 import { SourceIcon, STATUS_COLOR } from './ReceiptRow';
 import { avatarColor, initials } from '@/lib/avatar';
 import MatchTransactionSection from './MatchTransactionSection';
@@ -36,7 +36,8 @@ export default function ReceiptDetailPanel({
   receipt, categories, itemCategories, onSetCategory, onApplyAll, suggestion, onImport, importing, onClose, onReceiptChanged,
 }: Props) {
   const [approving, setApproving] = useState(false);
-  const groups = countGroups(receipt.items.length, itemCategories);
+  const transactionCount = countGroups(receipt.items.length, itemCategories);
+  const categoryGroups = groupItemsByCategory(receipt.items, itemCategories, categories);
   const label = statusLabel(receipt);
   const category = receipt.matchedTransaction?.category;
   const parsedAt = new Date(receipt.parsedAt);
@@ -53,6 +54,35 @@ export default function ReceiptDetailPanel({
     }
   }
 
+  function renderItemRow(item: Receipt['items'][number], idx: number) {
+    const catId = itemCategories[idx] ?? '';
+    const cat = categories.find((c) => c.id === catId);
+    return (
+      <div key={idx} className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{item.name}</p>
+          {item.quantity > 1 && (
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{item.quantity}× {money(item.unitPrice)}</p>
+          )}
+        </div>
+        <span className="shrink-0 text-sm tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>{money(item.total)}</span>
+        <select
+          value={catId}
+          onChange={(e) => onSetCategory(idx, e.target.value)}
+          className="shrink-0 text-xs font-medium rounded-full pl-2.5 pr-1.5 py-1 outline-none appearance-none text-center"
+          style={{
+            background: cat ? `color-mix(in srgb, ${cat.color} 15%, transparent)` : 'var(--color-elevated)',
+            color: cat ? cat.color : 'var(--color-text-muted)',
+            border: `1px solid ${cat ? `color-mix(in srgb, ${cat.color} 30%, transparent)` : 'var(--color-border)'}`,
+          }}>
+          <option value="">Choose…</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+          ))}
+        </select>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full p-6 overflow-y-auto">
@@ -141,34 +171,33 @@ export default function ReceiptDetailPanel({
           <p className="text-xs mb-3" style={{ color: 'var(--color-text-secondary)' }}>
             Assign a category to each item. Items with the same category become one transaction.
           </p>
-          <div className="space-y-2 mb-4">
-            {receipt.items.map((item, idx) => (
-              <div key={idx} className="rounded-xl p-3 flex items-center gap-3"
-                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>{item.name}</p>
-                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    {item.quantity > 1 ? `${item.quantity}× ` : ''}{money(item.unitPrice)} = {money(item.total)}
-                  </p>
-                </div>
-                <select
-                  value={itemCategories[idx] ?? ''}
-                  onChange={(e) => onSetCategory(idx, e.target.value)}
-                  className="text-xs rounded-lg px-2 py-1.5 outline-none"
-                  style={{ background: 'var(--color-surface)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)', minWidth: 120 }}>
-                  <option value="">No category</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-                  ))}
-                </select>
+          {suggestion && (
+            <div className="rounded-xl p-3 mb-3 flex items-center justify-between gap-3"
+              style={{ background: 'color-mix(in srgb, var(--color-card-violet) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 15%, transparent)' }}>
+              <div className="min-w-0">
+                <p className="text-xs font-medium" style={{ color: 'var(--color-card-violet)' }}>
+                  All {receipt.items.length} item{receipt.items.length !== 1 ? 's' : ''} look{receipt.items.length === 1 ? 's' : ''} like {suggestion.categoryName}
+                </p>
+                <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                  Based on your last {suggestion.receiptsConsidered} {receipt.merchant} receipt{suggestion.receiptsConsidered !== 1 ? 's' : ''}
+                </p>
               </div>
-            ))}
+              <button onClick={() => onApplyAll(suggestion.categoryId)}
+                className="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg transition-opacity hover:opacity-80"
+                style={{ background: 'var(--color-card-violet)', color: '#fff' }}>
+                Apply
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-2 mb-4">
+            {receipt.items.map((item, idx) => renderItemRow(item, idx))}
           </div>
 
           <div className="rounded-xl p-3 mb-4"
             style={{ background: 'color-mix(in srgb, var(--color-card-violet) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 15%, transparent)' }}>
             <p className="text-xs" style={{ color: 'var(--color-card-violet)' }}>
-              This will create <strong>{groups}</strong> transaction{groups !== 1 ? 's' : ''} totaling <strong>{money(receipt.total)}</strong>.
+              This will create <strong>{transactionCount}</strong> transaction{transactionCount !== 1 ? 's' : ''} totaling <strong>{money(receipt.total)}</strong>.
             </p>
           </div>
         </>
@@ -187,7 +216,7 @@ export default function ReceiptDetailPanel({
           <button onClick={onImport} disabled={importing}
             className="w-full py-3 rounded-xl font-semibold text-sm transition-opacity hover:opacity-80 disabled:opacity-50"
             style={{ background: 'linear-gradient(180deg, var(--color-card-violet), var(--color-primary))', color: '#fff' }}>
-            {importing ? 'Creating…' : `Create ${groups} Transaction${groups !== 1 ? 's' : ''}`}
+            {importing ? 'Creating…' : `Create ${transactionCount} Transaction${transactionCount !== 1 ? 's' : ''}`}
           </button>
         )}
 
