@@ -40,6 +40,8 @@ export default function ReceiptDetailPanel({
   const [grouped, setGrouped] = useState(false);
   const transactionCount = countGroups(receipt.items.length, itemCategories);
   const categoryGroups = groupItemsByCategory(receipt.items, itemCategories, categories);
+  const subtotal = receipt.items.reduce((sum, item) => sum + item.total, 0);
+  const tax = receipt.total - subtotal;
 
   const itemCount = receipt.items.length;
   const visibleCount = showAll ? itemCount : Math.min(itemCount, 6);
@@ -237,11 +239,38 @@ export default function ReceiptDetailPanel({
           )}
           {(grouped || hiddenCount === 0) && <div className="mb-4" />}
 
+          <div className="rounded-xl p-3 mb-3 space-y-1.5" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+            <div className="flex items-center justify-between text-xs">
+              <span style={{ color: 'var(--color-text-muted)' }}>Subtotal</span>
+              <span style={{ color: 'var(--color-text-secondary)' }}>{money(subtotal)}</span>
+            </div>
+            {tax > 0.01 && (
+              <div className="flex items-center justify-between text-xs">
+                <span style={{ color: 'var(--color-text-muted)' }}>Tax</span>
+                <span style={{ color: 'var(--color-text-secondary)' }}>{money(tax)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-sm font-bold pt-1" style={{ borderTop: '1px solid var(--color-border)' }}>
+              <span style={{ color: 'var(--color-text-primary)' }}>Receipt total</span>
+              <span style={{ color: 'var(--color-text-primary)' }}>{money(receipt.total)}</span>
+            </div>
+          </div>
+
           <div className="rounded-xl p-3 mb-4"
             style={{ background: 'color-mix(in srgb, var(--color-card-violet) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 15%, transparent)' }}>
-            <p className="text-xs" style={{ color: 'var(--color-card-violet)' }}>
-              This will create <strong>{transactionCount}</strong> transaction{transactionCount !== 1 ? 's' : ''} totaling <strong>{money(receipt.total)}</strong>.
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--color-card-violet)' }}>
+              This will create {transactionCount} transaction{transactionCount !== 1 ? 's' : ''}
             </p>
+            <div className="space-y-1.5">
+              {categoryGroups.map((group) => (
+                <div key={group.categoryId ?? 'uncategorized'} className="flex items-center justify-between text-xs">
+                  <span style={{ color: 'var(--color-text-secondary)' }}>
+                    {group.icon} {group.categoryName} · {group.itemIndices.length} item{group.itemIndices.length !== 1 ? 's' : ''}
+                  </span>
+                  <span className="font-medium tabular-nums" style={{ color: 'var(--color-text-primary)' }}>{money(group.total)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </>
       )}
