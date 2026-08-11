@@ -38,6 +38,8 @@ interface Transaction {
   isSplitParent: boolean;
   note: string | null;
   receiptId: string | null;
+  categorizedByRuleId: string | null;
+  categorizedByRule: { id: string; matchValue: string } | null;
 }
 interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid'; direction: 'lent' | 'owed' }
 
@@ -125,6 +127,10 @@ export default function TransactionsPage() {
   const [pickerTransferStep, setPickerTransferStep]   = useState(false);
   const [pickerSearch, setPickerSearch]               = useState('');
   const [justCategorizedId, setJustCategorizedId]     = useState<string | null>(null);
+  const [ruleMenuTxId, setRuleMenuTxId] = useState<string | null>(null);
+  const [ruleMenuPos, setRuleMenuPos]   = useState<{ top: number; left: number } | null>(null);
+  const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
+  const ruleMenuRef = useRef<HTMLDivElement>(null);
   const [transferMatches, setTransferMatches]         = useState<TransferMatch[]>([]);
   const [transferMatchesLoading, setTransferMatchesLoading] = useState(false);
   const [linkingProj, setLinkingProj]                 = useState(false);
@@ -301,6 +307,16 @@ export default function TransactionsPage() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [openPickerId, showImportPicker]);
 
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (ruleMenuTxId && ruleMenuRef.current && !ruleMenuRef.current.contains(e.target as Node)) {
+        setRuleMenuTxId(null);
+      }
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [ruleMenuTxId]);
+
   /* ── category assign ──
      Returns true if the assignment request succeeded, false otherwise, so
      callers can decide whether it's safe to proceed with a dependent action
@@ -339,6 +355,8 @@ export default function TransactionsPage() {
         categoryId: updated.categoryId,
         categoryRef: updated.categoryRef,
         debtId: updated.debtId ?? null,
+        categorizedByRuleId: updated.categorizedByRuleId ?? null,
+        categorizedByRule: updated.categorizedByRule ?? null,
         ...(!categoryId && { transferAccountId: null, transferAccount: null, counterpartTxId: null }),
       };
       if (counterpartId && t.id === counterpartId) return {
@@ -385,6 +403,20 @@ export default function TransactionsPage() {
     setRuleToast({ kind: 'created', matchLabel, appliedCount });
     ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
     if (appliedCount > 0) loadTransactions();
+  }
+
+  async function uncategorizeOne(tx: Transaction) {
+    setRuleMenuTxId(null);
+    await assignCategory(tx.id, null);
+  }
+
+  async function deleteRuleFromRow(tx: Transaction) {
+    if (!tx.categorizedByRuleId) return;
+    setDeletingRuleId(tx.categorizedByRuleId);
+    setRuleMenuTxId(null);
+    await fetch(`${API}/categorization-rules/${tx.categorizedByRuleId}`, { method: 'DELETE', credentials: 'include' });
+    setDeletingRuleId(null);
+    loadTransactions();
   }
 
   async function assignDebt(txId: string, debtId: string | null) {
@@ -2009,6 +2041,38 @@ export default function TransactionsPage() {
                                 <CloseIcon />
                               </button>
                             </div>
+                          )}
+
+                          {/* Rule-provenance indicator */}
+                          {tx.categorizedByRuleId && (
+                            <button
+                              onClick={(e) => {
+                                if (ruleMenuTxId === tx.id) { setRuleMenuTxId(null); return; }
+                                const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                setRuleMenuPos({ top: rect.bottom + 4, left: Math.max(4, rect.right - 180) });
+                                setRuleMenuTxId(tx.id);
+                              }}
+                              title={tx.categorizedByRule ? `Categorized by rule: ${tx.categorizedByRule.matchValue}` : 'Categorized by a rule'}
+                              className="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-colors hover:bg-[var(--color-elevated)] shrink-0">
+                              📌
+                            </button>
+                          )}
+
+                          {ruleMenuTxId === tx.id && ruleMenuPos && createPortal(
+                            <div ref={ruleMenuRef} className="py-1 rounded-xl overflow-hidden"
+                              style={{ ...glass, position: 'fixed', top: ruleMenuPos.top, left: ruleMenuPos.left, width: '180px', zIndex: 9999 }}>
+                              <button onClick={() => uncategorizeOne(tx)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
+                                style={{ color: 'var(--color-text-secondary)' }}>
+                                Uncategorize this one
+                              </button>
+                              <button onClick={() => deleteRuleFromRow(tx)} disabled={deletingRuleId === tx.categorizedByRuleId}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-red-500/20 disabled:opacity-40"
+                                style={{ color: 'var(--color-rose)' }}>
+                                {deletingRuleId === tx.categorizedByRuleId ? 'Deleting rule…' : 'Delete the rule'}
+                              </button>
+                            </div>,
+                            document.body
                           )}
 
                           {/* Find receipt in email */}
