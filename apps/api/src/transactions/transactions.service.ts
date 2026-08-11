@@ -87,6 +87,7 @@ export class TransactionsService {
       .leftJoinAndSelect('tx.categoryRef', 'categoryRef')
       .leftJoinAndSelect('tx.bankAccount', 'bankAccount')
       .leftJoinAndSelect('tx.transferAccount', 'transferAccount')
+      .leftJoinAndSelect('tx.categorizedByRule', 'categorizedByRule')
       .where('tx.userId = :userId', { userId })
       .andWhere('tx.isSplitParent = false')
       .orderBy('tx.date', 'DESC')
@@ -185,6 +186,7 @@ export class TransactionsService {
         .getOne();
       if (fieldMatch) { skipped++; continue; }
 
+      const matchedRule = this.rulesService.matchRule(rules, { name: row.name });
       await this.repo.save(
         this.repo.create({
           userId,
@@ -195,7 +197,8 @@ export class TransactionsService {
           name: row.name,
           date: normalizeDate(row.date),
           pending: false,
-          categoryId: this.rulesService.matchRule(rules, { name: row.name }) ?? undefined,
+          categoryId: matchedRule?.categoryId ?? undefined,
+          categorizedByRuleId: matchedRule?.id ?? undefined,
         }),
       );
       imported++;
@@ -239,7 +242,7 @@ export class TransactionsService {
     }
     if (dto.debtId && !(Math.abs(dto.amount) > 0)) throw new BadRequestException('A debt repayment amount must be non-zero.');
 
-    const matchedCategoryId = dto.debtId || dto.categoryId
+    const matchedRule = dto.debtId || dto.categoryId
       ? null
       : this.rulesService.matchRule(await this.rulesService.getActiveRules(userId), { name: dto.name });
 
@@ -253,7 +256,8 @@ export class TransactionsService {
         date: dto.date,
         pending: false,
         note: dto.note ?? null,
-        categoryId: dto.debtId ? undefined : (dto.categoryId ?? matchedCategoryId ?? undefined),
+        categoryId: dto.debtId ? undefined : (dto.categoryId ?? matchedRule?.categoryId ?? undefined),
+        categorizedByRuleId: dto.debtId || dto.categoryId ? undefined : (matchedRule?.id ?? undefined),
         debtId: dto.debtId ?? undefined,
       }),
     );
@@ -351,6 +355,7 @@ export class TransactionsService {
       tx.counterpartTxId   = undefined;
     }
     tx.categoryId = categoryId;
+    tx.categorizedByRuleId = null;
     const saved = await this.repo.save(tx);
     return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'transferAccount', 'bankAccount'] });
   }

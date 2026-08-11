@@ -150,6 +150,7 @@ export class PlaidService {
           continue;
         }
 
+        const matchedRule = this.rulesService.matchRule(rules, { merchantName: pt.merchant_name, name: pt.name });
         await this.txRepo.save(
           this.txRepo.create({
             userId: item.userId,
@@ -162,7 +163,8 @@ export class PlaidService {
             plaidCategory: pt.category ?? [],
             date: pt.date,
             pending: pt.pending,
-            categoryId: this.rulesService.matchRule(rules, { merchantName: pt.merchant_name, name: pt.name }) ?? undefined,
+            categoryId: matchedRule?.categoryId ?? undefined,
+            categorizedByRuleId: matchedRule?.id ?? undefined,
           }),
         );
       }

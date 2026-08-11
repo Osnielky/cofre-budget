@@ -6,6 +6,7 @@ import {
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Category } from '../categories/category.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
+import { CategorizationRule } from '../categorization-rules/categorization-rule.entity';
 
 /* externalId (Plaid transaction_id, or a CSV reference/composite key) is only
    guaranteed unique per user — two different users' CSV imports can produce
@@ -117,4 +118,14 @@ export class Transaction {
 
   @Column({ type: 'uuid', nullable: true, default: null })
   receiptId: string | null;
+
+  /* Set when this transaction's category was applied automatically by a
+     CategorizationRule, rather than picked manually — powers the "ruled"
+     indicator and lets it be cleared without affecting the category itself. */
+  @ManyToOne(() => CategorizationRule, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'categorizedByRuleId' })
+  categorizedByRule: CategorizationRule;
+
+  @Column({ type: 'uuid', nullable: true, default: null })
+  categorizedByRuleId: string | null;
 }

@@ -26,16 +26,16 @@ export class CategorizationRulesService {
     return this.repo.find({ where: { userId } });
   }
 
-  /* Picks the categoryId a new, uncategorized transaction should get, or null.
-     A merchant-type match takes precedence over a name-type match. */
-  matchRule(rules: CategorizationRule[], candidate: { merchantName?: string | null; name: string }): string | null {
+  /* Picks the rule a new, uncategorized transaction should be categorized by,
+     or null. A merchant-type match takes precedence over a name-type match. */
+  matchRule(rules: CategorizationRule[], candidate: { merchantName?: string | null; name: string }): CategorizationRule | null {
     const norm = (s: string) => s.trim().toLowerCase();
     if (candidate.merchantName) {
       const m = rules.find((r) => r.matchType === 'merchant' && norm(r.matchValue) === norm(candidate.merchantName!));
-      if (m) return m.categoryId;
+      if (m) return m;
     }
     const n = rules.find((r) => r.matchType === 'name' && norm(r.matchValue) === norm(candidate.name));
-    return n ? n.categoryId : null;
+    return n ?? null;
   }
 
   async create(userId: string, transactionId: string, categoryId: string): Promise<RuleWithApplyCount> {
@@ -65,7 +65,7 @@ export class CategorizationRulesService {
     } catch (err) {
       throw await this.toConflictOrRethrow(err, userId, matchType, matchValue);
     }
-    const appliedCount = await this.applyToUncategorized(userId, matchType, matchValue, categoryId);
+    const appliedCount = await this.applyToUncategorized(userId, matchType, matchValue, categoryId, rule.id);
     return { rule: await this.repo.findOne({ where: { id: rule.id }, relations: ['category'] }), appliedCount };
   }
 
@@ -100,7 +100,7 @@ export class CategorizationRulesService {
     } catch (err) {
       throw await this.toConflictOrRethrow(err, userId, rule.matchType, rule.matchValue, rule.id);
     }
-    const appliedCount = await this.applyToUncategorized(userId, rule.matchType, rule.matchValue, rule.categoryId);
+    const appliedCount = await this.applyToUncategorized(userId, rule.matchType, rule.matchValue, rule.categoryId, rule.id);
     return { rule: await this.repo.findOne({ where: { id: rule.id }, relations: ['category'] }), appliedCount };
   }
 
@@ -140,12 +140,12 @@ export class CategorizationRulesService {
     return err as Error;
   }
 
-  private async applyToUncategorized(userId: string, matchType: 'merchant' | 'name', matchValue: string, categoryId: string): Promise<number> {
+  private async applyToUncategorized(userId: string, matchType: 'merchant' | 'name', matchValue: string, categoryId: string, ruleId: string): Promise<number> {
     const column = matchType === 'merchant' ? 'merchantName' : 'name';
     const result = await this.txRepo
       .createQueryBuilder()
       .update(Transaction)
-      .set({ categoryId })
+      .set({ categoryId, categorizedByRuleId: ruleId })
       .where('userId = :userId', { userId })
       .andWhere('categoryId IS NULL')
       .andWhere(`LOWER(TRIM("${column}")) = LOWER(:matchValue)`, { matchValue })
