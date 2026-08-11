@@ -356,7 +356,8 @@ export default function TransactionsPage() {
     }
     setUpdatingId(null);
     if (categoryId) {
-      setJustCategorizedId(txId);
+      const assignedCat = categories.find((c) => c.id === categoryId);
+      setJustCategorizedId(assignedCat && assignedCat.type !== 'transfer' ? txId : null);
     } else {
       setJustCategorizedId((prev) => (prev === txId ? null : prev));
     }
