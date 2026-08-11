@@ -124,7 +124,7 @@ export default function TransactionsPage() {
   const [pickerShowPurchasePrompt, setPickerShowPurchasePrompt] = useState(false);
   const [pickerTransferStep, setPickerTransferStep]   = useState(false);
   const [pickerSearch, setPickerSearch]               = useState('');
-  const [pickerMakePermanent, setPickerMakePermanent] = useState(false);
+  const [justCategorizedId, setJustCategorizedId]     = useState<string | null>(null);
   const [transferMatches, setTransferMatches]         = useState<TransferMatch[]>([]);
   const [transferMatchesLoading, setTransferMatchesLoading] = useState(false);
   const [linkingProj, setLinkingProj]                 = useState(false);
@@ -301,14 +301,10 @@ export default function TransactionsPage() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [openPickerId, showImportPicker]);
 
-  useEffect(() => {
-    setPickerMakePermanent(false);
-  }, [openPickerId]);
-
   /* ── category assign ──
      Returns true if the assignment request succeeded, false otherwise, so
-     callers (e.g. chooseCategory) can decide whether it's safe to proceed
-     with a dependent action like creating a categorization rule. */
+     callers can decide whether it's safe to proceed with a dependent action
+     like creating a categorization rule. */
   async function assignCategory(txId: string, categoryId: string | null, keepOpen = false): Promise<boolean> {
     setUpdatingId(txId);
     if (!keepOpen) setOpenPickerId(null);
@@ -359,15 +355,12 @@ export default function TransactionsPage() {
       }
     }
     setUpdatingId(null);
-    return true;
-  }
-
-  async function chooseCategory(tx: Transaction, categoryId: string) {
-    const makePermanent = pickerMakePermanent;
-    const assigned = await assignCategory(tx.id, categoryId);
-    if (makePermanent && assigned) {
-      await createRule(tx, categoryId);
+    if (categoryId) {
+      setJustCategorizedId(txId);
+    } else {
+      setJustCategorizedId((prev) => (prev === txId ? null : prev));
     }
+    return true;
   }
 
   async function createRule(tx: Transaction, categoryId: string) {
@@ -1748,33 +1741,11 @@ export default function TransactionsPage() {
                                 ) : !pickerProjectDrill ? (
                                   /* ── Normal categories ── */
                                   <>
-                                    <label className="flex items-center gap-2 px-3 py-2 text-[11px] cursor-pointer"
-                                      style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                      <input type="checkbox" checked={pickerMakePermanent}
-                                        onChange={(e) => setPickerMakePermanent(e.target.checked)}
-                                        disabled={!tx.merchantName && !tx.name.trim()}
-                                        className="rounded" />
-                                      <span style={{ color: 'var(--color-text-secondary)' }}>
-                                        Always categorize <strong>{tx.merchantName || tx.name}</strong> as this
-                                      </span>
-                                    </label>
-
                                     {pickerCats.map((c) => (
                                       <button key={c.id} onClick={() => {
                                         const isTransfer = c.type === 'transfer';
                                         setPickerProjectDrill(null);
                                         if (isTransfer) {
-                                          if (pickerMakePermanent) {
-                                            setOpenPickerId(null);
-                                            if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current);
-                                            setRuleToast({
-                                              kind: 'error',
-                                              matchLabel: tx.merchantName || tx.name,
-                                              reason: "Rules can't be created for transfer categories",
-                                            });
-                                            ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
-                                            return;
-                                          }
                                           setOpenPickerId(null);
                                           setTransferModal({ tx, categoryId: c.id });
                                           setTransferModalSelected(null);
@@ -1788,7 +1759,7 @@ export default function TransactionsPage() {
                                             .catch(() => {})
                                             .finally(() => setTransferModalLoading(false));
                                         } else {
-                                          chooseCategory(tx, c.id);
+                                          assignCategory(tx.id, c.id);
                                         }
                                       }}
                                         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-[var(--color-elevated)]"
@@ -1816,7 +1787,7 @@ export default function TransactionsPage() {
                                           {isIncome ? 'Refund / Expense' : 'Income'}
                                         </p>
                                         {pickerCatsAlt.map((c) => (
-                                          <button key={c.id} onClick={() => chooseCategory(tx, c.id)}
+                                          <button key={c.id} onClick={() => assignCategory(tx.id, c.id)}
                                             className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs transition-colors hover:bg-[var(--color-elevated)]"
                                             style={tx.categoryId === c.id ? { background: `${c.color}15` } : {}}>
                                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
@@ -2020,6 +1991,24 @@ export default function TransactionsPage() {
                               document.body
                             )}
                           </div>
+
+                          {/* Make this categorization permanent (nudge right after a manual pick) */}
+                          {justCategorizedId === tx.id && tx.categoryId && (
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                onClick={() => { setJustCategorizedId(null); createRule(tx, tx.categoryId!); }}
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110"
+                                style={{ background: 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)', color: 'var(--color-card-violet)' }}>
+                                📌 Make permanent
+                              </button>
+                              <button
+                                onClick={() => setJustCategorizedId(null)}
+                                className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] shrink-0"
+                                style={{ color: 'var(--color-text-muted)' }} title="Dismiss">
+                                <CloseIcon />
+                              </button>
+                            </div>
+                          )}
 
                           {/* Find receipt in email */}
                           {!tx.isSplitParent && (() => {
