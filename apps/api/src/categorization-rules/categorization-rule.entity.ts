@@ -7,10 +7,10 @@ import { User } from '../users/user.entity';
 import { Category } from '../categories/category.entity';
 
 /* Match text/category is fixed once created except via update(); duplicates for the
-   same user+matchType+matchValue are rejected at create/update time (service-level
-   check backed by this DB constraint). */
+   same user+matchType+matchValue+matchStrategy are rejected at create/update time
+   (service-level check backed by this DB constraint). */
 @Entity('categorization_rules')
-@Unique(['userId', 'matchType', 'matchValue'])
+@Unique(['userId', 'matchType', 'matchValue', 'matchStrategy'])
 export class CategorizationRule {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -28,6 +28,12 @@ export class CategorizationRule {
 
   @Column()
   matchValue: string;
+
+  /* 'exact' requires the full text to match; 'prefix' matches anything starting
+     with matchValue — needed for ACH/payroll-style transactions that embed a
+     unique id after a stable prefix. */
+  @Column({ default: 'exact' })
+  matchStrategy: 'exact' | 'prefix';
 
   @ManyToOne(() => Category, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'categoryId' })

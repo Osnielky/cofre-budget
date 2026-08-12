@@ -18,7 +18,7 @@ export class CategorizationRulesController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Request() req: any, @Body() body: { matchValue?: string; categoryId?: string }) {
+  update(@Param('id') id: string, @Request() req: any, @Body() body: { matchValue?: string; categoryId?: string; matchStrategy?: 'exact' | 'prefix' }) {
     return this.service.update(id, req.user.id, body);
   }
 

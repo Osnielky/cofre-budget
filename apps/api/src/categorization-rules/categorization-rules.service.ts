@@ -26,16 +26,25 @@ export class CategorizationRulesService {
     return this.repo.find({ where: { userId } });
   }
 
-  /* Picks the rule a new, uncategorized transaction should be categorized by,
-     or null. A merchant-type match takes precedence over a name-type match. */
+  /* Picks the rule a new, uncategorized transaction should be categorized by, or
+     null. Precedence: merchant-type before name-type; within each type, an exact
+     match before a prefix match (exact is the more specific claim). */
   matchRule(rules: CategorizationRule[], candidate: { merchantName?: string | null; name: string }): CategorizationRule | null {
     const norm = (s: string) => s.trim().toLowerCase();
+    const isMatch = (r: CategorizationRule, value: string) => {
+      const v = norm(value);
+      const rv = norm(r.matchValue);
+      return r.matchStrategy === 'prefix' ? v.startsWith(rv) : v === rv;
+    };
+    const bestOfType = (matchType: 'merchant' | 'name', value: string): CategorizationRule | null => {
+      const candidates = rules.filter((r) => r.matchType === matchType && isMatch(r, value));
+      return candidates.find((r) => r.matchStrategy === 'exact') ?? candidates[0] ?? null;
+    };
     if (candidate.merchantName) {
-      const m = rules.find((r) => r.matchType === 'merchant' && norm(r.matchValue) === norm(candidate.merchantName!));
+      const m = bestOfType('merchant', candidate.merchantName);
       if (m) return m;
     }
-    const n = rules.find((r) => r.matchType === 'name' && norm(r.matchValue) === norm(candidate.name));
-    return n ?? null;
+    return bestOfType('name', candidate.name);
   }
 
   async create(userId: string, transactionId: string, categoryId: string): Promise<RuleWithApplyCount> {
@@ -53,6 +62,7 @@ export class CategorizationRulesService {
       .createQueryBuilder('rule')
       .where('rule.userId = :userId', { userId })
       .andWhere('rule.matchType = :matchType', { matchType })
+      .andWhere('rule.matchStrategy = :matchStrategy', { matchStrategy: 'exact' })
       .andWhere('LOWER(rule.matchValue) = LOWER(:matchValue)', { matchValue })
       .getOne();
     if (existing) {
@@ -63,13 +73,13 @@ export class CategorizationRulesService {
     try {
       rule = await this.repo.save(this.repo.create({ userId, matchType, matchValue, categoryId }));
     } catch (err) {
-      throw await this.toConflictOrRethrow(err, userId, matchType, matchValue);
+      throw await this.toConflictOrRethrow(err, userId, matchType, matchValue, 'exact');
     }
-    const appliedCount = await this.applyToUncategorized(userId, matchType, matchValue, categoryId, rule.id);
+    const appliedCount = await this.applyToUncategorized(userId, matchType, matchValue, 'exact', categoryId, rule.id);
     return { rule: await this.repo.findOne({ where: { id: rule.id }, relations: ['category'] }), appliedCount };
   }
 
-  async update(id: string, userId: string, dto: { matchValue?: string; categoryId?: string }): Promise<RuleWithApplyCount> {
+  async update(id: string, userId: string, dto: { matchValue?: string; categoryId?: string; matchStrategy?: 'exact' | 'prefix' }): Promise<RuleWithApplyCount> {
     const rule = await this.repo.findOneBy({ id });
     if (!rule) throw new NotFoundException();
     if (rule.userId !== userId) throw new ForbiddenException();
@@ -80,27 +90,34 @@ export class CategorizationRulesService {
       rule.categoryId = dto.categoryId;
     }
 
-    if (dto.matchValue !== undefined) {
-      const matchValue = dto.matchValue.trim();
-      if (!matchValue) throw new BadRequestException('Match text cannot be empty');
+    const nextMatchValue = dto.matchValue !== undefined ? dto.matchValue.trim() : rule.matchValue;
+    const nextMatchStrategy = dto.matchStrategy ?? rule.matchStrategy;
+
+    if (dto.matchValue !== undefined && !nextMatchValue) {
+      throw new BadRequestException('Match text cannot be empty');
+    }
+
+    if (dto.matchValue !== undefined || dto.matchStrategy !== undefined) {
       const existing = await this.repo
         .createQueryBuilder('rule')
         .where('rule.userId = :userId', { userId })
         .andWhere('rule.matchType = :matchType', { matchType: rule.matchType })
-        .andWhere('LOWER(rule.matchValue) = LOWER(:matchValue)', { matchValue })
+        .andWhere('rule.matchStrategy = :matchStrategy', { matchStrategy: nextMatchStrategy })
+        .andWhere('LOWER(rule.matchValue) = LOWER(:matchValue)', { matchValue: nextMatchValue })
         .getOne();
       if (existing && existing.id !== rule.id) {
         throw new ConflictException({ message: 'A rule for this merchant already exists', existingRuleId: existing.id });
       }
-      rule.matchValue = matchValue;
+      rule.matchValue = nextMatchValue;
+      rule.matchStrategy = nextMatchStrategy;
     }
 
     try {
       await this.repo.save(rule);
     } catch (err) {
-      throw await this.toConflictOrRethrow(err, userId, rule.matchType, rule.matchValue, rule.id);
+      throw await this.toConflictOrRethrow(err, userId, rule.matchType, rule.matchValue, rule.matchStrategy, rule.id);
     }
-    const appliedCount = await this.applyToUncategorized(userId, rule.matchType, rule.matchValue, rule.categoryId, rule.id);
+    const appliedCount = await this.applyToUncategorized(userId, rule.matchType, rule.matchValue, rule.matchStrategy, rule.categoryId, rule.id);
     return { rule: await this.repo.findOne({ where: { id: rule.id }, relations: ['category'] }), appliedCount };
   }
 
@@ -120,6 +137,7 @@ export class CategorizationRulesService {
     userId: string,
     matchType: 'merchant' | 'name',
     matchValue: string,
+    matchStrategy: 'exact' | 'prefix',
     excludeId?: string,
   ): Promise<Error> {
     const code = (err as { code?: string })?.code;
@@ -129,6 +147,7 @@ export class CategorizationRulesService {
       .createQueryBuilder('rule')
       .where('rule.userId = :userId', { userId })
       .andWhere('rule.matchType = :matchType', { matchType })
+      .andWhere('rule.matchStrategy = :matchStrategy', { matchStrategy })
       .andWhere('LOWER(rule.matchValue) = LOWER(:matchValue)', { matchValue });
     if (excludeId) qb = qb.andWhere('rule.id != :excludeId', { excludeId });
     const existing = await qb.getOne();
@@ -140,16 +159,22 @@ export class CategorizationRulesService {
     return err as Error;
   }
 
-  private async applyToUncategorized(userId: string, matchType: 'merchant' | 'name', matchValue: string, categoryId: string, ruleId: string): Promise<number> {
+  private async applyToUncategorized(userId: string, matchType: 'merchant' | 'name', matchValue: string, matchStrategy: 'exact' | 'prefix', categoryId: string, ruleId: string): Promise<number> {
     const column = matchType === 'merchant' ? 'merchantName' : 'name';
-    const result = await this.txRepo
+    const qb = this.txRepo
       .createQueryBuilder()
       .update(Transaction)
       .set({ categoryId, categorizedByRuleId: ruleId })
       .where('userId = :userId', { userId })
-      .andWhere('categoryId IS NULL')
-      .andWhere(`LOWER(TRIM("${column}")) = LOWER(:matchValue)`, { matchValue })
-      .execute();
+      .andWhere('categoryId IS NULL');
+    if (matchStrategy === 'prefix') {
+      // POSITION(...) = 1 avoids LIKE's %/_ wildcard-escaping concerns entirely — a
+      // plain "does this substring start at position 1" check.
+      qb.andWhere(`POSITION(LOWER(:matchValue) IN LOWER(TRIM("${column}"))) = 1`, { matchValue });
+    } else {
+      qb.andWhere(`LOWER(TRIM("${column}")) = LOWER(:matchValue)`, { matchValue });
+    }
+    const result = await qb.execute();
     return result.affected ?? 0;
   }
 }
