@@ -10,6 +10,7 @@ interface Rule {
   id: string;
   matchType: 'merchant' | 'name';
   matchValue: string;
+  matchStrategy: 'exact' | 'prefix';
   categoryId: string;
   category: CategoryLite | null;
   createdAt: string;
@@ -30,6 +31,7 @@ export default function RulesManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
+  const [editStrategy, setEditStrategy] = useState<'exact' | 'prefix'>('exact');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [confirmRule, setConfirmRule] = useState<Rule | null>(null);
@@ -49,6 +51,7 @@ export default function RulesManager() {
     setEditingId(rule.id);
     setEditValue(rule.matchValue);
     setEditCategoryId(rule.categoryId);
+    setEditStrategy(rule.matchStrategy);
     setSaveError('');
   }
 
@@ -63,7 +66,7 @@ export default function RulesManager() {
     const res = await fetch(`${API}/categorization-rules/${rule.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ matchValue: editValue, categoryId: editCategoryId }),
+      body: JSON.stringify({ matchValue: editValue, categoryId: editCategoryId, matchStrategy: editStrategy }),
     });
     setSaving(false);
     if (res.status === 409) { setSaveError('Another rule already matches this text.'); return; }
@@ -117,6 +120,22 @@ export default function RulesManager() {
                         className="flex-1 px-2.5 py-1.5 text-sm rounded-lg outline-none"
                         style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
                     </div>
+                    <div className="flex items-center gap-1">
+                      <button type="button" onClick={() => setEditStrategy('exact')}
+                        className="px-2.5 py-1 text-xs font-medium rounded-lg transition-colors"
+                        style={editStrategy === 'exact'
+                          ? { background: 'var(--color-card-violet)', color: '#fff' }
+                          : { background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
+                        Exact match
+                      </button>
+                      <button type="button" onClick={() => setEditStrategy('prefix')}
+                        className="px-2.5 py-1 text-xs font-medium rounded-lg transition-colors"
+                        style={editStrategy === 'prefix'
+                          ? { background: 'var(--color-card-violet)', color: '#fff' }
+                          : { background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
+                        Starts with
+                      </button>
+                    </div>
                     <select value={editCategoryId} onChange={(e) => setEditCategoryId(e.target.value)}
                       className="px-2.5 py-1.5 text-sm rounded-lg outline-none appearance-none"
                       style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
@@ -151,6 +170,12 @@ export default function RulesManager() {
                           style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
                           {rule.matchType === 'merchant' ? 'Merchant' : 'Description'}
                         </span>
+                        {rule.matchStrategy === 'prefix' && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wide"
+                            style={{ background: 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)', color: 'var(--color-card-violet)' }}>
+                            Starts with
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] truncate mt-0.5" style={{ color: cat?.color ?? 'var(--color-text-muted)' }}>
                         → {cat?.name ?? 'Unknown category'}
