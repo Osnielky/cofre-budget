@@ -2036,9 +2036,10 @@ export default function TransactionsPage() {
                             <div className="flex items-center gap-1 shrink-0">
                               <button
                                 onClick={() => { setJustCategorizedId(null); createRule(tx, tx.categoryId!); }}
-                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110"
+                                title="Set a permanent category for this type of transaction"
+                                className="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all hover:brightness-110 shrink-0"
                                 style={{ background: 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)', color: 'var(--color-card-violet)' }}>
-                                📌 Make permanent
+                                📌
                               </button>
                               <button
                                 onClick={() => setJustCategorizedId(null)}
