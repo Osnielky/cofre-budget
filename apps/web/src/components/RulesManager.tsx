@@ -95,7 +95,7 @@ export default function RulesManager() {
           <span className="text-3xl">📌</span>
           <p className="text-sm font-medium">No rules yet</p>
           <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            Open a transaction's category picker and check "Always categorize as this" to create one.
+            Categorize a transaction, then click "Make permanent" on that row to create one.
           </p>
         </div>
       ) : (

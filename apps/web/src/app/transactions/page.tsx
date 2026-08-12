@@ -374,8 +374,7 @@ export default function TransactionsPage() {
     }
     setUpdatingId(null);
     if (categoryId) {
-      const assignedCat = categories.find((c) => c.id === categoryId);
-      setJustCategorizedId(assignedCat && assignedCat.type !== 'transfer' ? txId : null);
+      setJustCategorizedId(updated.categoryRef && updated.categoryRef.type !== 'transfer' ? txId : null);
     } else {
       setJustCategorizedId((prev) => (prev === txId ? null : prev));
     }
@@ -412,10 +411,17 @@ export default function TransactionsPage() {
 
   async function deleteRuleFromRow(tx: Transaction) {
     if (!tx.categorizedByRuleId) return;
+    const matchLabel = tx.categorizedByRule?.matchValue || tx.merchantName || tx.name;
     setDeletingRuleId(tx.categorizedByRuleId);
     setRuleMenuTxId(null);
-    await fetch(`${API}/categorization-rules/${tx.categorizedByRuleId}`, { method: 'DELETE', credentials: 'include' });
+    const res = await fetch(`${API}/categorization-rules/${tx.categorizedByRuleId}`, { method: 'DELETE', credentials: 'include' });
     setDeletingRuleId(null);
+    if (!res.ok) {
+      if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current);
+      setRuleToast({ kind: 'error', matchLabel, reason: `Couldn't delete the rule for "${matchLabel}".` });
+      ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+      return;
+    }
     loadTransactions();
   }
 
@@ -701,7 +707,7 @@ export default function TransactionsPage() {
 
   const isRecurringTx = (t: Transaction) => Number(t.amount) < 0 && recurringMap.has(normalize(t.name));
   const visible = transactions.filter((t) => {
-    if (filter === 'uncategorized' && (t.categoryId || t.projectId || isTransfer(t))) return false;
+    if (filter === 'uncategorized' && justCategorizedId !== t.id && (t.categoryId || t.projectId || isTransfer(t))) return false;
     if (filter === 'expense'       && (Number(t.amount) >= 0 || isTransfer(t))) return false;
     if (filter === 'income'        && (Number(t.amount) < 0  || isTransfer(t))) return false;
     if (filter === 'recurring'     && !isRecurringTx(t)) return false;
@@ -2909,7 +2915,7 @@ export default function TransactionsPage() {
                 </>
               ) : (
                 <>
-                  <p className="text-sm font-semibold">Couldn't create rule</p>
+                  <p className="text-sm font-semibold">Something went wrong</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                     {ruleToast.reason || `Something went wrong creating a rule for "${ruleToast.matchLabel}".`}
                   </p>

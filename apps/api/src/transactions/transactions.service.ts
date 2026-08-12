@@ -385,6 +385,7 @@ export class TransactionsService {
     if (debtId) {
       tx.debtId    = debtId;
       tx.categoryId = undefined;
+      tx.categorizedByRuleId = null;
       await this.repo.save(tx);
       await this.debtsService.recordPaymentFromTransaction(debtId, userId, {
         amount: Math.abs(Number(tx.amount)),
@@ -454,6 +455,7 @@ export class TransactionsService {
           await this.adjustTransferBalance(matchTx.transferAccountId, userId, Number(matchTx.amount), 'undo');
         }
         matchTx.categoryId        = tx.categoryId ?? undefined;
+        matchTx.categorizedByRuleId = null;
         matchTx.transferAccountId = tx.bankAccountId ?? undefined;
         matchTx.counterpartTxId   = id;
         await this.repo.save(matchTx);
@@ -499,6 +501,7 @@ export class TransactionsService {
     const childIds: string[] = await this.repo.manager.transaction(async (em) => {
       tx.isSplitParent = true;
       tx.categoryId = null;
+      tx.categorizedByRuleId = null;
       tx.projectId = null;
       tx.projectCategoryId = null;
       await em.save(tx);
@@ -547,6 +550,7 @@ export class TransactionsService {
 
     tx.isSplitParent = false;
     tx.categoryId = null;
+    tx.categorizedByRuleId = null;
     const saved = await this.repo.save(tx);
     return this.repo.findOne({
       where: { id: saved.id },
