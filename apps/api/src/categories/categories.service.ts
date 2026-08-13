@@ -5,7 +5,7 @@ import { Category } from './category.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { Budget } from '../budgets/budget.entity';
 import { UpsertCategoryDto } from './dto/upsert-category.dto';
-import { CategorizationRule } from '../categorization-rules/categorization-rule.entity';
+import { CategorizationRule, ruleIdentityKey } from '../categorization-rules/categorization-rule.entity';
 
 const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'createdAt' | 'updatedAt' | 'isFixed'>[] = [
   { name: 'Food & Dining',  icon: '🍔', color: '#F07A3E', type: 'expense',  description: 'Restaurants, groceries, coffee & snacks' },
@@ -106,16 +106,16 @@ export class CategoriesService {
     if (reassignTo) {
       // Retarget rather than delete: a rule that used to fire for this category
       // should keep firing, just pointed at the category transactions were
-      // reassigned to. Guard against the unique(userId, matchType, matchValue)
-      // constraint — if the user already has a separate rule with the same
-      // match pointing at reassignTo, drop the now-redundant rule(s) on the
-      // deleted category before retargeting the rest.
+      // reassigned to. Guard against the unique(userId, matchType, matchValue,
+      // matchStrategy) constraint — if the user already has a separate rule with
+      // the same match pointing at reassignTo, drop the now-redundant rule(s) on
+      // the deleted category before retargeting the rest.
       const [deletedRules, targetRules] = await Promise.all([
         this.rulesRepo.find({ where: { categoryId: id } }),
         this.rulesRepo.find({ where: { categoryId: reassignTo } }),
       ]);
-      const targetKeys = new Set(targetRules.map((r) => `${r.matchType}::${r.matchValue.toLowerCase()}`));
-      const colliding = deletedRules.filter((r) => targetKeys.has(`${r.matchType}::${r.matchValue.toLowerCase()}`));
+      const targetKeys = new Set(targetRules.map(ruleIdentityKey));
+      const colliding = deletedRules.filter((r) => targetKeys.has(ruleIdentityKey(r)));
       if (colliding.length > 0) {
         await this.rulesRepo.delete(colliding.map((r) => r.id));
       }

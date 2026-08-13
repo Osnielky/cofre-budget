@@ -97,6 +97,10 @@ export class CategorizationRulesService {
       throw new BadRequestException('Match text cannot be empty');
     }
 
+    if (dto.matchStrategy !== undefined && dto.matchStrategy !== 'exact' && dto.matchStrategy !== 'prefix') {
+      throw new BadRequestException('matchStrategy must be "exact" or "prefix"');
+    }
+
     if (dto.matchValue !== undefined || dto.matchStrategy !== undefined) {
       const existing = await this.repo
         .createQueryBuilder('rule')

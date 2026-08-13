@@ -45,3 +45,13 @@ export class CategorizationRule {
   @CreateDateColumn()
   createdAt: Date;
 }
+
+/* Shared identity key mirroring the unique(userId, matchType, matchValue, matchStrategy)
+   constraint above — matchValue is compared case-insensitively, matching how the DB-level
+   duplicate checks in CategorizationRulesService compare via LOWER(rule.matchValue). Used
+   wherever rule "sameness" needs to be checked in-memory (e.g. CategoriesService.remove()'s
+   collision detection when reassigning rules off a deleted category). Callers still scoped
+   to a single userId must ensure that separately — this key alone doesn't include userId. */
+export function ruleIdentityKey(r: Pick<CategorizationRule, 'matchType' | 'matchValue' | 'matchStrategy'>): string {
+  return `${r.matchType}::${r.matchValue.toLowerCase()}::${r.matchStrategy}`;
+}
