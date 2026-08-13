@@ -68,10 +68,19 @@ export class ReceiptFinderService {
     const to = shiftDate(tx.date, windowDays);
 
     // 1) Local cache first — instant when the receipt was parsed before.
+    //    Must also be plausibly this merchant or amount: without that, any
+    //    unrelated receipt cached by the broad background sync (e.g. a
+    //    recurring toll charge) landing in the same date window would
+    //    short-circuit this and the Gmail search below would never run.
+    const merchantKey = merchantTerm(tx.name).replace(/\.com$/, '').toLowerCase();
     const cached = await this.receiptRepo
       .createQueryBuilder('r')
       .where('r.userId = :userId', { userId })
       .andWhere('(r.orderDate BETWEEN :from AND :to OR r.orderDate IS NULL)', { from, to })
+      .andWhere('(LOWER(r.merchant) LIKE :merchantLike OR ABS(r.total - :absAmount) < 0.01)', {
+        merchantLike: `%${merchantKey}%`,
+        absAmount,
+      })
       .getMany();
 
     if (cached.length > 0) {
