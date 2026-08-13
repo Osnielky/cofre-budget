@@ -9,6 +9,7 @@ export interface Category {
   id: string; name: string; icon: string; color: string;
   type: string; isDefault: boolean; description: string | null;
   isFixed?: boolean;
+  wantNeed?: 'want' | 'need' | null;
 }
 
 const PRESET_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0', '#5C5C78', '#FF6B6B'];
@@ -64,6 +65,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
     type: editing?.type ?? defaultType,
     description: editing?.description ?? '',
     isFixed: editing?.isFixed ?? false,
+    wantNeed: editing?.wantNeed ?? null,
   });
   const [saving, setSaving] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -82,6 +84,9 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
     return () => document.removeEventListener('mousedown', onDown);
   }, [showEmojiPicker]);
 
+  const isExpenseType = form.type === 'expense' || form.type === 'both';
+  const wantNeedMissing = isExpenseType && form.wantNeed == null;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -91,7 +96,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
         method: editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, wantNeed: isExpenseType ? form.wantNeed : null }),
       });
       if (!res.ok) return;
       const saved: Category = await res.json();
@@ -224,6 +229,33 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
             </label>
           )}
 
+          {isExpenseType && (
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                Want or need?
+              </span>
+              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+                {([['need', 'Need', 'var(--color-sky)'], ['want', 'Want', 'var(--color-card-violet)']] as const).map(([val, label, color]) => (
+                  <button key={val} type="button"
+                    onClick={() => setForm((f) => ({ ...f, wantNeed: val }))}
+                    className="py-1.5 rounded-lg text-xs font-semibold transition-all"
+                    style={{
+                      background: form.wantNeed === val ? `${color}22` : 'transparent',
+                      color: form.wantNeed === val ? color : 'var(--color-text-muted)',
+                      border: form.wantNeed === val ? `1px solid ${color}44` : '1px solid transparent',
+                    }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] px-0.5" style={{ color: wantNeedMissing ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
+                {wantNeedMissing
+                  ? 'Pick Need or Want so future spending comparisons can use it.'
+                  : 'Used to compare essential vs. discretionary spending.'}
+              </p>
+            </div>
+          )}
+
         </div>
 
         {/* Footer */}
@@ -234,7 +266,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
             style={{ color: 'var(--color-text-secondary)' }}>
             Cancel
           </button>
-          <button type="submit" disabled={saving}
+          <button type="submit" disabled={saving || wantNeedMissing}
             className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
             style={{ background: typeMeta.color }}>
             {saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Category'}

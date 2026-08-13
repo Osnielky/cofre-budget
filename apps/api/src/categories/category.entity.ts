@@ -41,6 +41,10 @@ export class Category {
   @Column({ default: false })
   isFixed: boolean;
 
+  /* Only meaningful for expense/both categories; null until the user classifies it. */
+  @Column({ type: 'varchar', nullable: true, default: null })
+  wantNeed: 'want' | 'need' | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

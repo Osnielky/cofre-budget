@@ -7,9 +7,10 @@ import { Budget } from '../budgets/budget.entity';
 import { UpsertCategoryDto } from './dto/upsert-category.dto';
 import { CategorizationRule, ruleIdentityKey } from '../categorization-rules/categorization-rule.entity';
 
-const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'createdAt' | 'updatedAt' | 'isFixed'>[] = [
+const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'createdAt' | 'updatedAt' | 'isFixed' | 'wantNeed'>[] = [
   { name: 'Food & Dining',  icon: '🍔', color: '#F07A3E', type: 'expense',  description: 'Restaurants, groceries, coffee & snacks' },
   { name: 'Groceries',      icon: '🛒', color: '#4FBF7F', type: 'expense',  description: 'Supermarket & grocery store purchases' },
+  { name: 'Candy & Sweets', icon: '🍬', color: '#F07A3E', type: 'expense',  description: 'Candy, sweets & sugary treats' },
   { name: 'Transport',      icon: '🚗', color: '#4BA8D8', type: 'expense',  description: 'Gas, rideshare, parking & transit' },
   { name: 'Shopping',       icon: '🛍️', color: '#9B6DFF', type: 'expense',  description: 'Clothing, electronics & retail purchases' },
   { name: 'Clothes',        icon: '👗', color: '#E879A0', type: 'expense',  description: 'Clothing, shoes & accessories' },

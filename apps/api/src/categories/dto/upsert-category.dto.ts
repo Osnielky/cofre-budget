@@ -5,4 +5,5 @@ export class UpsertCategoryDto {
   type?: string;
   description?: string | null;
   isFixed?: boolean;
+  wantNeed?: 'want' | 'need' | null;
 }
