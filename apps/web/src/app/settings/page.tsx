@@ -783,11 +783,16 @@ export default function SettingsPage() {
                               style={{ background: `${meta.accent}18`, color: meta.accent }}>
                               {meta.label}
                             </span>
-                            {isConnected && (
+                            {isConnected ? (
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1"
                                 style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)' }}>
                                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-green)' }} />
                                 Synced
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                style={{ background: 'color-mix(in srgb, var(--color-text-muted) 14%, transparent)', color: 'var(--color-text-muted)' }}>
+                                Manual
                               </span>
                             )}
                           </div>
