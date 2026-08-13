@@ -96,7 +96,6 @@ const I_USER   = 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z M4 21v-1a6 6 0 0 1 6-6h4a6
 const I_OFF    = 'M12 2v10 M18.4 6.6a9 9 0 1 1-12.8 0';
 const I_LINK   = 'M13.8 10.2a4 4 0 0 0-5.6 0l-4 4a4 4 0 1 0 5.6 5.6l1.1-1.1 M10.2 13.8a4 4 0 0 0 5.6 0l4-4a4 4 0 0 0-5.6-5.6l-1.1 1.1';
 const I_CLOCK  = 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M12 7v5l3 3';
-const I_SYNC   = 'M21 12a9 9 0 1 1-2.6-6.4 M21 3v5h-5';
 
 interface GmailStatus { connected: boolean; email?: string; connectedAt?: string }
 
@@ -314,25 +313,18 @@ export default function IntegrationsTab({ status, loading, onDisconnect, onManag
         <div className="rounded-2xl p-5 flex flex-col gap-3" style={card}>
           <p className="font-bold text-[14px]">Recent integration activity</p>
           {status?.connected ? (
-            <>
-              <div className="flex items-center gap-2.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ background: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)' }}>
-                  <GmailMark />
-                </span>
-                <div className="min-w-0">
-                  <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{status.email}</p>
-                  <p>{connectedAt ? `Connected ${connectedAt}` : 'Connected'}</p>
-                </div>
-                <span className="ml-auto w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[10px]"
-                  style={{ background: 'var(--color-green)', color: '#08111F' }}>✓</span>
+            <div className="flex items-center gap-2.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                style={{ background: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)' }}>
+                <GmailMark />
+              </span>
+              <div className="min-w-0">
+                <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{status.email}</p>
+                <p>{connectedAt ? `Connected ${connectedAt}` : 'Connected'}</p>
               </div>
-              <a href="/receipts"
-                className="flex items-center justify-center gap-2 text-xs font-semibold px-3 py-2 rounded-xl no-underline transition-all hover:brightness-110"
-                style={{ border: '1px solid color-mix(in srgb, var(--color-violet) 35%, transparent)', color: 'var(--color-violet)' }}>
-                <Icon d={I_SYNC} size={13} /> Sync receipts now
-              </a>
-            </>
+              <span className="ml-auto w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[10px]"
+                style={{ background: 'var(--color-green)', color: '#08111F' }}>✓</span>
+            </div>
           ) : (
             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
               No activity yet. Connect an integration to start importing receipts automatically.

@@ -15,7 +15,6 @@ const NAV = [
   { label: 'Budgets',      href: '/budgets',      icon: BudgetsIcon },
   { label: 'Projects',     href: '/projects',     icon: ProjectsIcon },
   { label: 'Debts',        href: '/debts',        icon: DebtsIcon },
-  { label: 'Receipts',     href: '/receipts',     icon: ReceiptsIcon },
 ];
 
 export default function Sidebar() {

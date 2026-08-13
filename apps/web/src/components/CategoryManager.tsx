@@ -124,7 +124,7 @@ export default function CategoryManager() {
           <CategoryColumn
             title="Expenses" color="#F07A3E" icon="💸"
             cats={[...expenseCats, ...bothCats]}
-
+            groupByWantNeed
             onEdit={startEdit} onDelete={openDeleteConfirm} deletingId={deletingId}
           />
 
@@ -270,14 +270,21 @@ export default function CategoryManager() {
 }
 
 /* ── CategoryColumn ─────────────────────────────────────────────── */
+const WANT_NEED_META: Record<string, { label: string; color: string }> = {
+  need: { label: 'Need', color: 'var(--color-sky)' },
+  want: { label: 'Want', color: 'var(--color-card-violet)' },
+  unclassified: { label: 'Unclassified', color: 'var(--color-text-muted)' },
+};
+
 interface ColProps {
   title: string; color: string; icon: string;
   cats: Category[];
+  groupByWantNeed?: boolean;
   onEdit: (c: Category) => void;
   onDelete: (c: Category) => void;
   deletingId: string | null;
 }
-function CategoryColumn({ title, color, icon, cats, onEdit, onDelete, deletingId }: ColProps) {
+function CategoryColumn({ title, color, icon, cats, groupByWantNeed, onEdit, onDelete, deletingId }: ColProps) {
   const glass: React.CSSProperties = {
     background: 'var(--color-surface)',
     backdropFilter: 'var(--glass-blur)',
@@ -285,6 +292,17 @@ function CategoryColumn({ title, color, icon, cats, onEdit, onDelete, deletingId
     border: 'var(--glass-border)',
     boxShadow: 'var(--glass-shadow)',
   };
+
+  const groups = groupByWantNeed
+    ? (['need', 'want', 'unclassified'] as const)
+        .map((key) => ({
+          key,
+          ...WANT_NEED_META[key],
+          items: cats.filter((c) => (c.wantNeed ?? 'unclassified') === key),
+        }))
+        .filter((g) => g.items.length > 0)
+    : [{ key: 'all', label: null, color: '', items: cats }];
+
   return (
     <div className="flex flex-col gap-2">
       {/* Column header */}
@@ -302,61 +320,90 @@ function CategoryColumn({ title, color, icon, cats, onEdit, onDelete, deletingId
         </div>
       ) : (
         <div className="flex flex-col overflow-hidden" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
-          {cats.map((cat, i) => {
-            const isBoth = cat.type === 'both';
-            return (
-              <div key={cat.id}
-                className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.025] group"
-                style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : {}}>
-
-                {/* Color bar */}
-                <div className="w-1 self-stretch rounded-full shrink-0 my-0.5" style={{ background: cat.color }} />
-
-                {/* Icon */}
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
-                  style={{ background: `${cat.color}18`, border: `1px solid ${cat.color}28` }}>
-                  {cat.icon}
+          {groups.map((g, gi) => (
+            <div key={g.key}>
+              {g.label && (
+                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
+                  style={{ color: g.color, background: `color-mix(in srgb, ${g.color} 6%, transparent)`,
+                           borderTop: gi > 0 ? '1px solid var(--color-border)' : 'none' }}>
+                  {g.label} <span style={{ opacity: 0.6, fontWeight: 600 }}>· {g.items.length}</span>
                 </div>
-
-                {/* Name + description */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <p className="text-sm font-semibold truncate">{cat.name}</p>
-                    {isBoth && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
-                        style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', color: 'var(--color-primary)' }}>Both</span>
-                    )}
-                    {cat.isDefault && (
-                      <span className="text-[9px] rounded shrink-0" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>Default</span>
-                    )}
-                  </div>
-                  {cat.description && (
-                    <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                      {cat.description}
-                    </p>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                  <button onClick={() => onEdit(cat)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
-                    title="Edit" style={{ color: 'var(--color-text-secondary)' }}>
-                    <PencilIcon />
-                  </button>
-                  <button onClick={() => onDelete(cat)} disabled={deletingId === cat.id}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 disabled:opacity-40"
-                    title="Delete">
-                    {deletingId === cat.id
-                      ? <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>…</span>
-                      : <TrashIcon />}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+              )}
+              {g.items.map((cat, i) => (
+                <CategoryRow key={cat.id} cat={cat} bordered={i > 0} showWantNeed={!!groupByWantNeed}
+                  onEdit={onEdit} onDelete={onDelete} deletingId={deletingId} />
+              ))}
+            </div>
+          ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── CategoryRow ────────────────────────────────────────────────── */
+interface RowProps {
+  cat: Category; bordered: boolean; showWantNeed: boolean;
+  onEdit: (c: Category) => void;
+  onDelete: (c: Category) => void;
+  deletingId: string | null;
+}
+function CategoryRow({ cat, bordered, showWantNeed, onEdit, onDelete, deletingId }: RowProps) {
+  const isBoth = cat.type === 'both';
+  const wantNeedMeta = showWantNeed ? WANT_NEED_META[cat.wantNeed ?? 'unclassified'] : null;
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-white/[0.025] group"
+      style={bordered ? { borderTop: '1px solid var(--color-border)' } : {}}>
+
+      {/* Color bar */}
+      <div className="w-1 self-stretch rounded-full shrink-0 my-0.5" style={{ background: cat.color }} />
+
+      {/* Icon */}
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0"
+        style={{ background: `${cat.color}18`, border: `1px solid ${cat.color}28` }}>
+        {cat.icon}
+      </div>
+
+      {/* Name + description */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="text-sm font-semibold truncate">{cat.name}</p>
+          {isBoth && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
+              style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', color: 'var(--color-primary)' }}>Both</span>
+          )}
+          {cat.isDefault && (
+            <span className="text-[9px] rounded shrink-0" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>Default</span>
+          )}
+        </div>
+        {(cat.description || wantNeedMeta) && (
+          <p className="text-[11px] truncate mt-0.5 flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+            {cat.description}
+            {wantNeedMeta && (
+              <span className="font-semibold shrink-0" style={{ color: wantNeedMeta.color }}>
+                {cat.description ? '· ' : ''}{wantNeedMeta.label}
+              </span>
+            )}
+          </p>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <button onClick={() => onEdit(cat)}
+          className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
+          title="Edit" style={{ color: 'var(--color-text-secondary)' }}>
+          <PencilIcon />
+        </button>
+        <button onClick={() => onDelete(cat)} disabled={deletingId === cat.id}
+          className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 disabled:opacity-40"
+          title="Delete">
+          {deletingId === cat.id
+            ? <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>…</span>
+            : <TrashIcon />}
+        </button>
+      </div>
     </div>
   );
 }

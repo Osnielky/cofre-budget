@@ -12,7 +12,6 @@ import LinkIcon from '@/components/LinkIcon';
 import InfoIcon from '@/components/InfoIcon';
 import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiability } from '@/lib/accountTypes';
 import SplitTransactionModal from '@/components/SplitTransactionModal';
-import ReceiptSplitFlow from '@/components/ReceiptSplitFlow';
 import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
 import { buildRecurringMap, normalize } from './recurring';
 import StatStrip from './StatStrip';
@@ -156,8 +155,6 @@ export default function TransactionsPage() {
   const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
   const [debts, setDebts] = useState<DebtLite[]>([]);
   const [splitTx, setSplitTx] = useState<Transaction | null>(null);
-  const [receiptSplitTx, setReceiptSplitTx] = useState<Transaction | null>(null);
-  const [receiptMatchIds, setReceiptMatchIds] = useState<Set<string>>(new Set());
   const [selectedTx, setSelectedTx]       = useState<Transaction | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionStore>({});
 
@@ -251,12 +248,9 @@ export default function TransactionsPage() {
         ? fetch(`${API}/transactions?from=${prevRange.from}&to=${prevRange.to}`, { credentials: 'include' })
             .then((r) => r.json()).catch(() => [])
         : Promise.resolve([]);
-      const matches = fetch(`${API}/transactions/receipt-matches`, { credentials: 'include' })
-        .then((r) => r.json()).catch(() => []);
-      const [data, prevData, matchIds] = await Promise.all([cur, prev, matches]);
+      const [data, prevData] = await Promise.all([cur, prev]);
       setTransactions(Array.isArray(data) ? data : []);
       setPrevTransactions(Array.isArray(prevData) ? prevData : []);
-      setReceiptMatchIds(new Set(Array.isArray(matchIds) ? matchIds : []));
     } finally {
       setLoading(false);
     }
@@ -2082,27 +2076,6 @@ export default function TransactionsPage() {
                             document.body
                           )}
 
-                          {/* Find receipt in email */}
-                          {!tx.isSplitParent && (() => {
-                            const candidateKnown = !tx.receiptId && receiptMatchIds.has(tx.id);
-                            const alwaysVisible = tx.receiptId || candidateKnown;
-                            const tint = tx.receiptId ? 'var(--color-green)' : 'var(--color-violet)';
-                            return (
-                              <button
-                                onClick={() => setReceiptSplitTx(tx)}
-                                className={`${alwaysVisible ? '' : 'opacity-0 group-hover:opacity-100'} flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110 shrink-0`}
-                                style={{
-                                  background: `color-mix(in srgb, ${tint} ${candidateKnown ? 16 : 10}%, transparent)`,
-                                  border: `1px solid color-mix(in srgb, ${tint} 25%, transparent)`,
-                                  color: tint,
-                                }}
-                                title={tx.receiptId ? 'View linked receipt' : candidateKnown ? 'A matching receipt was found — split from its items' : 'Find receipt in email'}
-                              >
-                                ✉ {tx.receiptId ? 'Receipt ✓' : candidateKnown ? 'Receipt found' : 'Receipt'}
-                              </button>
-                            );
-                          })()}
-
                           {/* Split / Unsplit */}
                           {!tx.debtId && !txIsTransfer && (
                             tx.parentId ? (
@@ -2258,17 +2231,6 @@ export default function TransactionsPage() {
               setSplitTx(null);
             }}
             onClose={() => setSplitTx(null)}
-          />
-        )}
-
-        {/* Find receipt → (optionally) split from its items — one flow, one modal at a time */}
-        {receiptSplitTx && (
-          <ReceiptSplitFlow
-            tx={receiptSplitTx}
-            categories={categories}
-            onDataChanged={loadTransactions}
-            onSaved={() => { loadTransactions(); setReceiptSplitTx(null); }}
-            onClose={() => setReceiptSplitTx(null)}
           />
         )}
 
