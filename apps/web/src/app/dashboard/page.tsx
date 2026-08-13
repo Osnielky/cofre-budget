@@ -70,11 +70,12 @@ export default function DashboardPage() {
     const goal = user?.savingsGoal != null ? Number(user.savingsGoal) : null;
     const expenseSlices = categoryTotals(monthTx, 'expense');
     const incomeSlices = categoryTotals(yearTx, 'income');
+    const yearExpenseSlices = categoryTotals(yearTx, 'expense');
     return {
       cashFlow: monthlyCashFlow(yearTx, now),
       trend: trendSeries(yearTx, now, 12),   // full YTD; the panel slices per selected range
-      expenseDonut: foldOther(expenseSlices, 7),
-      expenseTotal: expenseSlices.reduce((s, x) => s + x.value, 0),
+      expenseDonut: foldOther(yearExpenseSlices, 7),
+      expenseTotal: yearExpenseSlices.reduce((s, x) => s + x.value, 0),
       ranking: expenseSlices.slice(0, 7),
       incomeSlices: foldOther(incomeSlices, 6),
       incomeTotal: incomeSlices.reduce((s, x) => s + x.value, 0),
@@ -195,7 +196,7 @@ export default function DashboardPage() {
             <CashFlowTrendPanel data={d.trend} loading={loading} />
             <CategoryDonutPanel title="Income Sources" subtitle="Year to date" colSpan={2}
               slices={d.incomeSlices} total={d.incomeTotal} loading={loading} />
-            <CategoryDonutPanel title="Expenses by Category" subtitle={monthLabel(month)} colSpan={2}
+            <CategoryDonutPanel title="Expenses by Category" subtitle="Year to date" colSpan={2}
               slices={d.expenseDonut} total={d.expenseTotal} loading={loading} />
 
             <CategoryRankingPanel slices={d.ranking} loading={loading} />
