@@ -17,6 +17,7 @@ import { DataResetModule } from '../data-reset/data-reset.module';
 import { GmailModule } from '../gmail/gmail.module';
 import { ReceiptsModule } from '../receipts/receipts.module';
 import { CategorizationRulesModule } from '../categorization-rules/categorization-rules.module';
+import { NetWorthGoalModule } from '../net-worth-goal/net-worth-goal.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { CategorizationRulesModule } from '../categorization-rules/categorizatio
     GmailModule,
     ReceiptsModule,
     CategorizationRulesModule,
+    NetWorthGoalModule,
   ],
   providers: [
     // Apply ThrottlerGuard globally — all routes inherit the 100 req/min default
