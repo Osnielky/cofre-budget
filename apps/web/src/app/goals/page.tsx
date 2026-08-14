@@ -15,6 +15,8 @@ function fmtDate(iso: string) {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
+/** Signed currency: -$500.00 (not $-500.00 — see apps/web/src/app/dashboard/page.tsx). */
+const money = (n: number) => `${n < 0 ? '-' : ''}$${fmt(Math.abs(n))}`;
 
 const cardStyle: React.CSSProperties = {
   background: 'var(--color-surface)',
@@ -23,22 +25,28 @@ const cardStyle: React.CSSProperties = {
 };
 
 export default function GoalsPage() {
-  const { data, loading, setTargetDate } = useNetWorthGoal();
+  const { data, loading, error, setTargetDate } = useNetWorthGoal();
   const tc = useThemeColors();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
   const [editingDate, setEditingDate] = useState(false);
   const [dateValue, setDateValue] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      fetch(`${API}/bank-accounts`, { credentials: 'include' }).then((r) => r.json()),
-      fetch(`${API}/debts`, { credentials: 'include' }).then((r) => r.json()),
-    ]).then(([accs, dbts]) => {
-      setAccounts(Array.isArray(accs) ? accs : []);
-      setDebts(Array.isArray(dbts) ? dbts : []);
-    });
+    (async () => {
+      try {
+        const [accs, dbts] = await Promise.all([
+          fetch(`${API}/bank-accounts`, { credentials: 'include' }).then((r) => r.json()),
+          fetch(`${API}/debts`, { credentials: 'include' }).then((r) => r.json()),
+        ]);
+        setAccounts(Array.isArray(accs) ? accs : []);
+        setDebts(Array.isArray(dbts) ? dbts : []);
+      } catch {
+        setAccountsError("Couldn't load your accounts.");
+      }
+    })();
   }, []);
 
   const breakdown = netWorthBreakdown(accounts, debts, [], currentMonth());
@@ -66,13 +74,15 @@ export default function GoalsPage() {
             </p>
           </div>
 
-          {loading || !data ? (
+          {loading ? (
             <p style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
+          ) : !data ? (
+            <p style={{ color: 'var(--color-rose)' }}>{error ?? 'Could not load your net worth goal.'}</p>
           ) : (
             <>
               <div className="card-lift rounded-2xl p-6 flex flex-col gap-4" style={cardStyle}>
                 <div className="flex items-baseline gap-2">
-                  <p className="text-4xl font-bold tabular-nums">${fmt(data.current)}</p>
+                  <p className="text-4xl font-bold tabular-nums">{money(data.current)}</p>
                   <span style={{ color: 'var(--color-text-muted)' }}>of $1,000,000</span>
                 </div>
                 <div className="h-3 rounded-full overflow-hidden" style={{ background: 'var(--color-elevated)' }}>
@@ -110,31 +120,37 @@ export default function GoalsPage() {
                 )}
               </div>
 
-              <div className="card-lift rounded-2xl p-6 grid grid-cols-1 sm:grid-cols-2 gap-6" style={cardStyle}>
-                <div className="flex flex-col gap-2 min-w-0">
-                  <p className="text-xs font-semibold flex justify-between" style={{ color: 'var(--color-text-muted)' }}>
-                    Assets <span style={{ color: tc.green }}>${fmt(breakdown.assets)}</span>
-                  </p>
-                  {breakdown.assetItems.map((it) => (
-                    <p key={it.label} className="flex justify-between gap-2 text-sm">
-                      <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{it.label}</span>
-                      <span className="tabular-nums font-semibold shrink-0">${fmt(it.value)}</span>
-                    </p>
-                  ))}
-                </div>
-                <div className="flex flex-col gap-2 min-w-0">
-                  <p className="text-xs font-semibold flex justify-between" style={{ color: 'var(--color-text-muted)' }}>
-                    Liabilities <span style={{ color: tc.rose }}>${fmt(breakdown.liabilities)}</span>
-                  </p>
-                  {breakdown.liabilityItems.length === 0
-                    ? <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>None</p>
-                    : breakdown.liabilityItems.map((it) => (
-                      <p key={it.label} className="flex justify-between gap-2 text-sm">
-                        <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{it.label}</span>
-                        <span className="tabular-nums font-semibold shrink-0">${fmt(it.value)}</span>
+              <div className="card-lift rounded-2xl p-6 flex flex-col gap-4" style={cardStyle}>
+                {accountsError ? (
+                  <p className="text-sm" style={{ color: 'var(--color-rose)' }}>{accountsError}</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="flex flex-col gap-2 min-w-0">
+                      <p className="text-xs font-semibold flex justify-between" style={{ color: 'var(--color-text-muted)' }}>
+                        Assets <span style={{ color: tc.green }}>{money(breakdown.assets)}</span>
                       </p>
-                    ))}
-                </div>
+                      {breakdown.assetItems.map((it) => (
+                        <p key={it.label} className="flex justify-between gap-2 text-sm">
+                          <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{it.label}</span>
+                          <span className="tabular-nums font-semibold shrink-0">{money(it.value)}</span>
+                        </p>
+                      ))}
+                    </div>
+                    <div className="flex flex-col gap-2 min-w-0">
+                      <p className="text-xs font-semibold flex justify-between" style={{ color: 'var(--color-text-muted)' }}>
+                        Liabilities <span style={{ color: tc.rose }}>{money(breakdown.liabilities)}</span>
+                      </p>
+                      {breakdown.liabilityItems.length === 0
+                        ? <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>None</p>
+                        : breakdown.liabilityItems.map((it) => (
+                          <p key={it.label} className="flex justify-between gap-2 text-sm">
+                            <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{it.label}</span>
+                            <span className="tabular-nums font-semibold shrink-0">{money(it.value)}</span>
+                          </p>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
