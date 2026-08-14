@@ -9,7 +9,7 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 import { isLiability } from '@/lib/accountTypes';
 import {
   monthlyCashFlow, trendSeries, categoryTotals, foldOther, txInMonth,
-  calendarDays, spendingPace, fixedVariable, savingsSeries, netWorthBreakdown,
+  calendarDays, spendingPace, fixedVariable, netWorthBreakdown,
   expenseChanges, topMerchants, isTransfer, inCashFlow, dailyCumulative,
 } from '@/lib/dashboard/derive';
 import type { Budget } from '@/lib/dashboard/types';
@@ -23,7 +23,7 @@ import SpendingCalendarPanel from '@/components/dashboard/panels/SpendingCalenda
 import SpendingPacePanel from '@/components/dashboard/panels/SpendingPacePanel';
 import FixedVariablePanel from '@/components/dashboard/panels/FixedVariablePanel';
 import RecurringTimelinePanel from '@/components/dashboard/panels/RecurringTimelinePanel';
-import SavingsGrowthPanel from '@/components/dashboard/panels/SavingsGrowthPanel';
+import NetWorthGoalPanel from '@/components/dashboard/panels/NetWorthGoalPanel';
 import NetWorthPanel from '@/components/dashboard/panels/NetWorthPanel';
 import ExpenseChangePanel from '@/components/dashboard/panels/ExpenseChangePanel';
 import TopMerchantsPanel from '@/components/dashboard/panels/TopMerchantsPanel';
@@ -61,13 +61,12 @@ function greeting() {
 
 export default function DashboardPage() {
   const { month, setMonth, transactions, yearTx, accounts, budgets, projects, debts, loading } = useDashboardData();
-  const { user, refetch } = useUser();
+  const { user } = useUser();
   const tc = useThemeColors();
   const now = new Date();
 
   const d = useMemo(() => {
     const monthTx = txInMonth(yearTx, month);
-    const goal = user?.savingsGoal != null ? Number(user.savingsGoal) : null;
     const expenseSlices = categoryTotals(monthTx, 'expense');
     const incomeSlices = categoryTotals(yearTx, 'income');
     const yearExpenseSlices = categoryTotals(yearTx, 'expense');
@@ -82,14 +81,13 @@ export default function DashboardPage() {
       calendar: calendarDays(yearTx, month),
       pace: spendingPace(budgets, yearTx, month, now),
       fixedVar: fixedVariable(yearTx, month),
-      savings: savingsSeries(yearTx, now, goal),
       netWorth: netWorthBreakdown(accounts, debts, yearTx, month),
       changes: expenseChanges(yearTx, month),
       merchants: topMerchants(monthTx),
       daily: dailyCumulative(yearTx, month, now),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yearTx, month, budgets, accounts, debts, user?.savingsGoal]);
+  }, [yearTx, month, budgets, accounts, debts]);
 
   /* ── Stat-card derivations (ported verbatim from the pre-refactor page) ── */
   const isDebtAcc    = (a: (typeof accounts)[number]) => isLiability(a.accountType);
@@ -206,7 +204,7 @@ export default function DashboardPage() {
 
             <FixedVariablePanel split={d.fixedVar} monthLabel={monthLabel(month)} loading={loading} />
             <RecurringTimelinePanel />
-            <SavingsGrowthPanel stats={d.savings} loading={loading} onGoalSaved={refetch} />
+            <NetWorthGoalPanel />
             <NetWorthPanel data={d.netWorth} loading={loading} />
 
             <ExpenseChangePanel changes={d.changes.changes} unchanged={d.changes.unchanged}
