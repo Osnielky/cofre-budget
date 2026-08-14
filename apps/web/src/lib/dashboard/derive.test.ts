@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, savingsSeries, netWorthBreakdown, dailyCumulative } from './derive';
+import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative } from './derive';
 import type { Transaction, Category, BankAccount } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
@@ -202,29 +202,6 @@ describe('fixedVariable', () => {
     expect(out.fixedPct).toBeCloseTo(71.4, 1);
     expect(out.fixed).toHaveLength(1);
     expect(out.variable).toHaveLength(2);
-  });
-});
-
-describe('savingsSeries', () => {
-  const NOW = new Date(2026, 6, 3);
-  it('accumulates net and ramps the goal linearly', () => {
-    const out = savingsSeries([
-      tx({ date: '2026-01-05', amount: 2000 }), tx({ date: '2026-01-06', amount: -500 }),
-      tx({ date: '2026-02-05', amount: 1000 }),
-    ], NOW, 12000);
-    expect(out.points).toHaveLength(7);
-    expect(out.points[0].actual).toBe(1500);
-    expect(out.points[1].actual).toBe(2500);
-    expect(out.points[0].goal).toBe(1000);   // 12000 × 1/12
-    expect(out.points[6].goal).toBe(7000);   // 12000 × 7/12
-    expect(out.current).toBe(2500);
-    expect(out.onTrackPct).toBeCloseTo(35.7, 1); // 2500 / 7000
-  });
-  it('handles no goal', () => {
-    const out = savingsSeries([], NOW, null);
-    expect(out.goal).toBeNull();
-    expect(out.onTrackPct).toBeNull();
-    expect(out.points[0].goal).toBeNull();
   });
 });
 

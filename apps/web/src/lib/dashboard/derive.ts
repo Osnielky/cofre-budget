@@ -204,24 +204,6 @@ export function fixedVariable(yearTx: Transaction[], monthKey: string): FixedVar
   };
 }
 
-export interface SavingsPoint { month: string; actual: number; goal: number | null }
-export interface SavingsStats { points: SavingsPoint[]; current: number; goal: number | null; onTrackPct: number | null }
-
-export function savingsSeries(yearTx: Transaction[], now: Date, goal: number | null): SavingsStats {
-  const flow = monthlyCashFlow(yearTx, now);
-  let cum = 0;
-  const points: SavingsPoint[] = flow.map((m, i) => {
-    cum = +(cum + m.net).toFixed(2);
-    return { month: m.month, actual: cum, goal: goal != null ? +((goal * (i + 1)) / 12).toFixed(2) : null };
-  });
-  const current = points.length ? points[points.length - 1].actual : 0;
-  const goalNow = points.length && goal != null ? points[points.length - 1].goal! : null;
-  return {
-    points, current, goal,
-    onTrackPct: goalNow && goalNow > 0 ? +((current / goalNow) * 100).toFixed(1) : null,
-  };
-}
-
 export interface NetWorthItem { label: string; value: number; color: string }
 export interface NetWorthBreakdown {
   total: number; assets: number; liabilities: number;
