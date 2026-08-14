@@ -11,6 +11,7 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 const NAV = [
   { label: 'Dashboard',    href: '/dashboard',    icon: DashboardIcon },
+  { label: 'Goals',        href: '/goals',        icon: GoalsIcon },
   { label: 'Transactions', href: '/transactions', icon: TransactionsIcon },
   { label: 'Budgets',      href: '/budgets',      icon: BudgetsIcon },
   { label: 'Projects',     href: '/projects',     icon: ProjectsIcon },
@@ -227,6 +228,14 @@ function DashboardIcon() {
   return (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 12l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>
+    </svg>
+  );
+}
+
+function GoalsIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>
     </svg>
   );
 }
