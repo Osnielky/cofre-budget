@@ -26,9 +26,17 @@ export class User {
   @Column({ default: 'free' })
   plan: 'free' | 'pro';
 
-  /* Yearly savings goal in dollars; null = not set */
+  /* User-set date for reaching the $1,000,000 net-worth mission; null = not set */
+  @Column({ type: 'date', nullable: true, default: null })
+  netWorthGoalTargetDate: string | null;
+
+  /* Net worth snapshot captured the moment netWorthGoalTargetDate was first set */
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true, default: null })
-  savingsGoal: string | null;
+  netWorthGoalBaselineValue: string | null;
+
+  /* Date netWorthGoalBaselineValue was captured */
+  @Column({ type: 'date', nullable: true, default: null })
+  netWorthGoalBaselineDate: string | null;
 
   @Column({ default: false })
   emailVerified: boolean;
