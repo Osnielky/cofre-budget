@@ -11,6 +11,9 @@ function fmtMonthYear(iso: string) {
   return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
+/** Signed currency: -$500.00 (not $-500.00 — see apps/web/src/app/dashboard/page.tsx). */
+const money = (n: number) => `${n < 0 ? '-' : ''}$${fmt(Math.abs(n))}`;
+
 export default function NetWorthGoalPanel() {
   const { data, loading } = useNetWorthGoal();
   const tc = useThemeColors();
@@ -24,7 +27,7 @@ export default function NetWorthGoalPanel() {
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex items-baseline gap-2">
-            <p className="text-2xl font-bold tabular-nums">${fmt(data.current)}</p>
+            <p className="text-2xl font-bold tabular-nums">{money(data.current)}</p>
             <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>of $1,000,000</span>
           </div>
           <div className="h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--color-elevated)' }}>

@@ -54,4 +54,13 @@ describe('computeGoalProgress', () => {
     expect(out.projectedDate).toBeNull();
     expect(out.onTrackPct).toBeLessThan(0);
   });
+
+  it('returns a null projected date when a near-zero positive rate would produce an absurd/invalid far-future date', () => {
+    // Baseline $0 on 2025-01-01, one year elapsed, only $0.01 gained — the naive
+    // extrapolation would land thousands of years out (or overflow Date entirely).
+    const out = computeGoalProgress({
+      current: 0.01, targetDate: '2030-01-01', baselineValue: 0, baselineDate: '2025-01-01', now: new Date(2026, 0, 1),
+    });
+    expect(out.projectedDate).toBeNull();
+  });
 });

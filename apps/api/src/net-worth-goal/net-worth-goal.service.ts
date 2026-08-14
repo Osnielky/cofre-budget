@@ -1,11 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { BankAccountsService } from '../bank-accounts/bank-accounts.service';
 import { isLiabilityType } from '../bank-accounts/account-types';
 import { DebtsService } from '../debts/debts.service';
-import { NET_WORTH_TARGET, computeGoalProgress } from './net-worth-goal.math';
+import { NET_WORTH_TARGET, computeGoalProgress, toDateOnly } from './net-worth-goal.math';
+
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** True when `value` is a real calendar date in YYYY-MM-DD form (rejects e.g. "2026-13-45"). */
+function isValidDateOnly(value: string): boolean {
+  if (!DATE_ONLY_RE.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  const parsed = new Date(y, m - 1, d);
+  return parsed.getFullYear() === y && parsed.getMonth() === m - 1 && parsed.getDate() === d;
+}
 
 @Injectable()
 export class NetWorthGoalService {
@@ -50,7 +60,14 @@ export class NetWorthGoalService {
     };
   }
 
-  async setTargetDate(userId: string, targetDate: string | null) {
+  async setTargetDate(userId: string, targetDate: string | null | undefined) {
+    if (targetDate === undefined) {
+      throw new BadRequestException('targetDate is required.');
+    }
+    if (targetDate !== null && !isValidDateOnly(targetDate)) {
+      throw new BadRequestException('targetDate must be a valid date in YYYY-MM-DD format.');
+    }
+
     const user = await this.users.findOneByOrFail({ id: userId });
     if (targetDate === null) {
       user.netWorthGoalTargetDate = null;
@@ -60,7 +77,7 @@ export class NetWorthGoalService {
       if (user.netWorthGoalTargetDate == null) {
         const current = await this.currentNetWorth(userId);
         user.netWorthGoalBaselineValue = current.toFixed(2);
-        user.netWorthGoalBaselineDate = new Date().toISOString().slice(0, 10);
+        user.netWorthGoalBaselineDate = toDateOnly(new Date());
       }
       user.netWorthGoalTargetDate = targetDate;
     }

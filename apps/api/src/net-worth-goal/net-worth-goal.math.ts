@@ -1,4 +1,6 @@
 const MS_PER_DAY = 86_400_000;
+const MS_PER_YEAR = MS_PER_DAY * 365.25;
+const MAX_PROJECTION_YEARS = 100;
 
 export const NET_WORTH_TARGET = 1_000_000;
 
@@ -15,7 +17,7 @@ export interface GoalProgress {
   projectedDate: string | null;
 }
 
-function toDateOnly(d: Date): string {
+export function toDateOnly(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -52,9 +54,12 @@ export function computeGoalProgress(input: GoalProgressInput): GoalProgress {
 
   const progressSoFar = current - baselineValue;
   const rate = progressSoFar / elapsedDays; // dollars per day
-  const projectedDate = rate > 0
-    ? toDateOnly(new Date(now.getTime() + ((NET_WORTH_TARGET - current) / rate) * MS_PER_DAY))
-    : null;
+  let projectedDate: string | null = null;
+  if (rate > 0) {
+    const projectedMs = now.getTime() + ((NET_WORTH_TARGET - current) / rate) * MS_PER_DAY;
+    const withinSaneRange = Number.isFinite(projectedMs) && projectedMs - now.getTime() <= MAX_PROJECTION_YEARS * MS_PER_YEAR;
+    projectedDate = withinSaneRange ? toDateOnly(new Date(projectedMs)) : null;
+  }
 
   const totalMs = target.getTime() - baseline.getTime();
   let onTrackPct: number | null = null;

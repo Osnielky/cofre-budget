@@ -33,6 +33,7 @@ export default function GoalsPage() {
   const [editingDate, setEditingDate] = useState(false);
   const [dateValue, setDateValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -55,8 +56,15 @@ export default function GoalsPage() {
   async function saveDate() {
     setSaving(true);
     try {
-      await setTargetDate(dateValue || null);
-      setEditingDate(false);
+      const ok = await setTargetDate(dateValue || null);
+      if (ok) {
+        setSaveError(null);
+        setEditingDate(false);
+      } else {
+        setSaveError("Couldn't save your target date. Please try again.");
+      }
+    } catch {
+      setSaveError("Couldn't save your target date. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -95,18 +103,22 @@ export default function GoalsPage() {
                   {editingDate ? (
                     <span className="flex items-center gap-2">
                       <input type="date" value={dateValue} onChange={(e) => setDateValue(e.target.value)}
+                        aria-label="Target date"
                         className="px-3 py-1.5 text-sm rounded-lg outline-none"
                         style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
                       <button onClick={saveDate} disabled={saving} className="text-sm font-semibold cursor-pointer" style={{ color: tc.green }}>Save</button>
-                      <button onClick={() => setEditingDate(false)} className="text-sm cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>Cancel</button>
+                      <button onClick={() => { setEditingDate(false); setSaveError(null); }} className="text-sm cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>Cancel</button>
                     </span>
                   ) : (
-                    <button onClick={() => { setDateValue(data.targetDate ?? ''); setEditingDate(true); }}
+                    <button onClick={() => { setDateValue(data.targetDate ?? ''); setSaveError(null); setEditingDate(true); }}
                       className="text-sm font-semibold underline decoration-dotted underline-offset-2 cursor-pointer">
                       {data.targetDate ? fmtDate(data.targetDate) : 'Set a target date'}
                     </button>
                   )}
                 </div>
+                {saveError && (
+                  <p className="text-sm" style={{ color: 'var(--color-rose)' }}>{saveError}</p>
+                )}
 
                 {data.targetDate && (
                   <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
@@ -129,12 +141,14 @@ export default function GoalsPage() {
                       <p className="text-xs font-semibold flex justify-between" style={{ color: 'var(--color-text-muted)' }}>
                         Assets <span style={{ color: tc.green }}>{money(breakdown.assets)}</span>
                       </p>
-                      {breakdown.assetItems.map((it) => (
-                        <p key={it.label} className="flex justify-between gap-2 text-sm">
-                          <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{it.label}</span>
-                          <span className="tabular-nums font-semibold shrink-0">{money(it.value)}</span>
-                        </p>
-                      ))}
+                      {breakdown.assetItems.length === 0
+                        ? <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>None</p>
+                        : breakdown.assetItems.map((it) => (
+                          <p key={it.label} className="flex justify-between gap-2 text-sm">
+                            <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{it.label}</span>
+                            <span className="tabular-nums font-semibold shrink-0">{money(it.value)}</span>
+                          </p>
+                        ))}
                     </div>
                     <div className="flex flex-col gap-2 min-w-0">
                       <p className="text-xs font-semibold flex justify-between" style={{ color: 'var(--color-text-muted)' }}>

@@ -13,7 +13,7 @@ export class NetWorthGoalController {
   }
 
   @Patch()
-  setTargetDate(@Request() req: any, @Body() body: { targetDate: string | null }) {
-    return this.service.setTargetDate(req.user.id, body.targetDate ?? null);
+  setTargetDate(@Request() req: any, @Body() body: { targetDate?: string | null }) {
+    return this.service.setTargetDate(req.user.id, body?.targetDate);
   }
 }
