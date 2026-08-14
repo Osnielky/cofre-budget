@@ -10,5 +10,6 @@ import { NetWorthGoalController } from './net-worth-goal.controller';
   imports: [TypeOrmModule.forFeature([User]), BankAccountsModule, DebtsModule],
   providers: [NetWorthGoalService],
   controllers: [NetWorthGoalController],
+  exports: [NetWorthGoalService],
 })
 export class NetWorthGoalModule {}
