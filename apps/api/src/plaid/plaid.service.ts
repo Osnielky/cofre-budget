@@ -45,12 +45,16 @@ export class PlaidService {
   }
 
   async createLinkToken(userId: string): Promise<string> {
+    const webhook = this.config.get<string>('PLAID_WEBHOOK_URL');
+    const redirectUri = this.config.get<string>('PLAID_OAUTH_REDIRECT_URI');
     const res = await this.client.linkTokenCreate({
       user: { client_user_id: userId },
       client_name: 'Cofre Budget',
       products: [Products.Transactions],
       country_codes: [CountryCode.Us],
       language: 'en',
+      ...(webhook ? { webhook } : {}),
+      ...(redirectUri ? { redirect_uri: redirectUri } : {}),
     });
     return res.data.link_token;
   }
@@ -99,7 +103,7 @@ export class PlaidService {
     }
 
     /* Kick off an initial transaction sync */
-    await this.syncTransactions(item, access_token);
+    await this.runSync(item, access_token);
     return accounts;
   }
 
@@ -112,7 +116,7 @@ export class PlaidService {
 
     if (!item) return;
     const accessToken = decryptToken(item.accessToken, this.encKey);
-    await this.syncTransactions(item, accessToken);
+    await this.runSync(item, accessToken);
 
     /* Refresh balances */
     const balanceRes = await this.client.accountsBalanceGet({ access_token: accessToken });
@@ -125,51 +129,67 @@ export class PlaidService {
     }
   }
 
-  private async syncTransactions(item: PlaidItem, accessToken: string): Promise<void> {
-    const endDate = new Date().toISOString().slice(0, 10);
-    const startDate = new Date(Date.now() - 90 * 86400_000).toISOString().slice(0, 10);
-
+  /* Cursor-based sync via /transactions/sync — pages through everything new since
+     item.cursor, applying added/modified/removed. On any failure the whole sync is
+     abandoned without persisting a new cursor, which is safe: the next attempt just
+     re-processes the same page, and every operation here (upsert-by-externalId,
+     delete-by-externalId) is idempotent. */
+  private async runSync(item: PlaidItem, accessToken: string): Promise<void> {
     try {
-      const res = await this.client.transactionsGet({
-        access_token: accessToken,
-        start_date: startDate,
-        end_date: endDate,
-        options: { count: 500, offset: 0 },
-      });
-
+      let cursor = item.cursor ?? undefined;
+      let hasMore = true;
       const rules = await this.rulesService.getActiveRules(item.userId);
 
-      for (const pt of res.data.transactions) {
-        const account = await this.accountRepo.findOneBy({ plaidAccountId: pt.account_id });
-        if (!account) continue;
+      while (hasMore) {
+        const res = await this.client.transactionsSync({ access_token: accessToken, cursor });
 
-        const existing = await this.txRepo.findOneBy({ externalId: pt.transaction_id, userId: item.userId });
-        if (existing) {
-          existing.pending = pt.pending;
-          await this.txRepo.save(existing);
-          continue;
+        for (const pt of [...res.data.added, ...res.data.modified]) {
+          const account = await this.accountRepo.findOneBy({ plaidAccountId: pt.account_id });
+          if (!account) continue;
+
+          const existing = await this.txRepo.findOneBy({ externalId: pt.transaction_id, userId: item.userId });
+          if (existing) {
+            existing.pending = pt.pending;
+            existing.amount = -(pt.amount);
+            existing.name = pt.name;
+            existing.merchantName = pt.merchant_name ?? undefined;
+            existing.plaidCategory = pt.category ?? [];
+            existing.date = pt.date;
+            await this.txRepo.save(existing);
+            continue;
+          }
+
+          const matchedRule = this.rulesService.matchRule(rules, { merchantName: pt.merchant_name, name: pt.name });
+          await this.txRepo.save(
+            this.txRepo.create({
+              userId: item.userId,
+              bankAccountId: account.id,
+              externalId: pt.transaction_id,
+              /* Plaid: positive = debit; we flip so positive = money in */
+              amount: -(pt.amount),
+              name: pt.name,
+              merchantName: pt.merchant_name ?? undefined,
+              plaidCategory: pt.category ?? [],
+              date: pt.date,
+              pending: pt.pending,
+              categoryId: matchedRule?.categoryId ?? undefined,
+              categorizedByRuleId: matchedRule?.id ?? undefined,
+            }),
+          );
         }
 
-        const matchedRule = this.rulesService.matchRule(rules, { merchantName: pt.merchant_name, name: pt.name });
-        await this.txRepo.save(
-          this.txRepo.create({
-            userId: item.userId,
-            bankAccountId: account.id,
-            externalId: pt.transaction_id,
-            /* Plaid: positive = debit; we flip so positive = money in */
-            amount: -(pt.amount),
-            name: pt.name,
-            merchantName: pt.merchant_name ?? undefined,
-            plaidCategory: pt.category ?? [],
-            date: pt.date,
-            pending: pt.pending,
-            categoryId: matchedRule?.categoryId ?? undefined,
-            categorizedByRuleId: matchedRule?.id ?? undefined,
-          }),
-        );
+        for (const rt of res.data.removed) {
+          await this.txRepo.delete({ externalId: rt.transaction_id, userId: item.userId });
+        }
+
+        cursor = res.data.next_cursor;
+        hasMore = res.data.has_more;
       }
 
+      item.cursor = cursor ?? null;
       item.lastSync = new Date();
+      item.status = 'active';
+      item.errorCode = null;
       await this.itemRepo.save(item);
     } catch (err) {
       this.logger.error('Transaction sync failed', err);
