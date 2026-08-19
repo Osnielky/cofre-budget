@@ -46,6 +46,12 @@ GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 GOOGLE_GMAIL_REDIRECT_URI  # e.g. http://localhost:3333/api/gmail/callback
 ANTHROPIC_API_KEY
+PLAID_CLIENT_ID
+PLAID_SECRET
+PLAID_ENV                 # sandbox | development | production
+PLAID_WEBHOOK_URL          # e.g. https://<host>/api/plaid/webhook — enables automatic sync
+PLAID_OAUTH_REDIRECT_URI   # e.g. https://<host>/settings/plaid-oauth-redirect — must also be
+                            # registered in the Plaid dashboard's Allowed redirect URIs
 ```
 
 `NEXT_PUBLIC_API_URL` in the web app defaults to `http://localhost:3333/api`.
