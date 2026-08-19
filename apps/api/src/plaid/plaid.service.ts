@@ -129,6 +129,27 @@ export class PlaidService {
     }
   }
 
+  /* Looked up by Plaid's item_id (not our PlaidItem.id) — this is what webhook
+     payloads carry, with no authenticated user in the request. */
+  async syncByExternalItemId(externalItemId: string): Promise<void> {
+    const item = await this.itemRepo
+      .createQueryBuilder('item')
+      .addSelect('item.accessToken')
+      .where('item.itemId = :externalItemId', { externalItemId })
+      .getOne();
+    if (!item) return;
+    const accessToken = decryptToken(item.accessToken, this.encKey);
+    await this.runSync(item, accessToken);
+  }
+
+  async markItemStatus(externalItemId: string, status: string, errorCode: string | null): Promise<void> {
+    const item = await this.itemRepo.findOneBy({ itemId: externalItemId });
+    if (!item) return;
+    item.status = status;
+    item.errorCode = errorCode;
+    await this.itemRepo.save(item);
+  }
+
   /* Cursor-based sync via /transactions/sync — pages through everything new since
      item.cursor, applying added/modified/removed. On any failure the whole sync is
      abandoned without persisting a new cursor, which is safe: the next attempt just
