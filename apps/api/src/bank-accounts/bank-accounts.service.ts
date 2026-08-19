@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BankAccount } from './bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { PlaidItem } from '../plaid/plaid-item.entity';
 import { CreateBankAccountDto } from './dto/create-bank-account.dto';
 
 @Injectable()
@@ -12,6 +13,8 @@ export class BankAccountsService {
     private repo: Repository<BankAccount>,
     @InjectRepository(Transaction)
     private txRepo: Repository<Transaction>,
+    @InjectRepository(PlaidItem)
+    private plaidItemRepo: Repository<PlaidItem>,
   ) {}
 
   /** Number of transactions booked to this account (ownership-checked). */
@@ -22,7 +25,7 @@ export class BankAccountsService {
     return this.txRepo.count({ where: { bankAccountId: id } });
   }
 
-  async findAllByUser(userId: string): Promise<(BankAccount & { txCount: number })[]> {
+  async findAllByUser(userId: string): Promise<(BankAccount & { txCount: number; plaidStatus: string | null })[]> {
     const accounts = await this.repo.find({ where: { userId }, order: { createdAt: 'ASC' } });
     const counts = await this.txRepo
       .createQueryBuilder('t')
@@ -33,7 +36,15 @@ export class BankAccountsService {
       .groupBy('t.bankAccountId')
       .getRawMany<{ id: string; c: string }>();
     const byId = new Map(counts.map((r) => [r.id, Number(r.c)]));
-    return accounts.map((a) => ({ ...a, txCount: byId.get(a.id) ?? 0 }));
+
+    const plaidItems = await this.plaidItemRepo.find({ where: { userId } });
+    const statusByPlaidItemId = new Map(plaidItems.map((p) => [p.id, p.status]));
+
+    return accounts.map((a) => ({
+      ...a,
+      txCount: byId.get(a.id) ?? 0,
+      plaidStatus: a.plaidItemId ? statusByPlaidItemId.get(a.plaidItemId) ?? null : null,
+    }));
   }
 
   countByUser(userId: string): Promise<number> {
