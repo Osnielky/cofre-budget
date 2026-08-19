@@ -18,6 +18,10 @@ substitutions:
   # Google OAuth client ID is public (safe to keep here); the secret stays in
   # Secret Manager. Baked into the deploy so it survives every CI run.
   _GOOGLE_CLIENT_ID: 193134215805-qpksslufmo42rnsk10nk4d5q4070gso5.apps.googleusercontent.com
+  # Plaid client_id is shared across all Plaid environments (sandbox/development/
+  # production) — only the secret differs per environment, which stays in Secret
+  # Manager. Safe to check in here, same pattern as _GOOGLE_CLIENT_ID above.
+  _PLAID_CLIENT_ID: 698660e28d9c88001e4b3f80
   # Email sender on the Resend-verified notify.osmioservices.com subdomain
   # (kept separate from the apex Workspace domain). RESEND_API_KEY lives in
   # Secret Manager.
@@ -87,6 +91,7 @@ steps:
       - 'DB_NAME=${_DB_NAME}'
       - 'DB_USER=${_DB_USER}'
       - 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID}'
+      - 'PLAID_CLIENT_ID=${_PLAID_CLIENT_ID}'
       - 'MAIL_FROM=${_MAIL_FROM}'
 
 options:
