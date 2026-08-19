@@ -20,6 +20,7 @@ export class PlaidService {
   private readonly client: PlaidApi;
   private readonly logger = new Logger(PlaidService.name);
   private readonly encKey: Buffer;
+  private readonly syncsInFlight = new Set<string>();
 
   constructor(
     private config: ConfigService,
@@ -154,19 +155,44 @@ export class PlaidService {
      item.cursor, applying added/modified/removed. On any failure the whole sync is
      abandoned without persisting a new cursor, which is safe: the next attempt just
      re-processes the same page, and every operation here (upsert-by-externalId,
-     delete-by-externalId) is idempotent. */
+     delete-by-externalId) is idempotent.
+
+     Guarded by syncsInFlight (keyed by Plaid's item_id) because exchangeToken's initial
+     sync can race a webhook-triggered sync for the same item (Plaid's webhook can arrive
+     within seconds of the exchange completing, and redelivers on a ~10s timeout), and two
+     concurrent runs would both try to insert the same new transaction and collide on the
+     (userId, externalId) unique index. */
   private async runSync(item: PlaidItem, accessToken: string): Promise<void> {
+    if (this.syncsInFlight.has(item.itemId)) {
+      this.logger.warn(`Sync already in flight for item ${item.itemId} — skipping this trigger`);
+      return;
+    }
+    this.syncsInFlight.add(item.itemId);
+
     try {
       let cursor = item.cursor ?? undefined;
       let hasMore = true;
       const rules = await this.rulesService.getActiveRules(item.userId);
+      const accountCache = new Map<string, BankAccount | null>();
+
+      const getAccount = async (plaidAccountId: string): Promise<BankAccount | null> => {
+        if (accountCache.has(plaidAccountId)) return accountCache.get(plaidAccountId) ?? null;
+        const account = await this.accountRepo.findOneBy({ plaidAccountId });
+        accountCache.set(plaidAccountId, account);
+        return account;
+      };
 
       while (hasMore) {
         const res = await this.client.transactionsSync({ access_token: accessToken, cursor });
 
         for (const pt of [...res.data.added, ...res.data.modified]) {
-          const account = await this.accountRepo.findOneBy({ plaidAccountId: pt.account_id });
-          if (!account) continue;
+          const account = await getAccount(pt.account_id);
+          if (!account) {
+            this.logger.warn(
+              `Skipping transaction ${pt.transaction_id} — no BankAccount for Plaid account ${pt.account_id} (item ${item.itemId})`,
+            );
+            continue;
+          }
 
           const existing = await this.txRepo.findOneBy({ externalId: pt.transaction_id, userId: item.userId });
           if (existing) {
@@ -189,7 +215,7 @@ export class PlaidService {
               /* Plaid: positive = debit; we flip so positive = money in */
               amount: -(pt.amount),
               name: pt.name,
-              merchantName: pt.merchant_name ?? undefined,
+              merchantName: pt.merchant_name ?? null,
               plaidCategory: pt.category ?? [],
               date: pt.date,
               pending: pt.pending,
@@ -200,7 +226,17 @@ export class PlaidService {
         }
 
         for (const rt of res.data.removed) {
-          await this.txRepo.delete({ externalId: rt.transaction_id, userId: item.userId });
+          const victim = await this.txRepo.findOneBy({ externalId: rt.transaction_id, userId: item.userId });
+          if (victim) {
+            /* A split parent's children have no externalId of their own — Plaid never
+               references them directly, so they'd otherwise be orphaned (and still
+               counted, since totals exclude only the parent) when the parent transaction
+               is removed (e.g. a pending transaction that posted under a new id). */
+            if (victim.isSplitParent) {
+              await this.txRepo.delete({ parentId: victim.id, userId: item.userId });
+            }
+            await this.txRepo.delete({ id: victim.id });
+          }
         }
 
         cursor = res.data.next_cursor;
@@ -214,6 +250,8 @@ export class PlaidService {
       await this.itemRepo.save(item);
     } catch (err) {
       this.logger.error('Transaction sync failed', err);
+    } finally {
+      this.syncsInFlight.delete(item.itemId);
     }
   }
 
@@ -247,9 +285,10 @@ export class PlaidService {
   }
 
   /* Called after update-mode Link succeeds. A successful sync clears status/errorCode
-     back to 'active' on its own (see runSync), so there's no separate "clear error"
-     step — this just runs the sync that proves the reconnect worked. */
-  async completeReconnect(plaidItemId: string, userId: string): Promise<void> {
+     back to 'active' on its own (see runSync); this reads the item back after the sync
+     attempt so the response reflects what actually happened, rather than always
+     claiming success even if the underlying sync silently failed. */
+  async completeReconnect(plaidItemId: string, userId: string): Promise<{ status: string; errorCode: string | null }> {
     const item = await this.itemRepo
       .createQueryBuilder('item')
       .addSelect('item.accessToken')
@@ -259,6 +298,9 @@ export class PlaidService {
 
     const accessToken = decryptToken(item.accessToken, this.encKey);
     await this.runSync(item, accessToken);
+
+    const refreshed = await this.itemRepo.findOneBy({ id: plaidItemId });
+    return { status: refreshed?.status ?? item.status, errorCode: refreshed?.errorCode ?? null };
   }
 }
 

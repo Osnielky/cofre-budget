@@ -41,8 +41,7 @@ export class PlaidController {
   }
 
   @Post('reconnect/:itemId/complete')
-  async completeReconnect(@Param('itemId') itemId: string, @Request() req: any) {
-    await this.service.completeReconnect(itemId, req.user.id);
-    return { status: 'active' };
+  completeReconnect(@Param('itemId') itemId: string, @Request() req: any) {
+    return this.service.completeReconnect(itemId, req.user.id);
   }
 }
