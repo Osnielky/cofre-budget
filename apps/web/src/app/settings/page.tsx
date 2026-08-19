@@ -32,6 +32,7 @@ interface BankAccount {
   color: string;
   provider: string;
   plaidItemId: string | null;
+  plaidStatus?: string | null;
   last4?: string | null;
   txCount?: number;
 }
@@ -212,6 +213,8 @@ export default function SettingsPage() {
   const [importAccount, setImportAccount] = useState<BankAccount | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [linkMode, setLinkMode] = useState<'connect' | 'reconnect'>('connect');
+  const [reconnectItemId, setReconnectItemId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [typeOpen, setTypeOpen] = useState(false);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
@@ -260,9 +263,12 @@ export default function SettingsPage() {
 
   const openPlaidLink = async () => {
     setConnecting(true);
+    setLinkMode('connect');
     try {
       const res = await fetch(`${API}/plaid/link-token`, { method: 'POST', credentials: 'include' });
       const { link_token } = await res.json();
+      sessionStorage.setItem('plaidLinkToken', link_token);
+      sessionStorage.setItem('plaidLinkMode', 'connect');
       setLinkToken(link_token);
     } catch {
       setError('Could not open bank connection. Check your Plaid credentials.');
@@ -270,27 +276,57 @@ export default function SettingsPage() {
     }
   };
 
+  const openReconnect = async (account: BankAccount) => {
+    if (!account.plaidItemId) return;
+    setConnecting(true);
+    setLinkMode('reconnect');
+    setReconnectItemId(account.plaidItemId);
+    try {
+      const res = await fetch(`${API}/plaid/reconnect-token/${account.plaidItemId}`, { method: 'POST', credentials: 'include' });
+      const { link_token } = await res.json();
+      sessionStorage.setItem('plaidLinkToken', link_token);
+      sessionStorage.setItem('plaidLinkMode', 'reconnect');
+      sessionStorage.setItem('plaidReconnectItemId', account.plaidItemId);
+      setLinkToken(link_token);
+    } catch {
+      setError('Could not open bank reconnection.');
+      setConnecting(false);
+    }
+  };
+
   const onPlaidSuccess = useCallback(async (publicToken: string, metadata: any) => {
     setConnecting(true);
     try {
-      const res = await fetch(`${API}/plaid/exchange`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({
-          public_token: publicToken,
-          institution_id: metadata.institution?.institution_id ?? '',
-          institution_name: metadata.institution?.name ?? 'Unknown Bank',
-        }),
-      });
-      if (!res.ok) throw new Error();
-      const newAccounts: BankAccount[] = await res.json();
-      setAccounts((prev) => {
-        const ids = new Set(newAccounts.map((a) => a.id));
-        return [...prev.filter((a) => !ids.has(a.id)), ...newAccounts];
-      });
+      if (linkMode === 'reconnect' && reconnectItemId) {
+        await fetch(`${API}/plaid/reconnect/${reconnectItemId}/complete`, { method: 'POST', credentials: 'include' });
+        const res = await fetch(`${API}/bank-accounts`, { credentials: 'include' });
+        const data = await res.json();
+        setAccounts(Array.isArray(data) ? data : []);
+      } else {
+        const res = await fetch(`${API}/plaid/exchange`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({
+            public_token: publicToken,
+            institution_id: metadata.institution?.institution_id ?? '',
+            institution_name: metadata.institution?.name ?? 'Unknown Bank',
+          }),
+        });
+        if (!res.ok) throw new Error();
+        const newAccounts: BankAccount[] = await res.json();
+        setAccounts((prev) => {
+          const ids = new Set(newAccounts.map((a) => a.id));
+          return [...prev.filter((a) => !ids.has(a.id)), ...newAccounts];
+        });
+      }
     } catch {
-      setError('Bank connected but account import failed. Try syncing manually.');
-    } finally { setLinkToken(null); setConnecting(false); }
-  }, []);
+      setError(linkMode === 'reconnect' ? 'Reconnected, but refresh failed. Try syncing manually.' : 'Bank connected but account import failed. Try syncing manually.');
+    } finally {
+      setLinkToken(null); setConnecting(false); setReconnectItemId(null);
+      sessionStorage.removeItem('plaidLinkToken');
+      sessionStorage.removeItem('plaidLinkMode');
+      sessionStorage.removeItem('plaidReconnectItemId');
+    }
+  }, [linkMode, reconnectItemId]);
 
   const { open: openLink, ready: linkReady } = usePlaidLink({
     token: linkToken ?? '', onSuccess: onPlaidSuccess,
@@ -784,11 +820,19 @@ export default function SettingsPage() {
                               {meta.label}
                             </span>
                             {isConnected ? (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1"
-                                style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)' }}>
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-green)' }} />
-                                Synced
-                              </span>
+                              account.plaidStatus === 'error' ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1"
+                                  style={{ background: 'color-mix(in srgb, var(--color-rose) 12%, transparent)', color: 'var(--color-rose)' }}>
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-rose)' }} />
+                                  Needs reconnect
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1"
+                                  style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)' }}>
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-green)' }} />
+                                  Synced
+                                </span>
+                              )
                             ) : (
                               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
                                 style={{ background: 'color-mix(in srgb, var(--color-text-muted) 14%, transparent)', color: 'var(--color-text-muted)' }}>
@@ -824,12 +868,21 @@ export default function SettingsPage() {
                             <UploadIcon />
                           </button>
                           {isConnected && (
-                            <button onClick={() => handleSync(account)} disabled={syncingId === account.id}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40"
-                              style={{ color: syncingId === account.id ? 'var(--color-text-muted)' : 'var(--color-green)' }}
-                              title="Sync now">
-                              <SyncIcon spinning={syncingId === account.id} />
-                            </button>
+                            account.plaidStatus === 'error' ? (
+                              <button onClick={() => openReconnect(account)} disabled={connecting}
+                                className="px-2.5 h-8 rounded-lg flex items-center justify-center text-[11px] font-semibold transition-colors disabled:opacity-40"
+                                style={{ color: 'var(--color-rose)' }}
+                                title="Reconnect bank">
+                                Reconnect
+                              </button>
+                            ) : (
+                              <button onClick={() => handleSync(account)} disabled={syncingId === account.id}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40"
+                                style={{ color: syncingId === account.id ? 'var(--color-text-muted)' : 'var(--color-green)' }}
+                                title="Sync now">
+                                <SyncIcon spinning={syncingId === account.id} />
+                              </button>
+                            )
                           )}
                           <button onClick={() => openDeleteConfirm(account)} disabled={deletingId === account.id}
                             className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 disabled:opacity-40"
