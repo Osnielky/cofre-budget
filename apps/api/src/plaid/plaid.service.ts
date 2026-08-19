@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -219,6 +219,46 @@ export class PlaidService {
 
   findItemsByUser(userId: string): Promise<PlaidItem[]> {
     return this.itemRepo.find({ where: { userId }, order: { createdAt: 'ASC' } });
+  }
+
+  /* Update-mode link token: reuses the existing Item's access token so the user
+     re-authenticates the same connection instead of creating a new one. */
+  async createReconnectLinkToken(userId: string, plaidItemId: string): Promise<string> {
+    const item = await this.itemRepo
+      .createQueryBuilder('item')
+      .addSelect('item.accessToken')
+      .where('item.id = :plaidItemId AND item.userId = :userId', { plaidItemId, userId })
+      .getOne();
+    if (!item) throw new NotFoundException('Bank connection not found');
+
+    const accessToken = decryptToken(item.accessToken, this.encKey);
+    const webhook = this.config.get<string>('PLAID_WEBHOOK_URL');
+    const redirectUri = this.config.get<string>('PLAID_OAUTH_REDIRECT_URI');
+    const res = await this.client.linkTokenCreate({
+      user: { client_user_id: userId },
+      client_name: 'Cofre Budget',
+      access_token: accessToken,
+      country_codes: [CountryCode.Us],
+      language: 'en',
+      ...(webhook ? { webhook } : {}),
+      ...(redirectUri ? { redirect_uri: redirectUri } : {}),
+    });
+    return res.data.link_token;
+  }
+
+  /* Called after update-mode Link succeeds. A successful sync clears status/errorCode
+     back to 'active' on its own (see runSync), so there's no separate "clear error"
+     step — this just runs the sync that proves the reconnect worked. */
+  async completeReconnect(plaidItemId: string, userId: string): Promise<void> {
+    const item = await this.itemRepo
+      .createQueryBuilder('item')
+      .addSelect('item.accessToken')
+      .where('item.id = :plaidItemId AND item.userId = :userId', { plaidItemId, userId })
+      .getOne();
+    if (!item) throw new NotFoundException('Bank connection not found');
+
+    const accessToken = decryptToken(item.accessToken, this.encKey);
+    await this.runSync(item, accessToken);
   }
 }
 
