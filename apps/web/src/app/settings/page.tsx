@@ -266,6 +266,7 @@ export default function SettingsPage() {
     setLinkMode('connect');
     try {
       const res = await fetch(`${API}/plaid/link-token`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) throw new Error();
       const { link_token } = await res.json();
       sessionStorage.setItem('plaidLinkToken', link_token);
       sessionStorage.setItem('plaidLinkMode', 'connect');
@@ -283,6 +284,7 @@ export default function SettingsPage() {
     setReconnectItemId(account.plaidItemId);
     try {
       const res = await fetch(`${API}/plaid/reconnect-token/${account.plaidItemId}`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) throw new Error();
       const { link_token } = await res.json();
       sessionStorage.setItem('plaidLinkToken', link_token);
       sessionStorage.setItem('plaidLinkMode', 'reconnect');
@@ -298,7 +300,10 @@ export default function SettingsPage() {
     setConnecting(true);
     try {
       if (linkMode === 'reconnect' && reconnectItemId) {
-        await fetch(`${API}/plaid/reconnect/${reconnectItemId}/complete`, { method: 'POST', credentials: 'include' });
+        const completeRes = await fetch(`${API}/plaid/reconnect/${reconnectItemId}/complete`, { method: 'POST', credentials: 'include' });
+        if (!completeRes.ok) throw new Error();
+        const { status } = await completeRes.json();
+        if (status !== 'active') throw new Error();
         const res = await fetch(`${API}/bank-accounts`, { credentials: 'include' });
         const data = await res.json();
         setAccounts(Array.isArray(data) ? data : []);
@@ -330,7 +335,12 @@ export default function SettingsPage() {
 
   const { open: openLink, ready: linkReady } = usePlaidLink({
     token: linkToken ?? '', onSuccess: onPlaidSuccess,
-    onExit: () => { setLinkToken(null); setConnecting(false); },
+    onExit: () => {
+      setLinkToken(null); setConnecting(false); setReconnectItemId(null);
+      sessionStorage.removeItem('plaidLinkToken');
+      sessionStorage.removeItem('plaidLinkMode');
+      sessionStorage.removeItem('plaidReconnectItemId');
+    },
   });
 
   useEffect(() => { if (linkToken && linkReady) openLink(); }, [linkToken, linkReady, openLink]);
