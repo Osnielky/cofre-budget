@@ -5,12 +5,14 @@ import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { PlaidService } from './plaid.service';
 import { PlaidController } from './plaid.controller';
+import { PlaidWebhookController } from './plaid-webhook.controller';
+import { PlaidWebhookVerifierService } from './plaid-webhook-verifier.service';
 import { CategorizationRulesModule } from '../categorization-rules/categorization-rules.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([PlaidItem, BankAccount, Transaction]), CategorizationRulesModule],
-  providers: [PlaidService],
-  controllers: [PlaidController],
+  providers: [PlaidService, PlaidWebhookVerifierService],
+  controllers: [PlaidController, PlaidWebhookController],
   exports: [PlaidService],
 })
 export class PlaidModule {}
