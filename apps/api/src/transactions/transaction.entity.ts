@@ -46,7 +46,7 @@ export class Transaction {
   name: string;
 
   @Column({ nullable: true })
-  merchantName: string;
+  merchantName: string | null;
 
   /* User-assigned category */
   @Column({ nullable: true })

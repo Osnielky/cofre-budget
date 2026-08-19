@@ -152,7 +152,7 @@ export class PlaidService {
             existing.pending = pt.pending;
             existing.amount = -(pt.amount);
             existing.name = pt.name;
-            existing.merchantName = pt.merchant_name ?? undefined;
+            existing.merchantName = pt.merchant_name ?? null;
             existing.plaidCategory = pt.category ?? [];
             existing.date = pt.date;
             await this.txRepo.save(existing);
