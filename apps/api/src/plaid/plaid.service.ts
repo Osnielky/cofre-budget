@@ -16,6 +16,30 @@ import { User } from '../users/user.entity';
 import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.util';
 import { CategorizationRulesService } from '../categorization-rules/categorization-rules.service';
 
+export interface PreviewAccount {
+  plaidAccountId: string;
+  name: string;
+  mask: string | null;
+  subtype: string;
+  balance: number;
+  currency: string;
+  suggestedMatch: { id: string; accountName: string; lastTransactionDate: string | null } | null;
+}
+
+export interface PreviewExchangeResult {
+  plaidItemId: string;
+  institutionName: string;
+  hasManualAccounts: boolean;
+  accounts: PreviewAccount[];
+}
+
+export interface ExchangeDecision {
+  plaidAccountId: string;
+  action: 'new' | 'merge';
+  mergeIntoAccountId?: string;
+  cutoverDate?: string;
+}
+
 @Injectable()
 export class PlaidService {
   private readonly client: PlaidApi;
@@ -83,16 +107,21 @@ export class PlaidService {
     }
   }
 
-  async exchangeToken(
+  /* Step 1 of connecting a bank: exchanges the public token (so the PlaidItem exists
+     and is ready to sync) and reports back what Plaid returned, WITHOUT creating any
+     BankAccount rows yet. If the user has manual accounts, the frontend shows a review
+     step so a manual "Bank of America Checking" can be upgraded in place instead of
+     ending up duplicated alongside a new Plaid-connected one. Suggests a match by exact
+     bank name + last-4-digit mask; the user confirms or overrides via confirmExchange. */
+  async previewExchange(
     userId: string,
     publicToken: string,
     institutionId: string,
     institutionName: string,
-  ): Promise<BankAccount[]> {
+  ): Promise<PreviewExchangeResult> {
     const exchangeRes = await this.client.itemPublicTokenExchange({ public_token: publicToken });
     const { access_token, item_id } = exchangeRes.data;
 
-    /* Upsert PlaidItem (re-connecting same institution reuses the record) */
     let item = await this.itemRepo.findOneBy({ itemId: item_id });
     if (!item) {
       item = this.itemRepo.create({ userId, itemId: item_id, institutionId, institutionName });
@@ -100,34 +129,103 @@ export class PlaidService {
     item.accessToken = encryptToken(access_token, this.encKey);
     await this.itemRepo.save(item);
 
-    /* Fetch accounts from Plaid and create BankAccount records */
+    const manualAccounts = await this.accountRepo.find({ where: { userId, provider: 'manual' } });
     const balanceRes = await this.client.accountsBalanceGet({ access_token });
-    const accounts: BankAccount[] = [];
+    const accounts: PreviewAccount[] = [];
 
-    for (const plaidAccount of balanceRes.data.accounts) {
-      const existing = await this.accountRepo.findOneBy({ plaidAccountId: plaidAccount.account_id });
-      if (existing) {
-        existing.balance = plaidAccount.balances.current ?? existing.balance;
+    for (const pa of balanceRes.data.accounts) {
+      const mask = pa.mask ?? null;
+      const match = mask
+        ? manualAccounts.find(
+            (m) => m.bankName.trim().toLowerCase() === institutionName.trim().toLowerCase() && m.last4 === mask,
+          )
+        : undefined;
+
+      let lastTransactionDate: string | null = null;
+      if (match) {
+        const latest = await this.txRepo.findOne({ where: { bankAccountId: match.id }, order: { date: 'DESC' } });
+        lastTransactionDate = latest?.date ?? null;
+      }
+
+      accounts.push({
+        plaidAccountId: pa.account_id,
+        name: pa.name,
+        mask,
+        subtype: pa.subtype ?? '',
+        balance: pa.balances.current ?? 0,
+        currency: (pa.balances.iso_currency_code ?? 'USD').toUpperCase(),
+        suggestedMatch: match ? { id: match.id, accountName: match.accountName, lastTransactionDate } : null,
+      });
+    }
+
+    return {
+      plaidItemId: item.id,
+      institutionName,
+      hasManualAccounts: manualAccounts.length > 0,
+      accounts,
+    };
+  }
+
+  /* Step 2: applies the user's create-new/merge decisions from the preview, then runs
+     the initial sync. A merge decision upgrades the existing BankAccount row in place
+     (keeps its id, name, color, history — just attaches the Plaid connection) rather
+     than creating a duplicate. cutoverDate (per merged account) skips any Plaid
+     transaction older than the user's last manual entry for that account, so the
+     initial historical pull doesn't double up with what's already there. */
+  async confirmExchange(
+    userId: string,
+    plaidItemId: string,
+    decisions: ExchangeDecision[],
+  ): Promise<BankAccount[]> {
+    const item = await this.itemRepo
+      .createQueryBuilder('item')
+      .addSelect('item.accessToken')
+      .where('item.id = :plaidItemId AND item.userId = :userId', { plaidItemId, userId })
+      .getOne();
+    if (!item) throw new NotFoundException('Bank connection not found');
+
+    const accessToken = decryptToken(item.accessToken, this.encKey);
+    const balanceRes = await this.client.accountsBalanceGet({ access_token: accessToken });
+    const byId = new Map(balanceRes.data.accounts.map((a) => [a.account_id, a]));
+
+    const accounts: BankAccount[] = [];
+    const cutoverDates = new Map<string, string>();
+
+    for (const decision of decisions) {
+      const pa = byId.get(decision.plaidAccountId);
+      if (!pa) continue;
+
+      if (decision.action === 'merge' && decision.mergeIntoAccountId) {
+        const existing = await this.accountRepo.findOneBy({ id: decision.mergeIntoAccountId });
+        if (!existing || existing.userId !== userId || existing.provider !== 'manual') {
+          throw new NotFoundException('Account not found');
+        }
+
+        existing.provider = 'plaid';
+        existing.plaidItemId = item.id;
+        existing.plaidAccountId = pa.account_id;
+        existing.balance = pa.balances.current ?? existing.balance;
         accounts.push(await this.accountRepo.save(existing));
+
+        if (decision.cutoverDate) cutoverDates.set(pa.account_id, decision.cutoverDate);
         continue;
       }
 
       const account = this.accountRepo.create({
         userId,
-        bankName: institutionName,
-        accountName: plaidAccount.name,
-        accountType: mapPlaidSubtype(plaidAccount.subtype ?? ''),
-        balance: plaidAccount.balances.current ?? 0,
-        currency: (plaidAccount.balances.iso_currency_code ?? 'USD').toUpperCase(),
+        bankName: item.institutionName,
+        accountName: pa.name,
+        accountType: mapPlaidSubtype(pa.subtype ?? ''),
+        balance: pa.balances.current ?? 0,
+        currency: (pa.balances.iso_currency_code ?? 'USD').toUpperCase(),
         provider: 'plaid',
         plaidItemId: item.id,
-        plaidAccountId: plaidAccount.account_id,
+        plaidAccountId: pa.account_id,
       });
       accounts.push(await this.accountRepo.save(account));
     }
 
-    /* Kick off an initial transaction sync */
-    await this.runSync(item, access_token);
+    await this.runSync(item, accessToken, cutoverDates.size > 0 ? cutoverDates : undefined);
     return accounts;
   }
 
@@ -180,12 +278,23 @@ export class PlaidService {
      re-processes the same page, and every operation here (upsert-by-externalId,
      delete-by-externalId) is idempotent.
 
-     Guarded by syncsInFlight (keyed by Plaid's item_id) because exchangeToken's initial
+     Guarded by syncsInFlight (keyed by Plaid's item_id) because confirmExchange's initial
      sync can race a webhook-triggered sync for the same item (Plaid's webhook can arrive
      within seconds of the exchange completing, and redelivers on a ~10s timeout), and two
      concurrent runs would both try to insert the same new transaction and collide on the
-     (userId, externalId) unique index. */
-  private async runSync(item: PlaidItem, accessToken: string): Promise<void> {
+     (userId, externalId) unique index.
+
+     cutoverDates (Plaid account_id -> ISO date, only ever set by confirmExchange for a
+     merged manual account) skips inserting any transaction on that specific account
+     older than the date given — the account's own history before that point is already
+     covered by the manual entries it's being merged with. Keyed per-account, not per-item,
+     since one item can carry both a freshly-merged account (wants a cutover) and a
+     brand-new one (wants full history) in the same sync pass. */
+  private async runSync(
+    item: PlaidItem,
+    accessToken: string,
+    cutoverDates?: Map<string, string>,
+  ): Promise<void> {
     if (this.syncsInFlight.has(item.itemId)) {
       this.logger.warn(`Sync already in flight for item ${item.itemId} — skipping this trigger`);
       return;
@@ -228,6 +337,9 @@ export class PlaidService {
             await this.txRepo.save(existing);
             continue;
           }
+
+          const cutoff = cutoverDates?.get(pt.account_id);
+          if (cutoff && pt.date < cutoff) continue;
 
           const matchedRule = this.rulesService.matchRule(rules, { merchantName: pt.merchant_name, name: pt.name });
           await this.txRepo.save(

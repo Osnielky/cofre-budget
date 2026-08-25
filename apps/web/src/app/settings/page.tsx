@@ -12,6 +12,7 @@ import AccountSettings from '@/components/AccountSettings';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import DataResetModal from '@/components/DataResetModal';
+import PlaidMergeReviewModal, { PreviewExchangeResult } from '@/components/PlaidMergeReviewModal';
 import IntegrationsTab from '@/components/IntegrationsTab';
 import { useTheme } from '@/components/ThemeProvider';
 import { THEMES } from '@/lib/theme';
@@ -215,6 +216,7 @@ export default function SettingsPage() {
   const [connecting, setConnecting] = useState(false);
   const [linkMode, setLinkMode] = useState<'connect' | 'reconnect'>('connect');
   const [reconnectItemId, setReconnectItemId] = useState<string | null>(null);
+  const [mergeReview, setMergeReview] = useState<PreviewExchangeResult | null>(null);
   const [error, setError] = useState('');
   const [typeOpen, setTypeOpen] = useState(false);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
@@ -308,7 +310,7 @@ export default function SettingsPage() {
         const data = await res.json();
         setAccounts(Array.isArray(data) ? data : []);
       } else {
-        const res = await fetch(`${API}/plaid/exchange`, {
+        const res = await fetch(`${API}/plaid/exchange/preview`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
           body: JSON.stringify({
             public_token: publicToken,
@@ -317,11 +319,27 @@ export default function SettingsPage() {
           }),
         });
         if (!res.ok) throw new Error();
-        const newAccounts: BankAccount[] = await res.json();
-        setAccounts((prev) => {
-          const ids = new Set(newAccounts.map((a) => a.id));
-          return [...prev.filter((a) => !ids.has(a.id)), ...newAccounts];
-        });
+        const preview: PreviewExchangeResult = await res.json();
+
+        if (preview.hasManualAccounts) {
+          /* Let the user match to an existing manual account before creating anything —
+             handled by the modal itself, which calls /plaid/exchange/confirm on submit. */
+          setMergeReview(preview);
+        } else {
+          const confirmRes = await fetch(`${API}/plaid/exchange/confirm`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+            body: JSON.stringify({
+              plaid_item_id: preview.plaidItemId,
+              decisions: preview.accounts.map((a) => ({ plaidAccountId: a.plaidAccountId, action: 'new' })),
+            }),
+          });
+          if (!confirmRes.ok) throw new Error();
+          const newAccounts: BankAccount[] = await confirmRes.json();
+          setAccounts((prev) => {
+            const ids = new Set(newAccounts.map((a) => a.id));
+            return [...prev.filter((a) => !ids.has(a.id)), ...newAccounts];
+          });
+        }
       }
     } catch {
       setError(linkMode === 'reconnect' ? 'Reconnected, but refresh failed. Try syncing manually.' : 'Bank connected but account import failed. Try syncing manually.');
@@ -1045,6 +1063,21 @@ export default function SettingsPage() {
           </div>
         </div>,
         document.body,
+      )}
+
+      {mergeReview && (
+        <PlaidMergeReviewModal
+          plaidItemId={mergeReview.plaidItemId}
+          institutionName={mergeReview.institutionName}
+          plaidAccounts={mergeReview.accounts}
+          manualAccounts={accounts.filter((a) => a.provider === 'manual')}
+          onClose={() => setMergeReview(null)}
+          onDone={(newAccounts: BankAccount[]) => {
+            setMergeReview(null);
+            const ids = new Set(newAccounts.map((a) => a.id));
+            setAccounts((prev) => [...prev.filter((a) => !ids.has(a.id)), ...newAccounts]);
+          }}
+        />
       )}
 
       {showResetModal && (

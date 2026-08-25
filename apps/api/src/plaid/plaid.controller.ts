@@ -2,7 +2,7 @@ import { Controller, Post, Body, Param, UseGuards, Request } from '@nestjs/commo
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PlanGuard } from '../auth/guards/plan.guard';
 import { RequiresPlan } from '../auth/decorators/require-plan.decorator';
-import { PlaidService } from './plaid.service';
+import { PlaidService, ExchangeDecision } from './plaid.service';
 
 @UseGuards(JwtAuthGuard, PlanGuard)
 @RequiresPlan('pro')
@@ -16,17 +16,25 @@ export class PlaidController {
     return { link_token: linkToken };
   }
 
-  @Post('exchange')
-  exchange(
+  @Post('exchange/preview')
+  previewExchange(
     @Request() req: any,
     @Body() body: { public_token: string; institution_id: string; institution_name: string },
   ) {
-    return this.service.exchangeToken(
+    return this.service.previewExchange(
       req.user.id,
       body.public_token,
       body.institution_id,
       body.institution_name,
     );
+  }
+
+  @Post('exchange/confirm')
+  confirmExchange(
+    @Request() req: any,
+    @Body() body: { plaid_item_id: string; decisions: ExchangeDecision[] },
+  ) {
+    return this.service.confirmExchange(req.user.id, body.plaid_item_id, body.decisions);
   }
 
   @Post('sync/:itemId')
