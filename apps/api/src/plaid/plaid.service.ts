@@ -12,6 +12,7 @@ import {
 import { PlaidItem } from './plaid-item.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { User } from '../users/user.entity';
 import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.util';
 import { CategorizationRulesService } from '../categorization-rules/categorization-rules.service';
 
@@ -27,6 +28,7 @@ export class PlaidService {
     @InjectRepository(PlaidItem) private itemRepo: Repository<PlaidItem>,
     @InjectRepository(BankAccount) private accountRepo: Repository<BankAccount>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
+    @InjectRepository(User) private userRepo: Repository<User>,
     private rulesService: CategorizationRulesService,
   ) {
     const secret = this.config.get<string>('JWT_SECRET');
@@ -45,19 +47,40 @@ export class PlaidService {
     this.client = new PlaidApi(cfg);
   }
 
+  /* Plaid's newer User API: integrations approved after Dec 10, 2025 must pass
+     `user_id` (from /user/create) to linkTokenCreate — the legacy `user: {client_user_id}`
+     field alone is rejected with a 400 for these accounts. Cached on the User row since
+     it's a persistent identity, not per-Item. */
+  private async getOrCreatePlaidUserId(userId: string): Promise<string> {
+    const user = await this.userRepo.findOneBy({ id: userId });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.plaidUserId) return user.plaidUserId;
+
+    const res = await this.client.userCreate({ client_user_id: userId });
+    user.plaidUserId = res.data.user_id;
+    await this.userRepo.save(user);
+    return user.plaidUserId;
+  }
+
   async createLinkToken(userId: string): Promise<string> {
+    const plaidUserId = await this.getOrCreatePlaidUserId(userId);
     const webhook = this.config.get<string>('PLAID_WEBHOOK_URL');
     const redirectUri = this.config.get<string>('PLAID_OAUTH_REDIRECT_URI');
-    const res = await this.client.linkTokenCreate({
-      user: { client_user_id: userId },
-      client_name: 'Cofre Budget',
-      products: [Products.Transactions],
-      country_codes: [CountryCode.Us],
-      language: 'en',
-      ...(webhook ? { webhook } : {}),
-      ...(redirectUri ? { redirect_uri: redirectUri } : {}),
-    });
-    return res.data.link_token;
+    try {
+      const res = await this.client.linkTokenCreate({
+        user_id: plaidUserId,
+        client_name: 'Cofre Budget',
+        products: [Products.Transactions],
+        country_codes: [CountryCode.Us],
+        language: 'en',
+        ...(webhook ? { webhook } : {}),
+        ...(redirectUri ? { redirect_uri: redirectUri } : {}),
+      });
+      return res.data.link_token;
+    } catch (err) {
+      this.logger.error('linkTokenCreate failed', (err as any)?.response?.data ?? err);
+      throw err;
+    }
   }
 
   async exchangeToken(
@@ -294,18 +317,24 @@ export class PlaidService {
     if (!item) throw new NotFoundException('Bank connection not found');
 
     const accessToken = decryptToken(item.accessToken, this.encKey);
+    const plaidUserId = await this.getOrCreatePlaidUserId(userId);
     const webhook = this.config.get<string>('PLAID_WEBHOOK_URL');
     const redirectUri = this.config.get<string>('PLAID_OAUTH_REDIRECT_URI');
-    const res = await this.client.linkTokenCreate({
-      user: { client_user_id: userId },
-      client_name: 'Cofre Budget',
-      access_token: accessToken,
-      country_codes: [CountryCode.Us],
-      language: 'en',
-      ...(webhook ? { webhook } : {}),
-      ...(redirectUri ? { redirect_uri: redirectUri } : {}),
-    });
-    return res.data.link_token;
+    try {
+      const res = await this.client.linkTokenCreate({
+        user_id: plaidUserId,
+        client_name: 'Cofre Budget',
+        access_token: accessToken,
+        country_codes: [CountryCode.Us],
+        language: 'en',
+        ...(webhook ? { webhook } : {}),
+        ...(redirectUri ? { redirect_uri: redirectUri } : {}),
+      });
+      return res.data.link_token;
+    } catch (err) {
+      this.logger.error('linkTokenCreate (reconnect) failed', (err as any)?.response?.data ?? err);
+      throw err;
+    }
   }
 
   /* Called after update-mode Link succeeds. A successful sync clears status/errorCode

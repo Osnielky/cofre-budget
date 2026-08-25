@@ -41,6 +41,13 @@ export class User {
   @Column({ default: false })
   emailVerified: boolean;
 
+  /* Plaid's persistent user identifier (from /user/create) — required by
+     linkTokenCreate's `user_id` field for integrations approved after Dec 10, 2025
+     (see PlaidService.getOrCreatePlaidUserId). Null until the user's first Plaid
+     connection attempt. */
+  @Column({ type: 'varchar', nullable: true, default: null })
+  plaidUserId: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 
