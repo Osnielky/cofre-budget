@@ -36,7 +36,11 @@ steps:
   # ~110 pre-existing lint findings unrelated to any given change, so failing
   # the build on those would brick every deploy until they're all cleaned up. ──
   - id: verify
-    name: gcr.io/cloud-builders/npm
+    # gcr.io/cloud-builders/npm is pinned to an old, unmaintained Node version —
+    # too old for Vitest 4's rolldown dependency, which requires Node 20.19+,
+    # 22.12+, or 24+ (node:util.styleText doesn't exist on older Node, causing a
+    # SyntaxError at startup). Match the Node major version used locally.
+    name: node:24-slim
     entrypoint: bash
     waitFor: ['-']
     args:
