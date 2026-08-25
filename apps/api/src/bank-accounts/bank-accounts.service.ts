@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { BankAccount } from './bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { PlaidItem } from '../plaid/plaid-item.entity';
+import { PlaidService } from '../plaid/plaid.service';
 import { CreateBankAccountDto } from './dto/create-bank-account.dto';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class BankAccountsService {
     private txRepo: Repository<Transaction>,
     @InjectRepository(PlaidItem)
     private plaidItemRepo: Repository<PlaidItem>,
+    private plaidService: PlaidService,
   ) {}
 
   /** Number of transactions booked to this account (ownership-checked). */
@@ -72,6 +74,16 @@ export class BankAccountsService {
     if (deleteTransactions) {
       await this.txRepo.delete({ bankAccountId: id });
     }
+    const { plaidItemId } = account;
     await this.repo.remove(account);
+
+    /* An Item can back multiple accounts (e.g. checking + savings) — only tell Plaid
+       to remove it once none of them reference it any more. */
+    if (plaidItemId) {
+      const remaining = await this.repo.count({ where: { plaidItemId } });
+      if (remaining === 0) {
+        await this.plaidService.removeItem(plaidItemId, userId);
+      }
+    }
   }
 }

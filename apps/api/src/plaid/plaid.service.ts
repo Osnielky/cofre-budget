@@ -259,6 +259,30 @@ export class PlaidService {
     return this.itemRepo.find({ where: { userId }, order: { createdAt: 'ASC' } });
   }
 
+  /* Called once no BankAccount references this item any more (a user disconnected the
+     last account under it, or deleted their own Cofre account). Tells Plaid to actually
+     terminate the item — otherwise it keeps syncing and billing indefinitely even though
+     the user disconnected it. Scoped by userId so one user can't remove another's
+     connection. If the Plaid call fails, the local row is left in place rather than
+     deleted, so a later attempt can retry — deleting it here would strand the encrypted
+     access token needed to ever call this again. */
+  async removeItem(plaidItemId: string, userId: string): Promise<void> {
+    const item = await this.itemRepo
+      .createQueryBuilder('item')
+      .addSelect('item.accessToken')
+      .where('item.id = :plaidItemId AND item.userId = :userId', { plaidItemId, userId })
+      .getOne();
+    if (!item) return;
+
+    try {
+      const accessToken = decryptToken(item.accessToken, this.encKey);
+      await this.client.itemRemove({ access_token: accessToken });
+      await this.itemRepo.remove(item);
+    } catch (err) {
+      this.logger.error(`Failed to remove Plaid item ${item.itemId}`, err);
+    }
+  }
+
   /* Update-mode link token: reuses the existing Item's access token so the user
      re-authenticates the same connection instead of creating a new one. */
   async createReconnectLinkToken(userId: string, plaidItemId: string): Promise<string> {

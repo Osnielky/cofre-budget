@@ -3,11 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BankAccount } from './bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { PlaidItem } from '../plaid/plaid-item.entity';
+import { PlaidModule } from '../plaid/plaid.module';
 import { BankAccountsService } from './bank-accounts.service';
 import { BankAccountsController } from './bank-accounts.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([BankAccount, Transaction, PlaidItem])],
+  imports: [TypeOrmModule.forFeature([BankAccount, Transaction, PlaidItem]), PlaidModule],
   providers: [BankAccountsService],
   controllers: [BankAccountsController],
   exports: [BankAccountsService],
