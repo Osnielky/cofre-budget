@@ -60,7 +60,7 @@ function greeting() {
 }
 
 export default function DashboardPage() {
-  const { month, setMonth, transactions, yearTx, accounts, budgets, projects, debts, loading } = useDashboardData();
+  const { month, setMonth, transactions, yearTx, accounts, budgets, projects, debts, loading, error, reload } = useDashboardData();
   const { user } = useUser();
   const tc = useThemeColors();
   const now = new Date();
@@ -185,6 +185,17 @@ export default function DashboardPage() {
               </Link>
             </div>
           </div>
+
+          {/* ── Error banner ── */}
+          {error && (
+            <div className="flex items-center justify-between gap-4 rounded-2xl px-5 py-3.5 flex-wrap"
+              style={{ background: 'rgba(255, 107, 107, 0.08)', border: '1px solid rgba(255, 107, 107, 0.25)' }}>
+              <span className="text-sm" style={{ color: 'var(--color-rose)' }}>{error}</span>
+              <button onClick={reload} className="text-xs font-semibold uppercase cursor-pointer" style={{ color: 'var(--color-rose)', letterSpacing: '0.1em' }}>
+                Retry
+              </button>
+            </div>
+          )}
 
           {/* ── Stat cards ── */}
           <StatCardsRow cards={statCards} loading={loading} />

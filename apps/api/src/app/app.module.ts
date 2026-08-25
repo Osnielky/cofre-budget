@@ -18,6 +18,7 @@ import { GmailModule } from '../gmail/gmail.module';
 import { ReceiptsModule } from '../receipts/receipts.module';
 import { CategorizationRulesModule } from '../categorization-rules/categorization-rules.module';
 import { NetWorthGoalModule } from '../net-worth-goal/net-worth-goal.module';
+import { HealthController } from '../health/health.controller';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { NetWorthGoalModule } from '../net-worth-goal/net-worth-goal.module';
     CategorizationRulesModule,
     NetWorthGoalModule,
   ],
+  controllers: [HealthController],
   providers: [
     // Apply ThrottlerGuard globally — all routes inherit the 100 req/min default
     { provide: APP_GUARD, useClass: ThrottlerGuard },

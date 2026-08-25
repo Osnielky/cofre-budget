@@ -31,6 +31,23 @@ substitutions:
   _API_PROXY_URL: https://cofre-api-193134215805.us-central1.run.app
 
 steps:
+  # ── Gate: unit tests must pass before anything is built or deployed. Lint
+  # also runs for visibility but doesn't block — the repo currently carries
+  # ~110 pre-existing lint findings unrelated to any given change, so failing
+  # the build on those would brick every deploy until they're all cleaned up. ──
+  - id: verify
+    name: gcr.io/cloud-builders/npm
+    entrypoint: bash
+    waitFor: ['-']
+    args:
+      - -c
+      - |
+        set -e
+        npm install
+        npx nx run-many -t lint --projects=api,web || true
+        npm run test:api
+        npm run test:dashboard
+
   # ── Build images (parallel; web bakes in the static API proxy URL) ──
   # Each pulls the previous :latest and builds with --cache-from, so when
   # package*.json is unchanged Docker reuses the npm-install layer instead of
@@ -38,7 +55,7 @@ steps:
   - id: build-api
     name: gcr.io/cloud-builders/docker
     entrypoint: bash
-    waitFor: ['-']
+    waitFor: ['verify']
     args:
       - -c
       - |
@@ -52,7 +69,7 @@ steps:
   - id: build-web
     name: gcr.io/cloud-builders/docker
     entrypoint: bash
-    waitFor: ['-']
+    waitFor: ['verify']
     args:
       - -c
       - |
