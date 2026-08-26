@@ -49,7 +49,7 @@ export function Legend({ items }: { items: { label: string; color: string; line?
 }
 
 /** Standard empty state used by every panel. */
-export function PanelEmpty({ message }: { message: string }) {
+export function PanelEmpty({ message }: { message: React.ReactNode }) {
   return (
     <div className="flex-1 min-h-32 flex items-center justify-center text-xs text-center px-4"
       style={{ color: 'var(--color-text-muted)' }}>

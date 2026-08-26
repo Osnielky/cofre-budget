@@ -32,9 +32,11 @@ export class NetWorthGoalService {
     ]);
     const assetAccts = accounts.filter((a) => !isLiabilityType(a.accountType));
     const liabAccts = accounts.filter((a) => isLiabilityType(a.accountType));
-    const receivables = debts.filter((d) => d.status === 'open').reduce((s, d) => s + Number(d.remaining), 0);
+    const openDebts = debts.filter((d) => d.status === 'open');
+    const receivables = openDebts.filter((d) => d.direction === 'lent').reduce((s, d) => s + Number(d.remaining), 0);
+    const payables = openDebts.filter((d) => d.direction === 'owed').reduce((s, d) => s + Number(d.remaining), 0);
     const assets = assetAccts.reduce((s, a) => s + Number(a.balance), 0) + receivables;
-    const liabilities = liabAccts.reduce((s, a) => s + Math.abs(Number(a.balance)), 0);
+    const liabilities = liabAccts.reduce((s, a) => s + Math.abs(Number(a.balance)), 0) + payables;
     return +(assets - liabilities).toFixed(2);
   }
 

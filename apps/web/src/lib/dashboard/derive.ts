@@ -1,4 +1,4 @@
-import { isTrackingAccount, isLiability } from '@/lib/accountTypes';
+import { isTrackingAccount, isLiability, accountTypeMeta } from '@/lib/accountTypes';
 import type { Transaction, Budget, BankAccount, Debt } from './types';
 
 /** Transfers between own accounts + debt repayments — excluded everywhere. */
@@ -208,13 +208,15 @@ export interface NetWorthItem { label: string; value: number; color: string }
 export interface NetWorthBreakdown {
   total: number; assets: number; liabilities: number;
   assetItems: NetWorthItem[]; liabilityItems: NetWorthItem[]; deltaPct: number | null;
+  monthNet: number;
 }
 
 /**
  * Reproduces the net-worth math from `apps/web/src/app/dashboard/page.tsx`:
  *   totalBalance = Σ(asset balances) − Σ|liability balances|
- *   receivables  = Σ(open debts' remaining)
- *   netWorth     = totalBalance + receivables  ≡  totalAssets − totalDebt
+ *   receivables  = Σ(open 'lent' debts' remaining)      — an asset
+ *   payables     = Σ(open 'owed' debts' remaining)      — a liability
+ *   netWorth     = totalBalance + receivables − payables
  * Liability balances are taken by magnitude (Math.abs), matching the page's
  * `isDebtAcc(a) ? -Math.abs(balance) : balance` — sign convention in the DB
  * must not change the reported debt.
@@ -224,9 +226,11 @@ export function netWorthBreakdown(
 ): NetWorthBreakdown {
   const assetAccts = accounts.filter((a) => !isLiability(a.accountType));
   const liabAccts  = accounts.filter((a) => isLiability(a.accountType));
-  const receivables = debts.filter((d) => d.status === 'open').reduce((s, d) => s + Number(d.remaining), 0);
+  const openDebts = debts.filter((d) => d.status === 'open');
+  const receivables = openDebts.filter((d) => d.direction === 'lent').reduce((s, d) => s + Number(d.remaining), 0);
+  const payables = openDebts.filter((d) => d.direction === 'owed').reduce((s, d) => s + Number(d.remaining), 0);
   const assets = +(assetAccts.reduce((s, a) => s + Number(a.balance), 0) + receivables).toFixed(2);
-  const liabilities = +liabAccts.reduce((s, a) => s + Math.abs(Number(a.balance)), 0).toFixed(2);
+  const liabilities = +(liabAccts.reduce((s, a) => s + Math.abs(Number(a.balance)), 0) + payables).toFixed(2);
   const total = +(assets - liabilities).toFixed(2);
   const monthNet = txInMonth(yearTx, monthKey).filter(inCashFlow)
     .reduce((s, t) => s + Number(t.amount), 0);
@@ -235,12 +239,86 @@ export function netWorthBreakdown(
     ...assetAccts.map((a) => ({ label: a.accountName, value: Number(a.balance), color: a.color })),
     ...(receivables > 0 ? [{ label: 'Owed to you', value: receivables, color: '#6B6B8A' }] : []),
   ];
+  const liabilityItems: NetWorthItem[] = [
+    ...liabAccts.map((a) => ({ label: a.accountName, value: Math.abs(Number(a.balance)), color: a.color })),
+    ...(payables > 0 ? [{ label: 'Debts you owe', value: payables, color: '#6B6B8A' }] : []),
+  ];
   return {
     total, assets, liabilities,
-    assetItems,
-    liabilityItems: liabAccts.map((a) => ({ label: a.accountName, value: Math.abs(Number(a.balance)), color: a.color })),
+    assetItems, liabilityItems,
     deltaPct: base > 0 ? +((monthNet / base) * 100).toFixed(1) : null,
+    monthNet: +monthNet.toFixed(2),
   };
+}
+
+export interface AssetMixAccount { id: string; label: string; value: number }
+export interface AssetMixGroup {
+  key: string; label: string; icon: string; value: number; pct: number; accounts: AssetMixAccount[];
+}
+
+const RECEIVABLES_GROUP_KEY = 'receivables';
+
+/**
+ * Groups asset accounts by their account type (Checking, Savings, Investment
+ * Account, …) plus a synthetic "Money owed to you" group for open debts
+ * receivable — the finest breakdown the data model supports, since accounts
+ * are the only real "asset" records in this app (no separate asset entity).
+ */
+export function assetMix(accounts: BankAccount[], debts: Debt[]): AssetMixGroup[] {
+  const assetAccts = accounts.filter((a) => !isLiability(a.accountType));
+  const groups = new Map<string, AssetMixGroup>();
+  for (const a of assetAccts) {
+    const meta = accountTypeMeta(a.accountType);
+    const key = meta.value;
+    const group = groups.get(key) ?? { key, label: meta.label, icon: meta.icon, value: 0, pct: 0, accounts: [] };
+    group.value = +(group.value + Number(a.balance)).toFixed(2);
+    group.accounts.push({ id: a.id, label: a.accountName, value: Number(a.balance) });
+    groups.set(key, group);
+  }
+  const openReceivables = debts.filter((d) => d.status === 'open' && d.direction === 'lent');
+  const receivables = openReceivables.reduce((s, d) => s + Number(d.remaining), 0);
+  if (receivables > 0) {
+    groups.set(RECEIVABLES_GROUP_KEY, {
+      key: RECEIVABLES_GROUP_KEY, label: 'Money owed to you', icon: '🤝',
+      value: +receivables.toFixed(2), pct: 0,
+      accounts: openReceivables.map((d, i) => ({ id: `debt-${i}`, label: 'Owed to you', value: Number(d.remaining) })),
+    });
+  }
+  const list = [...groups.values()].sort((a, b) => b.value - a.value);
+  const total = list.reduce((s, g) => s + g.value, 0);
+  for (const g of list) {
+    g.pct = total > 0 ? +((g.value / total) * 100).toFixed(1) : 0;
+    g.accounts.sort((a, b) => b.value - a.value);
+  }
+  return list;
+}
+
+const TREND_MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+export interface NetWorthTrendPoint { month: string; value: number }
+
+/**
+ * Approximate net-worth-over-time sparkline: walks backward from `current`
+ * by each month's net cash flow (the same approximation the net-worth-goal
+ * pace math already relies on). Capped to the current calendar year, since
+ * `yearTx` only covers Jan 1 → today.
+ */
+export function netWorthTrend(current: number, yearTx: Transaction[], now: Date, months = 6): NetWorthTrendPoint[] {
+  const year = now.getFullYear();
+  const end = now.getMonth();
+  const start = Math.max(0, end - months + 1);
+  const netByMonth: number[] = [];
+  for (let i = start; i <= end; i++) {
+    const mk = `${year}-${String(i + 1).padStart(2, '0')}`;
+    netByMonth.push(txInMonth(yearTx, mk).filter(inCashFlow).reduce((s, t) => s + Number(t.amount), 0));
+  }
+  const points: NetWorthTrendPoint[] = [];
+  let value = current;
+  for (let k = netByMonth.length - 1; k >= 0; k--) {
+    points.unshift({ month: TREND_MONTHS_SHORT[start + k], value: +value.toFixed(2) });
+    value -= netByMonth[k];
+  }
+  return points;
 }
 
 export interface DailyPoint { day: number; income: number; expenses: number; net: number }
