@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import Sidebar from '@/components/Sidebar';
+import Avatar from '@/components/Avatar';
+import { useUser } from '@/components/UserProvider';
 import CsvImportModal from '@/components/CsvImportModal';
 import ImportReconcileModal from '@/components/ImportReconcileModal';
 import BankSelect, { BANKS } from '@/components/BankSelect';
@@ -48,7 +50,8 @@ type RangeMode = 'month' | 'custom';
 type RuleToast =
   | { kind: 'created'; matchLabel: string; appliedCount: number }
   | { kind: 'duplicate'; matchLabel: string }
-  | { kind: 'error'; matchLabel: string; reason?: string };
+  | { kind: 'error'; matchLabel: string; reason?: string }
+  | { kind: 'categorized'; tx: Transaction; categoryId: string; categoryLabel: string; categoryIcon?: string };
 
 const glass: React.CSSProperties = {
   background: 'var(--color-surface)',
@@ -91,6 +94,7 @@ const TYPE_META: Record<string, string> = { savings: '🏦', investment: '📈',
 
 /* ═══════════════════════════════════════════════════════════════ */
 export default function TransactionsPage() {
+  const { user } = useUser();
   const [month, setMonth]           = useState(currentMonth);
   const [rangeMode, setRangeMode]   = useState<RangeMode>('month');
   const [customFrom, setCustomFrom] = useState('');
@@ -100,6 +104,7 @@ export default function TransactionsPage() {
   const [prevTransactions, setPrevTransactions] = useState<Transaction[]>([]);
   const [sortMode, setSortMode] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
   const [accountFilter, setAccountFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [categories, setCategories]     = useState<Category[]>([]);
   const [accounts, setAccounts]         = useState<BankAccount[]>([]);
   const [projects, setProjects]         = useState<Project[]>([]);
@@ -125,11 +130,12 @@ export default function TransactionsPage() {
   const [pickerShowPurchasePrompt, setPickerShowPurchasePrompt] = useState(false);
   const [pickerTransferStep, setPickerTransferStep]   = useState(false);
   const [pickerSearch, setPickerSearch]               = useState('');
-  const [justCategorizedId, setJustCategorizedId]     = useState<string | null>(null);
-  const [ruleMenuTxId, setRuleMenuTxId] = useState<string | null>(null);
-  const [ruleMenuPos, setRuleMenuPos]   = useState<{ top: number; left: number } | null>(null);
+  const [rowMenuTxId, setRowMenuTxId] = useState<string | null>(null);
+  const [rowMenuPos, setRowMenuPos]   = useState<{ top: number; left: number } | null>(null);
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
-  const ruleMenuRef = useRef<HTMLDivElement>(null);
+  const rowMenuRef = useRef<HTMLDivElement>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
   const [transferMatches, setTransferMatches]         = useState<TransferMatch[]>([]);
   const [transferMatchesLoading, setTransferMatchesLoading] = useState(false);
   const [linkingProj, setLinkingProj]                 = useState(false);
@@ -303,13 +309,24 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     function onDown(e: MouseEvent) {
-      if (ruleMenuTxId && ruleMenuRef.current && !ruleMenuRef.current.contains(e.target as Node)) {
-        setRuleMenuTxId(null);
+      if (rowMenuTxId && rowMenuRef.current && !rowMenuRef.current.contains(e.target as Node)) {
+        setRowMenuTxId(null);
+        setDeleteConfirmId(null);
       }
     }
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
-  }, [ruleMenuTxId]);
+  }, [rowMenuTxId]);
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (notifOpen && notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [notifOpen]);
 
   /* ── category assign ──
      Returns true if the assignment request succeeded, false otherwise, so
@@ -367,10 +384,13 @@ export default function TransactionsPage() {
       }
     }
     setUpdatingId(null);
-    if (categoryId) {
-      setJustCategorizedId(updated.categoryRef && updated.categoryRef.type !== 'transfer' ? txId : null);
+    if (categoryId && updated.categoryRef && updated.categoryRef.type !== 'transfer') {
+      if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current);
+      const mergedTx: Transaction = { ...(txBefore as Transaction), ...updated };
+      setRuleToast({ kind: 'categorized', tx: mergedTx, categoryId, categoryLabel: updated.categoryRef.name, categoryIcon: updated.categoryRef.icon });
+      ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
     } else {
-      setJustCategorizedId((prev) => (prev === txId ? null : prev));
+      setRuleToast((prev) => (prev?.kind === 'categorized' && prev.tx.id === txId ? null : prev));
     }
     return true;
   }
@@ -399,7 +419,7 @@ export default function TransactionsPage() {
   }
 
   async function uncategorizeOne(tx: Transaction) {
-    setRuleMenuTxId(null);
+    setRowMenuTxId(null);
     await assignCategory(tx.id, null);
   }
 
@@ -407,7 +427,7 @@ export default function TransactionsPage() {
     if (!tx.categorizedByRuleId) return;
     const matchLabel = tx.categorizedByRule?.matchValue || tx.merchantName || tx.name;
     setDeletingRuleId(tx.categorizedByRuleId);
-    setRuleMenuTxId(null);
+    setRowMenuTxId(null);
     const res = await fetch(`${API}/categorization-rules/${tx.categorizedByRuleId}`, { method: 'DELETE', credentials: 'include' });
     setDeletingRuleId(null);
     if (!res.ok) {
@@ -701,11 +721,12 @@ export default function TransactionsPage() {
 
   const isRecurringTx = (t: Transaction) => Number(t.amount) < 0 && recurringMap.has(normalize(t.name));
   const visible = transactions.filter((t) => {
-    if (filter === 'uncategorized' && justCategorizedId !== t.id && (t.categoryId || t.projectId || isTransfer(t))) return false;
+    if (filter === 'uncategorized' && (t.categoryId || t.projectId || isTransfer(t))) return false;
     if (filter === 'expense'       && (Number(t.amount) >= 0 || isTransfer(t))) return false;
     if (filter === 'income'        && (Number(t.amount) < 0  || isTransfer(t))) return false;
     if (filter === 'recurring'     && !isRecurringTx(t)) return false;
     if (accountFilter !== 'all'    && t.bankAccountId !== accountFilter) return false;
+    if (categoryFilter !== 'all'   && t.categoryId !== categoryFilter) return false;
     if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -761,14 +782,39 @@ export default function TransactionsPage() {
 
       <main className="flex-1 overflow-y-auto min-w-0 pt-14 md:pt-0">
 
-        {/* ── Sticky header ── */}
-        <div className="sticky top-14 md:top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-4"
+        {/* ── Sticky header (desktop only — too tall to pin on narrow viewports) ── */}
+        <div className="md:sticky md:top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-4"
           style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
 
           {/* Title + actions */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Track, review and organize your money</p>
+            </div>
             <div className="flex items-center gap-2">
+              {/* Notifications */}
+              <div className="relative" ref={notifRef}>
+                <button onClick={() => setNotifOpen((v) => !v)}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
+                  style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+                  title="Notifications">
+                  <BellIcon />
+                </button>
+                {notifOpen && (
+                  <div className="absolute right-0 top-full mt-2 z-30 rounded-2xl overflow-hidden"
+                    style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', width: '260px' }}>
+                    <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <p className="text-sm font-semibold">Notifications</p>
+                    </div>
+                    <div className="px-4 py-6 text-center">
+                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No notifications yet</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Avatar */}
+              <Avatar name={user?.name} email={user?.email} src={user?.avatarUrl} size={32} rounded={12} />
               {/* New manual transaction */}
               <button onClick={() => { setManualTxError(''); setShowManualTx(true); }}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
@@ -1055,34 +1101,13 @@ export default function TransactionsPage() {
             loading={loading}
           />
 
-          {/* ── Uncategorized alert ── */}
-          {!loading && uncategorizedCount > 0 && (
-            <button onClick={() => setFilter('uncategorized')}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-left w-full transition-opacity hover:opacity-80"
-              style={{ background: 'color-mix(in srgb, var(--color-amber) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 25%, transparent)' }}>
-              <span className="text-lg">🏷️</span>
-              <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: 'var(--color-amber)' }}>
-                  {uncategorizedCount} transaction{uncategorizedCount !== 1 ? 's' : ''} without a category
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                  Assign categories so your budgets track spending correctly.
-                </p>
-              </div>
-              <span className="text-xs font-bold px-2 py-1 rounded-lg shrink-0"
-                style={{ background: 'color-mix(in srgb, var(--color-amber) 16%, transparent)', color: 'var(--color-amber)' }}>
-                Review →
-              </span>
-            </button>
-          )}
-
-          {/* ── Search + filter tabs ── */}
+          {/* ── Search + filters ── */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative flex-1 min-w-44">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                 style={{ color: 'var(--color-text-muted)' }}><SearchIcon /></span>
               <input value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name…"
+                placeholder="Search merchants or notes"
                 className="w-full pl-9 pr-3 py-2 text-sm outline-none rounded-xl"
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
             </div>
@@ -1104,25 +1129,62 @@ export default function TransactionsPage() {
                 <option key={a.id} value={a.id}>{a.bankName} · {a.accountName}</option>
               ))}
             </select>
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+              aria-label="Filter by category"
+              className="px-3 py-2 text-xs font-semibold rounded-xl outline-none cursor-pointer max-w-48 truncate"
+              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+              <option value="all">Category: All</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+              ))}
+            </select>
+            {(search || accountFilter !== 'all' || categoryFilter !== 'all' || sortMode !== 'date-desc') && (
+              <button
+                onClick={() => { setSearch(''); setAccountFilter('all'); setCategoryFilter('all'); setSortMode('date-desc'); }}
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
+                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+                title="Clear search, sort and filters">
+                <SlidersIcon />
+              </button>
+            )}
+          </div>
+
+          {/* ── Status tabs ── */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex gap-1 p-1 rounded-xl"
               style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               {([
-                { id: 'all',          label: 'All',           count: transactions.length },
-                { id: 'expense',      label: 'Expenses',      count: transactions.filter((t) => Number(t.amount) < 0).length },
-                { id: 'income',       label: 'Income',        count: transactions.filter((t) => Number(t.amount) >= 0).length },
-                { id: 'uncategorized',label: 'Uncategorized', count: uncategorizedCount, dot: true },
-                { id: 'recurring',    label: 'Recurring',     count: transactions.filter(isRecurringTx).length },
-              ] as { id: Filter; label: string; count: number; dot?: boolean }[]).map((f) => (
+                { id: 'all',       label: 'All',       count: transactions.length },
+                { id: 'expense',   label: 'Expenses',  count: transactions.filter((t) => Number(t.amount) < 0).length },
+                { id: 'income',    label: 'Income',    count: transactions.filter((t) => Number(t.amount) >= 0).length },
+                { id: 'recurring', label: 'Recurring', count: transactions.filter(isRecurringTx).length },
+              ] as { id: Filter; label: string; count: number }[]).map((f) => (
                 <button key={f.id} onClick={() => setFilter(f.id)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
                   style={filter === f.id
                     ? { background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
                     : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
-                  {f.dot && f.count > 0 && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--color-amber)' }} />}
                   {f.label}
                   <span className="opacity-50">{f.count}</span>
                 </button>
               ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setFilter('uncategorized')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:brightness-110"
+                style={{
+                  ...(uncategorizedCount > 0
+                    ? { background: 'color-mix(in srgb, var(--color-amber) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 30%, transparent)', color: 'var(--color-amber)' }
+                    : { background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 30%, transparent)', color: 'var(--color-green)' }),
+                  ...(filter === 'uncategorized' ? { boxShadow: `0 0 0 1px ${uncategorizedCount > 0 ? 'var(--color-amber)' : 'var(--color-green)'}` } : {}),
+                }}>
+                {uncategorizedCount > 0 ? '● ' : '✓ '}{uncategorizedCount} uncategorized
+              </button>
+              <button onClick={() => setFilter('all')}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold"
+                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+                {transactions.length} total
+              </button>
             </div>
           </div>
         </div>
@@ -1400,6 +1462,13 @@ export default function TransactionsPage() {
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
                                       style={{ background: 'color-mix(in srgb, var(--color-amber) 12%, transparent)', color: 'var(--color-amber)' }}>
                                       Pending
+                                    </span>
+                                  )}
+                                  {tx.categorizedByRuleId && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                      title={tx.categorizedByRule ? `Categorized by rule: ${tx.categorizedByRule.matchValue}` : 'Categorized by a rule'}
+                                      style={{ background: 'color-mix(in srgb, var(--color-card-violet) 12%, transparent)', color: 'var(--color-card-violet)' }}>
+                                      📌 Rule
                                     </span>
                                   )}
                                   {tx.projectId ? (() => {
@@ -2025,136 +2094,114 @@ export default function TransactionsPage() {
                             )}
                           </div>
 
-                          {/* Make this categorization permanent (nudge right after a manual pick) */}
-                          {justCategorizedId === tx.id && tx.categoryId && (
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                onClick={() => { setJustCategorizedId(null); createRule(tx, tx.categoryId!); }}
-                                title="Set a permanent category for this type of transaction"
-                                className="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-all hover:brightness-110 shrink-0"
-                                style={{ background: 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)', color: 'var(--color-card-violet)' }}>
-                                📌
-                              </button>
-                              <button
-                                onClick={() => setJustCategorizedId(null)}
-                                className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] shrink-0"
-                                style={{ color: 'var(--color-text-muted)' }} title="Dismiss">
-                                <CloseIcon />
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Rule-provenance indicator */}
-                          {tx.categorizedByRuleId && (
+                          {/* Row actions menu */}
+                          <div className="relative shrink-0">
                             <button
                               onClick={(e) => {
-                                if (ruleMenuTxId === tx.id) { setRuleMenuTxId(null); return; }
+                                if (rowMenuTxId === tx.id) { setRowMenuTxId(null); setDeleteConfirmId(null); return; }
                                 const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                                setRuleMenuPos({ top: rect.bottom + 4, left: Math.max(4, rect.right - 180) });
-                                setRuleMenuTxId(tx.id);
-                              }}
-                              title={tx.categorizedByRule ? `Categorized by rule: ${tx.categorizedByRule.matchValue}` : 'Categorized by a rule'}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center text-sm transition-colors hover:bg-[var(--color-elevated)] shrink-0">
-                              📌
-                            </button>
-                          )}
-
-                          {ruleMenuTxId === tx.id && ruleMenuPos && createPortal(
-                            <div ref={ruleMenuRef} className="py-1 rounded-xl overflow-hidden"
-                              style={{ ...glass, position: 'fixed', top: ruleMenuPos.top, left: ruleMenuPos.left, width: '180px', zIndex: 9999 }}>
-                              <button onClick={() => uncategorizeOne(tx)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
-                                style={{ color: 'var(--color-text-secondary)' }}>
-                                Uncategorize this one
-                              </button>
-                              <button onClick={() => deleteRuleFromRow(tx)} disabled={deletingRuleId === tx.categorizedByRuleId}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-red-500/20 disabled:opacity-40"
-                                style={{ color: 'var(--color-rose)' }}>
-                                {deletingRuleId === tx.categorizedByRuleId ? 'Deleting rule…' : 'Delete the rule'}
-                              </button>
-                            </div>,
-                            document.body
-                          )}
-
-                          {/* Split / Unsplit */}
-                          {!tx.debtId && !txIsTransfer && (
-                            tx.parentId ? (
-                              <button
-                                onClick={() => unsplitTransaction(tx)}
-                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110 shrink-0"
-                                style={{ background: 'color-mix(in srgb, var(--color-text-muted) 10%, transparent)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
-                                title="Unsplit — recombine into one transaction"
-                              >
-                                ↩ Unsplit
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => setSplitTx(tx)}
-                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110 shrink-0"
-                                style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)', color: 'var(--color-primary)' }}
-                                title="Split into multiple categories"
-                              >
-                                ✂ Split
-                              </button>
-                            )
-                          )}
-
-                          {/* Delete — manual only */}
-                          {tx.source === 'manual' && deleteConfirmId !== tx.id && (
-                            <button
-                              onClick={() => {
-                                const absAmt = Math.abs(Number(tx.amount));
-                                setEditingTxId(tx.id);
-                                setManualTx({
-                                  name: tx.name,
-                                  amountStr: String(absAmt),
-                                  sign: Number(tx.amount) >= 0 ? '+' : '-',
-                                  date: tx.date,
-                                  bankAccountId: tx.bankAccountId ?? '',
-                                  categoryId: tx.categoryId ?? '',
-                                  debtId: tx.debtId ?? '',
-                                  note: tx.note ?? '',
-                                });
-                                setManualTxError('');
-                                setShowManualTx(true);
+                                setRowMenuPos({ top: rect.bottom + 4, left: Math.max(4, rect.right - 210) });
+                                setRowMenuTxId(tx.id);
+                                setDeleteConfirmId(null);
                               }}
                               className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] shrink-0"
                               style={{ color: 'var(--color-text-muted)' }}
-                              title="Edit transaction">
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                              </svg>
+                              title="More actions">
+                              <KebabIcon />
                             </button>
-                          )}
-                          {tx.source === 'manual' && (
-                            deleteConfirmId === tx.id ? (
-                              <div className="flex items-center gap-1 shrink-0">
-                                {tx.transferAccountId && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded-md mr-1"
-                                    style={{ background: 'color-mix(in srgb, var(--color-rose) 12%, transparent)', color: 'var(--color-rose)' }}>
-                                    ⚠ linked transfer
-                                  </span>
+
+                            {rowMenuTxId === tx.id && rowMenuPos && createPortal(
+                              <div ref={rowMenuRef} className="py-1 rounded-xl overflow-hidden"
+                                style={{ ...glass, position: 'fixed', top: rowMenuPos.top, left: rowMenuPos.left, width: '210px', zIndex: 9999 }}>
+                                {deleteConfirmId === tx.id ? (
+                                  <div className="px-3 py-2.5">
+                                    <p className="text-xs font-semibold mb-1.5">Delete this transaction?</p>
+                                    {tx.transferAccountId && (
+                                      <p className="text-[10px] mb-2" style={{ color: 'var(--color-rose)' }}>⚠ linked transfer will be unlinked</p>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                      <button onClick={() => deleteManualTx(tx.id)}
+                                        className="flex-1 text-xs font-semibold px-2 py-1.5 rounded-lg"
+                                        style={{ background: 'color-mix(in srgb, var(--color-rose) 20%, transparent)', color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>
+                                        Delete
+                                      </button>
+                                      <button onClick={() => setDeleteConfirmId(null)}
+                                        className="flex-1 text-xs px-2 py-1.5 rounded-lg hover:bg-[var(--color-elevated)]"
+                                        style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {!tx.debtId && !txIsTransfer && (
+                                      tx.parentId ? (
+                                        <button onClick={() => { unsplitTransaction(tx); setRowMenuTxId(null); }}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
+                                          style={{ color: 'var(--color-text-secondary)' }}>
+                                          ↩ Unsplit — recombine into one transaction
+                                        </button>
+                                      ) : (
+                                        <button onClick={() => { setSplitTx(tx); setRowMenuTxId(null); }}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
+                                          style={{ color: 'var(--color-text-secondary)' }}>
+                                          ✂ Split into multiple categories
+                                        </button>
+                                      )
+                                    )}
+                                    {tx.categorizedByRuleId && (
+                                      <>
+                                        <div style={{ borderTop: '1px solid var(--color-border)' }} />
+                                        <button onClick={() => uncategorizeOne(tx)}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
+                                          style={{ color: 'var(--color-text-secondary)' }}>
+                                          📌 Uncategorize this one
+                                        </button>
+                                        <button onClick={() => deleteRuleFromRow(tx)} disabled={deletingRuleId === tx.categorizedByRuleId}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-red-500/20 disabled:opacity-40"
+                                          style={{ color: 'var(--color-rose)' }}>
+                                          {deletingRuleId === tx.categorizedByRuleId ? 'Deleting rule…' : 'Delete the rule'}
+                                        </button>
+                                      </>
+                                    )}
+                                    {tx.source === 'manual' && (
+                                      <>
+                                        <div style={{ borderTop: '1px solid var(--color-border)' }} />
+                                        <button
+                                          onClick={() => {
+                                            const absAmt = Math.abs(Number(tx.amount));
+                                            setEditingTxId(tx.id);
+                                            setManualTx({
+                                              name: tx.name,
+                                              amountStr: String(absAmt),
+                                              sign: Number(tx.amount) >= 0 ? '+' : '-',
+                                              date: tx.date,
+                                              bankAccountId: tx.bankAccountId ?? '',
+                                              categoryId: tx.categoryId ?? '',
+                                              debtId: tx.debtId ?? '',
+                                              note: tx.note ?? '',
+                                            });
+                                            setManualTxError('');
+                                            setShowManualTx(true);
+                                            setRowMenuTxId(null);
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
+                                          style={{ color: 'var(--color-text-secondary)' }}>
+                                          ✎ Edit transaction
+                                        </button>
+                                        <button onClick={() => setDeleteConfirmId(tx.id)}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-red-500/20"
+                                          style={{ color: 'var(--color-rose)' }}>
+                                          <TrashIcon /> Delete transaction
+                                        </button>
+                                      </>
+                                    )}
+                                  </>
                                 )}
-                                <button onClick={() => deleteManualTx(tx.id)}
-                                  className="text-[10px] font-semibold px-2 py-1 rounded-lg"
-                                  style={{ background: 'color-mix(in srgb, var(--color-rose) 20%, transparent)', color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>
-                                  Delete
-                                </button>
-                                <button onClick={() => setDeleteConfirmId(null)}
-                                  className="text-[10px] px-2 py-1 rounded-lg hover:bg-[var(--color-elevated)]"
-                                  style={{ color: 'var(--color-text-muted)' }}>
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <button onClick={() => setDeleteConfirmId(tx.id)}
-                                className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 shrink-0"
-                                title="Delete transaction">
-                                <TrashIcon />
-                              </button>
-                            )
-                          )}
+                              </div>,
+                              document.body
+                            )}
+                          </div>
 
                           {/* Amount */}
                           <p className="text-sm font-bold tabular-nums w-24 text-right shrink-0"
@@ -2854,12 +2901,32 @@ export default function TransactionsPage() {
               style={{
                 background: ruleToast.kind === 'error'
                   ? 'color-mix(in srgb, var(--color-card-orange) 20%, transparent)'
+                  : ruleToast.kind === 'categorized'
+                  ? 'color-mix(in srgb, var(--color-card-green) 20%, transparent)'
                   : 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)',
               }}>
-              {ruleToast.kind === 'error' ? '⚠️' : '📌'}
+              {ruleToast.kind === 'error' ? '⚠️' : ruleToast.kind === 'categorized' ? (ruleToast.categoryIcon || '✓') : '📌'}
             </div>
             <div className="flex-1 min-w-0">
-              {ruleToast.kind === 'created' ? (
+              {ruleToast.kind === 'categorized' ? (
+                <>
+                  <p className="text-sm font-semibold">Categorized as {ruleToast.categoryLabel}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {filter === 'uncategorized' ? "It's left the Uncategorized list. " : ''}
+                    Pin it to auto-categorize transactions like this from now on.
+                  </p>
+                  <button
+                    onClick={() => createRule(ruleToast.tx, ruleToast.categoryId)}
+                    className="mt-2 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors hover:brightness-110"
+                    style={{
+                      background: 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)',
+                      border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)',
+                      color: 'var(--color-card-violet)',
+                    }}>
+                    📌 Pin as rule
+                  </button>
+                </>
+              ) : ruleToast.kind === 'created' ? (
                 <>
                   <p className="text-sm font-semibold">Rule created</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
@@ -3005,4 +3072,13 @@ function CloseIcon() {
 }
 function TrashIcon() {
   return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF6B6B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>;
+}
+function KebabIcon() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>;
+}
+function BellIcon() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
+}
+function SlidersIcon() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>;
 }

@@ -40,9 +40,14 @@ export function InsightsPanel({
       {/* Header */}
       <div className="px-4 py-4 border-b shrink-0 flex items-center justify-between gap-2"
         style={{ borderColor: 'var(--color-border)', background: 'rgba(35,35,47,0.5)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
-        <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
-          Insights
-        </p>
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true">✨</span>
+          <p className="text-sm font-bold tracking-tight">Financial Intelligence</p>
+          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md tracking-wider"
+            style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)', color: 'var(--color-card-violet)' }}>
+            BETA
+          </span>
+        </div>
         <div className="flex items-center gap-1.5">
           {selectedTx && (
             <button onClick={onClose}

@@ -334,6 +334,18 @@ export class PlaidService {
             existing.merchantName = pt.merchant_name ?? null;
             existing.plaidCategory = pt.category ?? [];
             existing.date = pt.date;
+            /* Plaid often only enriches merchant_name/name once a pending transaction
+               posts — the insert-time match below can miss on the generic pending
+               name and never get a second chance. Re-match here (only while still
+               uncategorized, so a manual pick or an earlier rule match is never
+               overwritten) using the now-updated fields. */
+            if (!existing.categoryId) {
+              const matchedRule = this.rulesService.matchRule(rules, { merchantName: pt.merchant_name, name: pt.name });
+              if (matchedRule) {
+                existing.categoryId = matchedRule.categoryId;
+                existing.categorizedByRuleId = matchedRule.id;
+              }
+            }
             await this.txRepo.save(existing);
             continue;
           }
