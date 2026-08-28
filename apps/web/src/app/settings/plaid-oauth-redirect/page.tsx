@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePlaidLink } from 'react-plaid-link';
 import Sidebar from '@/components/Sidebar';
+import type { PreviewExchangeResult } from '@/components/PlaidMergeReviewModal';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -48,7 +49,7 @@ export default function PlaidOAuthRedirectPage() {
           if (!res.ok) throw new Error();
         }
       } else {
-        const res = await fetch(`${API}/plaid/exchange`, {
+        const res = await fetch(`${API}/plaid/exchange/preview`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
           body: JSON.stringify({
             public_token: publicToken,
@@ -57,9 +58,34 @@ export default function PlaidOAuthRedirectPage() {
           }),
         });
         if (!res.ok) throw new Error();
+        const preview: PreviewExchangeResult = await res.json();
+
+        if (preview.hasManualAccounts) {
+          /* This page doesn't have the manual-account list Settings uses to render
+             PlaidMergeReviewModal — hand the preview off via sessionStorage so
+             Settings can pick it up and show the modal once it mounts. */
+          sessionStorage.setItem('plaidPendingMergeReview', JSON.stringify(preview));
+        } else {
+          const confirmRes = await fetch(`${API}/plaid/exchange/confirm`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+            body: JSON.stringify({
+              plaid_item_id: preview.plaidItemId,
+              decisions: preview.accounts.map((a) => ({ plaidAccountId: a.plaidAccountId, action: 'new' })),
+            }),
+          });
+          if (!confirmRes.ok) throw new Error();
+        }
       }
-    } finally {
       clearHandoffState();
+      router.replace('/settings');
+    } catch {
+      clearHandoffState();
+      sessionStorage.setItem(
+        'plaidPendingError',
+        mode === 'reconnect'
+          ? 'Reconnected, but refresh failed. Try syncing manually.'
+          : 'Bank connected but account import failed. Try syncing manually.',
+      );
       router.replace('/settings');
     }
   };

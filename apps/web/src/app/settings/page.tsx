@@ -239,6 +239,24 @@ export default function SettingsPage() {
     }
   }, []);
 
+  /* Pick up state handed off by /settings/plaid-oauth-redirect — that page is a
+     lightweight Link landing page for banks requiring Plaid's OAuth redirect
+     (e.g. Charles Schwab) and doesn't carry the manual-account list this page
+     needs to render PlaidMergeReviewModal, so it stashes the preview (or a
+     failure message) in sessionStorage instead of showing it directly. */
+  useEffect(() => {
+    const pendingError = sessionStorage.getItem('plaidPendingError');
+    if (pendingError) {
+      setError(pendingError);
+      sessionStorage.removeItem('plaidPendingError');
+    }
+    const pendingMerge = sessionStorage.getItem('plaidPendingMergeReview');
+    if (pendingMerge) {
+      try { setMergeReview(JSON.parse(pendingMerge)); } catch { /* malformed — ignore */ }
+      sessionStorage.removeItem('plaidPendingMergeReview');
+    }
+  }, []);
+
   useEffect(() => {
     if (activeTab !== 'integrations') return;
     setGmailLoading(true);
@@ -513,6 +531,20 @@ export default function SettingsPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Connect/reconnect error — shown here so it's visible regardless of which
+                  flow set it (popup Link, OAuth-redirect hand-off, or reconnect) */}
+              {error && !showManualForm && (
+                <div className="px-4 py-3 rounded-xl flex items-start gap-3 text-sm"
+                  style={{ background: 'color-mix(in srgb, var(--color-rose) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-rose) 25%, transparent)' }}>
+                  <span className="mt-0.5">⚠️</span>
+                  <p className="flex-1" style={{ color: 'var(--color-rose)' }}>{error}</p>
+                  <button onClick={() => setError('')}
+                    className="text-xs font-semibold shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                    ✕
+                  </button>
+                </div>
+              )}
 
               {/* Plaid info banner */}
               <div className="px-4 py-3 rounded-xl flex items-start gap-3 text-sm"
