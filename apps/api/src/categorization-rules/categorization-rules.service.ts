@@ -10,6 +10,25 @@ export interface RuleWithApplyCount {
   appliedCount: number;
 }
 
+/* ACH/payroll-style descriptors embed a per-transaction reference number after
+   a stable merchant prefix (e.g. "ALPHA STAFFING & DES:PAYROLL ID:XXXXX89608407TK
+   INDN:..."), so an exact-match rule built from the raw name would never fire
+   again — the next deposit carries a different number. When the raw name has
+   enough stable text ahead of a long digit run, prefer a prefix match truncated
+   right before it; otherwise keep the full string as an exact match (the common
+   case for plain merchant names, which rarely contain digit runs at all). */
+function derivePrefixMatch(raw: string): { matchValue: string; matchStrategy: 'exact' | 'prefix' } {
+  const MIN_STABLE_PREFIX = 8;
+  const m = raw.match(/\d{4,}/);
+  if (m && m.index !== undefined && m.index >= MIN_STABLE_PREFIX) {
+    const prefix = raw.slice(0, m.index).trim();
+    if (prefix.length >= MIN_STABLE_PREFIX) {
+      return { matchValue: prefix, matchStrategy: 'prefix' };
+    }
+  }
+  return { matchValue: raw, matchStrategy: 'exact' };
+}
+
 @Injectable()
 export class CategorizationRulesService {
   constructor(
@@ -55,14 +74,17 @@ export class CategorizationRulesService {
     if (!category || category.userId !== userId) throw new ForbiddenException('Category not found');
 
     const matchType: 'merchant' | 'name' = tx.merchantName ? 'merchant' : 'name';
-    const matchValue = (tx.merchantName || tx.name || '').trim();
-    if (!matchValue) throw new BadRequestException('This transaction has no merchant or name to match on');
+    const rawValue = (tx.merchantName || tx.name || '').trim();
+    if (!rawValue) throw new BadRequestException('This transaction has no merchant or name to match on');
+    const { matchValue, matchStrategy } = matchType === 'name'
+      ? derivePrefixMatch(rawValue)
+      : { matchValue: rawValue, matchStrategy: 'exact' as const };
 
     const existing = await this.repo
       .createQueryBuilder('rule')
       .where('rule.userId = :userId', { userId })
       .andWhere('rule.matchType = :matchType', { matchType })
-      .andWhere('rule.matchStrategy = :matchStrategy', { matchStrategy: 'exact' })
+      .andWhere('rule.matchStrategy = :matchStrategy', { matchStrategy })
       .andWhere('LOWER(rule.matchValue) = LOWER(:matchValue)', { matchValue })
       .getOne();
     if (existing) {
@@ -71,11 +93,11 @@ export class CategorizationRulesService {
 
     let rule: CategorizationRule;
     try {
-      rule = await this.repo.save(this.repo.create({ userId, matchType, matchValue, categoryId }));
+      rule = await this.repo.save(this.repo.create({ userId, matchType, matchValue, matchStrategy, categoryId }));
     } catch (err) {
-      throw await this.toConflictOrRethrow(err, userId, matchType, matchValue, 'exact');
+      throw await this.toConflictOrRethrow(err, userId, matchType, matchValue, matchStrategy);
     }
-    const appliedCount = await this.applyToUncategorized(userId, matchType, matchValue, 'exact', categoryId, rule.id);
+    const appliedCount = await this.applyToUncategorized(userId, matchType, matchValue, matchStrategy, categoryId, rule.id);
     return { rule: await this.repo.findOne({ where: { id: rule.id }, relations: ['category'] }), appliedCount };
   }
 
