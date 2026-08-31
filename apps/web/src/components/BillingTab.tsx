@@ -28,9 +28,17 @@ function fmtDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+/**
+ * Throws on a non-OK response instead of returning `null` — a genuinely absent
+ * subscription (Free-tier user) is a 200 with a `null` body, so `null` here always
+ * means "confirmed no subscription," never "the request failed." Callers must not
+ * collapse those two cases, or a transient fetch failure gets misread as "no
+ * subscription" and silently offers to start a brand-new one (see BillingTab's load()).
+ */
 async function fetchSubscription(): Promise<SubscriptionInfo | null> {
   const res = await fetch(`${API}/billing/subscription`, { credentials: 'include' });
-  return res.ok ? await res.json() : null;
+  if (!res.ok) throw new Error(`Failed to fetch subscription (${res.status})`);
+  return await res.json();
 }
 
 /**
@@ -39,6 +47,8 @@ async function fetchSubscription(): Promise<SubscriptionInfo | null> {
  * request resolves. Poll a bounded number of times instead of trusting a single
  * fixed delay — always terminates (max ~6s total) and returns whatever the last
  * fetch was even if `check` never passes, so the UI never hangs indefinitely.
+ * A transient fetch error during an early attempt is treated as "not ready yet"
+ * and retried; only a failure on the very last attempt propagates to the caller.
  */
 async function waitForSubscriptionChange(
   fetchSub: () => Promise<SubscriptionInfo | null>,
@@ -47,8 +57,12 @@ async function waitForSubscriptionChange(
   delayMs = 1200,
 ): Promise<SubscriptionInfo | null> {
   for (let i = 0; i < maxAttempts; i++) {
-    const sub = await fetchSub();
-    if (check(sub)) return sub;
+    try {
+      const sub = await fetchSub();
+      if (check(sub)) return sub;
+    } catch {
+      // transient — keep retrying until the final attempt below, which is allowed to throw
+    }
     if (i < maxAttempts - 1) await new Promise((r) => setTimeout(r, delayMs));
   }
   return fetchSub();
@@ -58,6 +72,7 @@ export default function BillingTab() {
   const { user, refetch } = useUser();
   const [sub, setSub] = useState<SubscriptionInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -73,6 +88,13 @@ export default function BillingTab() {
         ? await waitForSubscriptionChange(fetchSubscription, (s) => s !== null)
         : await fetchSubscription();
       setSub(result);
+      setLoadError(false);
+    } catch {
+      // A genuinely absent subscription resolves above (as `null`) — landing here means
+      // the fetch itself failed. Keep whatever `sub` we last had and show an error state
+      // instead of falling through to the "no subscription" PricingCards view, which
+      // would look like an invitation to start a second subscription.
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -140,7 +162,21 @@ export default function BillingTab() {
 
   if (loading) return null;
 
-  if (!sub) {
+  if (loadError) {
+    return (
+      <div>
+        <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--color-text-primary)' }}>Plan &amp; billing</h2>
+        <p style={{ color: 'var(--color-card-orange)' }}>
+          Couldn&apos;t load your billing info — try refreshing the page.
+        </p>
+      </div>
+    );
+  }
+
+  // A canceled subscription's row is kept for history (see BillingService.syncFromStripeSubscription)
+  // but User.plan has already reset to 'free' — treat it the same as "no subscription" so a
+  // churned customer sees the resubscribe CTAs instead of management buttons for a dead subscription.
+  if (!sub || sub.status === 'canceled') {
     return (
       <div>
         <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--color-text-primary)' }}>Plan &amp; billing</h2>
