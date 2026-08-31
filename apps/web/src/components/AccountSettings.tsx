@@ -2,6 +2,7 @@
 
 import { useEffect, useState, FormEvent } from 'react';
 import { createPortal } from 'react-dom';
+import Link from 'next/link';
 import Avatar from './Avatar';
 import { useUser } from './UserProvider';
 
@@ -37,9 +38,10 @@ export default function AccountSettings() {
 
   useEffect(() => { setName(user?.name ?? ''); }, [user?.name]);
 
-  const isGoogle  = !!user?.googleId;
-  const isPro     = user?.plan === 'pro';
-  const nameDirty = name.trim() !== (user?.name ?? '') && name.trim().length > 0;
+  const isGoogle   = !!user?.googleId;
+  const planLabel  = user?.plan === 'elite' ? 'Elite' : user?.plan === 'pro' ? 'Pro' : 'Free';
+  const isPaid     = user?.plan === 'pro' || user?.plan === 'elite';
+  const nameDirty  = name.trim() !== (user?.name ?? '') && name.trim().length > 0;
 
   const [showPwModal, setShowPwModal] = useState(false);
 
@@ -79,7 +81,7 @@ export default function AccountSettings() {
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
                 style={{ background: 'color-mix(in srgb, var(--color-primary) 16%, transparent)', color: 'var(--color-primary)' }}>
-                {isPro ? 'Pro' : 'Free'} plan
+                {planLabel} plan
               </span>
               {isGoogle && (
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1"
@@ -144,20 +146,20 @@ export default function AccountSettings() {
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
               style={{
-                background: isPro
+                background: isPaid
                   ? 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-violet) 100%)'
                   : 'var(--color-surface)',
-                border: isPro ? 'none' : '1px solid var(--color-border)',
-                color: isPro ? '#fff' : 'var(--color-text-muted)',
+                border: isPaid ? 'none' : '1px solid var(--color-border)',
+                color: isPaid ? '#fff' : 'var(--color-text-muted)',
               }}>
               <PlanIcon />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>
-                {isPro ? 'Pro membership' : 'Free plan'}
+                {isPaid ? `${planLabel} membership` : 'Free plan'}
               </p>
               <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
-                {isPro
+                {isPaid
                   ? 'Thanks for supporting Cofre — all features unlocked.'
                   : "You're on the free plan. No charges, no billing on file."}
               </p>
@@ -165,25 +167,24 @@ export default function AccountSettings() {
           </div>
           <span className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide shrink-0"
             style={{
-              background: isPro ? 'color-mix(in srgb, var(--color-green) 14%, transparent)' : 'var(--color-surface)',
-              color: isPro ? 'var(--color-green)' : 'var(--color-text-muted)',
-              border: isPro ? '1px solid color-mix(in srgb, var(--color-green) 30%, transparent)' : '1px solid var(--color-border)',
+              background: isPaid ? 'color-mix(in srgb, var(--color-green) 14%, transparent)' : 'var(--color-surface)',
+              color: isPaid ? 'var(--color-green)' : 'var(--color-text-muted)',
+              border: isPaid ? '1px solid color-mix(in srgb, var(--color-green) 30%, transparent)' : '1px solid var(--color-border)',
             }}>
-            {isPro ? 'Active' : 'Free'}
+            {isPaid ? 'Active' : 'Free'}
           </span>
         </div>
 
-        {!isPro && (
+        {!isPaid && (
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <p className="text-[12px]" style={{ color: 'var(--color-text-muted)' }}>
-              Upgrade to Pro for unlimited accounts and advanced insights.
+              Upgrade for automatic bank sync.
             </p>
-            <button type="button" disabled
-              className="px-4 py-2 text-sm font-semibold text-white rounded-xl disabled:opacity-60 transition-all"
-              style={{ background: 'var(--color-primary)' }}
-              title="Coming soon">
+            <Link href="/settings?tab=billing"
+              className="px-4 py-2 text-sm font-semibold text-white rounded-xl transition-all"
+              style={{ background: 'var(--color-primary)' }}>
               Upgrade to Pro
-            </button>
+            </Link>
           </div>
         )}
       </div>

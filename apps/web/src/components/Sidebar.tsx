@@ -193,10 +193,10 @@ export default function Sidebar() {
             </p>
             {user && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
-                style={user.plan === 'pro'
+                style={user.plan !== 'free'
                   ? { background: 'color-mix(in srgb, var(--color-primary) 16%, transparent)', color: 'var(--color-primary)' }
                   : { background: 'color-mix(in srgb, var(--color-text-muted) 16%, transparent)', color: 'var(--color-text-muted)' }}>
-                {user.plan === 'pro' ? 'Pro' : 'Basic'}
+                {user.plan === 'elite' ? 'Elite' : user.plan === 'pro' ? 'Pro' : 'Basic'}
               </span>
             )}
           </div>
@@ -205,10 +205,16 @@ export default function Sidebar() {
               {user.email}
             </p>
           )}
-          {user && user.plan !== 'pro' && (
-            <Link href="/settings" className="text-[10px] font-semibold leading-tight hover:underline"
+          {user && user.plan === 'free' && (
+            <Link href="/settings?tab=billing" className="text-[10px] font-semibold leading-tight hover:underline"
               style={{ color: 'var(--color-primary)' }}>
               Upgrade to Pro
+            </Link>
+          )}
+          {user && user.plan === 'pro' && (
+            <Link href="/settings?tab=billing" className="text-[10px] font-semibold leading-tight hover:underline"
+              style={{ color: 'var(--color-primary)' }}>
+              Upgrade to Elite
             </Link>
           )}
         </div>

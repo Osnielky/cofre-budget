@@ -352,7 +352,13 @@ export default function SettingsPage() {
             institution_name: metadata.institution?.name ?? 'Unknown Bank',
           }),
         });
-        if (!res.ok) throw new Error();
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          if (body?.code === 'INSTITUTION_LIMIT_REACHED') {
+            throw new Error('INSTITUTION_LIMIT_REACHED');
+          }
+          throw new Error();
+        }
         const preview: PreviewExchangeResult = await res.json();
 
         if (preview.hasManualAccounts) {
@@ -375,8 +381,12 @@ export default function SettingsPage() {
           });
         }
       }
-    } catch {
-      setError(linkMode === 'reconnect' ? 'Reconnected, but refresh failed. Try syncing manually.' : 'Bank connected but account import failed. Try syncing manually.');
+    } catch (err) {
+      if (err instanceof Error && err.message === 'INSTITUTION_LIMIT_REACHED') {
+        setError('Pro is limited to 4 linked institutions — upgrade to Elite in Settings → Billing for unlimited.');
+      } else {
+        setError(linkMode === 'reconnect' ? 'Reconnected, but refresh failed. Try syncing manually.' : 'Bank connected but account import failed. Try syncing manually.');
+      }
     } finally {
       setLinkToken(null); setConnecting(false); setReconnectItemId(null);
       sessionStorage.removeItem('plaidLinkToken');
