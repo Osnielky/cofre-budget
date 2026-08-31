@@ -23,10 +23,10 @@ export class Subscription {
   @Column()
   status: 'trialing' | 'active' | 'past_due' | 'canceled';
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: Date, nullable: true })
   currentPeriodEnd: Date | null;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: Date, nullable: true })
   trialEnd: Date | null;
 
   @Column({ default: false })

@@ -28,7 +28,7 @@ export class User {
 
   /* Set the first time this user ever starts Stripe Checkout — lets checkout/webhook
      code reuse one Stripe Customer across repeat attempts and upgrades/downgrades. */
-  @Column({ nullable: true, unique: true })
+  @Column({ type: 'varchar', nullable: true, unique: true })
   stripeCustomerId: string | null;
 
   /* User-set date for reaching the $1,000,000 net-worth mission; null = not set */
