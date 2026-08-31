@@ -28,6 +28,32 @@ function fmtDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+async function fetchSubscription(): Promise<SubscriptionInfo | null> {
+  const res = await fetch(`${API}/billing/subscription`, { credentials: 'include' });
+  return res.ok ? await res.json() : null;
+}
+
+/**
+ * Stripe webhooks land asynchronously, so a subscription we just created/changed
+ * server-side may not be reflected yet on the first read straight after our own
+ * request resolves. Poll a bounded number of times instead of trusting a single
+ * fixed delay — always terminates (max ~6s total) and returns whatever the last
+ * fetch was even if `check` never passes, so the UI never hangs indefinitely.
+ */
+async function waitForSubscriptionChange(
+  fetchSub: () => Promise<SubscriptionInfo | null>,
+  check: (sub: SubscriptionInfo | null) => boolean,
+  maxAttempts = 5,
+  delayMs = 1200,
+): Promise<SubscriptionInfo | null> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const sub = await fetchSub();
+    if (check(sub)) return sub;
+    if (i < maxAttempts - 1) await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return fetchSub();
+}
+
 export default function BillingTab() {
   const { user, refetch } = useUser();
   const [sub, setSub] = useState<SubscriptionInfo | null>(null);
@@ -37,8 +63,16 @@ export default function BillingTab() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/billing/subscription`, { credentials: 'include' });
-      setSub(res.ok ? await res.json() : null);
+      // Landing here from Stripe Checkout's success_url (?checkout=success — see
+      // settings/page.tsx's tab-restore effect, which routes us onto this tab):
+      // the confirming webhook may not have landed yet, so poll for a subscription
+      // to appear instead of a single fetch that would otherwise still show the
+      // Free-tier PricingCards right after a successful payment.
+      const isCheckoutSuccess = new URLSearchParams(window.location.search).get('checkout') === 'success';
+      const result = isCheckoutSuccess
+        ? await waitForSubscriptionChange(fetchSubscription, (s) => s !== null)
+        : await fetchSubscription();
+      setSub(result);
     } finally {
       setLoading(false);
     }
@@ -69,8 +103,13 @@ export default function BillingTab() {
         body: JSON.stringify({ tier, interval }),
       });
       if (res.ok) {
-        await new Promise((r) => setTimeout(r, 1500)); // give the webhook a moment to land
-        await load();
+        // Busy stays true (button disabled) for the whole poll, not just a fixed delay,
+        // so the UI keeps signalling "still working" until the webhook actually lands.
+        const updated = await waitForSubscriptionChange(
+          fetchSubscription,
+          (s) => s?.tier === tier && s?.interval === interval,
+        );
+        setSub(updated);
         await refetch();
       }
     } finally {
@@ -84,8 +123,8 @@ export default function BillingTab() {
     try {
       const res = await fetch(`${API}/billing/cancel`, { method: 'POST', credentials: 'include' });
       if (res.ok) {
-        await new Promise((r) => setTimeout(r, 1500));
-        await load();
+        const updated = await waitForSubscriptionChange(fetchSubscription, (s) => s?.cancelAtPeriodEnd === true);
+        setSub(updated);
       }
     } finally {
       setBusy(false);
