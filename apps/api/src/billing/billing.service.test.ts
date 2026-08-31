@@ -97,3 +97,22 @@ describe('BillingService.syncFromStripeSubscription', () => {
     ).resolves.not.toThrow();
   });
 });
+
+describe('BillingService constructor', () => {
+  it('throws a clear error when a required Stripe env var is missing', async () => {
+    const ds = await makeDataSource();
+    const incompleteConfig = { get: (key: string) => ({
+      STRIPE_PRICE_PRO_MONTHLY: 'price_pro_month',
+      STRIPE_PRICE_PRO_YEARLY: 'price_pro_year',
+      STRIPE_PRICE_ELITE_MONTHLY: 'price_elite_month',
+      // STRIPE_PRICE_ELITE_YEARLY intentionally omitted
+      STRIPE_SECRET_KEY: 'sk_test_x',
+    } as Record<string, string>)[key] } as unknown as ConfigService;
+
+    expect(() => new BillingService(
+      ds.getRepository(User),
+      ds.getRepository(Subscription),
+      incompleteConfig,
+    )).toThrow(/STRIPE_PRICE_ELITE_YEARLY/);
+  });
+});

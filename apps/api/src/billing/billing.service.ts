@@ -19,13 +19,33 @@ export class BillingService {
     @InjectRepository(Subscription) private subs: Repository<Subscription>,
     private config: ConfigService,
   ) {
-    this.stripe = new Stripe(this.config.get<string>('STRIPE_SECRET_KEY') as string);
+    const secretKey = this.config.get<string>('STRIPE_SECRET_KEY');
+    const proMonthly = this.config.get<string>('STRIPE_PRICE_PRO_MONTHLY');
+    const proYearly = this.config.get<string>('STRIPE_PRICE_PRO_YEARLY');
+    const eliteMonthly = this.config.get<string>('STRIPE_PRICE_ELITE_MONTHLY');
+    const eliteYearly = this.config.get<string>('STRIPE_PRICE_ELITE_YEARLY');
+
+    const required: Record<string, string | undefined> = {
+      STRIPE_SECRET_KEY: secretKey,
+      STRIPE_PRICE_PRO_MONTHLY: proMonthly,
+      STRIPE_PRICE_PRO_YEARLY: proYearly,
+      STRIPE_PRICE_ELITE_MONTHLY: eliteMonthly,
+      STRIPE_PRICE_ELITE_YEARLY: eliteYearly,
+    };
+    const missing = Object.entries(required)
+      .filter(([, value]) => !value)
+      .map(([key]) => key);
+    if (missing.length > 0) {
+      throw new Error(`BillingService is missing required env var(s): ${missing.join(', ')}`);
+    }
+
+    this.stripe = new Stripe(secretKey as string);
     this.frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
     this.priceIds = {
-      [this.config.get<string>('STRIPE_PRICE_PRO_MONTHLY') as string]: { tier: 'pro', interval: 'month' },
-      [this.config.get<string>('STRIPE_PRICE_PRO_YEARLY') as string]: { tier: 'pro', interval: 'year' },
-      [this.config.get<string>('STRIPE_PRICE_ELITE_MONTHLY') as string]: { tier: 'elite', interval: 'month' },
-      [this.config.get<string>('STRIPE_PRICE_ELITE_YEARLY') as string]: { tier: 'elite', interval: 'year' },
+      [proMonthly as string]: { tier: 'pro', interval: 'month' },
+      [proYearly as string]: { tier: 'pro', interval: 'year' },
+      [eliteMonthly as string]: { tier: 'elite', interval: 'month' },
+      [eliteYearly as string]: { tier: 'elite', interval: 'year' },
     };
   }
 
