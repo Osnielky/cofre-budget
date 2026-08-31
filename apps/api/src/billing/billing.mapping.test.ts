@@ -63,4 +63,12 @@ describe('mapStripeSubscription', () => {
   it('throws when the subscription is on a price ID this app does not recognize', () => {
     expect(() => mapStripeSubscription(fakeSub({ priceId: 'price_unknown' } as any), PRICE_IDS)).toThrow(/unknown price/i);
   });
+
+  it('maps paused status to past_due', () => {
+    expect(mapStripeSubscription(fakeSub({ priceId: 'price_pro_month', status: 'paused' } as any), PRICE_IDS).status).toBe('past_due');
+  });
+
+  it('throws when the subscription is in an unrecognized Stripe status', () => {
+    expect(() => mapStripeSubscription(fakeSub({ priceId: 'price_pro_month', status: 'ended' } as any), PRICE_IDS)).toThrow(/unknown status/i);
+  });
 });

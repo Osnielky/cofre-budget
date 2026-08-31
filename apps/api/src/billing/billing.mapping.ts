@@ -15,6 +15,7 @@ const STATUS_MAP: Record<string, MappedSubscription['status']> = {
   trialing: 'trialing',
   active: 'active',
   past_due: 'past_due',
+  paused: 'past_due',
   unpaid: 'past_due',
   incomplete: 'past_due',
   incomplete_expired: 'canceled',
@@ -26,7 +27,8 @@ export function mapStripeSubscription(sub: Stripe.Subscription, priceIds: PriceI
   const tierInterval = priceId ? priceIds[priceId] : undefined;
   if (!tierInterval) throw new Error(`Subscription ${sub.id} is on an unknown price ID: ${priceId}`);
 
-  const status = STATUS_MAP[sub.status] ?? 'past_due';
+  const status = STATUS_MAP[sub.status];
+  if (!status) throw new Error(`Subscription ${sub.id} is in an unknown status: ${sub.status}`);
 
   return {
     tier: tierInterval.tier,
