@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -20,6 +20,7 @@ export class BillingService {
     private config: ConfigService,
   ) {
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY');
+    const webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET');
     const proMonthly = this.config.get<string>('STRIPE_PRICE_PRO_MONTHLY');
     const proYearly = this.config.get<string>('STRIPE_PRICE_PRO_YEARLY');
     const eliteMonthly = this.config.get<string>('STRIPE_PRICE_ELITE_MONTHLY');
@@ -27,6 +28,7 @@ export class BillingService {
 
     const required: Record<string, string | undefined> = {
       STRIPE_SECRET_KEY: secretKey,
+      STRIPE_WEBHOOK_SECRET: webhookSecret,
       STRIPE_PRICE_PRO_MONTHLY: proMonthly,
       STRIPE_PRICE_PRO_YEARLY: proYearly,
       STRIPE_PRICE_ELITE_MONTHLY: eliteMonthly,
@@ -64,6 +66,12 @@ export class BillingService {
   }
 
   async createCheckoutSession(userId: string, tier: 'pro' | 'elite', interval: 'month' | 'year'): Promise<{ url: string }> {
+    const existing = await this.subs.findOneBy({ userId });
+    if (existing && ['trialing', 'active', 'past_due'].includes(existing.status)) {
+      throw new ConflictException(
+        'You already have an active subscription — manage it from Settings instead of starting a new one.',
+      );
+    }
     const customerId = await this.getOrCreateCustomer(userId);
     const session = await this.stripe.checkout.sessions.create({
       customer: customerId,

@@ -1,9 +1,23 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DataSource } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import { ConflictException } from '@nestjs/common';
 import { User } from '../users/user.entity';
 import { Subscription } from './subscription.entity';
 import { BillingService } from './billing.service';
+
+function fakeConfig(overrides: Record<string, string | undefined> = {}): ConfigService {
+  const base: Record<string, string | undefined> = {
+    STRIPE_PRICE_PRO_MONTHLY: 'price_pro_month',
+    STRIPE_PRICE_PRO_YEARLY: 'price_pro_year',
+    STRIPE_PRICE_ELITE_MONTHLY: 'price_elite_month',
+    STRIPE_PRICE_ELITE_YEARLY: 'price_elite_year',
+    STRIPE_SECRET_KEY: 'sk_test_x',
+    STRIPE_WEBHOOK_SECRET: 'whsec_test',
+    ...overrides,
+  };
+  return { get: (key: string) => base[key] } as unknown as ConfigService;
+}
 
 async function makeDataSource() {
   const ds = new DataSource({
@@ -30,13 +44,7 @@ describe('BillingService.syncFromStripeSubscription', () => {
     }));
     userId = user.id;
 
-    const config = { get: (key: string) => ({
-      STRIPE_PRICE_PRO_MONTHLY: 'price_pro_month',
-      STRIPE_PRICE_PRO_YEARLY: 'price_pro_year',
-      STRIPE_PRICE_ELITE_MONTHLY: 'price_elite_month',
-      STRIPE_PRICE_ELITE_YEARLY: 'price_elite_year',
-      STRIPE_SECRET_KEY: 'sk_test_x',
-    } as Record<string, string>)[key] } as unknown as ConfigService;
+    const config = fakeConfig();
 
     service = new BillingService(
       ds.getRepository(User),
@@ -101,18 +109,68 @@ describe('BillingService.syncFromStripeSubscription', () => {
 describe('BillingService constructor', () => {
   it('throws a clear error when a required Stripe env var is missing', async () => {
     const ds = await makeDataSource();
-    const incompleteConfig = { get: (key: string) => ({
-      STRIPE_PRICE_PRO_MONTHLY: 'price_pro_month',
-      STRIPE_PRICE_PRO_YEARLY: 'price_pro_year',
-      STRIPE_PRICE_ELITE_MONTHLY: 'price_elite_month',
-      // STRIPE_PRICE_ELITE_YEARLY intentionally omitted
-      STRIPE_SECRET_KEY: 'sk_test_x',
-    } as Record<string, string>)[key] } as unknown as ConfigService;
+    // STRIPE_PRICE_ELITE_YEARLY intentionally omitted
+    const incompleteConfig = fakeConfig({ STRIPE_PRICE_ELITE_YEARLY: undefined });
 
     expect(() => new BillingService(
       ds.getRepository(User),
       ds.getRepository(Subscription),
       incompleteConfig,
     )).toThrow(/STRIPE_PRICE_ELITE_YEARLY/);
+  });
+
+  it('throws a clear error when STRIPE_WEBHOOK_SECRET is missing', async () => {
+    const ds = await makeDataSource();
+    const incompleteConfig = fakeConfig({ STRIPE_WEBHOOK_SECRET: undefined });
+
+    expect(() => new BillingService(
+      ds.getRepository(User),
+      ds.getRepository(Subscription),
+      incompleteConfig,
+    )).toThrow(/STRIPE_WEBHOOK_SECRET/);
+  });
+});
+
+describe('BillingService.createCheckoutSession existing-subscription guard', () => {
+  async function setupUserWithSubscription(status: 'trialing' | 'active' | 'past_due' | 'canceled') {
+    const ds = await makeDataSource();
+    const userRepo = ds.getRepository(User);
+    const user = await userRepo.save(userRepo.create({
+      email: 'b@example.com', stripeCustomerId: 'cus_456', plan: status === 'canceled' ? 'free' : 'pro',
+    }));
+    await ds.getRepository(Subscription).save(ds.getRepository(Subscription).create({
+      userId: user.id,
+      stripeSubscriptionId: 'sub_existing',
+      tier: 'pro',
+      interval: 'month',
+      status,
+      cancelAtPeriodEnd: false,
+    }));
+    const service = new BillingService(ds.getRepository(User), ds.getRepository(Subscription), fakeConfig());
+    return { service, userId: user.id };
+  }
+
+  it.each(['trialing', 'active', 'past_due'] as const)(
+    'rejects a new checkout with ConflictException when the existing subscription is %s',
+    async (status) => {
+      const { service, userId } = await setupUserWithSubscription(status);
+      await expect(service.createCheckoutSession(userId, 'elite', 'month')).rejects.toBeInstanceOf(ConflictException);
+    },
+  );
+
+  it('does not block on the guard when the existing subscription is canceled', async () => {
+    const { service, userId } = await setupUserWithSubscription('canceled');
+    // Past the guard, createCheckoutSession would go on to call the real Stripe API
+    // (no network in this test env), so we only assert it never rejects with the
+    // guard's ConflictException — anything else confirms the guard let it through.
+    await expect(service.createCheckoutSession(userId, 'pro', 'month')).rejects.not.toBeInstanceOf(ConflictException);
+  });
+
+  it('does not block on the guard when the user has no Subscription row at all', async () => {
+    const ds = await makeDataSource();
+    const userRepo = ds.getRepository(User);
+    const user = await userRepo.save(userRepo.create({ email: 'c@example.com', stripeCustomerId: 'cus_789', plan: 'free' }));
+    const service = new BillingService(ds.getRepository(User), ds.getRepository(Subscription), fakeConfig());
+    await expect(service.createCheckoutSession(user.id, 'pro', 'month')).rejects.not.toBeInstanceOf(ConflictException);
   });
 });
