@@ -26,6 +26,12 @@ substitutions:
   # (kept separate from the apex Workspace domain). RESEND_API_KEY lives in
   # Secret Manager.
   _MAIL_FROM: Cofre <no-reply@notify.osmioservices.com>
+  # Fill in with the real Price IDs from the Stripe dashboard before the first
+  # deploy that ships billing.
+  _STRIPE_PRICE_PRO_MONTHLY: price_REPLACE_ME
+  _STRIPE_PRICE_PRO_YEARLY: price_REPLACE_ME
+  _STRIPE_PRICE_ELITE_MONTHLY: price_REPLACE_ME
+  _STRIPE_PRICE_ELITE_YEARLY: price_REPLACE_ME
   # The API's Cloud Run URL is deterministic (service-projectnumber.region).
   # Baked into the web build because Next evaluates rewrites() at build time.
   _API_PROXY_URL: https://cofre-api-193134215805.us-central1.run.app
@@ -114,6 +120,10 @@ steps:
       - 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID}'
       - 'PLAID_CLIENT_ID=${_PLAID_CLIENT_ID}'
       - 'MAIL_FROM=${_MAIL_FROM}'
+      - 'STRIPE_PRICE_PRO_MONTHLY=${_STRIPE_PRICE_PRO_MONTHLY}'
+      - 'STRIPE_PRICE_PRO_YEARLY=${_STRIPE_PRICE_PRO_YEARLY}'
+      - 'STRIPE_PRICE_ELITE_MONTHLY=${_STRIPE_PRICE_ELITE_MONTHLY}'
+      - 'STRIPE_PRICE_ELITE_YEARLY=${_STRIPE_PRICE_ELITE_YEARLY}'
 
 options:
   logging: CLOUD_LOGGING_ONLY
