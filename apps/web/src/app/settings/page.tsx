@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Fragment, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment, FormEvent, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { usePlaidLink } from 'react-plaid-link';
 import Sidebar from '@/components/Sidebar';
@@ -206,7 +207,8 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   },
 ];
 
-export default function SettingsPage() {
+function SettingsPageInner() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>('banks');
   const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string; connectedAt?: string } | null>(null);
   const [gmailLoading, setGmailLoading] = useState(false);
@@ -242,18 +244,21 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('checkout') === 'success') {
+    if (searchParams.get('checkout') === 'success') {
       // Stripe Checkout's success_url lands here — always show the new plan,
       // regardless of any ?tab= param also present.
       setActiveTab('billing');
       return;
     }
-    const tab = params.get('tab') as Tab | null;
+    const tab = searchParams.get('tab') as Tab | null;
     if (tab && ['account', 'banks', 'categories', 'rules', 'projects', 'appearance', 'integrations', 'billing'].includes(tab)) {
       setActiveTab(tab);
     }
-  }, []);
+    // Re-run whenever the query string actually changes (e.g. clicking "Upgrade" while
+    // already on /settings only changes the URL — Next.js's App Router does not remount
+    // this client component for a query-only navigation, so a mount-only effect here
+    // would never see the new ?tab= value).
+  }, [searchParams]);
 
   /* Pick up state handed off by /settings/plaid-oauth-redirect — that page is a
      lightweight Link landing page for banks requiring Plaid's OAuth redirect
@@ -1154,6 +1159,14 @@ export default function SettingsPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsPageInner />
+    </Suspense>
   );
 }
 
