@@ -57,7 +57,13 @@ export default function PlaidOAuthRedirectPage() {
             institution_name: metadata.institution?.name ?? 'Unknown Bank',
           }),
         });
-        if (!res.ok) throw new Error();
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          if (body?.code === 'INSTITUTION_LIMIT_REACHED') {
+            throw new Error('INSTITUTION_LIMIT_REACHED');
+          }
+          throw new Error();
+        }
         const preview: PreviewExchangeResult = await res.json();
 
         if (preview.hasManualAccounts) {
@@ -78,14 +84,15 @@ export default function PlaidOAuthRedirectPage() {
       }
       clearHandoffState();
       router.replace('/settings');
-    } catch {
+    } catch (err) {
       clearHandoffState();
-      sessionStorage.setItem(
-        'plaidPendingError',
-        mode === 'reconnect'
-          ? 'Reconnected, but refresh failed. Try syncing manually.'
-          : 'Bank connected but account import failed. Try syncing manually.',
-      );
+      const message =
+        err instanceof Error && err.message === 'INSTITUTION_LIMIT_REACHED'
+          ? 'Pro is limited to 4 linked institutions — upgrade to Elite in Settings → Billing for unlimited.'
+          : mode === 'reconnect'
+            ? 'Reconnected, but refresh failed. Try syncing manually.'
+            : 'Bank connected but account import failed. Try syncing manually.';
+      sessionStorage.setItem('plaidPendingError', message);
       router.replace('/settings');
     }
   };
