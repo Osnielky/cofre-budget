@@ -14,6 +14,7 @@ import AccountTypeIcon from '@/components/AccountTypeIcon';
 import DataResetModal from '@/components/DataResetModal';
 import PlaidMergeReviewModal, { PreviewExchangeResult } from '@/components/PlaidMergeReviewModal';
 import IntegrationsTab from '@/components/IntegrationsTab';
+import BillingTab from '@/components/BillingTab';
 import { useTheme } from '@/components/ThemeProvider';
 import { THEMES } from '@/lib/theme';
 import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
@@ -21,7 +22,7 @@ import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 type AccountType = string;
-type Tab = 'account' | 'banks' | 'categories' | 'rules' | 'projects' | 'appearance' | 'integrations' | 'data';
+type Tab = 'account' | 'banks' | 'categories' | 'rules' | 'projects' | 'appearance' | 'integrations' | 'billing' | 'data';
 
 interface BankAccount {
   id: string;
@@ -176,6 +177,15 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    id: 'billing',
+    label: 'Billing',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+      </svg>
+    ),
+  },
+  {
     id: 'appearance',
     label: 'Appearance',
     icon: (
@@ -233,8 +243,14 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    if (params.get('checkout') === 'success') {
+      // Stripe Checkout's success_url lands here — always show the new plan,
+      // regardless of any ?tab= param also present.
+      setActiveTab('billing');
+      return;
+    }
     const tab = params.get('tab') as Tab | null;
-    if (tab && ['account', 'banks', 'categories', 'rules', 'projects', 'appearance', 'integrations'].includes(tab)) {
+    if (tab && ['account', 'banks', 'categories', 'rules', 'projects', 'appearance', 'integrations', 'billing'].includes(tab)) {
       setActiveTab(tab);
     }
   }, []);
@@ -977,6 +993,9 @@ export default function SettingsPage() {
               onManageData={() => setShowResetModal(true)}
             />
           )}
+
+          {/* ── BILLING TAB ── */}
+          {activeTab === 'billing' && <BillingTab />}
 
           {/* ── APPEARANCE TAB ── */}
           {activeTab === 'appearance' && (
