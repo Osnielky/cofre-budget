@@ -47,9 +47,9 @@ describe('BillingService.syncFromStripeSubscription', () => {
 
   function fakeSub(overrides: any = {}) {
     return {
-      id: 'sub_1', status: 'trialing', current_period_end: 1_800_000_000,
+      id: 'sub_1', status: 'trialing',
       trial_end: 1_700_000_000, cancel_at_period_end: false,
-      items: { data: [{ price: { id: 'price_pro_month' } }] },
+      items: { data: [{ price: { id: 'price_pro_month' }, current_period_end: 1_800_000_000 }] },
       ...overrides,
     };
   }

@@ -14,10 +14,9 @@ function fakeSub(overrides: Partial<Stripe.Subscription> & { priceId: string }):
   return {
     id: 'sub_123',
     status: 'trialing',
-    current_period_end: 1_800_000_000,
     trial_end: 1_700_000_000,
     cancel_at_period_end: false,
-    items: { data: [{ price: { id: priceId } }] },
+    items: { data: [{ price: { id: priceId }, current_period_end: 1_800_000_000 }] },
     ...rest,
   } as unknown as Stripe.Subscription;
 }
