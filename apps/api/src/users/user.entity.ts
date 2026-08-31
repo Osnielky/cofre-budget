@@ -24,7 +24,12 @@ export class User {
   avatarUrl: string;
 
   @Column({ default: 'free' })
-  plan: 'free' | 'pro';
+  plan: 'free' | 'pro' | 'elite';
+
+  /* Set the first time this user ever starts Stripe Checkout — lets checkout/webhook
+     code reuse one Stripe Customer across repeat attempts and upgrades/downgrades. */
+  @Column({ nullable: true, unique: true })
+  stripeCustomerId: string | null;
 
   /* User-set date for reaching the $1,000,000 net-worth mission; null = not set */
   @Column({ type: 'date', nullable: true, default: null })
