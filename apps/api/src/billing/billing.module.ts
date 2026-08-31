@@ -1,0 +1,14 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { User } from '../users/user.entity';
+import { Subscription } from './subscription.entity';
+import { BillingService } from './billing.service';
+import { StripeWebhookVerifierService } from './stripe-webhook-verifier.service';
+import { MailModule } from '../mail/mail.module';
+
+@Module({
+  imports: [TypeOrmModule.forFeature([User, Subscription]), MailModule],
+  providers: [BillingService, StripeWebhookVerifierService],
+  exports: [BillingService],
+})
+export class BillingModule {}
