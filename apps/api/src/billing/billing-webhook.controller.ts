@@ -32,8 +32,8 @@ export class BillingWebhookController {
     let event: Stripe.Event;
     try {
       event = this.verifier.verify(rawBody, signature, this.config.get<string>('STRIPE_WEBHOOK_SECRET') as string);
-    } catch {
-      this.logger.warn('Rejected webhook: invalid signature');
+    } catch (err) {
+      this.logger.warn('Webhook signature verification failed: ' + (err instanceof Error ? err.message : String(err)));
       throw new UnauthorizedException('Invalid webhook signature');
     }
 
