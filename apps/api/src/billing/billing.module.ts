@@ -4,11 +4,13 @@ import { User } from '../users/user.entity';
 import { Subscription } from './subscription.entity';
 import { BillingService } from './billing.service';
 import { StripeWebhookVerifierService } from './stripe-webhook-verifier.service';
+import { BillingController } from './billing.controller';
 import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User, Subscription]), MailModule],
   providers: [BillingService, StripeWebhookVerifierService],
+  controllers: [BillingController],
   exports: [BillingService],
 })
 export class BillingModule {}
