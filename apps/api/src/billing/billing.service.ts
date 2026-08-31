@@ -132,4 +132,22 @@ export class BillingService {
     });
     return { url: session.url };
   }
+
+  async retrieveSubscription(id: string): Promise<Stripe.Subscription> {
+    return this.stripe.subscriptions.retrieve(id);
+  }
+
+  async getCustomerContact(stripeCustomerId: string): Promise<{ email: string; name: string } | null> {
+    const user = await this.users.findOneBy({ stripeCustomerId });
+    return user ? { email: user.email, name: user.name } : null;
+  }
+
+  async createPortalLinkForCustomer(stripeCustomerId: string): Promise<{ url: string }> {
+    const session = await this.stripe.billingPortal.sessions.create({
+      customer: stripeCustomerId,
+      return_url: `${this.frontendUrl}/settings`,
+      flow_data: { type: 'payment_method_update' },
+    });
+    return { url: session.url };
+  }
 }
