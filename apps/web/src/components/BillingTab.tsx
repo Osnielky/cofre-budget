@@ -38,7 +38,12 @@ function fmtDate(iso: string | null): string {
 async function fetchSubscription(): Promise<SubscriptionInfo | null> {
   const res = await fetch(`${API}/billing/subscription`, { credentials: 'include' });
   if (!res.ok) throw new Error(`Failed to fetch subscription (${res.status})`);
-  return await res.json();
+  // A genuinely absent subscription is a 200 with an EMPTY body (NestJS serializes a
+  // controller returning `null` that way), not the JSON literal `null` — res.json()
+  // throws a SyntaxError on an empty body, which the caller would otherwise misread
+  // as a fetch failure. Read as text first and only parse if non-empty.
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 /**

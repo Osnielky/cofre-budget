@@ -53,7 +53,7 @@ export default function PricingPage() {
       <PricingCards
         onSelectFree={() => router.push('/signup')}
         onSelectPaid={handleSelectPaid}
-        currentTier={user?.plan ?? 'free'}
+        currentTier={user ? (user.plan ?? 'free') : undefined}
       />
     </div>
   );
