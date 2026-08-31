@@ -45,10 +45,10 @@ export default function PricingCards({
             <button
               key={i}
               onClick={() => setInterval(i)}
-              className="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors"
-              style={interval === i
-                ? { background: 'var(--color-primary)', color: '#fff' }
-                : { color: 'var(--color-text-muted)' }}
+              className={interval === i
+                ? 'btn-gold px-4 py-1.5 rounded-full text-sm font-semibold transition-colors'
+                : 'px-4 py-1.5 rounded-full text-sm font-semibold transition-colors'}
+              style={interval === i ? undefined : { color: 'var(--color-text-muted)' }}
             >
               {i === 'month' ? 'Monthly' : 'Yearly — save 20%'}
             </button>
