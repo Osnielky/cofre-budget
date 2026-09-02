@@ -18,6 +18,7 @@ import { GmailModule } from '../gmail/gmail.module';
 import { ReceiptsModule } from '../receipts/receipts.module';
 import { CategorizationRulesModule } from '../categorization-rules/categorization-rules.module';
 import { NetWorthGoalModule } from '../net-worth-goal/net-worth-goal.module';
+import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { BillingModule } from '../billing/billing.module';
 import { HealthController } from '../health/health.controller';
 
@@ -44,6 +45,7 @@ import { HealthController } from '../health/health.controller';
     ReceiptsModule,
     CategorizationRulesModule,
     NetWorthGoalModule,
+    AiAgentModule,
     BillingModule,
   ],
   controllers: [HealthController],
