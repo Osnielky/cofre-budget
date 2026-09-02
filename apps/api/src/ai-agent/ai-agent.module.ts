@@ -15,14 +15,16 @@ import { DebtsModule } from '../debts/debts.module';
 import { AiReadToolsService } from './ai-read-tools.service';
 import { Category } from '../categories/category.entity';
 import { AiProposeToolsService } from './ai-propose-tools.service';
+import { AiActionsService } from './ai-actions.service';
+import { AiActionsController } from './ai-actions.controller';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([AiConversation, AiMessage, AiPendingAction, Transaction, Category]),
     TransactionsModule, CategoriesModule, BudgetsModule, NetWorthGoalModule, BankAccountsModule, DebtsModule,
   ],
-  providers: [AiConversationsService, AiReadToolsService, AiProposeToolsService],
-  controllers: [AiConversationsController],
+  providers: [AiConversationsService, AiReadToolsService, AiProposeToolsService, AiActionsService],
+  controllers: [AiConversationsController, AiActionsController],
   exports: [AiConversationsService],
 })
 export class AiAgentModule {}
