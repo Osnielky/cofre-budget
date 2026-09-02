@@ -13,7 +13,7 @@ export interface SavingsTrendWidgetData {
 }
 
 export type AiMessageWidget =
-  | { type: 'proposal'; actionId: string }
+  | { type: 'proposal'; actionId: string; status?: 'pending' | 'confirmed' | 'rejected' }
   | { type: 'savings_trend'; data: SavingsTrendWidgetData };
 
 @Entity('ai_messages')

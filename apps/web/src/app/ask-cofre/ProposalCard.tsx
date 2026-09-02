@@ -3,13 +3,16 @@
 import { useState } from 'react';
 
 export default function ProposalCard({
-  summary, onConfirm, onReject,
+  summary, onConfirm, onReject, initialStatus,
 }: {
   summary: string;
   onConfirm: () => Promise<void>;
   onReject: () => Promise<void>;
+  /** The proposal's real status as of the last load — lets a reloaded page show a
+   * resolved proposal correctly instead of defaulting to "pending". */
+  initialStatus?: 'pending' | 'confirmed' | 'rejected';
 }) {
-  const [status, setStatus] = useState<'pending' | 'confirming' | 'rejecting' | 'confirmed' | 'rejected'>('pending');
+  const [status, setStatus] = useState<'pending' | 'confirming' | 'rejecting' | 'confirmed' | 'rejected'>(initialStatus ?? 'pending');
 
   async function handleConfirm() {
     setStatus('confirming');

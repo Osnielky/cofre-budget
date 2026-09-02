@@ -15,15 +15,27 @@ export default function RecentChangesPanel({
   actions, onUndo,
 }: {
   actions: RecentAction[];
-  onUndo: (id: string) => Promise<void>;
+  onUndo: (id: string) => Promise<{ reverted: number; skipped: number } | null>;
 }) {
   const [undoingId, setUndoingId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [undoNotice, setUndoNotice] = useState<string | null>(null);
   const visible = expanded ? actions : actions.slice(0, 5);
 
   async function handleUndo(id: string) {
     setUndoingId(id);
-    try { await onUndo(id); } finally { setUndoingId(null); }
+    setUndoNotice(null);
+    try {
+      const result = await onUndo(id);
+      if (result && result.skipped > 0) {
+        const total = result.reverted + result.skipped;
+        setUndoNotice(
+          `Reverted ${result.reverted} of ${total} — ${result.skipped} ${result.skipped === 1 ? 'was' : 'were'} edited manually since and left alone.`,
+        );
+      }
+    } finally {
+      setUndoingId(null);
+    }
   }
 
   return (
@@ -36,6 +48,11 @@ export default function RecentChangesPanel({
           </button>
         )}
       </div>
+      {undoNotice && (
+        <p className="text-xs px-3 py-2 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-amber)', color: 'var(--color-text-secondary)' }}>
+          {undoNotice}
+        </p>
+      )}
       {visible.length === 0 && <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Nothing yet.</p>}
       {visible.map((a) => (
         <div key={a.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs"

@@ -13,7 +13,7 @@ export interface SavingsTrendWidgetData {
 }
 
 export type AiMessageWidget =
-  | { type: 'proposal'; actionId: string }
+  | { type: 'proposal'; actionId: string; status?: 'pending' | 'confirmed' | 'rejected' }
   | { type: 'savings_trend'; data: SavingsTrendWidgetData };
 
 export interface AiMessage {
@@ -150,9 +150,11 @@ export function useAiChat() {
     await fetch(`${API}/ai/actions/${actionId}/reject`, { method: 'POST', credentials: 'include' });
   }, []);
 
-  const undoAction = useCallback(async (actionId: string) => {
-    await fetch(`${API}/ai/actions/${actionId}/undo`, { method: 'POST', credentials: 'include' });
+  const undoAction = useCallback(async (actionId: string): Promise<{ reverted: number; skipped: number } | null> => {
+    const res = await fetch(`${API}/ai/actions/${actionId}/undo`, { method: 'POST', credentials: 'include' });
     await reloadRecent();
+    if (!res.ok) return null;
+    return res.json();
   }, [reloadRecent]);
 
   return {

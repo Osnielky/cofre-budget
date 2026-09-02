@@ -104,6 +104,7 @@ export default function AskCofrePage() {
                         return (
                           <ProposalCard
                             summary={m.text || 'A change was proposed.'}
+                            initialStatus={m.widget.status}
                             onConfirm={() => confirmAction(actionId)}
                             onReject={() => rejectAction(actionId)}
                           />
