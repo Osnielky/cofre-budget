@@ -17,14 +17,16 @@ import { Category } from '../categories/category.entity';
 import { AiProposeToolsService } from './ai-propose-tools.service';
 import { AiActionsService } from './ai-actions.service';
 import { AiActionsController } from './ai-actions.controller';
+import { AiChatService } from './ai-chat.service';
+import { AiChatController } from './ai-chat.controller';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([AiConversation, AiMessage, AiPendingAction, Transaction, Category]),
     TransactionsModule, CategoriesModule, BudgetsModule, NetWorthGoalModule, BankAccountsModule, DebtsModule,
   ],
-  providers: [AiConversationsService, AiReadToolsService, AiProposeToolsService, AiActionsService],
-  controllers: [AiConversationsController, AiActionsController],
+  providers: [AiConversationsService, AiReadToolsService, AiProposeToolsService, AiActionsService, AiChatService],
+  controllers: [AiConversationsController, AiActionsController, AiChatController],
   exports: [AiConversationsService],
 })
 export class AiAgentModule {}
