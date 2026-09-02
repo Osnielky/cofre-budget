@@ -109,7 +109,7 @@ export class AiActionsService {
       .andWhere("a.type = 'categorize_transactions'")
       .andWhere("a.status = 'confirmed'")
       .andWhere('a."undoneAt" IS NULL')
-      .orderBy('a."resolvedAt"', 'DESC')
+      .orderBy('a.resolvedAt', 'DESC')
       .limit(20)
       .getMany();
 
