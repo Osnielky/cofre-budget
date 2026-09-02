@@ -13,13 +13,15 @@ import { NetWorthGoalModule } from '../net-worth-goal/net-worth-goal.module';
 import { BankAccountsModule } from '../bank-accounts/bank-accounts.module';
 import { DebtsModule } from '../debts/debts.module';
 import { AiReadToolsService } from './ai-read-tools.service';
+import { Category } from '../categories/category.entity';
+import { AiProposeToolsService } from './ai-propose-tools.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AiConversation, AiMessage, AiPendingAction, Transaction]),
+    TypeOrmModule.forFeature([AiConversation, AiMessage, AiPendingAction, Transaction, Category]),
     TransactionsModule, CategoriesModule, BudgetsModule, NetWorthGoalModule, BankAccountsModule, DebtsModule,
   ],
-  providers: [AiConversationsService, AiReadToolsService],
+  providers: [AiConversationsService, AiReadToolsService, AiProposeToolsService],
   controllers: [AiConversationsController],
   exports: [AiConversationsService],
 })
