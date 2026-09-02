@@ -28,6 +28,11 @@ export class AiProposeToolsService {
     if (txs.length !== args.transactionIds.length) throw new NotFoundException('One or more transactions were not found.');
     if (!category || category.userId !== userId) throw new NotFoundException('Category not found.');
 
+    const debtLinked = txs.find(tx => tx.debtId);
+    if (debtLinked) {
+      throw new BadRequestException('Cannot categorize a debt-payment transaction through this action — it is already categorized by the Debts flow.');
+    }
+
     const action = await this.actions.save(this.actions.create({
       conversationId, type: 'categorize_transactions',
       payload: { transactionIds: args.transactionIds, categoryId: args.categoryId },
