@@ -79,10 +79,11 @@ export class AuthService {
 
   async requestPasswordReset(email: string): Promise<void> {
     const user = await this.usersService.findByEmailWithPassword(email);
-    if (!user?.password) return; // no account, or Google-only: silent (enumeration-safe)
+    if (!user) return; // no account with that email: silent (enumeration-safe)
+    // Google-only accounts have no password yet — reuse this flow to let them set one.
     const token = this.jwtService.sign(
       { sub: user.id, purpose: 'reset' },
-      { secret: this.jwtSecret + user.password, expiresIn: '1h' },
+      { secret: this.jwtSecret + (user.password ?? user.id), expiresIn: '1h' },
     );
     const link = `${this.frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
     await this.mail.sendPasswordReset(user.email, user.name, link);
@@ -93,9 +94,11 @@ export class AuthService {
     const decoded = this.jwtService.decode(token) as { sub?: string } | null;
     if (!decoded?.sub) throw new BadRequestException('Invalid or expired link.');
     const user = await this.usersService.findByIdWithPassword(decoded.sub);
-    if (!user?.password) throw new BadRequestException('Invalid or expired link.');
+    if (!user) throw new BadRequestException('Invalid or expired link.');
     try {
-      const payload = this.jwtService.verify<{ purpose: string }>(token, { secret: this.jwtSecret + user.password });
+      const payload = this.jwtService.verify<{ purpose: string }>(token, {
+        secret: this.jwtSecret + (user.password ?? user.id),
+      });
       if (payload.purpose !== 'reset') throw new Error('bad purpose');
     } catch {
       throw new BadRequestException('Invalid or expired link.');

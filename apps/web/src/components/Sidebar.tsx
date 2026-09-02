@@ -187,13 +187,35 @@ export default function Sidebar() {
         style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)' }}>
         <Avatar name={user?.name} email={user?.email} src={user?.avatarUrl} size={32} rounded={12} />
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold truncate leading-tight" style={{ color: 'var(--color-text-primary)' }}>
-            {displayName}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-semibold truncate leading-tight" style={{ color: 'var(--color-text-primary)' }}>
+              {displayName}
+            </p>
+            {user && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
+                style={user.plan !== 'free'
+                  ? { background: 'color-mix(in srgb, var(--color-primary) 16%, transparent)', color: 'var(--color-primary)' }
+                  : { background: 'color-mix(in srgb, var(--color-text-muted) 16%, transparent)', color: 'var(--color-text-muted)' }}>
+                {user.plan === 'elite' ? 'Elite' : user.plan === 'pro' ? 'Pro' : 'Basic'}
+              </span>
+            )}
+          </div>
           {user?.email && (
             <p className="text-[10px] truncate leading-tight" style={{ color: 'var(--color-text-muted)' }}>
               {user.email}
             </p>
+          )}
+          {user && user.plan === 'free' && (
+            <Link href="/settings?tab=billing" className="text-[10px] font-semibold leading-tight hover:underline"
+              style={{ color: 'var(--color-primary)' }}>
+              Upgrade to Pro
+            </Link>
+          )}
+          {user && user.plan === 'pro' && (
+            <Link href="/settings?tab=billing" className="text-[10px] font-semibold leading-tight hover:underline"
+              style={{ color: 'var(--color-primary)' }}>
+              Upgrade to Elite
+            </Link>
           )}
         </div>
         <button onClick={handleLogout} disabled={loggingOut} title="Sign out"

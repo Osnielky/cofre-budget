@@ -20,4 +20,4 @@ export interface Project {
   expenses: number; income: number; costBasis: number; netGain: number | null;
   roi: number | null; purchasePrice: number;
 }
-export interface Debt { remaining: number; status: 'open' | 'paid' }
+export interface Debt { remaining: number; status: 'open' | 'paid'; direction: 'lent' | 'owed' }

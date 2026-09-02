@@ -24,7 +24,12 @@ export class User {
   avatarUrl: string;
 
   @Column({ default: 'free' })
-  plan: 'free' | 'pro';
+  plan: 'free' | 'pro' | 'elite';
+
+  /* Set the first time this user ever starts Stripe Checkout — lets checkout/webhook
+     code reuse one Stripe Customer across repeat attempts and upgrades/downgrades. */
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  stripeCustomerId: string | null;
 
   /* User-set date for reaching the $1,000,000 net-worth mission; null = not set */
   @Column({ type: 'date', nullable: true, default: null })
@@ -40,6 +45,13 @@ export class User {
 
   @Column({ default: false })
   emailVerified: boolean;
+
+  /* Plaid's persistent user identifier (from /user/create) — required by
+     linkTokenCreate's `user_id` field for integrations approved after Dec 10, 2025
+     (see PlaidService.getOrCreatePlaidUserId). Null until the user's first Plaid
+     connection attempt. */
+  @Column({ type: 'varchar', nullable: true, default: null })
+  plaidUserId: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

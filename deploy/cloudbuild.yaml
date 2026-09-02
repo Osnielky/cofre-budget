@@ -18,15 +18,46 @@ substitutions:
   # Google OAuth client ID is public (safe to keep here); the secret stays in
   # Secret Manager. Baked into the deploy so it survives every CI run.
   _GOOGLE_CLIENT_ID: 193134215805-qpksslufmo42rnsk10nk4d5q4070gso5.apps.googleusercontent.com
+  # Plaid client_id is shared across all Plaid environments (sandbox/development/
+  # production) — only the secret differs per environment, which stays in Secret
+  # Manager. Safe to check in here, same pattern as _GOOGLE_CLIENT_ID above.
+  _PLAID_CLIENT_ID: 698660e28d9c88001e4b3f80
   # Email sender on the Resend-verified notify.osmioservices.com subdomain
   # (kept separate from the apex Workspace domain). RESEND_API_KEY lives in
   # Secret Manager.
   _MAIL_FROM: Cofre <no-reply@notify.osmioservices.com>
+  # Sandbox (test mode) Price IDs from the Stripe dashboard — swap to live-mode
+  # Price IDs once billing is verified end-to-end and ready to accept real payments.
+  _STRIPE_PRICE_PRO_MONTHLY: price_1UBFyP3EUUzxViMvgWjZpAb4
+  _STRIPE_PRICE_PRO_YEARLY: price_1UBG223EUUzxViMvNXXZFVDp
+  _STRIPE_PRICE_ELITE_MONTHLY: price_1UBFz63EUUzxViMvk6meqFzC
+  _STRIPE_PRICE_ELITE_YEARLY: price_1UBG2Z3EUUzxViMv4Z57m17a
   # The API's Cloud Run URL is deterministic (service-projectnumber.region).
   # Baked into the web build because Next evaluates rewrites() at build time.
   _API_PROXY_URL: https://cofre-api-193134215805.us-central1.run.app
 
 steps:
+  # ── Gate: unit tests must pass before anything is built or deployed. Lint
+  # also runs for visibility but doesn't block — the repo currently carries
+  # ~110 pre-existing lint findings unrelated to any given change, so failing
+  # the build on those would brick every deploy until they're all cleaned up. ──
+  - id: verify
+    # gcr.io/cloud-builders/npm is pinned to an old, unmaintained Node version —
+    # too old for Vitest 4's rolldown dependency, which requires Node 20.19+,
+    # 22.12+, or 24+ (node:util.styleText doesn't exist on older Node, causing a
+    # SyntaxError at startup). Match the Node major version used locally.
+    name: node:24-slim
+    entrypoint: bash
+    waitFor: ['-']
+    args:
+      - -c
+      - |
+        set -e
+        npm install
+        npx nx run-many -t lint --projects=api,web || true
+        npm run test:api
+        npm run test:dashboard
+
   # ── Build images (parallel; web bakes in the static API proxy URL) ──
   # Each pulls the previous :latest and builds with --cache-from, so when
   # package*.json is unchanged Docker reuses the npm-install layer instead of
@@ -34,7 +65,7 @@ steps:
   - id: build-api
     name: gcr.io/cloud-builders/docker
     entrypoint: bash
-    waitFor: ['-']
+    waitFor: ['verify']
     args:
       - -c
       - |
@@ -48,7 +79,7 @@ steps:
   - id: build-web
     name: gcr.io/cloud-builders/docker
     entrypoint: bash
-    waitFor: ['-']
+    waitFor: ['verify']
     args:
       - -c
       - |
@@ -87,7 +118,12 @@ steps:
       - 'DB_NAME=${_DB_NAME}'
       - 'DB_USER=${_DB_USER}'
       - 'GOOGLE_CLIENT_ID=${_GOOGLE_CLIENT_ID}'
+      - 'PLAID_CLIENT_ID=${_PLAID_CLIENT_ID}'
       - 'MAIL_FROM=${_MAIL_FROM}'
+      - 'STRIPE_PRICE_PRO_MONTHLY=${_STRIPE_PRICE_PRO_MONTHLY}'
+      - 'STRIPE_PRICE_PRO_YEARLY=${_STRIPE_PRICE_PRO_YEARLY}'
+      - 'STRIPE_PRICE_ELITE_MONTHLY=${_STRIPE_PRICE_ELITE_MONTHLY}'
+      - 'STRIPE_PRICE_ELITE_YEARLY=${_STRIPE_PRICE_ELITE_YEARLY}'
 
 options:
   logging: CLOUD_LOGGING_ONLY

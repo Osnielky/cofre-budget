@@ -21,9 +21,11 @@ export function useDashboardData() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const from = monthFrom(month), to = monthTo(month);
       const yearFrom = `${new Date().getFullYear()}-01-01`;
@@ -42,10 +44,13 @@ export function useDashboardData() {
       setBudgets(Array.isArray(bdg) ? bdg : []);
       setProjects(Array.isArray(proj) ? proj : []);
       setDebts(Array.isArray(dbt) ? dbt : []);
-    } catch {} finally { setLoading(false); }
+    } catch (err) {
+      console.error('[dashboard] failed to load data', err);
+      setError('Something went wrong loading your data. Please try again.');
+    } finally { setLoading(false); }
   }, [month]);
 
   useEffect(() => { reload(); }, [reload]);
 
-  return { month, setMonth, transactions, yearTx, accounts, budgets, projects, debts, loading, reload };
+  return { month, setMonth, transactions, yearTx, accounts, budgets, projects, debts, loading, error, reload };
 }

@@ -60,7 +60,7 @@ function greeting() {
 }
 
 export default function DashboardPage() {
-  const { month, setMonth, transactions, yearTx, accounts, budgets, projects, debts, loading } = useDashboardData();
+  const { month, setMonth, transactions, yearTx, accounts, budgets, projects, debts, loading, error, reload } = useDashboardData();
   const { user } = useUser();
   const tc = useThemeColors();
   const now = new Date();
@@ -101,9 +101,11 @@ export default function DashboardPage() {
   const incomeTarget    = incomeTargets.reduce((s,b) => s + Number(b.amount), 0) || null;
   const targetPct       = incomeTarget ? Math.round((income / incomeTarget) * 100) : null;
   const totalBalance = accounts.reduce((s,a) => s + (isDebtAcc(a) ? -Math.abs(Number(a.balance||0)) : Number(a.balance||0)), 0);
-  /* Money others still owe you = a receivable asset (open debts' remaining). */
-  const receivables  = debts.filter(dbt => dbt.status === 'open').reduce((s,dbt) => s + Number(dbt.remaining || 0), 0);
-  const netWorth     = totalBalance + receivables;
+  /* Open debts split by direction: money others owe you is a receivable asset; money you owe them is a liability. */
+  const openDebts    = debts.filter(dbt => dbt.status === 'open');
+  const receivables  = openDebts.filter(dbt => dbt.direction === 'lent').reduce((s,dbt) => s + Number(dbt.remaining || 0), 0);
+  const payables     = openDebts.filter(dbt => dbt.direction === 'owed').reduce((s,dbt) => s + Number(dbt.remaining || 0), 0);
+  const netWorth     = totalBalance + receivables - payables;
   const isCurrentMonth = month === currentMonth();
   const isEarliestMonth = month <= `${new Date().getFullYear()}-01`;
 
@@ -123,7 +125,8 @@ export default function DashboardPage() {
   const balanceBase     = netWorth - (d.daily.at(-1)?.net ?? 0);
   const money           = (n: number) => `${n < 0 ? '-' : ''}$${fmt(Math.abs(n))}`;
   const statCards: StatCardDef[] = [
-    { label: 'Total Balance',    value: money(netWorth), delta: d.netWorth.deltaPct, sub: receivables > 0 ? `incl. ${money(receivables)} owed to you` : 'vs last month',
+    { label: 'Total Balance',    value: money(netWorth), delta: d.netWorth.deltaPct,
+      sub: receivables > 0 ? `incl. ${money(receivables)} owed to you` : payables > 0 ? `incl. ${money(payables)} you owe` : 'vs last month',
       accent: tc.sky, icon: 'wallet', spark: d.daily.map(p => balanceBase + p.net) },
     { label: 'Monthly Income',   value: money(income), delta: incDelta, sub: targetPct != null ? `${targetPct}% of ${money(incomeTarget!)} target` : `vs ${monthShort(prevM)}: ${money(prevInc)}`,
       accent: tc.green, icon: 'trendup', spark: d.daily.map(p => p.income) },
@@ -185,6 +188,17 @@ export default function DashboardPage() {
               </Link>
             </div>
           </div>
+
+          {/* ── Error banner ── */}
+          {error && (
+            <div className="flex items-center justify-between gap-4 rounded-2xl px-5 py-3.5 flex-wrap"
+              style={{ background: 'rgba(255, 107, 107, 0.08)', border: '1px solid rgba(255, 107, 107, 0.25)' }}>
+              <span className="text-sm" style={{ color: 'var(--color-rose)' }}>{error}</span>
+              <button onClick={reload} className="text-xs font-semibold uppercase cursor-pointer" style={{ color: 'var(--color-rose)', letterSpacing: '0.1em' }}>
+                Retry
+              </button>
+            </div>
+          )}
 
           {/* ── Stat cards ── */}
           <StatCardsRow cards={statCards} loading={loading} />

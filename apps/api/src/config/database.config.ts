@@ -18,6 +18,7 @@ import { CategorizationRule } from '../categorization-rules/categorization-rule.
 import { AiConversation } from '../ai-agent/ai-conversation.entity';
 import { AiMessage } from '../ai-agent/ai-message.entity';
 import { AiPendingAction } from '../ai-agent/ai-pending-action.entity';
+import { Subscription } from '../billing/subscription.entity';
 
 export default registerAs('database', (): TypeOrmModuleOptions => ({
   type: 'postgres',
@@ -26,7 +27,7 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   username: process.env.DB_USER ?? 'postgres',
   password: process.env.DB_PASS ?? 'postgres',
   database: process.env.DB_NAME ?? 'cofre_budget',
-  entities: [User, BankAccount, PlaidItem, Transaction, Category, Budget, Project, ProjectCategory, Debt, DebtPayment, ConnectedApp, Receipt, CategorizationRule, AiConversation, AiMessage, AiPendingAction],
+  entities: [User, BankAccount, PlaidItem, Transaction, Category, Budget, Project, ProjectCategory, Debt, DebtPayment, ConnectedApp, Receipt, CategorizationRule, AiConversation, AiMessage, AiPendingAction, Subscription],
   synchronize: true,
   logging: false,
   ssl: (() => {

@@ -1,7 +1,18 @@
 # AI Agent (Chat + Tool-Calling)
 
 **Date:** 2026-08-14
-**Status:** Approved for planning
+**Status:** Approved for planning; amended 2026-09-02 (plan gating, persona, cost cap) — see Amendments
+
+## Amendments (2026-09-02)
+
+Written after billing (Free/Pro/Elite tiers) shipped — this spec predates billing entirely, so it originally had no tier-awareness. Decisions made when resuming this feature:
+
+- **Gated to Pro + Elite.** Every `ai/*` route requires `plan` in `('pro', 'elite')`, via the same `PlanGuard`/`@RequiresPlan` mechanism already gating Plaid. Free users are not blocked at the sidebar — "Ask Cofre" stays visible in nav for everyone — but visiting `/ask-cofre` on Free shows a locked/upsell screen instead of the chat, linking to Settings → Billing.
+- **Persona: a $1M-focused financial coach.** Per this product's stated mission (track wasteful spend, grow income, visualize the path to $1,000,000 net worth), the system prompt is reframed from a neutral "financial assistant" to an explicit coaching voice whose job is to help the user reach that goal as soon as possible — still bounded by the exact same tool set and confirm-before-acting rules below, this only changes tone/framing, not capability.
+- **Daily message cap: 50 per user.** Each real Claude API call costs money; this bounds worst-case exposure from a runaway client loop or deliberate abuse without meaningfully limiting real usage. Enforced server-side before the tool loop starts (checked before any Anthropic API call, so a capped-out user costs nothing) — returns a plain 403, no SSE stream opened.
+- **Explicitly deferred, NOT in this build** (flagged during scoping, each needs its own design pass before being built):
+  - **Credit-card spend optimization** — analyzing linked cards and proposing which card to use per category for "maximum results." Blocked on checking whether the data model even tracks what this needs (rewards categories, APR, credit limits on `BankAccount` rows) — likely needs new fields before any tool design.
+  - **Recommending new credit cards / comparing banks** — a fundamentally different kind of feature from the rest of this spec: it means the agent asserting facts about specific real third-party financial products (rates, rewards, sign-up bonuses) that change constantly and that Claude has no live data feed for. Building this via general model knowledge risks presenting stale or hallucinated product details as authoritative financial advice. Needs its own design that either sources real, current data or scopes down to general educational guidance ("look for a no-annual-fee card with grocery cashback") rather than naming specific products/rates.
 
 ## Problem
 

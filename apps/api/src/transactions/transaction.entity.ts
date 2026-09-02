@@ -45,8 +45,8 @@ export class Transaction {
   @Column()
   name: string;
 
-  @Column({ nullable: true })
-  merchantName: string;
+  @Column({ type: 'varchar', nullable: true })
+  merchantName: string | null;
 
   /* User-assigned category */
   @Column({ nullable: true })

@@ -1,12 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative } from './derive';
-import type { Transaction, Category, BankAccount } from './types';
+import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative, assetMix, netWorthTrend } from './derive';
+import type { Transaction, Category, BankAccount, Debt } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
   return { id: 'c1', name: 'Food', icon: '🍔', color: '#fff', type: 'expense', ...p };
 }
 export function acct(p: Partial<BankAccount> = {}): BankAccount {
   return { id: 'a1', bankName: 'B', accountName: 'A', accountType: 'checking', color: '#fff', balance: 0, ...p };
+}
+export function debt(p: Partial<Debt> = {}): Debt {
+  return { remaining: 0, status: 'open', direction: 'lent', ...p };
 }
 export function tx(p: Partial<Transaction> = {}): Transaction {
   return {
@@ -210,12 +213,24 @@ describe('netWorthBreakdown', () => {
     const out = netWorthBreakdown(
       [acct({ id: 'a1', accountName: 'Chk', accountType: 'checking', balance: 5000 }),
        acct({ id: 'a2', accountName: 'CC', accountType: 'credit', balance: 1200 })],
-      [{ remaining: 300, status: 'open' }],
+      [debt({ remaining: 300, status: 'open' })],
       [], '2026-07',
     );
     expect(out.assets).toBe(5300);       // 5000 + 300 receivable
     expect(out.liabilities).toBe(1200);
     expect(out.total).toBe(4100);
+  });
+  it('treats open "owed" debts as a liability, not a receivable', () => {
+    const out = netWorthBreakdown(
+      [acct({ balance: 5000 })],
+      [debt({ remaining: 300, status: 'open', direction: 'lent' }),
+       debt({ remaining: 800, status: 'open', direction: 'owed' })],
+      [], '2026-07',
+    );
+    expect(out.assets).toBe(5300);         // 5000 + 300 receivable ('lent')
+    expect(out.liabilities).toBe(800);     // 800 payable ('owed')
+    expect(out.total).toBe(4500);
+    expect(out.liabilityItems).toContainEqual({ label: 'Debts you owe', value: 800, color: '#6B6B8A' });
   });
   it('approximates month delta from this month cash flow', () => {
     const out = netWorthBreakdown(
@@ -234,6 +249,67 @@ describe('netWorthBreakdown', () => {
     );
     expect(out.liabilities).toBe(1200);
     expect(out.total).toBe(3800);
+  });
+  it('exposes this month cash flow as a dollar amount', () => {
+    const out = netWorthBreakdown(
+      [acct({ balance: 5000 })], [],
+      [tx({ date: '2026-07-01', amount: 1000 })], '2026-07',
+    );
+    expect(out.monthNet).toBe(1000);
+  });
+});
+
+describe('assetMix', () => {
+  it('groups accounts by type and computes percentages', () => {
+    const out = assetMix(
+      [acct({ id: 'a1', accountName: 'Chase Checking', accountType: 'checking', balance: 3000 }),
+       acct({ id: 'a2', accountName: 'Ally Savings', accountType: 'savings', balance: 1000 }),
+       acct({ id: 'a3', accountName: 'Vanguard', accountType: 'investment', balance: 6000 })],
+      [],
+    );
+    expect(out).toHaveLength(3);
+    expect(out[0]).toMatchObject({ label: 'Investment Account', value: 6000, pct: 60 });
+    expect(out[0].accounts).toEqual([{ id: 'a3', label: 'Vanguard', value: 6000 }]);
+  });
+  it('merges multiple accounts of the same type into one group', () => {
+    const out = assetMix(
+      [acct({ id: 'a1', accountName: 'Chk 1', accountType: 'checking', balance: 1000 }),
+       acct({ id: 'a2', accountName: 'Chk 2', accountType: 'checking', balance: 500 })],
+      [],
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].value).toBe(1500);
+    expect(out[0].accounts).toHaveLength(2);
+  });
+  it('adds a receivables group for open lent debts, excludes paid ones', () => {
+    const out = assetMix([], [debt({ remaining: 300, status: 'open' }), debt({ remaining: 200, status: 'paid' })]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ label: 'Money owed to you', value: 300 });
+  });
+  it('excludes open "owed" debts from the receivables group', () => {
+    const out = assetMix([], [debt({ remaining: 300, status: 'open', direction: 'lent' }),
+      debt({ remaining: 900, status: 'open', direction: 'owed' })]);
+    expect(out).toHaveLength(1);
+    expect(out[0].value).toBe(300);
+  });
+  it('excludes liability accounts', () => {
+    const out = assetMix([acct({ accountType: 'credit', balance: 500 })], []);
+    expect(out).toHaveLength(0);
+  });
+});
+
+describe('netWorthTrend', () => {
+  const NOW = new Date(2026, 6, 15); // Jul 15 2026
+  it('walks backward from current using each month net cash flow, capped to start of year', () => {
+    const yearTx = [
+      tx({ date: '2026-06-01', amount: 500 }),
+      tx({ date: '2026-07-01', amount: 200 }),
+    ];
+    const out = netWorthTrend(10000, yearTx, NOW, 3);
+    expect(out.map((p) => p.month)).toEqual(['May', 'Jun', 'Jul']);
+    expect(out[2].value).toBe(10000);   // Jul (current)
+    expect(out[1].value).toBe(9800);    // before Jul's +200
+    expect(out[0].value).toBe(9300);    // before Jun's +500
   });
 });
 
