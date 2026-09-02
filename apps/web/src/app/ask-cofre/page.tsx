@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useAiChat } from '@/hooks/useAiChat';
+import ProposalCard from './ProposalCard';
 
 const SUGGESTED_PROMPTS = [
   'How much am I saving this month?',
@@ -95,7 +96,16 @@ export default function AskCofrePage() {
                   ) : (
                     <div className="text-sm whitespace-pre-wrap" style={{ color: 'var(--color-text-primary)' }}>
                       {m.text || (sending && m.id === 'streaming' ? '…' : '')}
-                      {/* Task 9 renders m.widget?.type === 'proposal' here; Task 10 renders 'savings_trend'. */}
+                      {m.widget && m.widget.type === 'proposal' && (() => {
+                        const actionId = m.widget.actionId;
+                        return (
+                          <ProposalCard
+                            summary={m.text || 'A change was proposed.'}
+                            onConfirm={() => confirmAction(actionId)}
+                            onReject={() => rejectAction(actionId)}
+                          />
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
