@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useAiChat } from '@/hooks/useAiChat';
 import ProposalCard from './ProposalCard';
+import SavingsTrendWidget from './SavingsTrendWidget';
 
 const SUGGESTED_PROMPTS = [
   'How much am I saving this month?',
@@ -106,6 +107,9 @@ export default function AskCofrePage() {
                           />
                         );
                       })()}
+                      {m.widget && m.widget.type === 'savings_trend' && (
+                        <SavingsTrendWidget data={m.widget.data} />
+                      )}
                     </div>
                   )}
                 </div>
