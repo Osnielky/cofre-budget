@@ -5,6 +5,8 @@ import Sidebar from '@/components/Sidebar';
 import { useAiChat } from '@/hooks/useAiChat';
 import ProposalCard from './ProposalCard';
 import SavingsTrendWidget from './SavingsTrendWidget';
+import PermissionsPanel from './PermissionsPanel';
+import RecentChangesPanel from './RecentChangesPanel';
 
 const SUGGESTED_PROMPTS = [
   'How much am I saving this month?',
@@ -145,10 +147,14 @@ export default function AskCofrePage() {
           </form>
         </div>
 
-        {/* Right column: Tasks 11 fills this in with the permissions panel and recent-changes log. */}
-        <aside className="hidden lg:flex flex-col gap-4 w-80 shrink-0 border-l overflow-y-auto p-6"
+        {/* Right column: permissions panel and recent-changes log */}
+        <aside className="hidden lg:flex flex-col gap-6 w-80 shrink-0 border-l overflow-y-auto p-6"
           style={{ borderColor: 'var(--color-border)' }}>
-          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{recentActions.length} recent change(s) tracked.</p>
+          <PermissionsPanel />
+          <RecentChangesPanel actions={recentActions} onUndo={undoAction} />
+          <p className="text-xs p-3 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+            Categorization changes can be undone with one click. Other changes (categories, budgets, the net-worth goal) can always be edited or removed afterward.
+          </p>
         </aside>
       </main>
     </div>
