@@ -5,7 +5,7 @@ import { RequiresPlan } from '../auth/decorators/require-plan.decorator';
 import { PlaidService, ExchangeDecision } from './plaid.service';
 
 @UseGuards(JwtAuthGuard, PlanGuard)
-@RequiresPlan('pro')
+@RequiresPlan('pro', 'elite')
 @Controller('plaid')
 export class PlaidController {
   constructor(private service: PlaidService) {}
@@ -26,6 +26,7 @@ export class PlaidController {
       body.public_token,
       body.institution_id,
       body.institution_name,
+      req.user.plan,
     );
   }
 

@@ -42,6 +42,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "better-sqlite3": "^13.0.3",
     "eslint": "^9.8.0",
     "eslint-config-next": "^16.1.6",
     "eslint-config-prettier": "^10.0.0",
@@ -89,6 +90,7 @@
     "reflect-metadata": "^0.1.13",
     "resend": "^6.12.4",
     "rxjs": "^7.8.0",
+    "stripe": "^22.6.0",
     "tailwindcss": "^4.3.0",
     "typeorm": "^0.3.29"
   }

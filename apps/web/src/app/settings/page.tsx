@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Fragment, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment, FormEvent, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { usePlaidLink } from 'react-plaid-link';
 import Sidebar from '@/components/Sidebar';
@@ -14,6 +15,7 @@ import AccountTypeIcon from '@/components/AccountTypeIcon';
 import DataResetModal from '@/components/DataResetModal';
 import PlaidMergeReviewModal, { PreviewExchangeResult } from '@/components/PlaidMergeReviewModal';
 import IntegrationsTab from '@/components/IntegrationsTab';
+import BillingTab from '@/components/BillingTab';
 import { useTheme } from '@/components/ThemeProvider';
 import { THEMES } from '@/lib/theme';
 import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
@@ -21,7 +23,7 @@ import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 type AccountType = string;
-type Tab = 'account' | 'banks' | 'categories' | 'rules' | 'projects' | 'appearance' | 'integrations' | 'data';
+type Tab = 'account' | 'banks' | 'categories' | 'rules' | 'projects' | 'appearance' | 'integrations' | 'billing' | 'data';
 
 interface BankAccount {
   id: string;
@@ -176,6 +178,15 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    id: 'billing',
+    label: 'Billing',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+      </svg>
+    ),
+  },
+  {
     id: 'appearance',
     label: 'Appearance',
     icon: (
@@ -196,7 +207,8 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   },
 ];
 
-export default function SettingsPage() {
+function SettingsPageInner() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>('banks');
   const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string; connectedAt?: string } | null>(null);
   const [gmailLoading, setGmailLoading] = useState(false);
@@ -232,12 +244,21 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tab = params.get('tab') as Tab | null;
-    if (tab && ['account', 'banks', 'categories', 'rules', 'projects', 'appearance', 'integrations'].includes(tab)) {
+    if (searchParams.get('checkout') === 'success') {
+      // Stripe Checkout's success_url lands here — always show the new plan,
+      // regardless of any ?tab= param also present.
+      setActiveTab('billing');
+      return;
+    }
+    const tab = searchParams.get('tab') as Tab | null;
+    if (tab && ['account', 'banks', 'categories', 'rules', 'projects', 'appearance', 'integrations', 'billing'].includes(tab)) {
       setActiveTab(tab);
     }
-  }, []);
+    // Re-run whenever the query string actually changes (e.g. clicking "Upgrade" while
+    // already on /settings only changes the URL — Next.js's App Router does not remount
+    // this client component for a query-only navigation, so a mount-only effect here
+    // would never see the new ?tab= value).
+  }, [searchParams]);
 
   /* Pick up state handed off by /settings/plaid-oauth-redirect — that page is a
      lightweight Link landing page for banks requiring Plaid's OAuth redirect
@@ -336,7 +357,13 @@ export default function SettingsPage() {
             institution_name: metadata.institution?.name ?? 'Unknown Bank',
           }),
         });
-        if (!res.ok) throw new Error();
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          if (body?.code === 'INSTITUTION_LIMIT_REACHED') {
+            throw new Error('INSTITUTION_LIMIT_REACHED');
+          }
+          throw new Error();
+        }
         const preview: PreviewExchangeResult = await res.json();
 
         if (preview.hasManualAccounts) {
@@ -359,8 +386,12 @@ export default function SettingsPage() {
           });
         }
       }
-    } catch {
-      setError(linkMode === 'reconnect' ? 'Reconnected, but refresh failed. Try syncing manually.' : 'Bank connected but account import failed. Try syncing manually.');
+    } catch (err) {
+      if (err instanceof Error && err.message === 'INSTITUTION_LIMIT_REACHED') {
+        setError('Pro is limited to 4 linked institutions — upgrade to Elite in Settings → Billing for unlimited.');
+      } else {
+        setError(linkMode === 'reconnect' ? 'Reconnected, but refresh failed. Try syncing manually.' : 'Bank connected but account import failed. Try syncing manually.');
+      }
     } finally {
       setLinkToken(null); setConnecting(false); setReconnectItemId(null);
       sessionStorage.removeItem('plaidLinkToken');
@@ -978,6 +1009,9 @@ export default function SettingsPage() {
             />
           )}
 
+          {/* ── BILLING TAB ── */}
+          {activeTab === 'billing' && <BillingTab />}
+
           {/* ── APPEARANCE TAB ── */}
           {activeTab === 'appearance' && (
             <div className="flex flex-col gap-6 max-w-2xl">
@@ -1125,6 +1159,14 @@ export default function SettingsPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsPageInner />
+    </Suspense>
   );
 }
 

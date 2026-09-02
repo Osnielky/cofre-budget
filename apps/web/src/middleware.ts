@@ -10,7 +10,7 @@ function isJwtExpired(token: string): boolean {
   }
 }
 
-const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/privacy', '/terms', '/report-error'];
+const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/privacy', '/terms', '/report-error', '/pricing'];
 
 export function middleware(req: NextRequest) {
   const token = req.cookies.get('access_token')?.value;

@@ -10,7 +10,7 @@ interface User {
   email: string;
   avatarUrl?: string | null;
   googleId?: string | null;
-  plan?: 'free' | 'pro';
+  plan?: 'free' | 'pro' | 'elite';
   emailVerified?: boolean;
   createdAt?: string;
 }

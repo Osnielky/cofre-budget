@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -118,12 +118,23 @@ export class PlaidService {
     publicToken: string,
     institutionId: string,
     institutionName: string,
+    plan: 'free' | 'pro' | 'elite',
   ): Promise<PreviewExchangeResult> {
     const exchangeRes = await this.client.itemPublicTokenExchange({ public_token: publicToken });
     const { access_token, item_id } = exchangeRes.data;
 
     let item = await this.itemRepo.findOneBy({ itemId: item_id });
     if (!item) {
+      if (plan === 'pro') {
+        const count = await this.itemRepo.count({ where: { userId } });
+        if (count >= 4) {
+          await this.client.itemRemove({ access_token });
+          throw new ForbiddenException({
+            message: 'Pro is limited to 4 linked institutions — upgrade to Elite for unlimited.',
+            code: 'INSTITUTION_LIMIT_REACHED',
+          });
+        }
+      }
       item = this.itemRepo.create({ userId, itemId: item_id, institutionId, institutionName });
     }
     item.accessToken = encryptToken(access_token, this.encKey);

@@ -49,6 +49,17 @@ export class MailService {
     );
   }
 
+  async sendPaymentFailed(to: string, name: string, updateLink: string): Promise<void> {
+    await this.send(
+      to,
+      'Your Cofre payment failed',
+      'Payment failed',
+      'We couldn’t charge your card for your Cofre subscription. Please update your payment method to keep your plan active.',
+      'Update payment method',
+      updateLink,
+    );
+  }
+
   async sendDebtReceipt(to: string, borrowerName: string, d: { lenderName: string; amountPaid: number; remaining: number }): Promise<void> {
     const body = `${esc(d.lenderName)} recorded your payment of <strong>${money(d.amountPaid)}</strong>.<br/><br/>`
       + `Remaining balance: <strong>${money(d.remaining)}</strong>.`;
