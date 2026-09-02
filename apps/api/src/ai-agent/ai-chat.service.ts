@@ -179,7 +179,7 @@ export class AiChatService {
 
     const history = await this.conversations.historyForModel(conversationId, userId);
     const monthNote = monthContext ? `[The user is currently focused on ${monthContext}.] ` : '';
-    const messages = [...history, { role: 'user' as const, content: `${monthNote}${userText}` }];
+    const messages = [...history.slice(0, -1), { role: 'user' as const, content: `${monthNote}${userText}` }];
 
     const runner = this.client.beta.messages.toolRunner({
       model: MODEL,
