@@ -10,12 +10,16 @@ const PRICES: Record<'pro' | 'elite', { month: number; year: number }> = {
   elite: { month: 7.99, year: 76.7 },
 };
 
-const FEATURES: { label: string; free: boolean; pro: boolean; elite: boolean }[] = [
+type FeatureValue = boolean | string;
+
+const FEATURES: { label: string; free: FeatureValue; pro: FeatureValue; elite: FeatureValue }[] = [
   { label: 'Manual accounts & CSV import', free: true, pro: true, elite: true },
-  { label: 'Budgets, debts/loans, goals, net worth', free: true, pro: true, elite: true },
+  { label: 'Budgets & spending tracking', free: true, pro: true, elite: true },
+  { label: 'Debts & loans tracking', free: true, pro: true, elite: true },
+  { label: 'Savings goals & net-worth trajectory', free: true, pro: true, elite: true },
+  { label: 'Receipt scanning via Gmail', free: true, pro: true, elite: true },
   { label: 'Automatic bank sync (Plaid)', free: false, pro: true, elite: true },
-  { label: 'Up to 4 linked institutions', free: false, pro: true, elite: true },
-  { label: 'Unlimited linked institutions', free: false, pro: false, elite: true },
+  { label: 'Linked institutions', free: '—', pro: 'Up to 4', elite: 'Unlimited' },
 ];
 
 const glass: React.CSSProperties = {
@@ -25,6 +29,96 @@ const glass: React.CSSProperties = {
   border: 'var(--glass-border)',
   boxShadow: 'var(--glass-shadow)',
 };
+
+function money(n: number): string {
+  return n.toFixed(2);
+}
+
+function FeatureRow({ value, label, isLast }: { value: FeatureValue; label: string; isLast: boolean }) {
+  return (
+    <div
+      className="flex items-center justify-between gap-3 py-2.5 text-sm"
+      style={{ borderBottom: isLast ? 'none' : '1px solid var(--color-border)' }}
+    >
+      <span className="flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
+        {value === false ? (
+          <span aria-hidden style={{ color: 'var(--color-text-muted)' }}>✕</span>
+        ) : (
+          <span aria-hidden style={{ color: 'var(--color-green)' }}>✓</span>
+        )}
+        {label}
+      </span>
+      {typeof value === 'string' && (
+        <span className="font-semibold shrink-0" style={{ color: 'var(--color-text-secondary)' }}>{value}</span>
+      )}
+    </div>
+  );
+}
+
+function Card({
+  name,
+  priceMonth,
+  priceYear,
+  interval,
+  isCurrent,
+  onSelect,
+  ctaLabel,
+  featureKey,
+}: {
+  name: string;
+  priceMonth: number;
+  priceYear: number;
+  interval: Interval;
+  isCurrent: boolean;
+  onSelect: () => void;
+  ctaLabel: string;
+  featureKey: 'free' | 'pro' | 'elite';
+}) {
+  const price = interval === 'month' ? priceMonth : priceYear / 12;
+  const yearlySavings = priceMonth * 12 - priceYear;
+
+  return (
+    <div
+      className="rounded-2xl p-6 flex flex-col"
+      style={{
+        ...glass,
+        border: isCurrent ? '2px solid var(--color-primary)' : glass.border,
+      }}
+    >
+      <h3 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>{name}</h3>
+      <p className="mt-3">
+        <span className="text-3xl font-bold" style={{ color: 'var(--color-text-primary)' }}>${money(price)}</span>
+        <span className="text-sm font-normal" style={{ color: 'var(--color-text-muted)' }}>/mo</span>
+      </p>
+      {priceMonth > 0 && (
+        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+          {interval === 'year'
+            ? `billed annually · save $${money(yearlySavings)} a year`
+            : 'billed monthly'}
+        </p>
+      )}
+
+      {isCurrent ? (
+        <span
+          className="w-full mt-6 py-2 rounded-full font-semibold text-center text-sm"
+          style={{ background: 'color-mix(in srgb, var(--color-primary) 16%, transparent)', color: 'var(--color-primary)' }}
+        >
+          Your current plan
+        </span>
+      ) : (
+        <button onClick={onSelect} className="btn-gold w-full mt-6 py-2 rounded-full font-semibold">
+          {ctaLabel}
+        </button>
+      )}
+
+      <div className="mt-6 flex flex-col">
+        {FEATURES.map((f, i) => (
+          <FeatureRow key={f.label} label={f.label} value={f[featureKey]} isLast={i === FEATURES.length - 1} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function PricingCards({
   onSelectFree,
@@ -39,77 +133,66 @@ export default function PricingCards({
 
   return (
     <div>
-      <div className="flex justify-center mb-8">
-        <div className="inline-flex rounded-full p-1" style={glass}>
-          {(['month', 'year'] as Interval[]).map((i) => (
-            <button
-              key={i}
-              onClick={() => setInterval(i)}
-              className={interval === i
-                ? 'btn-gold px-4 py-1.5 rounded-full text-sm font-semibold transition-colors'
-                : 'px-4 py-1.5 rounded-full text-sm font-semibold transition-colors'}
-              style={interval === i ? undefined : { color: 'var(--color-text-muted)' }}
+      <div className="flex items-center justify-center gap-6 mb-10">
+        {(['month', 'year'] as Interval[]).map((i) => (
+          <label key={i} className="flex items-center gap-2 cursor-pointer select-none">
+            <span
+              className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
+              style={{ border: `2px solid ${interval === i ? 'var(--color-primary)' : 'var(--color-border)'}` }}
             >
-              {i === 'month' ? 'Monthly' : 'Yearly — save 20%'}
-            </button>
-          ))}
-        </div>
+              {interval === i && <span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-primary)' }} />}
+            </span>
+            <input
+              type="radio"
+              name="billing-interval"
+              className="sr-only"
+              checked={interval === i}
+              onChange={() => setInterval(i)}
+            />
+            <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+              {i === 'month' ? 'Monthly' : 'Annually'}
+            </span>
+          </label>
+        ))}
+        <span
+          className="text-xs font-bold px-2.5 py-1 rounded-full"
+          style={{ background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
+        >
+          Save 20%
+        </span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="rounded-2xl p-6" style={glass}>
-          <h3 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>Free</h3>
-          <p className="text-3xl font-bold mt-2" style={{ color: 'var(--color-text-primary)' }}>$0</p>
-          <button
-            onClick={onSelectFree}
-            disabled={currentTier === 'free'}
-            className="btn-gold w-full mt-6 py-2 rounded-full font-semibold disabled:opacity-50"
-          >
-            {currentTier === 'free' ? 'Current plan' : 'Get started'}
-          </button>
-        </div>
-
-        {(['pro', 'elite'] as const).map((tier) => (
-          <div key={tier} className="rounded-2xl p-6" style={glass}>
-            <h3 className="text-lg font-bold capitalize" style={{ color: 'var(--color-text-primary)' }}>{tier}</h3>
-            <p className="text-3xl font-bold mt-2" style={{ color: 'var(--color-text-primary)' }}>
-              ${PRICES[tier][interval].toFixed(2)}
-              <span className="text-sm font-normal" style={{ color: 'var(--color-text-muted)' }}>
-                /{interval === 'month' ? 'mo' : 'yr'}
-              </span>
-            </p>
-            <button
-              onClick={() => onSelectPaid(tier, interval)}
-              disabled={currentTier === tier}
-              className="btn-gold w-full mt-6 py-2 rounded-full font-semibold disabled:opacity-50"
-            >
-              {currentTier === tier ? 'Current plan' : 'Start 7-day free trial'}
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-10 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ color: 'var(--color-text-muted)' }}>
-              <th className="text-left py-2">Feature</th>
-              <th className="py-2">Free</th>
-              <th className="py-2">Pro</th>
-              <th className="py-2">Elite</th>
-            </tr>
-          </thead>
-          <tbody>
-            {FEATURES.map((f) => (
-              <tr key={f.label} style={{ borderTop: '1px solid var(--color-border)' }}>
-                <td className="py-2" style={{ color: 'var(--color-text-primary)' }}>{f.label}</td>
-                <td className="text-center py-2">{f.free ? '✓' : '—'}</td>
-                <td className="text-center py-2">{f.pro ? '✓' : '—'}</td>
-                <td className="text-center py-2">{f.elite ? '✓' : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Card
+          name="Free"
+          priceMonth={0}
+          priceYear={0}
+          interval={interval}
+          isCurrent={currentTier === 'free'}
+          onSelect={onSelectFree}
+          ctaLabel="Get started"
+          featureKey="free"
+        />
+        <Card
+          name="Pro"
+          priceMonth={PRICES.pro.month}
+          priceYear={PRICES.pro.year}
+          interval={interval}
+          isCurrent={currentTier === 'pro'}
+          onSelect={() => onSelectPaid('pro', interval)}
+          ctaLabel="Start 15-day free trial"
+          featureKey="pro"
+        />
+        <Card
+          name="Elite"
+          priceMonth={PRICES.elite.month}
+          priceYear={PRICES.elite.year}
+          interval={interval}
+          isCurrent={currentTier === 'elite'}
+          onSelect={() => onSelectPaid('elite', interval)}
+          ctaLabel="Start 15-day free trial"
+          featureKey="elite"
+        />
       </div>
     </div>
   );

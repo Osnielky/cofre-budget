@@ -77,7 +77,7 @@ export class BillingService {
       customer: customerId,
       mode: 'subscription',
       line_items: [{ price: this.priceIdFor(tier, interval), quantity: 1 }],
-      subscription_data: { trial_period_days: 7 },
+      subscription_data: { trial_period_days: 15 },
       success_url: `${this.frontendUrl}/settings?checkout=success`,
       cancel_url: `${this.frontendUrl}/pricing`,
     });
