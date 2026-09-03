@@ -78,4 +78,15 @@ export class AiConversationsService {
     await this.conversations.update(conversationId, { updatedAt: new Date() });
     return this.messages.save(this.messages.create({ conversationId, role: 'assistant', text, widget }));
   }
+
+  async countUserMessagesToday(userId: string): Promise<number> {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    return this.messages.createQueryBuilder('m')
+      .innerJoin(AiConversation, 'c', 'c.id = m."conversationId"')
+      .where('c."userId" = :userId', { userId })
+      .andWhere("m.role = 'user'")
+      .andWhere('m."createdAt" >= :startOfDay', { startOfDay })
+      .getCount();
+  }
 }

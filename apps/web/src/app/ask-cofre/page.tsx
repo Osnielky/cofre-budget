@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { useAiChat } from '@/hooks/useAiChat';
+import { useUser } from '@/components/UserProvider';
 import ProposalCard from './ProposalCard';
 import SavingsTrendWidget from './SavingsTrendWidget';
 import PermissionsPanel from './PermissionsPanel';
@@ -27,6 +29,7 @@ export default function AskCofrePage() {
     messages, loading, sending, sendMessage,
     confirmAction, rejectAction, recentActions, undoAction,
   } = useAiChat();
+  const { user } = useUser();
   const [input, setInput] = useState('');
   const [month, setMonth] = useState(currentMonth());
   const [showHistory, setShowHistory] = useState(false);
@@ -38,6 +41,28 @@ export default function AskCofrePage() {
     if (!text.trim() || sending) return;
     setInput('');
     await sendMessage(text.trim(), month);
+  }
+
+  if (user && user.plan === 'free') {
+    return (
+      <div className="flex h-dvh overflow-hidden">
+        <Sidebar />
+        <main className="flex-1 flex items-center justify-center p-6">
+          <div className="max-w-md text-center rounded-2xl p-8 flex flex-col items-center gap-4"
+            style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
+            <span className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-indigo))', color: 'white' }}>⚡</span>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>Ask Cofre is a Pro & Elite feature</h2>
+            <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+              Your personal AI finance coach — get straight answers, spending analysis, and hands-on help getting to $1,000,000 faster.
+            </p>
+            <Link href="/settings?tab=billing" className="btn-gold px-5 py-2.5 rounded-full font-semibold text-sm">
+              Upgrade to unlock
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (

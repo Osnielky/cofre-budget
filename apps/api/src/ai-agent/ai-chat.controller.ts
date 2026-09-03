@@ -1,10 +1,13 @@
-import { Controller, Post, Param, Body, UseGuards, Request, Res } from '@nestjs/common';
+import { Controller, Post, Param, Body, UseGuards, Request, Res, ForbiddenException } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PlanGuard } from '../auth/guards/plan.guard';
+import { RequiresPlan } from '../auth/decorators/require-plan.decorator';
 import { AiChatService } from './ai-chat.service';
 import { AiConversationsService } from './ai-conversations.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PlanGuard)
+@RequiresPlan('pro', 'elite')
 @Controller('ai/conversations')
 export class AiChatController {
   constructor(
@@ -19,6 +22,12 @@ export class AiChatController {
     @Body() body: { content: string; month?: string },
     @Res() res: Response,
   ) {
+    const DAILY_MESSAGE_CAP = 50;
+    const sentToday = await this.conversations.countUserMessagesToday(req.user.id);
+    if (sentToday >= DAILY_MESSAGE_CAP) {
+      throw new ForbiddenException(`You've reached today's limit of ${DAILY_MESSAGE_CAP} messages — it resets at midnight.`);
+    }
+
     await this.conversations.appendUserMessage(id, req.user.id, body.content);
 
     res.writeHead(200, {

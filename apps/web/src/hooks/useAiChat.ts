@@ -108,6 +108,15 @@ export function useAiChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, month }),
       });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setMessages((prev) => [...prev.slice(0, -1), {
+          id: `err-${Date.now()}`, role: 'assistant',
+          text: typeof body?.message === 'string' ? body.message : 'Something went wrong. Please try again.',
+          widget: null, createdAt: new Date().toISOString(),
+        }]);
+        return;
+      }
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let buffer = '';

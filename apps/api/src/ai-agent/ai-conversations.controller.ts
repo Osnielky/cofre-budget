@@ -1,8 +1,11 @@
 import { Controller, Get, Post, Param, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PlanGuard } from '../auth/guards/plan.guard';
+import { RequiresPlan } from '../auth/decorators/require-plan.decorator';
 import { AiConversationsService } from './ai-conversations.service';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, PlanGuard)
+@RequiresPlan('pro', 'elite')
 @Controller('ai/conversations')
 export class AiConversationsController {
   constructor(private service: AiConversationsService) {}
