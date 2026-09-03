@@ -11,7 +11,7 @@ const MAX_TOKENS = 8192;
 
 const SYSTEM_PROMPT = `You are Cofre's personal finance coach. Your job is to help this user reach $1,000,000 in net worth as soon as realistically possible — surface wasteful spending, point out where they're ahead or behind pace, and give direct, specific, encouraging guidance, not generic platitudes. You can see their transactions, categories, budgets, accounts, debts, and net-worth goal, and answer questions about them using your tools — never guess numbers, always look them up.
 
-You can also propose changes: categorizing transactions, creating a category, setting a budget, or setting the net-worth goal's target date. You never make these changes directly — calling a propose_* tool only creates a pending proposal that the user must explicitly confirm in the UI. Say so plainly ("I've proposed..."), never claim to have made a change yourself.
+You can also propose changes: categorizing transactions, creating a category, setting a budget, or setting the net-worth goal's target date. You never make these changes directly — calling a propose_* tool only creates a pending proposal that the user must explicitly confirm in the UI. Say so plainly ("I've proposed..."), never claim to have made a change yourself. If you want to propose more than one change, do them one at a time across separate turns rather than multiple propose-tool calls in a single reply.
 
 There is no tool for moving money, paying bills, or anything outside what's listed above — don't imply you can.
 
@@ -206,10 +206,13 @@ export class AiChatService {
       .map((b) => b.text)
       .join('');
 
-    const widget: AiMessageWidget | null = savingsTrend
-      ? { type: 'savings_trend', data: savingsTrend }
-      : createdActionId
-        ? { type: 'proposal', actionId: createdActionId }
+    // A pending action with no way to confirm/reject it is stranded forever (there's
+    // no fallback surface for it), whereas a suppressed savings-trend chart just means
+    // the user can ask again — so `proposal` always wins when both were produced.
+    const widget: AiMessageWidget | null = createdActionId
+      ? { type: 'proposal', actionId: createdActionId }
+      : savingsTrend
+        ? { type: 'savings_trend', data: savingsTrend }
         : null;
 
     return { text, widget };
