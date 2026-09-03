@@ -48,6 +48,7 @@ export class AiActionsService {
       for (const transactionId of payload.transactionIds) {
         const before = await this.txRepo.findOneBy({ id: transactionId, userId });
         if (!before) continue; // vanished since the proposal was made — skip it
+        if (before.debtId) continue; // became debt-linked since the proposal was made — skip it
         undoEntries.push({ transactionId, previousCategoryId: before.categoryId });
         await this.transactions.updateCategory(transactionId, userId, payload.categoryId);
         applied++;
