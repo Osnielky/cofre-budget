@@ -50,8 +50,8 @@ export default function AskCofrePage() {
         <main className="flex-1 flex items-center justify-center p-6">
           <div className="max-w-md text-center rounded-2xl p-8 flex flex-col items-center gap-4"
             style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
-            <span className="w-12 h-12 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-indigo))', color: 'white' }}>⚡</span>
+            {/* eslint-disable-next-line @next/next/no-img-element -- fixed-color brand asset, not a themed vector icon */}
+            <img src="/ask-cofre-logo.png" alt="" className="w-12 h-12" style={{ objectFit: 'contain' }} />
             <h2 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>Ask Cofre is a Pro & Elite feature</h2>
             <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
               Your personal AI finance coach — get straight answers, spending analysis, and hands-on help getting to $1,000,000 faster.
@@ -73,8 +73,8 @@ export default function AskCofrePage() {
           {/* Header */}
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
-              <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-indigo))', color: 'white' }}>⚡</span>
+              {/* eslint-disable-next-line @next/next/no-img-element -- fixed-color brand asset, not a themed vector icon */}
+              <img src="/ask-cofre-logo.png" alt="" className="w-10 h-10 shrink-0" style={{ objectFit: 'contain' }} />
               <div>
                 <h1 className="font-bold" style={{ fontSize: 22 }}>Ask Cofre</h1>
                 <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Reads your whole account. Asks before it changes anything.</p>

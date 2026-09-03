@@ -256,11 +256,8 @@ function DashboardIcon() {
 }
 
 function AskCofreIcon() {
-  return (
-    <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-      <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/>
-    </svg>
-  );
+  // eslint-disable-next-line @next/next/no-img-element -- fixed-color brand asset, not a themed vector icon
+  return <img src="/ask-cofre-logo.png" alt="" width={19} height={19} style={{ objectFit: 'contain' }} />;
 }
 
 function GoalsIcon() {
