@@ -40,7 +40,10 @@ steps:
   # ── Gate: unit tests must pass before anything is built or deployed. Lint
   # also runs for visibility but doesn't block — the repo currently carries
   # ~110 pre-existing lint findings unrelated to any given change, so failing
-  # the build on those would brick every deploy until they're all cleaned up. ──
+  # the build on those would brick every deploy until they're all cleaned up.
+  # Runs in parallel with the image builds below (nothing they produce depends
+  # on test results) — only `deploy` waits on this, so a full test run no
+  # longer sits on the critical path when it passes. ──
   - id: verify
     # gcr.io/cloud-builders/npm is pinned to an old, unmaintained Node version —
     # too old for Vitest 4's rolldown dependency, which requires Node 20.19+,
@@ -58,14 +61,15 @@ steps:
         npm run test:api
         npm run test:dashboard
 
-  # ── Build images (parallel; web bakes in the static API proxy URL) ──
+  # ── Build images (parallel with each other AND with `verify` above; web
+  # bakes in the static API proxy URL) ──
   # Each pulls the previous :latest and builds with --cache-from, so when
   # package*.json is unchanged Docker reuses the npm-install layer instead of
   # reinstalling ~1700 packages — cutting most builds from ~10min to ~3-4min.
   - id: build-api
     name: gcr.io/cloud-builders/docker
     entrypoint: bash
-    waitFor: ['verify']
+    waitFor: ['-']
     args:
       - -c
       - |
@@ -79,7 +83,7 @@ steps:
   - id: build-web
     name: gcr.io/cloud-builders/docker
     entrypoint: bash
-    waitFor: ['verify']
+    waitFor: ['-']
     args:
       - -c
       - |
@@ -107,7 +111,7 @@ steps:
   - id: deploy
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: bash
-    waitFor: ['push-api', 'push-web']
+    waitFor: ['verify', 'push-api', 'push-web']
     args: ['deploy/ci-deploy.sh']
     env:
       - 'PROJECT_ID=$PROJECT_ID'
@@ -127,5 +131,9 @@ steps:
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  # Default Cloud Build workers are low-CPU (~1 vCPU), and npm install / lint /
+  # test / Nx-webpack / Next-Turbopack compiles are all CPU-bound — a bigger
+  # machine cuts wall-clock time well past what the extra per-minute cost adds.
+  machineType: E2_HIGHCPU_8
 
 timeout: 1800s
