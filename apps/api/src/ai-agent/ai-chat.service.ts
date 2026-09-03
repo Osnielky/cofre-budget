@@ -4,7 +4,7 @@ import { betaTool } from '@anthropic-ai/sdk/helpers/beta/json-schema';
 import { AiConversationsService } from './ai-conversations.service';
 import { AiReadToolsService } from './ai-read-tools.service';
 import { AiProposeToolsService } from './ai-propose-tools.service';
-import type { AiMessageWidget, SavingsTrendWidgetData } from './ai-message.entity';
+import type { AiMessageWidget, SavingsTrendWidgetData, SafeToSpendWidgetData } from './ai-message.entity';
 
 const MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 8192;
@@ -45,6 +45,7 @@ export class AiChatService {
 
     let createdActionId: string | null = null;
     let savingsTrend: SavingsTrendWidgetData | null = null;
+    let safeToSpend: SafeToSpendWidgetData | null = null;
 
     const tools = [
       betaTool({
@@ -103,6 +104,19 @@ export class AiChatService {
         run: async () => {
           const data = await this.readTools.getSavingsTrend(userId);
           savingsTrend = data;
+          return JSON.stringify(data);
+        },
+      }),
+      betaTool({
+        name: 'get_safe_to_spend',
+        description: 'Calculate how much the user can safely spend or save this month: projected income minus their planned (budgeted) spending minus a 5% safety buffer. Use this when the user asks how much they can safely spend, save, or afford something this month.',
+        inputSchema: {
+          type: 'object',
+          properties: { month: { type: 'string', description: 'YYYY-MM, defaults to the current month' } },
+        },
+        run: async (args) => {
+          const data = await this.readTools.getSafeToSpend(userId, args as any);
+          safeToSpend = data;
           return JSON.stringify(data);
         },
       }),
@@ -207,13 +221,15 @@ export class AiChatService {
       .join('');
 
     // A pending action with no way to confirm/reject it is stranded forever (there's
-    // no fallback surface for it), whereas a suppressed savings-trend chart just means
-    // the user can ask again — so `proposal` always wins when both were produced.
+    // no fallback surface for it), whereas a suppressed read-only widget just means
+    // the user can ask again — so `proposal` always wins when multiple were produced.
     const widget: AiMessageWidget | null = createdActionId
       ? { type: 'proposal', actionId: createdActionId }
-      : savingsTrend
-        ? { type: 'savings_trend', data: savingsTrend }
-        : null;
+      : safeToSpend
+        ? { type: 'safe_to_spend', data: safeToSpend }
+        : savingsTrend
+          ? { type: 'savings_trend', data: savingsTrend }
+          : null;
 
     return { text, widget };
   }

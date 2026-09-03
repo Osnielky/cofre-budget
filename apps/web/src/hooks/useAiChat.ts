@@ -12,9 +12,18 @@ export interface SavingsTrendWidgetData {
   accountCount: number;
 }
 
+export interface SafeToSpendWidgetData {
+  month: string;
+  income: number;
+  plannedSpending: number;
+  safetyBuffer: number;
+  safeAmount: number;
+}
+
 export type AiMessageWidget =
   | { type: 'proposal'; actionId: string; status?: 'pending' | 'confirmed' | 'rejected' }
-  | { type: 'savings_trend'; data: SavingsTrendWidgetData };
+  | { type: 'savings_trend'; data: SavingsTrendWidgetData }
+  | { type: 'safe_to_spend'; data: SafeToSpendWidgetData };
 
 export interface AiMessage {
   id: string;

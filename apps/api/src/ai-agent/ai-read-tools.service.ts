@@ -10,7 +10,8 @@ import { BankAccountsService } from '../bank-accounts/bank-accounts.service';
 import { DebtsService } from '../debts/debts.service';
 import { TRACKING_TYPES } from '../bank-accounts/account-types';
 import { computeSavingsTrend } from './ai-savings-trend.math';
-import type { SavingsTrendWidgetData } from './ai-message.entity';
+import { computeSafeToSpend } from './ai-safe-to-spend.math';
+import type { SavingsTrendWidgetData, SafeToSpendWidgetData } from './ai-message.entity';
 
 export interface GetTransactionsArgs {
   startDate?: string;
@@ -120,5 +121,30 @@ export class AiReadToolsService {
     ]);
 
     return { months: monthlyNets, projected, sixMonthAvg, transactionCount, accountCount: accounts.length };
+  }
+
+  async getSafeToSpend(userId: string, args: { month?: string } = {}): Promise<SafeToSpendWidgetData> {
+    const month = args.month ?? currentMonthKey();
+    const now = new Date();
+    const [y, m] = month.split('-').map(Number);
+    const startDate = `${month}-01`;
+    const endDate = new Date(y, m, 0).toISOString().slice(0, 10);
+
+    const incomeRow = await this.txRepo.createQueryBuilder('tx')
+      .leftJoin('tx.categoryRef', 'cat')
+      .select('COALESCE(SUM(tx.amount), 0)', 'total')
+      .where('tx.userId = :userId', { userId })
+      .andWhere("cat.type = 'income'")
+      .andWhere('tx.date >= :start AND tx.date <= :end', { start: startDate, end: endDate })
+      .getRawOne<{ total: string }>();
+    const incomeSoFar = parseFloat(incomeRow?.total ?? '0');
+
+    const budgetRows = await this.budgets.findWithSpent(userId, month);
+    const plannedSpending = budgetRows
+      .filter((b) => b.category?.type !== 'income' && !b.projectCategoryId)
+      .reduce((s, b) => s + Number(b.amount), 0);
+
+    const result = computeSafeToSpend({ incomeSoFar, plannedSpending, now });
+    return { month, ...result };
   }
 }
