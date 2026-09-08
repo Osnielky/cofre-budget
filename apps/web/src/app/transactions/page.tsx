@@ -22,6 +22,48 @@ import StatStrip from './StatStrip';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
+interface PickerPos { top: number; left: number; width: number; maxHeight: number; origin: string }
+
+/** Where to put the category picker for a given trigger.
+ *
+ *  It scales with the viewport rather than using a fixed 220x360 box, and when
+ *  neither side of the trigger has room for a usable list it centres the panel
+ *  instead of squeezing it into a sliver. Always clamped inside the viewport.
+ */
+function placePicker(rect: DOMRect): PickerPos {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const GAP = 8;
+  const MARGIN = 16;
+  /** Below this the list is too short to scan; centre instead of anchoring. */
+  const COMFORTABLE = 340;
+
+  const width = Math.round(Math.min(460, Math.max(280, vw - MARGIN * 2)));
+  const cap = Math.round(Math.min(620, vh - MARGIN * 2));
+
+  const spaceBelow = vh - rect.bottom - GAP - MARGIN;
+  const spaceAbove = rect.top - GAP - MARGIN;
+
+  // Right-align to the trigger, then keep the whole panel on screen.
+  const left = Math.round(Math.min(Math.max(MARGIN, rect.right - width), vw - width - MARGIN));
+
+  /** Keep the panel fully on screen — the trigger itself may be scrolled out of view. */
+  const clampTop = (top: number, h: number) =>
+    Math.round(Math.min(Math.max(MARGIN, top), Math.max(MARGIN, vh - h - MARGIN)));
+
+  if (spaceBelow >= Math.min(cap, COMFORTABLE)) {
+    const maxHeight = Math.min(cap, spaceBelow);
+    return { top: clampTop(rect.bottom + GAP, maxHeight), left, width, maxHeight, origin: 'top right' };
+  }
+  if (spaceAbove >= Math.min(cap, COMFORTABLE)) {
+    const maxHeight = Math.min(cap, spaceAbove);
+    return { top: clampTop(rect.top - GAP - maxHeight, maxHeight), left, width, maxHeight, origin: 'bottom right' };
+  }
+  // Neither side fits: centre it vertically so the full list is usable.
+  const maxHeight = Math.min(cap, vh - MARGIN * 2);
+  return { top: clampTop((vh - maxHeight) / 2, maxHeight), left, width, maxHeight, origin: 'center' };
+}
+
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null; last4?: string | null }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
@@ -115,7 +157,7 @@ export default function TransactionsPage() {
   const [filter, setFilter]             = useState<Filter>('all');
   const [search, setSearch]             = useState('');
   const [openPickerId, setOpenPickerId] = useState<string | null>(null);
-  const [pickerPos, setPickerPos]       = useState<{ top: number; left: number; maxHeight: number } | null>(null);
+  const [pickerPos, setPickerPos]       = useState<PickerPos | null>(null);
   const [updatingId, setUpdatingId]     = useState<string | null>(null);
   const [importAccount, setImportAccount]       = useState<BankAccount | null>(null);
   const [showImportPicker, setShowImportPicker] = useState(false);
@@ -284,6 +326,22 @@ export default function TransactionsPage() {
   }, []);
 
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
+
+  /* Escape closes the category picker — it can be a large centred panel now,
+     so leaving the keyboard with no way out would be a trap. */
+  useEffect(() => {
+    if (!openPickerId) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setOpenPickerId(null);
+      setPickerProjectDrill(null);
+      setPickerTransferStep(false);
+      setPickerSearch('');
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [openPickerId]);
 
   /* close pickers on outside click */
   useEffect(() => {
@@ -1580,15 +1638,7 @@ export default function TransactionsPage() {
                               onMouseDown={(e) => { if (isOpen) e.stopPropagation(); }}
                               onClick={(e) => {
                                 if (isOpen) { setOpenPickerId(null); setPickerProjectDrill(null); setPickerTransferStep(false); setPickerShowPurchasePrompt(false); return; }
-                                const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                                const w = 220;
-                                const left = Math.max(4, rect.right - w);
-                                const spaceBelow = window.innerHeight - rect.bottom - 8;
-                                const spaceAbove = rect.top - 8;
-                                const openAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
-                                const maxHeight = Math.min(360, openAbove ? spaceAbove : spaceBelow);
-                                const top = openAbove ? rect.top - maxHeight - 4 : rect.bottom + 4;
-                                setPickerPos({ top, left, maxHeight });
+                                setPickerPos(placePicker((e.currentTarget as HTMLButtonElement).getBoundingClientRect()));
                                 setOpenPickerId(tx.id);
                                 setPickerProjectDrill(null);
                                 setPickerTransferStep(false);
@@ -1645,8 +1695,8 @@ export default function TransactionsPage() {
                             </button>
 
                             {isOpen && pickerPos && createPortal(
-                              <div ref={pickerRef} className="py-1 rounded-xl overflow-y-auto"
-                                style={{ ...glass, position: 'fixed', top: pickerPos.top, left: pickerPos.left, width: '220px', maxHeight: pickerPos.maxHeight, zIndex: 9999 }}>
+                              <div ref={pickerRef} className="py-1 rounded-xl overflow-y-auto cat-picker"
+                                style={{ ...glass, position: 'fixed', top: pickerPos.top, left: pickerPos.left, width: pickerPos.width, maxHeight: pickerPos.maxHeight, zIndex: 9999, transformOrigin: pickerPos.origin }}>
                                 {cat && (
                                   <>
                                     <button onClick={() => assignCategory(tx.id, null)}

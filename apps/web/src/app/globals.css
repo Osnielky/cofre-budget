@@ -260,3 +260,27 @@ body::before {
   outline: 2px solid var(--slider-accent, var(--color-primary));
   outline-offset: 4px;
 }
+
+/* ── Category picker ──
+   The transactions row picker. Sized in JS (see placePicker); this supplies the
+   entrance animation and the roomier rows that make a long list scannable. */
+@keyframes cat-picker-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.cat-picker {
+  animation: cat-picker-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  overscroll-behavior: contain;
+}
+/* Roomier hit targets + readable names now that there is width to spare. */
+.cat-picker button {
+  font-size: 13px;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+.cat-picker input {
+  font-size: 13px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-picker { animation: none; }
+}
