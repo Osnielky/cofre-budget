@@ -2280,6 +2280,7 @@ export default function TransactionsPage() {
           <SplitTransactionModal
             tx={splitTx}
             categories={categories}
+            projects={projects}
             onSave={() => {
               loadTransactions();
               setSplitTx(null);

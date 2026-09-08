@@ -16,13 +16,18 @@ import {
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 interface Category { id: string; name: string; icon: string; color: string; type: string }
+interface ProjectCategory { id: string; name: string; icon: string; color: string }
+interface Project { id: string; name: string; icon: string; color?: string | null; categories?: ProjectCategory[] }
 interface Transaction {
   id: string; name: string; amount: number; date: string;
   categoryId: string | null; bankAccountId: string;
   parentId: string | null; isSplitParent: boolean;
 }
 
-interface SplitLine { categoryId: string; amount: string }
+/** A line is either budget-categorised (categoryId) or project-categorised
+    (projectId + projectCategoryId) — never both, matching how the rest of the
+    app treats a transaction. */
+interface SplitLine { categoryId: string; amount: string; projectId?: string; projectCategoryId?: string }
 
 interface Props {
   tx: Transaction;
@@ -31,6 +36,8 @@ interface Props {
   onClose: () => void;
   /** Optional pre-seeded lines (e.g. from a linked receipt's items). Used as-is when ≥ 2 lines. */
   initialLines?: SplitLine[];
+  /** Projects whose categories can also be assigned to a line. */
+  projects?: Project[];
 }
 
 const NEUTRAL_COLOR = '#5E7095';
@@ -68,7 +75,7 @@ function Sortable({ id, children }: { id: string; children: (s: SortableRender) 
   return <>{children(sortable)}</>;
 }
 
-export default function SplitTransactionModal({ tx, categories, onSave, onClose, initialLines }: Props) {
+export default function SplitTransactionModal({ tx, categories, onSave, onClose, initialLines, projects = [] }: Props) {
   const absTotal = Math.abs(Number(tx.amount));
   const isExpense = Number(tx.amount) < 0;
 
@@ -126,6 +133,36 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
   );
 
   const ids = useMemo(() => lines.map((l) => l.uid), [lines]);
+
+  const PROJECT_FALLBACK = '#9B6DFF';
+
+  /** Resolve a line's display identity, whichever kind of category it carries. */
+  function resolve(line: SplitLine): { name: string; icon: string; color: string; project?: string } | null {
+    if (line.projectCategoryId) {
+      const proj = projects.find((p) => p.id === line.projectId);
+      const pc = proj?.categories?.find((c) => c.id === line.projectCategoryId);
+      if (pc) return { name: pc.name, icon: pc.icon, color: pc.color, project: proj?.name };
+      return { name: 'Project category', icon: '📁', color: proj?.color ?? PROJECT_FALLBACK, project: proj?.name };
+    }
+    const cat = categories.find((c) => c.id === line.categoryId);
+    return cat ? { name: cat.name, icon: cat.icon, color: cat.color } : null;
+  }
+
+  /** Assign either kind of category, keeping the two mutually exclusive. */
+  function pickCategory(idx: number, categoryId: string) {
+    updateLine(idx, { categoryId, projectId: undefined, projectCategoryId: undefined });
+    setOpenPickerUid(null);
+  }
+  function pickProjectCategory(idx: number, projectId: string, projectCategoryId: string) {
+    updateLine(idx, { categoryId: '', projectId, projectCategoryId });
+    setOpenPickerUid(null);
+  }
+
+  /** Flattened project categories, for searching across every project at once. */
+  const projectOptions = useMemo(
+    () => projects.flatMap((p) => (p.categories ?? []).map((c) => ({ project: p, cat: c }))),
+    [projects],
+  );
 
   const allocated = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
   const remaining = absTotal - allocated;
@@ -189,6 +226,8 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
         body: JSON.stringify({
           splits: lines.map((l) => ({
             categoryId: l.categoryId || null,
+            projectId: l.projectId ?? null,
+            projectCategoryId: l.projectCategoryId ?? null,
             amount: parseFloat(l.amount),
           })),
         }),
@@ -211,7 +250,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
   const secondaryCats = categories.filter(
     (c) => c.type !== (isExpense ? 'expense' : 'income') && c.type !== 'both' && c.type !== 'transfer',
   );
-  const usedCatIds = new Set(lines.map((l) => l.categoryId).filter(Boolean));
+  const usedCatIds = new Set(lines.flatMap((l) => [l.categoryId, l.projectCategoryId]).filter(Boolean) as string[]);
   const suggestions = [...primaryCats, ...secondaryCats].filter((c) => !usedCatIds.has(c.id)).slice(0, 4);
 
   const statusColor = balanced ? 'var(--color-green)' : remaining < 0 ? 'var(--color-rose)' : 'var(--color-amber)';
@@ -229,7 +268,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
     const pos = (id: UniqueIdentifier) => lines.findIndex((l) => l.uid === id) + 1;
     const label = (id: UniqueIdentifier) => {
       const l = lines.find((x) => x.uid === id);
-      return categories.find((c) => c.id === l?.categoryId)?.name ?? 'Uncategorized';
+      return (l ? resolve(l)?.name : null) ?? 'Uncategorized';
     };
     return {
       onDragStart: ({ active }) => `Picked up ${label(active.id)} split line, position ${pos(active.id)} of ${lines.length}.`,
@@ -375,7 +414,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
           <SortableContext items={ids} strategy={verticalListSortingStrategy}>
           <div className="flex flex-col gap-2">
             {lines.map((line, idx) => {
-              const cat = categories.find((c) => c.id === line.categoryId);
+              const cat = resolve(line);
               const pct = absTotal > 0 ? ((parseFloat(line.amount) || 0) / absTotal) * 100 : 0;
               const swatchColor = cat?.color ?? NEUTRAL_COLOR;
               return (
@@ -457,10 +496,15 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                       const q = pickerSearch.trim().toLowerCase();
                       const fp = q ? primaryCats.filter((c) => c.name.toLowerCase().includes(q)) : primaryCats;
                       const fs = q ? secondaryCats.filter((c) => c.name.toLowerCase().includes(q)) : secondaryCats;
+                      // Project categories match on their own name OR their project's,
+                      // so "kitchen" finds the Kitchen Reno project's categories too.
+                      const fpc = projectOptions.filter(({ project, cat: pc }) =>
+                        !q || pc.name.toLowerCase().includes(q) || project.name.toLowerCase().includes(q));
+
                       const renderCat = (c: Category) => (
                         <button
                           key={c.id}
-                          onClick={() => { updateLine(idx, { categoryId: c.id }); setOpenPickerUid(null); }}
+                          onClick={() => pickCategory(idx, c.id)}
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--color-elevated)]"
                           style={line.categoryId === c.id ? { background: `${c.color}15` } : {}}
                         >
@@ -469,6 +513,27 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                           {line.categoryId === c.id && <span style={{ color: c.color }}>✓</span>}
                         </button>
                       );
+
+                      const renderProjectCat = ({ project, cat: pc }: { project: Project; cat: ProjectCategory }) => {
+                        const on = line.projectCategoryId === pc.id && line.projectId === project.id;
+                        return (
+                          <button
+                            key={`${project.id}:${pc.id}`}
+                            onClick={() => pickProjectCategory(idx, project.id, pc.id)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--color-elevated)]"
+                            style={on ? { background: `${pc.color}15` } : {}}
+                          >
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-base shrink-0" style={{ background: `${pc.color}20` }}>{pc.icon}</span>
+                            <span className="flex-1 min-w-0 text-left">
+                              <span className="font-medium block truncate" style={{ color: on ? pc.color : 'var(--color-text-primary)' }}>{pc.name}</span>
+                              <span className="block truncate text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                                {project.icon} {project.name}
+                              </span>
+                            </span>
+                            {on && <span style={{ color: pc.color }}>✓</span>}
+                          </button>
+                        );
+                      };
                       if (!pickerRect) return null;
                       const DROP_MAX = 340;
                       const openUp = pickerRect.bottom + DROP_MAX > window.innerHeight
@@ -495,7 +560,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                               autoFocus
                               value={pickerSearch}
                               onChange={(e) => setPickerSearch(e.target.value)}
-                              placeholder="Search categories…"
+                              placeholder="Search categories or projects…"
                               className="w-full px-3 py-2 text-sm rounded-lg outline-none"
                               style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
                             />
@@ -504,7 +569,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                           <div className="py-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
                             {cat && !q && (
                               <button
-                                onClick={() => { updateLine(idx, { categoryId: '' }); setOpenPickerUid(null); }}
+                                onClick={() => { updateLine(idx, { categoryId: '', projectId: undefined, projectCategoryId: undefined }); setOpenPickerUid(null); }}
                                 className="w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--color-elevated)]"
                                 style={{ color: 'var(--color-rose)' }}
                               >
@@ -518,7 +583,14 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                                 {fs.map(renderCat)}
                               </>
                             )}
-                            {fp.length === 0 && fs.length === 0 && (
+                            {fpc.length > 0 && (
+                              <>
+                                <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+                                <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Projects</p>
+                                {fpc.map(renderProjectCat)}
+                              </>
+                            )}
+                            {fp.length === 0 && fs.length === 0 && fpc.length === 0 && (
                               <p className="px-3 py-4 text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>No categories match “{pickerSearch}”.</p>
                             )}
                           </div>
@@ -639,7 +711,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                   {lines.map((l, i) => {
                     const amt = parseFloat(l.amount) || 0;
                     if (amt <= 0 || absTotal <= 0) return null;
-                    const cat = categories.find((c) => c.id === l.categoryId);
+                    const cat = resolve(l);
                     return (
                       <div key={i} style={{ width: `${(amt / absTotal) * 100}%`, background: cat?.color ?? NEUTRAL_COLOR }} />
                     );
@@ -649,7 +721,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                   {lines.map((l, i) => {
                     const amt = parseFloat(l.amount) || 0;
                     if (amt <= 0) return null;
-                    const cat = categories.find((c) => c.id === l.categoryId);
+                    const cat = resolve(l);
                     const p = absTotal > 0 ? (amt / absTotal) * 100 : 0;
                     return (
                       <span key={i} className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}>

@@ -1,12 +1,22 @@
 import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Between, In, Repository } from 'typeorm';
 import { Transaction } from './transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
+import { Project } from '../projects/project.entity';
 import { DebtsService } from '../debts/debts.service';
 import { isLiabilityType } from '../bank-accounts/account-types';
 import { CategorizationRulesService } from '../categorization-rules/categorization-rules.service';
+
+/** One piece of a split. Exactly one of categoryId / projectCategoryId may be
+    set; a projectCategoryId must be accompanied by its projectId. */
+export interface SplitPiece {
+  categoryId?: string | null;
+  projectId?: string | null;
+  projectCategoryId?: string | null;
+  amount: number;
+}
 
 export interface CsvRow {
   date: string;        // MM/DD/YYYY or YYYY-MM-DD
@@ -21,6 +31,7 @@ export class TransactionsService {
     @InjectRepository(Transaction) private repo: Repository<Transaction>,
     @InjectRepository(BankAccount) private accountRepo: Repository<BankAccount>,
     @InjectRepository(ProjectCategory) private projCatRepo: Repository<ProjectCategory>,
+    @InjectRepository(Project) private projectRepo: Repository<Project>,
     private debtsService: DebtsService,
     private rulesService: CategorizationRulesService,
   ) {}
@@ -481,7 +492,7 @@ export class TransactionsService {
   async split(
     id: string,
     userId: string,
-    splits: { categoryId: string | null; amount: number }[],
+    splits: SplitPiece[],
   ): Promise<Transaction[]> {
     const tx = await this.repo.findOneByOrFail({ id, userId });
     if (tx.isSplitParent) throw new BadRequestException('Transaction is already split');
@@ -496,6 +507,27 @@ export class TransactionsService {
       );
     }
 
+    // A row is either budget-categorised or project-categorised, never both:
+    // budgets match project budgets on (projectId, projectCategoryId) and regular
+    // budgets on categoryId, so a row carrying both is counted twice. The web
+    // client already enforces this; splitting is the one path where a bad row
+    // cannot be corrected afterwards, so enforce it here too.
+    for (const piece of splits) {
+      if (piece.categoryId && piece.projectCategoryId) {
+        throw new BadRequestException('A split piece cannot have both a category and a project category');
+      }
+      if (piece.projectCategoryId && !piece.projectId) {
+        throw new BadRequestException('A project category requires its project');
+      }
+    }
+
+    await this.assertOwnsProjectRefs(userId, splits);
+
+    // The parent is stripped below; keep its project link so pieces that do not
+    // name one of their own stay on the project instead of silently leaving it.
+    const parentProjectId = tx.projectId ?? null;
+    const parentProjectCategoryId = tx.projectCategoryId ?? null;
+
     const sign = Number(tx.amount) >= 0 ? 1 : -1;
 
     const childIds: string[] = await this.repo.manager.transaction(async (em) => {
@@ -508,6 +540,9 @@ export class TransactionsService {
 
       const ids: string[] = [];
       for (const piece of splits) {
+        // Inherit the parent's project only when the piece names neither a
+        // category nor a project of its own.
+        const inherits = !piece.categoryId && !piece.projectId && !piece.projectCategoryId;
         const child = em.create(Transaction, {
           userId: tx.userId,
           parentId: tx.id,
@@ -517,6 +552,8 @@ export class TransactionsService {
           date: tx.date,
           amount: sign * Math.abs(piece.amount),
           categoryId: piece.categoryId ?? undefined,
+          projectId: (inherits ? parentProjectId : piece.projectId) ?? undefined,
+          projectCategoryId: (inherits ? parentProjectCategoryId : piece.projectCategoryId) ?? undefined,
           pending: tx.pending,
           isSplitParent: false,
           receiptId: tx.receiptId ?? undefined,
@@ -529,9 +566,30 @@ export class TransactionsService {
 
     return Promise.all(
       childIds.map((cid) =>
-        this.repo.findOne({ where: { id: cid }, relations: ['categoryRef', 'bankAccount'] }),
+        this.repo.findOne({ where: { id: cid }, relations: ['categoryRef', 'bankAccount', 'projectCategoryRef'] }),
       ),
     );
+  }
+
+  /** Reject project / project-category ids that belong to someone else. There is
+      no global ValidationPipe, so this is the only thing standing between the
+      request body and a cross-tenant write. Batched: two queries at most. */
+  private async assertOwnsProjectRefs(userId: string, splits: SplitPiece[]): Promise<void> {
+    const projectIds = [...new Set(splits.map((p) => p.projectId).filter((v): v is string => !!v))];
+    const projCatIds = [...new Set(splits.map((p) => p.projectCategoryId).filter((v): v is string => !!v))];
+
+    if (projectIds.length) {
+      const found = await this.projectRepo.find({ where: { id: In(projectIds) } });
+      if (found.length !== projectIds.length || found.some((p) => p.userId !== userId)) {
+        throw new ForbiddenException('Unknown project');
+      }
+    }
+    if (projCatIds.length) {
+      const found = await this.projCatRepo.find({ where: { id: In(projCatIds) } });
+      if (found.length !== projCatIds.length || found.some((c) => c.userId !== userId)) {
+        throw new ForbiddenException('Unknown project category');
+      }
+    }
   }
 
   async unsplit(id: string, userId: string): Promise<Transaction> {

@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { TransactionsService, CsvRow } from './transactions.service';
+import { TransactionsService, CsvRow, SplitPiece } from './transactions.service';
 import { ReceiptFinderService } from './receipt-finder.service';
 
 @UseGuards(JwtAuthGuard)
@@ -72,7 +72,7 @@ export class TransactionsController {
   split(
     @Param('id') id: string,
     @Request() req: any,
-    @Body() body: { splits: { categoryId: string | null; amount: number }[] },
+    @Body() body: { splits: SplitPiece[] },
   ) {
     return this.service.split(id, req.user.id, body.splits);
   }
