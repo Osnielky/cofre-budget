@@ -33,23 +33,36 @@ export class BudgetsService {
     @InjectRepository(ProjectCategory) private projectCategoryRepo: Repository<ProjectCategory>,
   ) {}
 
-  /** Average monthly spend per category over the trailing `months` months,
-      to suggest budget amounts. Expenses only; tracking accounts excluded. */
-  async categoryAverages(userId: string, months = 3): Promise<Record<string, number>> {
+  /** Average monthly spend per category over the `months` FULL months before
+      `month` (defaulting to the current month), to suggest budget amounts.
+      Expenses only; transfers, debt repayments and tracking accounts excluded.
+
+      The window is closed at both ends and anchored on `month`, so the divisor
+      always matches the number of months actually summed — an open-ended window
+      would fold the partial current month into an n-month average. */
+  async categoryAverages(userId: string, months = 3, month?: string): Promise<Record<string, number>> {
     const n = Math.min(Math.max(months, 1), 12);
     const now = new Date();
-    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - n, 1));
+    const anchor = /^\d{4}-\d{2}$/.test(month ?? '')
+      ? new Date(Date.UTC(Number(month!.slice(0, 4)), Number(month!.slice(5, 7)) - 1, 1))
+      : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const start = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - n, 1));
     const startDate = start.toISOString().slice(0, 10);
+    const endDate = anchor.toISOString().slice(0, 10);
 
     const rows = await this.txRepo
       .createQueryBuilder('tx')
       .leftJoin('tx.bankAccount', 'ba')
+      .leftJoin('tx.categoryRef', 'cat')
       .select('tx.categoryId', 'categoryId')
       .addSelect('COALESCE(SUM(ABS(tx.amount)), 0)', 'total')
       .where('tx.userId = :userId', { userId })
       .andWhere('tx.amount < 0')
       .andWhere('tx.categoryId IS NOT NULL')
       .andWhere('tx.date >= :startDate', { startDate })
+      .andWhere('tx.date < :endDate', { endDate })
+      .andWhere('tx.debtId IS NULL')
+      .andWhere("(cat.type IS NULL OR cat.type != 'transfer')")
       .andWhere('(ba."accountType" IS NULL OR ba."accountType" NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] })
       .groupBy('tx.categoryId')
       .getRawMany<{ categoryId: string; total: string }>();

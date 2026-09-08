@@ -13,8 +13,8 @@ export class BudgetsController {
   }
 
   @Get('category-averages')
-  categoryAverages(@Request() req: any, @Query('months') months?: string) {
-    return this.service.categoryAverages(req.user.id, months ? parseInt(months, 10) : 3);
+  categoryAverages(@Request() req: any, @Query('months') months?: string, @Query('month') month?: string) {
+    return this.service.categoryAverages(req.user.id, months ? parseInt(months, 10) : 3, month);
   }
 
   @Get('history')

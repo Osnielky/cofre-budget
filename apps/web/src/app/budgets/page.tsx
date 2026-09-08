@@ -211,7 +211,7 @@ export default function BudgetsPage() {
         fetch(`${API}/projects`, { credentials: 'include' }).then(r => r.json()),
         fetch(`${API}/transactions?from=${monthFrom(monthsAgoKey(month, 5))}&to=${monthTo(month)}&limit=3000`, { credentials: 'include' }).then(r => r.json()),
         fetch(`${API}/budgets/history?months=6`, { credentials: 'include' }).then(r => r.json()),
-        fetch(`${API}/budgets/category-averages?months=3`, { credentials: 'include' }).then((r): Promise<Record<string, number>> => (r.ok ? r.json() : Promise.resolve({}))),
+        fetch(`${API}/budgets/category-averages?months=3&month=${month}`, { credentials: 'include' }).then((r): Promise<Record<string, number>> => (r.ok ? r.json() : Promise.resolve({}))),
       ]))
       .then(([b, c, p, tx, h, avgs]) => {
         setBudgets(Array.isArray(b) ? b : []);
