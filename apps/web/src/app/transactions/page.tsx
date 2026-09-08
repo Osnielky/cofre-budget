@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import dynamic from 'next/dynamic';
 import Sidebar from '@/components/Sidebar';
 import Avatar from '@/components/Avatar';
 import { useUser } from '@/components/UserProvider';
@@ -13,7 +14,8 @@ import AccountTypeIcon from '@/components/AccountTypeIcon';
 import LinkIcon from '@/components/LinkIcon';
 import InfoIcon from '@/components/InfoIcon';
 import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiability } from '@/lib/accountTypes';
-import SplitTransactionModal from '@/components/SplitTransactionModal';
+// Lazy: pulls in @dnd-kit (~19 KB gz) only when someone opens the split modal.
+const SplitTransactionModal = dynamic(() => import('@/components/SplitTransactionModal'), { ssr: false });
 import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
 import { buildRecurringMap, normalize } from './recurring';
 import StatStrip from './StatStrip';

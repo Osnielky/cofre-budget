@@ -1,7 +1,17 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import {
+  DndContext, MouseSensor, TouchSensor, KeyboardSensor,
+  closestCenter, useSensor, useSensors,
+  type DragEndEvent, type UniqueIdentifier, type Announcements,
+} from '@dnd-kit/core';
+import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import {
+  SortableContext, useSortable, verticalListSortingStrategy,
+  sortableKeyboardCoordinates,
+} from '@dnd-kit/sortable';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -25,13 +35,37 @@ interface Props {
 
 const NEUTRAL_COLOR = '#5E7095';
 
-function seedLines(tx: Transaction, absTotal: number, initialLines?: SplitLine[]): SplitLine[] {
-  return initialLines && initialLines.length >= 2
+/**
+ * Rows carry a stable `uid` so dnd-kit (and the category menu) can identify a row
+ * across reorders — array indices shift under a sort and would mis-target both.
+ * `uid` is local to this component and never reaches the API.
+ */
+type Row = SplitLine & { uid: string };
+
+let uidSeq = 0;
+const nextUid = () => `sl${++uidSeq}`;
+const withUid = (l: SplitLine): Row => ({ ...l, uid: nextUid() });
+
+function seedLines(tx: Transaction, absTotal: number, initialLines?: SplitLine[]): Row[] {
+  const base: SplitLine[] = initialLines && initialLines.length >= 2
     ? initialLines
     : [
         { categoryId: tx.categoryId ?? '', amount: absTotal.toFixed(2) },
         { categoryId: '', amount: '' },
       ];
+  return base.map(withUid);
+}
+
+type SortableRender = ReturnType<typeof useSortable>;
+
+/**
+ * Hooks can't be called inside `lines.map()`, and extracting a <SplitRow> would mean
+ * threading ~15 props. This render-prop shim gets legal hook usage while the row JSX
+ * stays in the parent closure.
+ */
+function Sortable({ id, children }: { id: string; children: (s: SortableRender) => React.ReactNode }) {
+  const sortable = useSortable({ id });
+  return <>{children(sortable)}</>;
 }
 
 export default function SplitTransactionModal({ tx, categories, onSave, onClose, initialLines }: Props) {
@@ -39,48 +73,59 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
   const isExpense = Number(tx.amount) < 0;
 
   const [splitBy, setSplitBy] = useState<'amount' | 'percentage'>('amount');
-  const [lines, setLines] = useState<SplitLine[]>(() => seedLines(tx, absTotal, initialLines));
+  const [lines, setLines] = useState<Row[]>(() => seedLines(tx, absTotal, initialLines));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [openPickerIdx, setOpenPickerIdx] = useState<number | null>(null);
+  const [openPickerUid, setOpenPickerUid] = useState<string | null>(null);
   const [pickerSearch, setPickerSearch] = useState('');
   const [pickerRect, setPickerRect] = useState<DOMRect | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const dragIdxRef = useRef<number | null>(null);
-  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
-  function togglePicker(idx: number, e: React.MouseEvent<HTMLButtonElement>) {
-    if (openPickerIdx === idx) { setOpenPickerIdx(null); return; }
+  function togglePicker(uid: string, e: React.MouseEvent<HTMLButtonElement>) {
+    if (openPickerUid === uid) { setOpenPickerUid(null); return; }
     setPickerRect(e.currentTarget.getBoundingClientRect());
-    setOpenPickerIdx(idx);
+    setOpenPickerUid(uid);
     setPickerSearch('');
   }
 
-  // Close the category menu on outside-click / scroll / resize.
+  // Close the category menu on outside-press / scroll / resize.
   useEffect(() => {
-    if (openPickerIdx === null) return;
-    const onDown = (e: MouseEvent) => {
+    if (openPickerUid === null) return;
+    // pointerdown, not mousedown: a touch that starts a drag never synthesizes
+    // mousedown, so the menu would otherwise stay open under the moving rows.
+    const onDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement;
       if (t.closest('[data-cat-trigger]') || menuRef.current?.contains(t)) return;
-      setOpenPickerIdx(null);
+      setOpenPickerUid(null);
     };
-    const onResize = () => setOpenPickerIdx(null);
+    const onResize = () => setOpenPickerUid(null);
     // Scrolling the menu's own list must NOT close it — only outside scrolls
     // (which would detach the fixed-positioned menu from its trigger).
     const onScroll = (e: Event) => {
       const t = e.target as Node;
       if (menuRef.current && (menuRef.current === t || menuRef.current.contains(t))) return;
-      setOpenPickerIdx(null);
+      setOpenPickerUid(null);
     };
-    document.addEventListener('mousedown', onDown);
+    document.addEventListener('pointerdown', onDown);
     window.addEventListener('resize', onResize);
     window.addEventListener('scroll', onScroll, true);
     return () => {
-      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('pointerdown', onDown);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('scroll', onScroll, true);
     };
-  }, [openPickerIdx]);
+  }, [openPickerUid]);
+
+  const sensors = useSensors(
+    // MouseSensor + TouchSensor rather than PointerSensor: each input needs its own
+    // activation constraint (a distance threshold that suits a mouse fights scrolling
+    // on touch), and PointerSensor alongside TouchSensor double-fires on touch.
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates, scrollBehavior: 'auto' }),
+  );
+
+  const ids = useMemo(() => lines.map((l) => l.uid), [lines]);
 
   const allocated = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
   const remaining = absTotal - allocated;
@@ -101,7 +146,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
 
   function addLine(categoryId = '') {
     const rem = absTotal - lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
-    setLines((prev) => [...prev, { categoryId, amount: rem > 0.005 ? rem.toFixed(2) : '' }]);
+    setLines((prev) => [...prev, withUid({ categoryId, amount: rem > 0.005 ? rem.toFixed(2) : '' })]);
   }
 
   function removeLine(idx: number) {
@@ -171,6 +216,30 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
 
   const statusColor = balanced ? 'var(--color-green)' : remaining < 0 ? 'var(--color-rose)' : 'var(--color-amber)';
   const statusLabel = balanced ? 'Ready to split' : remaining < 0 ? 'Over allocated' : 'Remaining to allocate';
+
+  // dnd-kit's default announcements ("Draggable item 3 was moved over droppable area 1")
+  // say nothing useful; name the category and the position instead.
+  const screenReaderInstructions = {
+    draggable:
+      'Press space or enter to pick up this split line. Use the up and down arrow keys to '
+      + 'change its position. Press space or enter again to drop it, or escape to cancel.',
+  };
+
+  const announcements: Announcements = useMemo(() => {
+    const pos = (id: UniqueIdentifier) => lines.findIndex((l) => l.uid === id) + 1;
+    const label = (id: UniqueIdentifier) => {
+      const l = lines.find((x) => x.uid === id);
+      return categories.find((c) => c.id === l?.categoryId)?.name ?? 'Uncategorized';
+    };
+    return {
+      onDragStart: ({ active }) => `Picked up ${label(active.id)} split line, position ${pos(active.id)} of ${lines.length}.`,
+      onDragOver: ({ active, over }) => (over ? `${label(active.id)} moved to position ${pos(over.id)} of ${lines.length}.` : undefined),
+      onDragEnd: ({ active, over }) => (over
+        ? `${label(active.id)} dropped at position ${pos(over.id)} of ${lines.length}.`
+        : `${label(active.id)} returned to its original position.`),
+      onDragCancel: ({ active }) => `Reorder cancelled. ${label(active.id)} returned to its original position.`,
+    };
+  }, [lines, categories]);
 
   return createPortal(
     <div
@@ -288,41 +357,78 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
           </div>
 
           {/* Split lines */}
+          <DndContext
+            id="split-lines"
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+            accessibility={{ announcements, screenReaderInstructions }}
+            // The category menu is a fixed-positioned portal anchored to a rect captured
+            // at click time; any row movement would strand it. Close it before the first
+            // transform lands.
+            onDragStart={() => setOpenPickerUid(null)}
+            onDragEnd={({ active, over }: DragEndEvent) => {
+              if (!over || active.id === over.id) return;
+              reorder(ids.indexOf(String(active.id)), ids.indexOf(String(over.id)));
+            }}
+          >
+          <SortableContext items={ids} strategy={verticalListSortingStrategy}>
           <div className="flex flex-col gap-2">
             {lines.map((line, idx) => {
               const cat = categories.find((c) => c.id === line.categoryId);
               const pct = absTotal > 0 ? ((parseFloat(line.amount) || 0) / absTotal) * 100 : 0;
               const swatchColor = cat?.color ?? NEUTRAL_COLOR;
               return (
+                <Sortable key={line.uid} id={line.uid}>
+                {({ setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging, isOver, isSorting }) => (
                 <div
-                  key={idx}
-                  onDragOver={(e) => { e.preventDefault(); if (dragOverIdx !== idx) setDragOverIdx(idx); }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    if (dragIdxRef.current !== null) reorder(dragIdxRef.current, idx);
-                    dragIdxRef.current = null;
-                    setDragOverIdx(null);
-                  }}
-                  className="flex flex-wrap sm:flex-nowrap items-center gap-2 px-3 py-2.5 rounded-xl transition-colors"
+                  ref={setNodeRef}
+                  data-split-row
+                  className="flex flex-wrap sm:flex-nowrap items-center gap-2 px-3 py-2.5 rounded-xl"
                   style={{
                     background: 'var(--color-surface)',
-                    border: dragOverIdx === idx ? '1px dashed var(--color-primary)' : '1px solid transparent',
+                    border: isOver && !isDragging ? '1px dashed var(--color-primary)' : '1px solid transparent',
+                    // restrictToVerticalAxis zeroes x, so the translate is written by hand
+                    // rather than pulling in @dnd-kit/utilities for CSS.Translate.
+                    transform: transform ? `translate3d(0, ${Math.round(transform.y)}px, 0)` : undefined,
+                    // An inline `transition` replaces Tailwind's transition-colors wholesale,
+                    // so the sortable transition and the border fade are merged here.
+                    transition: [transition, 'background-color 150ms ease, border-color 150ms ease'].filter(Boolean).join(', '),
+                    position: 'relative',
+                    zIndex: isDragging ? 2 : undefined,
+                    opacity: isDragging ? 0.92 : 1,
+                    boxShadow: isDragging ? 'var(--glass-shadow)' : undefined,
+                    willChange: isSorting ? 'transform' : undefined,
                   }}
                 >
-                  {/* Drag handle */}
-                  <span
-                    draggable
-                    onDragStart={(e) => { dragIdxRef.current = idx; e.dataTransfer.effectAllowed = 'move'; }}
-                    onDragEnd={() => { dragIdxRef.current = null; setDragOverIdx(null); }}
-                    className="w-5 shrink-0 flex items-center justify-center cursor-grab active:cursor-grabbing"
-                    style={{ color: 'var(--color-text-muted)' }}
+                  {/* Drag handle — a real button so it is focusable and keyboard-draggable */}
+                  <button
+                    type="button"
+                    ref={setActivatorNodeRef}
+                    data-drag-handle
+                    {...attributes}
+                    {...listeners}
+                    onContextMenu={(e) => e.preventDefault()}
+                    aria-label={`Reorder ${cat ? cat.name : 'uncategorized'} split line`}
+                    className="w-8 h-9 -ml-1 sm:w-5 sm:h-auto sm:ml-0 shrink-0 flex items-center justify-center rounded-md cursor-grab active:cursor-grabbing"
+                    style={{
+                      color: 'var(--color-text-muted)',
+                      // Load-bearing: scoped to the handle alone so the modal body still
+                      // pans with a finger everywhere else.
+                      touchAction: 'none',
+                      userSelect: 'none',
+                      WebkitUserSelect: 'none',
+                      WebkitTouchCallout: 'none',
+                      outlineColor: 'var(--color-primary)',
+                      outlineOffset: 2,
+                    }}
                   >
                     <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor">
                       <circle cx="2" cy="2" r="1.4" /><circle cx="8" cy="2" r="1.4" />
                       <circle cx="2" cy="8" r="1.4" /><circle cx="8" cy="8" r="1.4" />
                       <circle cx="2" cy="14" r="1.4" /><circle cx="8" cy="14" r="1.4" />
                     </svg>
-                  </span>
+                  </button>
 
                   {/* Color swatch */}
                   <span
@@ -337,7 +443,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                     <button
                       type="button"
                       data-cat-trigger
-                      onClick={(e) => togglePicker(idx, e)}
+                      onClick={(e) => togglePicker(line.uid, e)}
                       className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-left transition-all hover:brightness-110"
                       style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
                     >
@@ -347,14 +453,14 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                       </svg>
                     </button>
 
-                    {openPickerIdx === idx && (() => {
+                    {openPickerUid === line.uid && (() => {
                       const q = pickerSearch.trim().toLowerCase();
                       const fp = q ? primaryCats.filter((c) => c.name.toLowerCase().includes(q)) : primaryCats;
                       const fs = q ? secondaryCats.filter((c) => c.name.toLowerCase().includes(q)) : secondaryCats;
                       const renderCat = (c: Category) => (
                         <button
                           key={c.id}
-                          onClick={() => { updateLine(idx, { categoryId: c.id }); setOpenPickerIdx(null); }}
+                          onClick={() => { updateLine(idx, { categoryId: c.id }); setOpenPickerUid(null); }}
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--color-elevated)]"
                           style={line.categoryId === c.id ? { background: `${c.color}15` } : {}}
                         >
@@ -398,7 +504,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                           <div className="py-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
                             {cat && !q && (
                               <button
-                                onClick={() => { updateLine(idx, { categoryId: '' }); setOpenPickerIdx(null); }}
+                                onClick={() => { updateLine(idx, { categoryId: '' }); setOpenPickerUid(null); }}
                                 className="w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--color-elevated)]"
                                 style={{ color: 'var(--color-rose)' }}
                               >
@@ -428,12 +534,13 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                       <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>$</span>
                       <input
                         type="number"
+                        inputMode="decimal"
                         min="0"
                         step="0.01"
                         placeholder="0.00"
                         value={line.amount}
                         onChange={(e) => updateAmount(idx, e.target.value)}
-                        className="w-full px-2 py-2 text-sm font-semibold outline-none rounded-xl text-right tabular-nums"
+                        className="w-full px-2 py-2 text-base sm:text-sm font-semibold outline-none rounded-xl text-right tabular-nums"
                         style={{
                           background: 'var(--color-elevated)',
                           border: splitBy === 'amount' ? '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' : '1px solid var(--color-border)',
@@ -444,13 +551,14 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                     <div className="flex items-center gap-1 flex-1 sm:flex-none sm:w-24">
                       <input
                         type="number"
+                        inputMode="decimal"
                         min="0"
                         max="100"
                         step="0.1"
                         placeholder="0.0"
                         value={pct ? (Math.round(pct * 10) / 10).toString() : ''}
                         onChange={(e) => updatePercentage(idx, e.target.value)}
-                        className="w-full px-2 py-2 text-sm font-semibold outline-none rounded-xl text-right tabular-nums"
+                        className="w-full px-2 py-2 text-base sm:text-sm font-semibold outline-none rounded-xl text-right tabular-nums"
                         style={{
                           background: 'var(--color-elevated)',
                           border: splitBy === 'percentage' ? '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' : '1px solid var(--color-border)',
@@ -474,9 +582,13 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                     </svg>
                   </button>
                 </div>
+                )}
+                </Sortable>
               );
             })}
           </div>
+          </SortableContext>
+          </DndContext>
 
           {/* Add another category */}
           <button
