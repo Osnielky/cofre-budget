@@ -23,7 +23,7 @@ export default function TargetsPanel({
       style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-green)' }}>Income targets</span>
+          <span className="text-base font-bold">Income targets</span>
           <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums"
             style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
             {targets.length}
@@ -46,15 +46,16 @@ export default function TargetsPanel({
       ) : (
         <>
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-baseline justify-between">
-              <span className="text-xl font-extrabold tabular-nums">${fmt(totalEarned)}</span>
-              <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>of ${fmt(totalTarget)} · {earnPct}%</span>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="tabular-nums font-extrabold leading-none" style={{ fontSize: 26 }}>${fmt(totalEarned)}</span>
+              <span className="text-sm font-bold tabular-nums shrink-0" style={{ color: 'var(--color-green)' }}>{earnPct}%</span>
             </div>
+            <p className="text-[11px] -mt-0.5" style={{ color: 'var(--color-text-muted)' }}>of ${fmt(totalTarget)}</p>
             <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
               <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(earnPct, 100)}%`, background: 'var(--color-green)' }} />
             </div>
             <p className="text-[10.5px]" style={{ color: 'var(--color-text-muted)' }}>
-              ${fmt(Math.max(totalTarget - totalEarned, 0))} still expected before {lastDayLabel}
+              ${fmt(Math.max(totalTarget - totalEarned, 0))} remaining · expected before {lastDayLabel}
             </p>
           </div>
 

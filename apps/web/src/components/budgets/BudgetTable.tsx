@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { deriveBudget, monthTotals, riskCounts } from '@/lib/budgets/derive';
 import type { CategoryTrendPoint, RiskGroup, UnbudgetedSlice } from '@/lib/budgets/derive';
 import type { BudgetWithSpent, Transaction } from '@/lib/budgets/types';
@@ -32,8 +33,28 @@ export default function BudgetTable({
   spending, unbudgeted, month, now, sort, onSortChange, expandedId, onToggleExpand,
   txsByCategory, trendByCategory, categoryAverages, onEdit, onDelete, onRaise, deletingId, onSetUnbudgeted,
 }: BudgetTableProps) {
+  const [query, setQuery] = useState('');
+  const [riskFilter, setRiskFilter] = useState<RiskGroup | 'all'>('all');
+
   const counts = riskCounts(spending, month, now);
   const totals = monthTotals(spending, month, now);
+  const monthLabel = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1)
+    .toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  const FILTERS: { key: RiskGroup | 'all'; label: string; color: string; n: number }[] = [
+    { key: 'all', label: 'All', color: 'var(--color-card-violet)', n: spending.length },
+    { key: 'over', label: 'Over', color: GROUP_COLOR.over, n: counts.over },
+    { key: 'near', label: 'Near limit', color: GROUP_COLOR.near, n: counts.near },
+    { key: 'ontrack', label: 'On track', color: GROUP_COLOR.ontrack, n: counts.ontrack },
+  ];
+
+  const q = query.trim().toLowerCase();
+  const matches = (b: BudgetWithSpent) =>
+    (!q || (b.category?.name ?? '').toLowerCase().includes(q))
+    && (riskFilter === 'all' || deriveBudget(b, month, now).riskGroup === riskFilter);
+  const visible = spending.filter(matches);
+  const visibleUnbudgeted = unbudgeted.filter((u) =>
+    (!q || u.category.name.toLowerCase().includes(q)) && riskFilter === 'all');
   const unbudgetedTotal = +unbudgeted.reduce((s, u) => s + u.total, 0).toFixed(2);
   const combinedSpent = +(totals.totalSpent + unbudgetedTotal).toFixed(2);
   const combinedRemaining = +(totals.totalBudget - combinedSpent).toFixed(2);
@@ -46,9 +67,9 @@ export default function BudgetTable({
 
   const groups: { key: RiskGroup; rows: BudgetWithSpent[] }[] = sort === 'risk'
     ? (['over', 'near', 'ontrack'] as RiskGroup[]).map((key) => ({
-        key, rows: sortRows(spending.filter((b) => deriveBudget(b, month, now).riskGroup === key)),
+        key, rows: sortRows(visible.filter((b) => deriveBudget(b, month, now).riskGroup === key)),
       })).filter((g) => g.rows.length > 0)
-    : [{ key: 'ontrack', rows: sortRows(spending) }];
+    : [{ key: 'ontrack', rows: sortRows(visible) }];
 
   const renderRow = (b: BudgetWithSpent) => (
     <BudgetRow key={b.id} budget={b} month={month} now={now}
@@ -65,29 +86,53 @@ export default function BudgetTable({
       style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
 
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3.5 flex-wrap" style={{ borderBottom: '1px solid var(--color-border)' }}>
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold">Spending budgets</span>
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums"
-              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-              {spending.length}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-[11px] font-semibold flex-wrap">
-            {counts.over > 0 && <span style={{ color: GROUP_COLOR.over }}>● {counts.over} over</span>}
-            {counts.near > 0 && <span style={{ color: GROUP_COLOR.near }}>● {counts.near} near limit</span>}
-            <span style={{ color: GROUP_COLOR.ontrack }}>● {counts.ontrack} on track</span>
-          </div>
+      <div className="flex flex-col gap-3 px-4 py-3.5" style={{ borderBottom: '1px solid var(--color-border)' }}>
+        <div>
+          <p className="text-base font-bold">Category budgets</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+            Manage your spending limits for {monthLabel}.
+          </p>
         </div>
-        <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-          {([['risk', 'Risk'], ['amount', 'Amount'], ['name', 'A–Z']] as const).map(([k, l]) => (
-            <button key={k} type="button" onClick={() => onSortChange(k)}
-              className="px-3 py-1 rounded-lg text-[11px] font-semibold transition-colors"
-              style={sort === k ? { background: 'var(--color-card-violet)', color: 'white' } : { color: 'var(--color-text-muted)' }}>
-              {l}
-            </button>
-          ))}
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative flex-1 min-w-40">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+              className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--color-text-muted)' }}>
+              <circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" />
+            </svg>
+            <input value={query} onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search categories…" aria-label="Search categories"
+              className="w-full pl-8 pr-3 py-2 text-xs rounded-xl outline-none"
+              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
+          </div>
+
+          {/* Risk filters, each showing how many fall in that bucket */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {FILTERS.map(({ key, label, color, n }) => {
+              const on = riskFilter === key;
+              return (
+                <button key={key} type="button" onClick={() => setRiskFilter(key)}
+                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1.5"
+                  style={{
+                    background: on ? `color-mix(in srgb, ${color} 18%, transparent)` : 'var(--color-elevated)',
+                    border: `1px solid ${on ? `color-mix(in srgb, ${color} 45%, transparent)` : 'var(--color-border)'}`,
+                    color: on ? color : 'var(--color-text-muted)',
+                  }}>
+                  {label}
+                  <span className="tabular-nums" style={{ opacity: 0.75 }}>{n}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <select value={sort} onChange={(e) => onSortChange(e.target.value as SortKey)}
+            aria-label="Sort budgets"
+            className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold outline-none"
+            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+            <option value="risk">Sort: Highest risk</option>
+            <option value="amount">Sort: Largest budget</option>
+            <option value="name">Sort: A–Z</option>
+          </select>
         </div>
       </div>
 
@@ -109,6 +154,10 @@ export default function BudgetTable({
       <div className="flex flex-col gap-1 p-2 overflow-y-auto" style={{ maxHeight: 560 }}>
         {spending.length === 0 && unbudgeted.length === 0 ? (
           <p className="text-xs text-center py-10" style={{ color: 'var(--color-text-muted)' }}>No budgets yet — add one to start tracking spending.</p>
+        ) : visible.length === 0 && visibleUnbudgeted.length === 0 ? (
+          <p className="text-xs text-center py-10" style={{ color: 'var(--color-text-muted)' }}>
+            No budgets match {q ? <>“{query}”</> : 'this filter'}.
+          </p>
         ) : (
           <>
             {groups.map((g) => (
@@ -122,7 +171,7 @@ export default function BudgetTable({
               </div>
             ))}
 
-            {unbudgeted.map((u) => (
+            {visibleUnbudgeted.map((u) => (
               <div key={u.categoryId} className={`grid items-center gap-2 px-3 py-2.5 rounded-xl ${GRID_CLASSES}`}
                 style={{ background: 'color-mix(in srgb, var(--color-amber) 4%, transparent)', border: '1px dashed var(--color-border)' }}>
                 <div className="flex items-center gap-2.5 min-w-0">

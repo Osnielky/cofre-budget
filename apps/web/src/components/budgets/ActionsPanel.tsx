@@ -10,6 +10,8 @@ interface ActionItem {
   key: string; tone: 'rose' | 'amber' | 'green';
   icon: string; text: React.ReactNode; sub: React.ReactNode;
   onClick?: () => void;
+  /** Label for the row's action button; omitted on informational rows. */
+  action?: string;
 }
 
 interface ActionsPanelProps {
@@ -60,6 +62,7 @@ export default function ActionsPanel({
       text: <>{b.category?.name} is already <strong>{`$${fmt(overBy)}`}</strong> over</>,
       sub: <>Raise to <strong>${fmt(roundUp50(d.projected))}</strong> or freeze the category</>,
       onClick: () => onRaise(b, roundUp50(d.projected)),
+      action: 'Review',
     });
   }
   if (projectedOver.length) {
@@ -70,6 +73,7 @@ export default function ActionsPanel({
       text: <>{b.category?.name} will land ~<strong>{`$${fmt(willBeOver)}`}</strong> over</>,
       sub: d.perDay != null ? <>${fmt(d.perDay)}/day for {daysLeft} days keeps it in</> : 'Keep an eye on it',
       onClick: () => onRaise(b, roundUp50(d.projected)),
+      action: 'Review',
     });
   }
   if (unbudgeted.length) {
@@ -80,6 +84,7 @@ export default function ActionsPanel({
       text: <>${fmt(totalUnbudgeted)} spent outside any budget</>,
       sub: <>{top.category.name} has no limit set — add one</>,
       onClick: () => onSetUnbudgeted(top.categoryId),
+      action: 'Set budget',
     });
   }
 
@@ -96,10 +101,53 @@ export default function ActionsPanel({
     });
   }
 
+  const actionable = items.filter((it) => it.tone !== 'green').length;
+
   return (
     <div className="flex flex-col gap-3 p-5 rounded-2xl"
       style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
-      <span className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>What to do about it</span>
+      <div>
+        <p className="flex items-center gap-2 text-base font-bold">
+          Needs attention
+          {actionable > 0 && (
+            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold"
+              style={{ background: 'color-mix(in srgb, var(--color-rose) 18%, transparent)', color: 'var(--color-rose)' }}>
+              {actionable}
+            </span>
+          )}
+        </p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+          {actionable > 0 ? 'Fix these to stay on track.' : 'Nothing needs fixing right now.'}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {items.map((it) => (
+          <div key={it.key}
+            className="flex items-center gap-3 p-3 rounded-xl"
+            style={{ background: TONE_BG[it.tone], border: `1px solid ${TONE_BORDER[it.tone]}` }}>
+            <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
+              style={{ background: `color-mix(in srgb, ${TONE_COLOR[it.tone]} 16%, transparent)` }}>
+              {it.icon}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>{it.text}</p>
+              <p className="text-[11px] mt-0.5" style={{ color: TONE_COLOR[it.tone] }}>{it.sub}</p>
+            </div>
+            {it.action && it.onClick && (
+              <button type="button" onClick={it.onClick}
+                className="px-3 py-1.5 rounded-lg text-[11px] font-bold shrink-0 transition-all hover:brightness-125"
+                style={{
+                  background: `color-mix(in srgb, ${TONE_COLOR[it.tone]} 16%, transparent)`,
+                  border: `1px solid color-mix(in srgb, ${TONE_COLOR[it.tone]} 40%, transparent)`,
+                  color: TONE_COLOR[it.tone],
+                }}>
+                {it.action}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
 
       <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 20%, transparent)' }}>
         <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)' }}>Daily allowance left</p>
@@ -111,24 +159,6 @@ export default function ActionsPanel({
         </p>
       </div>
 
-      <div className="flex flex-col gap-2">
-        {items.map((it) => (
-          <button key={it.key} type="button" onClick={it.onClick} disabled={!it.onClick}
-            className="flex items-start gap-3 p-3 rounded-xl text-left transition-transform disabled:cursor-default"
-            style={{ background: TONE_BG[it.tone], border: `1px solid ${TONE_BORDER[it.tone]}`, cursor: it.onClick ? 'pointer' : 'default' }}
-            onMouseEnter={(e) => { if (it.onClick) e.currentTarget.style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; }}>
-            <span className="w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0"
-              style={{ background: `color-mix(in srgb, ${TONE_COLOR[it.tone]} 16%, transparent)` }}>
-              {it.icon}
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>{it.text}</p>
-              <p className="text-[11px] mt-0.5" style={{ color: TONE_COLOR[it.tone] }}>{it.sub}</p>
-            </div>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

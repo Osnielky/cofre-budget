@@ -353,12 +353,12 @@ export default function BudgetsPage() {
         <div className="sticky top-14 md:top-0 z-20 px-6 pt-5 pb-4 flex items-center justify-between gap-4 flex-wrap"
           style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
           <div>
-            <h1 className="text-xl font-bold tracking-tight">Budgets &amp; Targets</h1>
+            <h1 className="text-xl font-bold tracking-tight">Budgets</h1>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              Day {dayOfMonth(month, now)} of {daysInMonth(month)} · {spending.length} spending budget{spending.length === 1 ? '' : 's'} · {targets.length} income target{targets.length === 1 ? '' : 's'}
+              Plan your spending and stay in control.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               <button onClick={() => setMonth(prevMonth(month))} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors" style={{ color: 'var(--color-text-muted)' }}>‹</button>
               <span className="text-sm font-semibold px-2 min-w-36 text-center">{monthLabel(month)}</span>
@@ -383,8 +383,11 @@ export default function BudgetsPage() {
             <button onClick={() => openAddBudget()}
               className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5"
               style={{ background: 'var(--color-card-violet)' }}>
-              <span className="text-base leading-none">+</span> Add Budget
+              <span className="text-base leading-none">+</span> Create budget
             </button>
+            <span className="text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
+              Day {dayOfMonth(month, now)} of {daysInMonth(month)}
+            </span>
           </div>
         </div>
 
@@ -392,39 +395,40 @@ export default function BudgetsPage() {
           {loading ? (
             <p className="text-xs text-center py-12" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
           ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4 items-start">
+            <>
+            {/* Headline figures — full width above the two columns */}
+            <PlanFlow
+              totalTarget={totalTarget} totalEarned={totalEarned} earnPct={earnPct}
+              totalBudget={totals.totalBudget} spendingCount={spending.length}
+              combinedSpent={combinedSpent} budgetedSpent={totals.totalSpent} unbudgetedTotal={unbudgetedTotal}
+              plannedSavings={plannedSavings} actualSoFar={actualSoFar} projectedSavings={projectedSavings} />
 
-              {/* Row 1, left — plan flow + burn chart */}
+            {/* Two independent columns rather than a grid: grid rows would stretch
+                the shorter card to match its neighbour and leave a dead gap. */}
+            <div className="flex flex-col xl:flex-row gap-4 items-start">
+              <div className="w-full xl:flex-1 min-w-0 flex flex-col gap-4">
+
+              {/* Spending pace */}
               <div className="flex flex-col gap-4 p-5 rounded-2xl"
                 style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
-                <div className="flex items-center justify-between flex-wrap gap-1">
-                  <span className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>The plan, and where it stands</span>
-                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>every figure below is for {monthLabel(month).split(' ')[0]}</span>
-                </div>
-                <PlanFlow
-                  totalTarget={totalTarget} totalEarned={totalEarned} earnPct={earnPct}
-                  totalBudget={totals.totalBudget} spendingCount={spending.length}
-                  combinedSpent={combinedSpent} budgetedSpent={totals.totalSpent} unbudgetedTotal={unbudgetedTotal}
-                  plannedSavings={plannedSavings} actualSoFar={actualSoFar} projectedSavings={projectedSavings} />
                 <BurnChart month={month} now={now} series={burn}
                   totalBudget={totals.totalBudget} overallPct={totals.overallPct} totalProjected={totals.totalProjected} />
               </div>
 
-              {/* Row 1, right — actions */}
-              <ActionsPanel spending={spending} unbudgeted={unbudgeted} month={month} now={now}
-                daysLeft={dLeft} totalRemaining={combinedRemaining} budgetPerDay={combinedPerDay}
-                onRaise={handleRaise} onSetUnbudgeted={(categoryId) => openAddBudget(categoryId)} />
-
-              {/* Row 2, left — table */}
+              {/* Category budgets */}
               <BudgetTable spending={spending} unbudgeted={unbudgeted} month={month} now={now}
                 sort={sort} onSortChange={setSort} expandedId={expandedId} onToggleExpand={(id) => setExpandedId((cur) => cur === id ? null : id)}
                 txsByCategory={txsByCategory} trendByCategory={trendByCategory} categoryAverages={categoryAverages}
                 onEdit={(b) => { setFormKind('expense'); setEditingId(b.id); setForm({ ...EMPTY_FORM, categoryId: b.categoryId ?? '', amount: String(b.amount), projectId: b.projectId ?? '', ...settingsOf(b) }); setShowForm(true); }}
                 onDelete={handleDelete} onRaise={handleRaise} deletingId={deletingId}
                 onSetUnbudgeted={(categoryId) => openAddBudget(categoryId)} />
+              </div>
 
-              {/* Row 2, right rail */}
-              <div className="flex flex-col gap-4">
+              {/* Right rail */}
+              <div className="w-full xl:w-[340px] shrink-0 flex flex-col gap-4">
+                <ActionsPanel spending={spending} unbudgeted={unbudgeted} month={month} now={now}
+                  daysLeft={dLeft} totalRemaining={combinedRemaining} budgetPerDay={combinedPerDay}
+                  onRaise={handleRaise} onSetUnbudgeted={(categoryId) => openAddBudget(categoryId)} />
                 <TargetsPanel targets={targets} projects={projects} totalTarget={totalTarget} totalEarned={totalEarned} earnPct={earnPct}
                   lastDayLabel={lastDayLabel(month)}
                   onAdd={() => { setFormKind('income'); setEditingId(null); setFormError(null); setForm(EMPTY_FORM); setShowForm(true); }}
@@ -434,6 +438,7 @@ export default function BudgetsPage() {
                   onImport={() => setImportOpen(true)} onSetAll={openSetAll} />
               </div>
             </div>
+            </>
           )}
         </div>
 
