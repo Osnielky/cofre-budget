@@ -343,6 +343,30 @@ export default function TransactionsPage() {
     return () => document.removeEventListener('keydown', onKey);
   }, [openPickerId]);
 
+  /* The picker is position:fixed against a rect captured at open time, so an
+     outside scroll or a resize detaches it from its row. Close on both.
+     Scrolling the picker's OWN list must not close it. */
+  useEffect(() => {
+    if (!openPickerId) return;
+    const close = () => {
+      setOpenPickerId(null);
+      setPickerProjectDrill(null);
+      setPickerTransferStep(false);
+      setPickerSearch('');
+    };
+    const onScroll = (e: Event) => {
+      const t = e.target as Node;
+      if (pickerRef.current && (pickerRef.current === t || pickerRef.current.contains(t))) return;
+      close();
+    };
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [openPickerId]);
+
   /* close pickers on outside click */
   useEffect(() => {
     function onDown(e: MouseEvent) {
