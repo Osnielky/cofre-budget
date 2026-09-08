@@ -1,3 +1,4 @@
+import { isTrackingAccount } from '@/lib/accountTypes';
 import type { BudgetWithSpent, Transaction, Category } from './types';
 
 function monthKeyOf(d: Date): string {
@@ -140,6 +141,34 @@ export function categoryTrend(txs: Transaction[], categoryId: string, month: str
     if (totals.has(k)) totals.set(k, +(totals.get(k)! + Math.abs(Number(t.amount))).toFixed(2));
   }
   return keys.map((k) => ({ month: k, total: totals.get(k)! }));
+}
+
+/** Expense total for one category in a single calendar month, using the app's
+    canonical exclusions (transfers, debt repayments, tracking accounts). */
+export function categoryMonthSpend(txs: Transaction[], categoryId: string, monthKey: string): number {
+  let total = 0;
+  for (const t of txs) {
+    if (Number(t.amount) >= 0) continue;               // refunds/income don't net off, per findWithSpent
+    if (t.categoryRef?.id !== categoryId) continue;
+    if (t.categoryRef?.type === 'transfer' || t.debtId) continue;
+    if (isTrackingAccount(t.bankAccount?.accountType ?? '')) continue;
+    if (!t.date.startsWith(monthKey)) continue;
+    total += Math.abs(Number(t.amount));
+  }
+  return +total.toFixed(2);
+}
+
+/** Average monthly spend for a category over the `months` FULL months before
+    `month`. Anchored on the selected month, not on today, so opening the budget
+    form in August averages May–July rather than leaking a partial September. */
+export function categoryAverageBefore(txs: Transaction[], categoryId: string, month: string, months = 3): number {
+  const [y, m] = month.split('-').map(Number);
+  let total = 0;
+  for (let i = 1; i <= months; i++) {
+    const d = new Date(y, m - 1 - i, 1);
+    total += categoryMonthSpend(txs, categoryId, `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return +(total / months).toFixed(2);
 }
 
 export interface BurnPoint { day: number; cumulative: number }

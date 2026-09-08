@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom';
 import Sidebar from '@/components/Sidebar';
 import {
   daysInMonth, dayOfMonth, elapsedPct, splitBudgets, monthTotals,
-  unbudgetedSpending, burnSeries, categoryTrend,
+  unbudgetedSpending, burnSeries, categoryTrend, categoryAverageBefore,
+  categoryMonthSpend, roundUp50,
 } from '@/lib/budgets/derive';
 import type { CategoryTrendPoint } from '@/lib/budgets/derive';
 import type { Category, Project, BudgetWithSpent, Transaction, MonthSummary, HistoryPoint } from '@/lib/budgets/types';
@@ -18,6 +19,49 @@ import TargetsPanel from '@/components/budgets/TargetsPanel';
 import PlanHistory from '@/components/budgets/PlanHistory';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
+
+interface BudgetForm {
+  categoryId: string;
+  amount: string;
+  projectId: string;
+  projectCategoryId: string;
+  notifyEnabled: boolean;
+  notifyThreshold: number;
+  rollover: boolean;
+  isRecurring: boolean;
+}
+
+const EMPTY_FORM: BudgetForm = {
+  categoryId: '', amount: '', projectId: '', projectCategoryId: '',
+  notifyEnabled: false, notifyThreshold: 80, rollover: false, isRecurring: false,
+};
+
+/** Seed the form's settings from a stored budget, falling back to the defaults. */
+function settingsOf(b: Pick<BudgetWithSpent, 'notifyEnabled' | 'notifyThreshold' | 'rollover' | 'isRecurring'>) {
+  return {
+    notifyEnabled: b.notifyEnabled ?? false,
+    notifyThreshold: b.notifyThreshold ?? 80,
+    rollover: b.rollover ?? false,
+    isRecurring: b.isRecurring ?? false,
+  };
+}
+
+/** The settings half of the form, in the shape the API expects. */
+function formSettings(f: BudgetForm) {
+  return {
+    notifyEnabled: f.notifyEnabled,
+    notifyThreshold: f.notifyThreshold,
+    rollover: f.rollover,
+    isRecurring: f.isRecurring,
+  };
+}
+
+/** Slider ceiling: a round number comfortably above the recommendation. */
+function sliderMax(recommended: number, entered: number): number {
+  const base = Math.max(recommended * 2, entered * 1.5, 500);
+  const mag = Math.pow(10, Math.floor(Math.log10(base)));
+  return Math.ceil(base / (mag / 2)) * (mag / 2);
+}
 
 function monthLabel(m: string) {
   const [y, mo] = m.split('-');
@@ -64,13 +108,14 @@ export default function BudgetsPage() {
   const [showForm, setShowForm]     = useState(false);
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [form, setForm]             = useState({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' });
+  const [form, setForm]             = useState<BudgetForm>(EMPTY_FORM);
   const [sort, setSort]             = useState<SortKey>('risk');
   const [catDropOpen, setCatDropOpen] = useState(false);
   const [projectDropOpen, setProjectDropOpen] = useState(false);
   const [formKind, setFormKind]     = useState<'expense' | 'income'>('expense');
   const [formError, setFormError]   = useState<string | null>(null);
   const [formSaving, setFormSaving] = useState(false);
+  const [moreOpen, setMoreOpen]     = useState(false);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -229,7 +274,8 @@ export default function BudgetsPage() {
 
   function openAddBudget(prefillCategoryId?: string) {
     setFormKind('expense'); setEditingId(null); setFormError(null);
-    setForm({ categoryId: prefillCategoryId ?? '', amount: '', projectId: '', projectCategoryId: '' });
+    setForm({ ...EMPTY_FORM, categoryId: prefillCategoryId ?? '' });
+    setMoreOpen(false);
     setShowForm(true);
   }
 
@@ -254,15 +300,15 @@ export default function BudgetsPage() {
     setFormSaving(true);
     try {
       if (editingId) {
-        const res = await fetch(`${API}/budgets/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ amount: amt, projectId: form.projectId || null }) });
+        const res = await fetch(`${API}/budgets/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ amount: amt, projectId: form.projectId || null, ...formSettings(form) }) });
         if (!res.ok) throw new Error('Failed to update budget');
         const prev = budgets.find(b => b.id === editingId);
         const spentAmt = prev?.spent ?? 0;
-        setBudgets(bs => bs.map(b => b.id === editingId ? { ...b, amount: amt, projectId: form.projectId || null, project: projects.find(p => p.id === form.projectId) ?? null, percentage: amt > 0 ? Math.round((spentAmt / amt) * 100) : 0, remaining: amt - spentAmt } : b));
+        setBudgets(bs => bs.map(b => b.id === editingId ? { ...b, amount: amt, projectId: form.projectId || null, project: projects.find(p => p.id === form.projectId) ?? null, percentage: amt > 0 ? Math.round((spentAmt / amt) * 100) : 0, remaining: amt - spentAmt, ...formSettings(form) } : b));
       } else {
         const body = form.projectCategoryId
-          ? { projectCategoryId: form.projectCategoryId, amount: amt, month, projectId: form.projectId || null }
-          : { categoryId: form.categoryId, amount: amt, month, projectId: form.projectId || null };
+          ? { projectCategoryId: form.projectCategoryId, amount: amt, month, projectId: form.projectId || null, ...formSettings(form) }
+          : { categoryId: form.categoryId, amount: amt, month, projectId: form.projectId || null, ...formSettings(form) };
         const res = await fetch(`${API}/budgets`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) });
         if (!res.ok) throw new Error('Failed to save budget');
         const created = await res.json();
@@ -270,7 +316,7 @@ export default function BudgetsPage() {
         const selProj2 = projects.find(p => p.id === form.projectId);
         setBudgets(bs => [...bs, { ...created, category: cat ?? created.category, project: selProj2 ?? null, amount: amt, spent: 0, percentage: 0, remaining: amt }]);
       }
-      setShowForm(false); setEditingId(null); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' });
+      setShowForm(false); setEditingId(null); setProjectDropOpen(false); setForm(EMPTY_FORM);
     } catch {
       setFormError('Something went wrong. Please try again.');
     } finally {
@@ -373,7 +419,7 @@ export default function BudgetsPage() {
               <BudgetTable spending={spending} unbudgeted={unbudgeted} month={month} now={now}
                 sort={sort} onSortChange={setSort} expandedId={expandedId} onToggleExpand={(id) => setExpandedId((cur) => cur === id ? null : id)}
                 txsByCategory={txsByCategory} trendByCategory={trendByCategory} categoryAverages={categoryAverages}
-                onEdit={(b) => { setFormKind('expense'); setEditingId(b.id); setForm({ categoryId: b.categoryId ?? '', amount: String(b.amount), projectId: b.projectId ?? '', projectCategoryId: '' }); setShowForm(true); }}
+                onEdit={(b) => { setFormKind('expense'); setEditingId(b.id); setForm({ ...EMPTY_FORM, categoryId: b.categoryId ?? '', amount: String(b.amount), projectId: b.projectId ?? '', ...settingsOf(b) }); setShowForm(true); }}
                 onDelete={handleDelete} onRaise={handleRaise} deletingId={deletingId}
                 onSetUnbudgeted={(categoryId) => openAddBudget(categoryId)} />
 
@@ -381,8 +427,8 @@ export default function BudgetsPage() {
               <div className="flex flex-col gap-4">
                 <TargetsPanel targets={targets} projects={projects} totalTarget={totalTarget} totalEarned={totalEarned} earnPct={earnPct}
                   lastDayLabel={lastDayLabel(month)}
-                  onAdd={() => { setFormKind('income'); setEditingId(null); setFormError(null); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); setShowForm(true); }}
-                  onEdit={(t) => { setFormKind('income'); setEditingId(t.id); setFormError(null); setForm({ categoryId: t.categoryId ?? '', amount: String(t.amount), projectId: t.projectId ?? '', projectCategoryId: t.projectCategoryId ?? '' }); setShowForm(true); }}
+                  onAdd={() => { setFormKind('income'); setEditingId(null); setFormError(null); setForm(EMPTY_FORM); setShowForm(true); }}
+                  onEdit={(t) => { setFormKind('income'); setEditingId(t.id); setFormError(null); setForm({ ...EMPTY_FORM, categoryId: t.categoryId ?? '', amount: String(t.amount), projectId: t.projectId ?? '', projectCategoryId: t.projectCategoryId ?? '', ...settingsOf(t) }); setShowForm(true); }}
                   onDelete={handleDelete} deletingId={deletingId} />
                 <PlanHistory history={history} currentMonth={month} elapsedPct={elapsedPct(month, now)}
                   onImport={() => setImportOpen(true)} onSetAll={openSetAll} />
@@ -395,7 +441,7 @@ export default function BudgetsPage() {
         {showForm && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowForm(false); setEditingId(null); setCatDropOpen(false); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); } }}>
+            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowForm(false); setEditingId(null); setCatDropOpen(false); setProjectDropOpen(false); setForm(EMPTY_FORM); } }}>
             {(() => {
               const selProj = projects.find(p => p.id === form.projectId);
               const selCat = categories.find(c => c.id === form.categoryId)
@@ -403,33 +449,58 @@ export default function BudgetsPage() {
               const accent = selCat?.color ?? 'var(--color-card-violet)';
               const accentHex = selCat?.color ?? '#818CF8';
               const amt    = parseFloat(form.amount) || 0;
+              const isIncome = formKind === 'income';
+
+              // Every derived number below comes from wideTxs (6 months already loaded),
+              // windowed on the SELECTED month rather than today.
+              const avg3mo = selCat && !isIncome ? categoryAverageBefore(wideTxs, selCat.id, month, 3) : 0;
+              const recommended = avg3mo > 0 ? roundUp50(avg3mo * 1.1) : 0;
+              const lastMonthSpend = selCat && !isIncome ? categoryMonthSpend(wideTxs, selCat.id, prevMonth(month)) : 0;
+              const din = daysInMonth(month);
+              const perDay = amt > 0 ? amt / din : 0;
+              const vsLast = amt > 0 && lastMonthSpend > 0 ? amt - lastMonthSpend : null;
+              const sMax = sliderMax(recommended, amt);
+              // Four distinct ascending presets around the recommendation. Rounding
+              // can collapse neighbouring multiples into the same value, so walk a
+              // wider ladder until four survive.
+              const presets = (() => {
+                if (recommended <= 0) return [100, 250, 500, 1000];
+                const out: number[] = [];
+                for (const mult of [0.5, 1, 1.5, 2, 3, 4, 6]) {
+                  const v = roundUp50(recommended * mult);
+                  if (v > 0 && !out.includes(v)) out.push(v);
+                  if (out.length === 4) break;
+                }
+                return out.sort((a, b) => a - b);
+              })();
+
               return (
                 <form onSubmit={handleSubmit}
-                  className="w-full max-w-sm flex flex-col rounded-2xl"
-                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)' }}>
+                  className="w-full max-w-lg flex flex-col rounded-2xl"
+                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '92dvh', overflow: 'hidden' }}>
 
                   {/* Form header */}
-                  <div className="px-5 py-4 flex items-center justify-between gap-3 rounded-t-2xl"
+                  <div className="px-5 sm:px-6 py-4 sm:py-5 flex items-center justify-between gap-3 rounded-t-2xl shrink-0"
                     style={{ borderBottom: '1px solid var(--color-border)', background: `linear-gradient(135deg, ${accentHex}12 0%, transparent 60%)` }}>
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0" style={{ background: `${accentHex}22` }}>
+                      <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shrink-0" style={{ background: `${accentHex}22` }}>
                         {selCat?.icon ?? '🎯'}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-bold text-sm">{selCat?.name ?? (editingId
-                          ? (formKind === 'income' ? 'Edit Income Target' : 'Edit Budget')
-                          : (formKind === 'income' ? 'New Income Target' : 'New Budget'))}</p>
-                        <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
-                          {amt > 0 ? `$${amt.toLocaleString()} / month` : monthLabel(month)}
+                        <p className="font-bold text-lg leading-tight">{editingId
+                          ? (isIncome ? 'Edit income target' : 'Edit budget')
+                          : (isIncome ? 'Create an income target' : 'Create a budget')}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                          {isIncome ? 'Set an expected income for' : 'Set a spending limit for'} {monthLabel(month)}
                         </p>
                       </div>
                     </div>
-                    <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); }}
+                    <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); setProjectDropOpen(false); setForm(EMPTY_FORM); }}
                       className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] shrink-0"
                       style={{ color: 'var(--color-text-muted)' }}>✕</button>
                   </div>
 
-                  <div className="flex flex-col gap-4 px-5 py-4">
+                  <div className="flex flex-col gap-4 px-5 sm:px-6 py-4 sm:py-5 overflow-y-auto flex-1">
                     {/* Project picker — income targets only, shown FIRST */}
                     {formKind === 'income' && (
                       <div className="flex flex-col gap-1.5">
@@ -543,46 +614,175 @@ export default function BudgetsPage() {
                     })()}
 
                     {/* Amount */}
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-3">
                       <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                        {formKind === 'income' ? 'Expected Income' : 'Monthly Limit'}
+                        {isIncome ? 'Expected Income' : 'Monthly Limit'}
                       </span>
                       <div className="flex rounded-xl overflow-hidden" style={{ border: `1px solid ${amt > 0 ? accentHex + '55' : 'var(--color-border)'}` }}>
-                        <span className="flex items-center px-3 text-sm font-semibold shrink-0"
+                        <span className="flex items-center px-4 text-lg font-semibold shrink-0"
                           style={{ background: 'var(--color-surface)', color: amt > 0 ? accentHex : 'var(--color-text-muted)', borderRight: '1px solid var(--color-border)' }}>$</span>
-                        <input required type="number" step="0.01" min="1" placeholder="0.00" autoFocus={!!editingId}
+                        <input required type="number" inputMode="decimal" step="0.01" min="1" placeholder="0.00" autoFocus={!!editingId}
                           value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
-                          className="flex-1 px-3 py-2.5 text-sm outline-none font-semibold"
+                          className="flex-1 px-4 py-3 text-2xl outline-none font-bold tabular-nums min-w-0"
                           style={{ background: 'var(--color-elevated)', color: 'var(--color-text-primary)' }} />
                       </div>
-                      <div className="grid grid-cols-4 gap-1.5">
-                        {[100,250,500,1000].map(q => (
-                          <button key={q} type="button" onClick={() => setForm(f => ({ ...f, amount: String(q) }))}
-                            className="py-1.5 rounded-lg text-xs font-semibold transition-all"
-                            style={{
-                              background: Number(form.amount) === q ? `${accentHex}22` : 'var(--color-surface)',
-                              border: `1px solid ${Number(form.amount) === q ? accentHex + '44' : 'var(--color-border)'}`,
-                              color: Number(form.amount) === q ? accentHex : 'var(--color-text-muted)',
-                            }}>
-                            ${q}
+
+                      {/* Insight row — only when there is real history to draw on */}
+                      {avg3mo > 0 && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'var(--color-surface)' }}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                                <path d="M4 20V10M10 20V4M16 20v-6M22 20H2" />
+                              </svg>
+                            </span>
+                            3-month average: <strong style={{ color: 'var(--color-text-primary)' }}>${fmt(avg3mo)}</strong>
+                          </span>
+                          <button type="button" onClick={() => setForm(f => ({ ...f, amount: String(recommended) }))}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all hover:brightness-110"
+                            style={{ background: `${accentHex}18`, border: `1px solid ${accentHex}44`, color: accentHex }}>
+                            ✦ Recommended: ${recommended.toLocaleString()}
                           </button>
-                        ))}
+                        </div>
+                      )}
+
+                      {/* Slider */}
+                      <div className="flex flex-col gap-1.5">
+                        <input type="range" min={0} max={sMax} step={sMax / 100}
+                          value={Math.min(amt, sMax)}
+                          onChange={e => setForm(f => ({ ...f, amount: String(Math.round(Number(e.target.value))) }))}
+                          aria-label={isIncome ? 'Expected income' : 'Monthly limit'}
+                          className="budget-slider"
+                          style={{
+                            ['--slider-accent' as string]: accentHex,
+                            ['--slider-pct' as string]: `${sMax > 0 ? (Math.min(amt, sMax) / sMax) * 100 : 0}%`,
+                          }} />
+                        <div className="flex justify-between text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                          <span>$0</span><span>${(sMax / 2).toLocaleString()}</span><span>${sMax.toLocaleString()}</span>
+                        </div>
                       </div>
+
+                      {/* Quick amounts */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                        {presets.map(q => {
+                          const on = Number(form.amount) === q;
+                          const isRec = recommended > 0 && q === recommended;
+                          return (
+                            <button key={q} type="button" onClick={() => setForm(f => ({ ...f, amount: String(q) }))}
+                              className="py-2 rounded-lg text-xs font-semibold transition-all leading-tight"
+                              style={{
+                                background: on ? `${accentHex}22` : 'var(--color-surface)',
+                                border: `1px solid ${on ? accentHex + '44' : 'var(--color-border)'}`,
+                                color: on ? accentHex : 'var(--color-text-muted)',
+                              }}>
+                              ${q.toLocaleString()}
+                              {isRec && <span className="block text-[10px] font-medium opacity-80">Recommended</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Allowance stats — self-consistent: weekly is exactly 7 daily */}
+                    {amt > 0 && (
+                      <div className="flex flex-wrap gap-2 rounded-xl px-3 py-3"
+                        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Daily allowance</p>
+                          <p className="text-sm font-bold tabular-nums">${fmt(perDay)}</p>
+                        </div>
+                        <div className="flex-1 min-w-0" style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: 12 }}>
+                          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Weekly allowance</p>
+                          <p className="text-sm font-bold tabular-nums">${fmt(perDay * 7)}</p>
+                        </div>
+                        <div className="flex-1 min-w-0" style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: 12 }}>
+                          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>vs. last month</p>
+                          <p className="text-sm font-bold tabular-nums"
+                            style={{ color: vsLast === null ? 'var(--color-text-muted)' : vsLast >= 0 ? 'var(--color-amber)' : 'var(--color-green)' }}>
+                            {vsLast === null ? '—' : `${vsLast >= 0 ? '+' : '−'}$${fmt(vsLast)}`}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notify threshold */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3 py-3"
+                      style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                      <span className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: `${accentHex}18` }}>🔔</span>
+                      <div className="flex-1 basis-40 min-w-0">
+                        <p className="text-sm font-semibold leading-tight">Notify me when I reach {form.notifyThreshold}%</p>
+                        <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Get a heads up before you hit your limit.</p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-auto shrink-0">
+                        <select value={form.notifyThreshold} disabled={!form.notifyEnabled}
+                          onChange={e => setForm(f => ({ ...f, notifyThreshold: Number(e.target.value) }))}
+                          aria-label="Alert threshold"
+                          className="px-2 py-1.5 rounded-lg text-xs font-semibold outline-none disabled:opacity-40"
+                          style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
+                          {[50, 60, 70, 75, 80, 90, 100].map(p => <option key={p} value={p}>{p}%</option>)}
+                        </select>
+                        <button type="button" role="switch" aria-checked={form.notifyEnabled}
+                          aria-label="Enable budget alert"
+                          onClick={() => setForm(f => ({ ...f, notifyEnabled: !f.notifyEnabled }))}
+                          className="w-11 h-6 rounded-full shrink-0 transition-colors relative"
+                          style={{ background: form.notifyEnabled ? accentHex : 'var(--color-border)' }}>
+                          <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+                            style={{ left: form.notifyEnabled ? 22 : 2 }} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* More options */}
+                    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+                      <button type="button" onClick={() => setMoreOpen(o => !o)} aria-expanded={moreOpen}
+                        className="w-full flex items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-[var(--color-surface)]">
+                        <span className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: 'var(--color-surface)' }}>⚙️</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold leading-tight">More options</p>
+                          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Rollover unused funds, set as recurring, and more</p>
+                        </div>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0"
+                          style={{ opacity: 0.5, transform: moreOpen ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }}>
+                          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      {moreOpen && (
+                        <div className="flex flex-col" style={{ borderTop: '1px solid var(--color-border)' }}>
+                          {([
+                            { key: 'rollover' as const, label: 'Roll over unused funds', hint: "Add what you don't spend to next month." },
+                            { key: 'isRecurring' as const, label: 'Repeat every month', hint: 'Recreate this budget in months without one.' },
+                          ]).map(opt => (
+                            <label key={opt.key} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium leading-tight">{opt.label}</p>
+                                <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{opt.hint}</p>
+                              </div>
+                              <button type="button" role="switch" aria-checked={form[opt.key]} aria-label={opt.label}
+                                onClick={() => setForm(f => ({ ...f, [opt.key]: !f[opt.key] }))}
+                                className="w-11 h-6 rounded-full shrink-0 transition-colors relative"
+                                style={{ background: form[opt.key] ? accentHex : 'var(--color-border)' }}>
+                                <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all"
+                                  style={{ left: form[opt.key] ? 22 : 2 }} />
+                              </button>
+                            </label>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-2 px-5 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
+                  <div className="flex flex-col gap-2 px-5 sm:px-6 py-4 shrink-0" style={{ borderTop: '1px solid var(--color-border)' }}>
                     {formError && (
                       <p className="text-xs font-medium text-center" style={{ color: 'var(--color-rose)' }}>{formError}</p>
                     )}
                     <div className="flex gap-2 justify-end">
-                      <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); setProjectDropOpen(false); setForm({ categoryId: '', amount: '', projectId: '', projectCategoryId: '' }); setFormError(null); }}
+                      <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setCatDropOpen(false); setProjectDropOpen(false); setForm(EMPTY_FORM); setFormError(null); }}
                         className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
                         style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
                       <button type="submit" disabled={formSaving}
                         className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all disabled:opacity-60"
                         style={{ background: accent }}>
-                        {formSaving ? 'Saving…' : editingId ? 'Save Changes' : (formKind === 'income' ? 'Create Target' : 'Create Budget')}
+                        {formSaving ? 'Saving…' : editingId ? 'Save changes' : (formKind === 'income' ? 'Create target' : 'Create budget')}
                       </button>
                     </div>
                   </div>

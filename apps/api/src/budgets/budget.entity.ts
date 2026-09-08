@@ -43,6 +43,21 @@ export class Budget {
   @JoinColumn({ name: 'projectId' })
   project: Project | null;
 
+  /* Warn when spend crosses `notifyThreshold` percent of the amount. */
+  @Column({ type: 'boolean', default: false })
+  notifyEnabled: boolean;
+
+  @Column({ type: 'smallint', default: 80 })
+  notifyThreshold: number;
+
+  /* Carry an underspend forward into next month's available amount. */
+  @Column({ type: 'boolean', default: false })
+  rollover: boolean;
+
+  /* Re-create this budget automatically in months that don't have one yet. */
+  @Column({ type: 'boolean', default: false })
+  isRecurring: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 
