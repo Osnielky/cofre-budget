@@ -129,10 +129,10 @@ export class RecurringService {
         .andWhere('userId = :userId', { userId })
         .andWhere('date > :today', { today: iso(new Date()) })
         .execute();
-    } else {
-      // Keep the rows, just detach them so they survive the rule.
-      await this.txRepo.update({ recurringRuleId: id, userId }, { recurringRuleId: null });
     }
+    // Whatever survives must stop pointing at a rule that is about to vanish —
+    // recurringRuleId has no FK, so a stale id would linger silently.
+    await this.txRepo.update({ recurringRuleId: id, userId }, { recurringRuleId: null });
     await this.repo.delete({ id, userId });
   }
 

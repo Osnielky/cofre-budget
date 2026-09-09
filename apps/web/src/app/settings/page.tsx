@@ -8,6 +8,7 @@ import Sidebar from '@/components/Sidebar';
 import CsvImportModal from '@/components/CsvImportModal';
 import CategoryManager from '@/components/CategoryManager';
 import RulesManager from '@/components/RulesManager';
+import RecurringManager from '@/components/RecurringManager';
 import ProjectCategoryManager from '@/components/ProjectCategoryManager';
 import AccountSettings from '@/components/AccountSettings';
 import BankSelect, { BANKS } from '@/components/BankSelect';
@@ -23,7 +24,7 @@ import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 type AccountType = string;
-type Tab = 'account' | 'banks' | 'categories' | 'rules' | 'projects' | 'appearance' | 'integrations' | 'billing' | 'data';
+type Tab = 'account' | 'banks' | 'categories' | 'recurring' | 'rules' | 'projects' | 'appearance' | 'integrations' | 'billing' | 'data';
 
 interface BankAccount {
   id: string;
@@ -147,6 +148,16 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'recurring',
+    label: 'Recurring Payments',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/>
+        <path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
       </svg>
     ),
   },
@@ -994,6 +1005,7 @@ function SettingsPageInner() {
 
           {/* ── CATEGORIES TAB ── */}
           {activeTab === 'categories' && <CategoryManager />}
+          {activeTab === 'recurring' && <RecurringManager />}
           {activeTab === 'rules' && <RulesManager />}
 
           {/* ── PROJECT CATEGORIES TAB ── */}
