@@ -2486,7 +2486,18 @@ export default function TransactionsPage() {
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                         <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Transaction date</span>
                         <input required type="date" value={manualTx.date}
-                          onChange={(e) => setManualTx((f) => ({ ...f, date: e.target.value }))}
+                          onChange={(e) => {
+                            const date = e.target.value;
+                            setManualTx((f) => ({ ...f, date }));
+                            // The series starts on the transaction being recorded. Without
+                            // this the start stayed at today, so picking Aug 1 silently
+                            // produced a series starting today and no August entry at all.
+                            if (date) {
+                              setRecurring((r) => (r.startDateTouched
+                                ? r
+                                : { ...r, startDate: date, dayOfMonth: Number(date.slice(8, 10)) || r.dayOfMonth }));
+                            }
+                          }}
                           className="px-3 py-2.5 text-sm outline-none rounded-xl w-full"
                           style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', colorScheme: 'dark' }} />
                       </div>

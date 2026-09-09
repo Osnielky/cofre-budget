@@ -5,6 +5,9 @@ export type EndMode = 'never' | 'on' | 'after';
 
 export interface RecurringState {
   enabled: boolean;
+  /** Set once the user edits Starts directly, so it stops following the
+      transaction date. */
+  startDateTouched?: boolean;
   interval: number;
   unit: RecurringUnit;
   dayOfMonth: number;
@@ -18,7 +21,7 @@ export interface RecurringState {
 export function emptyRecurring(startDate: string): RecurringState {
   const day = Number(startDate.slice(8, 10)) || 1;
   return {
-    enabled: false, interval: 1, unit: 'month', dayOfMonth: day,
+    enabled: false, interval: 1, unit: 'month', dayOfMonth: day, startDateTouched: false,
     startDate, endMode: 'never', endDate: '', count: 12, recordFirst: true,
   };
 }
@@ -157,7 +160,11 @@ export default function RecurringPanel({ value: r, onChange, amount, accent, isE
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>Starts</p>
               <input type="date" value={r.startDate} aria-label="Start date"
-                onChange={(e) => set({ startDate: e.target.value })}
+                onChange={(e) => set({
+                  startDate: e.target.value,
+                  startDateTouched: true,
+                  dayOfMonth: Number(e.target.value.slice(8, 10)) || r.dayOfMonth,
+                })}
                 className="w-full h-10 px-3 rounded-xl text-sm outline-none" style={field} />
             </div>
             <div className="flex-1 min-w-0">
