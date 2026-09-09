@@ -63,13 +63,29 @@ export interface CategorySlice { id: string; name: string; icon: string; color: 
 const UNCAT = { id: 'uncat', name: 'Uncategorized', icon: '❓', color: '#6B6B8A' };
 const OTHER = { id: 'other', name: 'Other', icon: '·', color: '#6B6B8A' };
 
+/**
+ * The bucket a transaction belongs to.
+ *
+ * A row linked to a project carries `projectCategoryRef` and, by the app's own
+ * convention, `categoryId = null`. Keying on the budget category alone would
+ * therefore file all project activity under "Uncategorized" — which is what it
+ * used to do. Project categories are namespaced so they can never collide with
+ * a budget category that happens to share an id.
+ */
+function bucketOf(t: Transaction): { id: string; name: string; icon: string; color: string } {
+  if (t.categoryRef) return t.categoryRef;
+  const pc = t.projectCategoryRef;
+  if (pc) return { id: `proj:${pc.id}`, name: pc.name, icon: pc.icon || '📁', color: pc.color };
+  return UNCAT;
+}
+
 export function categoryTotals(txs: Transaction[], dir: 'income' | 'expense'): CategorySlice[] {
   const sign = dir === 'income' ? 1 : -1;
   const map = new Map<string, CategorySlice>();
   for (const t of txs) {
     if (!inCashFlow(t) || Math.sign(Number(t.amount)) !== sign) continue;
-    const c = t.categoryRef ?? UNCAT as never;
-    const key = t.categoryRef ? t.categoryRef.id : 'uncat';
+    const c = bucketOf(t);
+    const key = c.id;
     const cur = map.get(key) ?? { id: key, name: c.name, icon: c.icon, color: c.color, value: 0, pct: 0 };
     cur.value = +(cur.value + Math.abs(Number(t.amount))).toFixed(2);
     map.set(key, cur);

@@ -105,6 +105,31 @@ describe('categoryTotals', () => {
     const out = categoryTotals([tx({ amount: -10, categoryRef: null })], 'expense');
     expect(out[0].id).toBe('uncat');
   });
+
+  // A project-linked row has categoryId = null by design, so keying on the
+  // budget category alone reported all project activity as "Uncategorized".
+  it('attributes project-categorized income to its project category', () => {
+    const out = categoryTotals([
+      tx({ amount: 3488.87, categoryRef: null, projectCategoryRef: { id: 'pc1', name: 'Trade Profits', icon: '📈', color: '#22C55E' } }),
+    ] as never, 'income');
+    expect(out).toHaveLength(1);
+    expect(out[0].name).toBe('Trade Profits');
+    expect(out[0].id).toBe('proj:pc1');
+    expect(out[0].value).toBe(3488.87);
+  });
+
+  it('keeps project and budget categories in separate buckets even on an id clash', () => {
+    const out = categoryTotals([
+      tx({ amount: -40, categoryRef: cat({ id: 'x', name: 'Budget X' }) }),
+      tx({ amount: -60, categoryRef: null, projectCategoryRef: { id: 'x', name: 'Project X', icon: '📁', color: '#9B6DFF' } }),
+    ] as never, 'expense');
+    expect(out.map((s) => [s.id, s.value])).toEqual([['proj:x', 60], ['x', 40]]);
+  });
+
+  it('still reports a row with neither kind of category as uncategorized', () => {
+    const out = categoryTotals([tx({ amount: -10, categoryRef: null, projectCategoryRef: null })] as never, 'expense');
+    expect(out[0].id).toBe('uncat');
+  });
 });
 
 describe('foldOther', () => {

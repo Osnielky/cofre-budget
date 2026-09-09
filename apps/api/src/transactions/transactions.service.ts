@@ -96,6 +96,10 @@ export class TransactionsService {
   ): Promise<Transaction[]> {
     const qb = this.repo.createQueryBuilder('tx')
       .leftJoinAndSelect('tx.categoryRef', 'categoryRef')
+      // A project-categorised row has categoryId = null by design, so without
+      // this join the client cannot tell it apart from a genuinely
+      // uncategorised one and reports it as "Uncategorized".
+      .leftJoinAndSelect('tx.projectCategoryRef', 'projectCategoryRef')
       .leftJoinAndSelect('tx.bankAccount', 'bankAccount')
       .leftJoinAndSelect('tx.transferAccount', 'transferAccount')
       .leftJoinAndSelect('tx.categorizedByRule', 'categorizedByRule')
