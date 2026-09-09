@@ -7,10 +7,16 @@ import Panel, { PanelEmpty } from '../Panel';
 import { makeChartTheme, fmt } from '../chartTheme';
 import type { CategorySlice } from '@/lib/dashboard/derive';
 
+export interface PeriodOption { value: string; label: string }
+
 interface Props {
   title: string; subtitle: string;
   slices: CategorySlice[]; total: number; loading: boolean;
   colSpan?: 1 | 2;
+  /** Optional period filter. 'ytd' plus one entry per month with data. */
+  period?: string;
+  periodOptions?: PeriodOption[];
+  onPeriodChange?: (value: string) => void;
 }
 
 function IconChip({ slice }: { slice: CategorySlice }) {
@@ -24,7 +30,7 @@ function IconChip({ slice }: { slice: CategorySlice }) {
   );
 }
 
-export default function CategoryDonutPanel({ title, subtitle, slices, total, loading, colSpan = 1 }: Props) {
+export default function CategoryDonutPanel({ title, subtitle, slices, total, loading, colSpan = 1, period, periodOptions, onPeriodChange }: Props) {
   const tc = useThemeColors();
   const th = makeChartTheme(tc);
   const [mode, setMode] = useState<'amount' | 'percent'>('amount');
@@ -44,9 +50,19 @@ export default function CategoryDonutPanel({ title, subtitle, slices, total, loa
 
   return (
     <Panel title={title} subtitle={subtitle} loading={loading} colSpan={colSpan}
-      legend={slices.length > 0 ? (
-        <div className="flex items-center gap-1.5">{toggleBtn('amount', '$ Amount')}{toggleBtn('percent', '% Percent')}</div>
-      ) : undefined}>
+      legend={(
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          {periodOptions && periodOptions.length > 0 && onPeriodChange && (
+            <select value={period} onChange={(e) => onPeriodChange(e.target.value)}
+              aria-label={`${title} period`}
+              className="px-2 py-1 rounded-md text-[10.5px] font-semibold outline-none cursor-pointer"
+              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+              {periodOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          )}
+          {slices.length > 0 && <>{toggleBtn('amount', '$ Amount')}{toggleBtn('percent', '% Percent')}</>}
+        </div>
+      )}>
       {slices.length === 0 ? <PanelEmpty message="Nothing categorized here yet." /> : (
         <div className="flex flex-col gap-4 flex-1">
           <div className="flex items-center gap-5 flex-wrap sm:flex-nowrap flex-1">

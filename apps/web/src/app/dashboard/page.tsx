@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import { useUser } from '@/components/UserProvider';
@@ -52,6 +52,13 @@ function nextMonth(m: string) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 function fmt(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2 }); }
+/** 'ytd' or a YYYY-MM key -> the label shown as the panel subtitle. */
+function periodLabel(p: string): string {
+  if (p === 'ytd') return 'Year to date';
+  const [y, m] = p.split('-').map(Number);
+  return new Date(y, m - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
 function greeting() {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -65,11 +72,24 @@ export default function DashboardPage() {
   const tc = useThemeColors();
   const now = new Date();
 
+  // Each donut filters independently, so income and expenses can be compared
+  // across different periods. 'ytd' is the default.
+  const [incomePeriod, setIncomePeriod] = useState('ytd');
+  const [expensePeriod, setExpensePeriod] = useState('ytd');
+
+  // Only offer months that actually have transactions. yearTx starts at Jan 1,
+  // so earlier months are not selectable without a wider fetch.
+  const periodOptions = useMemo(() => {
+    const months = [...new Set(yearTx.map((t) => t.date.slice(0, 7)))].sort().reverse();
+    return [{ value: 'ytd', label: 'Year to date' }, ...months.map((m) => ({ value: m, label: periodLabel(m) }))];
+  }, [yearTx]);
+
   const d = useMemo(() => {
     const monthTx = txInMonth(yearTx, month);
     const expenseSlices = categoryTotals(monthTx, 'expense');
-    const incomeSlices = categoryTotals(yearTx, 'income');
-    const yearExpenseSlices = categoryTotals(yearTx, 'expense');
+    const forPeriod = (p: string) => (p === 'ytd' ? yearTx : txInMonth(yearTx, p));
+    const incomeSlices = categoryTotals(forPeriod(incomePeriod), 'income');
+    const yearExpenseSlices = categoryTotals(forPeriod(expensePeriod), 'expense');
     return {
       cashFlow: monthlyCashFlow(yearTx, now),
       trend: trendSeries(yearTx, now, 12),   // full YTD; the panel slices per selected range
@@ -87,7 +107,7 @@ export default function DashboardPage() {
       daily: dailyCumulative(yearTx, month, now),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yearTx, month, budgets, accounts, debts]);
+  }, [yearTx, month, budgets, accounts, debts, incomePeriod, expensePeriod]);
 
   /* ── Stat-card derivations (ported verbatim from the pre-refactor page) ── */
   const isDebtAcc    = (a: (typeof accounts)[number]) => isLiability(a.accountType);
@@ -206,10 +226,12 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
             <IncomeExpensesPanel data={d.cashFlow} loading={loading} />
             <CashFlowTrendPanel data={d.trend} loading={loading} />
-            <CategoryDonutPanel title="Income Sources" subtitle="Year to date" colSpan={2}
-              slices={d.incomeSlices} total={d.incomeTotal} loading={loading} />
-            <CategoryDonutPanel title="Expenses by Category" subtitle="Year to date" colSpan={2}
-              slices={d.expenseDonut} total={d.expenseTotal} loading={loading} />
+            <CategoryDonutPanel title="Income Sources" subtitle={periodLabel(incomePeriod)} colSpan={2}
+              slices={d.incomeSlices} total={d.incomeTotal} loading={loading}
+              period={incomePeriod} periodOptions={periodOptions} onPeriodChange={setIncomePeriod} />
+            <CategoryDonutPanel title="Expenses by Category" subtitle={periodLabel(expensePeriod)} colSpan={2}
+              slices={d.expenseDonut} total={d.expenseTotal} loading={loading}
+              period={expensePeriod} periodOptions={periodOptions} onPeriodChange={setExpensePeriod} />
 
             <CategoryRankingPanel slices={d.ranking} loading={loading} />
             <BudgetActualPanel budgets={spendingBudgets} monthLabel={monthLabel(month)} loading={loading} />
