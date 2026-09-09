@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
+import RecurringPanel, { emptyRecurring, occurrenceDates, type RecurringState } from '@/components/RecurringPanel';
 import Sidebar from '@/components/Sidebar';
 import Avatar from '@/components/Avatar';
 import { useUser } from '@/components/UserProvider';
@@ -203,6 +204,7 @@ export default function TransactionsPage() {
   const [manualCatOpen, setManualCatOpen] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
   const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
+  const [recurring, setRecurring] = useState<RecurringState>(() => emptyRecurring(new Date().toISOString().slice(0, 10)));
   const [debts, setDebts] = useState<DebtLite[]>([]);
   const [splitTx, setSplitTx] = useState<Transaction | null>(null);
   const [selectedTx, setSelectedTx]       = useState<Transaction | null>(null);
@@ -572,6 +574,37 @@ export default function TransactionsPage() {
         setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
         return;
       }
+      // A recurring transaction is a rule, not a row: the server materialises
+      // occurrences as their dates arrive. Reload afterwards so any already-due
+      // ones show up.
+      if (recurring.enabled) {
+        const res = await fetch(`${API}/transactions/recurring`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            name: manualTx.name,
+            amount: finalAmount,
+            categoryId: manualTx.debtId ? null : (manualTx.categoryId || null),
+            bankAccountId: manualTx.bankAccountId,
+            note: manualTx.note || null,
+            interval: recurring.interval,
+            unit: recurring.unit,
+            dayOfMonth: recurring.unit === 'month' || recurring.unit === 'year' ? recurring.dayOfMonth : null,
+            startDate: recurring.startDate,
+            endDate: recurring.endMode === 'on' ? (recurring.endDate || null) : null,
+            occurrenceCount: recurring.endMode === 'after' ? recurring.count : null,
+            recordFirstNow: recurring.recordFirst,
+          }),
+        });
+        if (!res.ok) { setManualTxError('Could not save the recurring transaction.'); return; }
+        await loadTransactions();
+        setShowManualTx(false);
+        setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
+        setRecurring(emptyRecurring(today));
+        return;
+      }
+
       const res = await fetch(`${API}/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2386,12 +2419,27 @@ export default function TransactionsPage() {
               const amt        = parseFloat(manualTx.amountStr) || 0;
               return (
                 <form onSubmit={saveManualTx}
-                  className="w-full max-w-md flex flex-col rounded-2xl"
-                  style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
+                  className="w-full max-w-lg flex flex-col rounded-2xl"
+                  style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '92dvh', overflow: 'hidden' }}>
 
                   {/* Hero header */}
-                  <div className="flex flex-col items-center gap-3 px-6 pt-6 pb-5 rounded-t-2xl"
+                  <div className="flex flex-col items-center gap-3 px-6 pt-5 pb-5 rounded-t-2xl shrink-0"
                     style={{ background: `linear-gradient(160deg, ${accent}14 0%, transparent 60%)`, borderBottom: '1px solid var(--color-border)' }}>
+                    <div className="flex items-start gap-3 w-full">
+                      <span className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background: `color-mix(in srgb, ${accent} 16%, transparent)`, color: accent }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 7a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                          <path d="M16 12h3" /><path d="M3 9h18" />
+                        </svg>
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-lg font-bold leading-tight">{editingTxId ? 'Edit transaction' : 'Add transaction'}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                          Record a cash payment or a transaction missing from your accounts.
+                        </p>
+                      </div>
+                    </div>
                     <div className="flex items-center justify-between w-full">
                       {/* Type toggle */}
                       <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
@@ -2429,19 +2477,19 @@ export default function TransactionsPage() {
                       style={{ color: manualTx.name ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }} />
                   </div>
 
-                  <div className="flex flex-col gap-3 px-5 py-4">
+                  <div className="flex flex-col gap-3 px-5 py-4 overflow-y-auto flex-1">
 
                     {/* Date + Account */}
                     <div className="flex gap-3">
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Date</span>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Transaction date</span>
                         <input required type="date" value={manualTx.date}
                           onChange={(e) => setManualTx((f) => ({ ...f, date: e.target.value }))}
                           className="px-3 py-2.5 text-sm outline-none rounded-xl w-full"
                           style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', colorScheme: 'dark' }} />
                       </div>
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0" style={{ position: 'relative' }}>
-                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Account</span>
+                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Paid from</span>
                         <button type="button" onClick={() => { setManualAccOpen((o) => !o); setManualCatOpen(false); }}
                           className="px-3 py-2.5 text-sm flex items-center gap-2 rounded-xl outline-none text-left w-full"
                           style={{ background: 'var(--color-elevated)', border: `1px solid ${selAcc ? (selAcc.color || accent) + '55' : 'var(--color-elevated)'}`, color: selAcc ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
@@ -2599,6 +2647,15 @@ export default function TransactionsPage() {
                     />
                   </div>
 
+                  {/* Recurring — editing an existing row is not a series */}
+                  {!editingTxId && (
+                    <RecurringPanel
+                      value={recurring}
+                      onChange={setRecurring}
+                      amount={parseFloat(manualTx.amountStr) || 0}
+                      accent={accent} />
+                  )}
+
                   </div>
 
                   {/* Footer */}
@@ -2609,11 +2666,26 @@ export default function TransactionsPage() {
                     <button type="button" onClick={() => { setShowManualTx(false); setManualTxError(''); }}
                       className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
                       style={{ color: 'var(--color-text-secondary)' }}>Cancel</button>
-                    <button type="submit" disabled={manualTxSaving}
-                      className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
-                      style={{ background: accent }}>
-                      {manualTxSaving ? 'Saving…' : editingTxId ? 'Save Changes' : 'Add Transaction'}
-                    </button>
+                    <div className="flex flex-col items-end gap-1">
+                      <button type="submit" disabled={manualTxSaving}
+                        className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
+                        style={{ background: accent }}>
+                        {manualTxSaving ? 'Saving…' : editingTxId ? 'Save Changes' : recurring.enabled ? 'Save & schedule' : 'Add Transaction'}
+                      </button>
+                      {!editingTxId && recurring.enabled && (() => {
+                        const all = occurrenceDates(recurring);
+                        const todayIso = new Date().toISOString().slice(0, 10);
+                        const recorded = all.filter((d) => d <= todayIso || recurring.recordFirst).length
+                          ? Math.max(all.filter((d) => d <= todayIso).length, recurring.recordFirst ? 1 : 0)
+                          : 0;
+                        const scheduled = Math.max(all.length - recorded, 0);
+                        return (
+                          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                            {recorded} recorded transaction{recorded === 1 ? '' : 's'} · {recurring.endMode === 'never' ? 'rest' : scheduled} scheduled
+                          </p>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </form>
               );

@@ -59,6 +59,11 @@ export class Transaction {
   @Column({ nullable: true })
   categoryId: string;
 
+  /* Set when this row was materialised from a RecurringRule. Nulled rather than
+     cascaded when the rule is deleted, so past spending survives. */
+  @Column({ type: 'varchar', nullable: true })
+  recurringRuleId: string | null;
+
   /* Set when this transaction is a repayment of a debt (excluded from income/expense). */
   @Column({ type: 'varchar', nullable: true })
   debtId: string | null;

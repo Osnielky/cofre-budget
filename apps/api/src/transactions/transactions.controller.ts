@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Re
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TransactionsService, CsvRow, SplitPiece } from './transactions.service';
 import { ReceiptFinderService } from './receipt-finder.service';
+import { RecurringService, CreateRuleDto } from './recurring.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('transactions')
@@ -9,6 +10,7 @@ export class TransactionsController {
   constructor(
     private service: TransactionsService,
     private receiptFinder: ReceiptFinderService,
+    private recurring: RecurringService,
   ) {}
 
   @Get('category-hints')
@@ -37,14 +39,37 @@ export class TransactionsController {
   }
 
   @Get()
-  list(
+  async list(
     @Request() req: any,
     @Query('accountId') accountId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('limit') limit?: string,
   ) {
+    // No scheduler in this deployment, so recurring occurrences are written
+    // when they are next asked for. Never let that fail the read.
+    await this.recurring.materialiseDue(req.user.id).catch(() => undefined);
     return this.service.findByUser(req.user.id, accountId, from, to, limit ? parseInt(limit) : 500);
+  }
+
+  @Get('recurring')
+  listRules(@Request() req: any) {
+    return this.recurring.list(req.user.id);
+  }
+
+  @Post('recurring')
+  createRule(@Request() req: any, @Body() body: CreateRuleDto) {
+    return this.recurring.create(req.user.id, body);
+  }
+
+  @Patch('recurring/:id/stop')
+  stopRule(@Param('id') id: string, @Request() req: any) {
+    return this.recurring.stop(id, req.user.id);
+  }
+
+  @Delete('recurring/:id')
+  removeRule(@Param('id') id: string, @Request() req: any, @Query('deleteFuture') deleteFuture?: string) {
+    return this.recurring.remove(id, req.user.id, deleteFuture === 'true');
   }
 
   @Post()
