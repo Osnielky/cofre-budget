@@ -76,9 +76,11 @@ interface Props {
   /** Absolute per-occurrence amount, for the series total. */
   amount: number;
   accent: string;
+  /** Money out vs money in — only affects wording. */
+  isExpense?: boolean;
 }
 
-export default function RecurringPanel({ value: r, onChange, amount, accent }: Props) {
+export default function RecurringPanel({ value: r, onChange, amount, accent, isExpense = true }: Props) {
   const set = (patch: Partial<RecurringState>) => onChange({ ...r, ...patch });
   const dates = r.enabled ? occurrenceDates(r) : [];
   const endless = r.endMode === 'never';
@@ -194,7 +196,7 @@ export default function RecurringPanel({ value: r, onChange, amount, accent }: P
             <input type="checkbox" checked={r.recordFirst} onChange={(e) => set({ recordFirst: e.target.checked })}
               className="mt-0.5 w-4 h-4 shrink-0" style={{ accentColor: accent }} />
             <span className="min-w-0">
-              <span className="block text-xs font-semibold">Record the first occurrence as paid</span>
+              <span className="block text-xs font-semibold">Record the first occurrence as {isExpense ? 'paid' : 'received'}</span>
               <span className="block text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                 {dates[0] ? `${fmtFull(dates[0])} · Future occurrences remain scheduled.` : 'Future occurrences remain scheduled.'}
               </span>

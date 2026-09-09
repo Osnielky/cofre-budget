@@ -2436,7 +2436,9 @@ export default function TransactionsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-lg font-bold leading-tight">{editingTxId ? 'Edit transaction' : 'Add transaction'}</p>
                         <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                          Record a cash payment or a transaction missing from your accounts.
+                          {isExpense
+                            ? 'Record a cash payment or a transaction missing from your accounts.'
+                            : 'Record money you received that is missing from your accounts.'}
                         </p>
                       </div>
                     </div>
@@ -2489,7 +2491,11 @@ export default function TransactionsPage() {
                           style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', colorScheme: 'dark' }} />
                       </div>
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0" style={{ position: 'relative' }}>
-                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Paid from</span>
+                        {/* Money leaves an account on an expense and arrives on income —
+                            one fixed label would be wrong half the time. */}
+                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                          {isExpense ? 'Paid from' : 'Deposited to'}
+                        </span>
                         <button type="button" onClick={() => { setManualAccOpen((o) => !o); setManualCatOpen(false); }}
                           className="px-3 py-2.5 text-sm flex items-center gap-2 rounded-xl outline-none text-left w-full"
                           style={{ background: 'var(--color-elevated)', border: `1px solid ${selAcc ? (selAcc.color || accent) + '55' : 'var(--color-elevated)'}`, color: selAcc ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
@@ -2653,7 +2659,7 @@ export default function TransactionsPage() {
                       value={recurring}
                       onChange={setRecurring}
                       amount={parseFloat(manualTx.amountStr) || 0}
-                      accent={accent} />
+                      accent={accent} isExpense={isExpense} />
                   )}
 
                   </div>
