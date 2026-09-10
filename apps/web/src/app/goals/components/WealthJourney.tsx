@@ -37,9 +37,13 @@ export default function WealthJourney({ netWorth }: Props) {
 
       {/* The track. Horizontally scrollable so eight nodes never squash on a phone. */}
       <div className="overflow-x-auto pb-2" style={{ overscrollBehaviorX: 'contain' }}>
-        <div className="relative" style={{ minWidth: 680, paddingTop: 34, paddingBottom: 8 }}>
-          {/* Base line */}
-          <div className="absolute" style={{ left: 0, right: 0, top: 34 + 22, height: 2, background: 'var(--color-border)' }} />
+        {/* No overflow-hidden: border-radius already clips the artwork, and clipping
+            here would cut the "YOU" pill in half at net worth 0, where it sits at
+            left:0 with translateX(-50%). Horizontal geometry is untouched so the
+            node/marker maths stays as it was. */}
+        <div className="relative journey-art rounded-xl" style={{ minWidth: 680, paddingTop: 34, paddingBottom: 12 }}>
+          {/* Base line. Stronger than --color-border, which all but vanishes over the artwork. */}
+          <div className="absolute" style={{ left: 0, right: 0, top: 34 + 22, height: 2, background: 'color-mix(in srgb, var(--color-text-muted) 50%, transparent)' }} />
           {/* Completed portion */}
           <div className="absolute rounded-full" style={{
             left: 0, width: `${pos}%`, top: 34 + 21, height: 4,

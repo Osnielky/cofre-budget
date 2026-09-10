@@ -200,6 +200,37 @@ body::before {
   }
 }
 
+/* ── Wealth-journey backdrop ──
+   A panorama that runs cold mountains → tropical coast, left to right, so the
+   artwork points the same way the ladder does (Level 1 → $1M).
+
+   It sits on the *scrolling track*, not the card, so the photo pans together
+   with the nodes — otherwise on a phone the nodes slide over a fixed image and
+   "mountains = Level 1, beach = $1M" stops being true.
+
+   Read as texture, not as a photo: the scrim keeps the 10px level labels
+   legible where the art would otherwise be bright sky or white sand. If the
+   artwork is missing, the layer stack degrades to a plain dark band. */
+.journey-art {
+  --journey-art: url('/wealth-journey-background-1800x500.webp');
+  background-color: var(--color-elevated);
+  background-image:
+    /* Bottom-weighted — LEVEL n and the dollar figures live down there. */
+    linear-gradient(180deg, rgba(9, 15, 30, 0.66) 0%, rgba(9, 15, 30, 0.76) 45%, rgba(9, 15, 30, 0.93) 100%),
+    /* Ramps right: the art ends in bright turquoise and white sand, which swallowed
+       the Level 8 / $1M labels. The mountain end is already dark and needs none. */
+    linear-gradient(90deg, rgba(9, 15, 30, 0) 0%, rgba(9, 15, 30, 0.10) 42%, rgba(9, 15, 30, 0.36) 100%),
+    /* Pulls the photo toward the theme's accent so it doesn't read as foreign. */
+    linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 16%, transparent) 0%, transparent 58%),
+    var(--journey-art);
+  background-size: cover;
+  /* 42% favours the horizon band — peaks and shoreline — over sky and foreground. */
+  background-position: center, center, center, center 42%;
+  background-repeat: no-repeat;
+}
+/* Cheap insurance for the small type sitting over a busy backdrop. */
+.journey-art :where(span) { text-shadow: 0 1px 3px rgba(5, 9, 18, 0.85); }
+
 /* ── Primary pill button ──
    Class name .btn-gold is legacy (pre-Cobalt); it is the themed
    primary CTA. Restyle per theme here rather than renaming call sites. */
