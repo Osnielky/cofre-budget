@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import EmojiPicker from './EmojiPicker';
 import { createPortal } from 'react-dom';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -14,20 +15,6 @@ export interface Category {
 
 const PRESET_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0', '#5C5C78', '#FF6B6B'];
 
-const EMOJI_OPTIONS = [
-  '🍔','🍕','🍣','🌮','🍜','🥗','🥩','🍱','☕','🧃','🍺','🥤','🍷','🧋','🍦','🧁',
-  '🛒','🥦','🍎','🥑','🧀','🥐','🍳','🥘','🚗','🚕','🏎️','🚙','🚐','🛻','🚌','🚎',
-  '✈️','🚂','🚲','🛵','⛽','🛺','🚁','🛳️','🚢','🚀','🛸','🛞','🅿️','🚦','🗺️','🛍️',
-  '👗','👟','👔','👜','💍','🕶️','🧣','🏠','🛋️','🪑','🛏️','🚿','🪣','🧹','🧺','🔧',
-  '🔨','🪛','🧰','💡','🔌','🖼️','🪞','💊','🏥','🏃','🧘','🦷','❤️','🧠','🩺','🩹',
-  '🩻','🧬','💉','🏋️','🚴','🧗','⛷️','🫀','🫁','🧴','🧼','🪥','🌡️','🎬','🎮','🎵',
-  '🎭','📚','🎨','🎲','🏆','🎯','🎸','🎹','🎺','🎻','🥁','🎤','🎧','🎪','🎠','🎡',
-  '🎢','🎟️','🃏','💻','📱','⌨️','🖥️','📷','📹','💼','📊','📋','📌','🗓️','✏️','📝',
-  '🔍','📡','🤖','⌚','📺','📻','🔭','💰','💳','💵','🪙','💎','📈','📉','🏦','🤑',
-  '💸','🏷️','🏖️','🏕️','🧳','🏔️','🌋','🏝️','🗼','🗽','🏰','🌃','🌆','🎓','🔬','🧪',
-  '🧲','⚗️','📖','📓','🌿','🌸','🌺','🌻','🍁','🍄','🌊','⛰️','🌈','☀️','🌙','⭐',
-  '❄️','🔥','💧','🌱','🎁','✨','🔑','🪴','🐾','🧸','📦','🗑️','📬','🧧','🏡','⚡',
-];
 
 const TYPE_META: Record<string, { label: string; color: string }> = {
   expense:  { label: 'Expense',  color: 'var(--color-orange)' },
@@ -69,20 +56,8 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
   });
   const [saving, setSaving] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [emojiPos, setEmojiPos] = useState<{ top: number; left: number } | null>(null);
+  const [emojiAnchor, setEmojiAnchor] = useState<DOMRect | null>(null);
   const emojiTriggerRef = useRef<HTMLButtonElement>(null);
-  const emojiPickerRef  = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!showEmojiPicker) return;
-    function onDown(e: MouseEvent) {
-      const t = e.target as Node;
-      if (!emojiPickerRef.current?.contains(t) && !emojiTriggerRef.current?.contains(t))
-        setShowEmojiPicker(false);
-    }
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [showEmojiPicker]);
 
   const isExpenseType = form.type === 'expense' || form.type === 'both';
   const wantNeedMissing = isExpenseType && form.wantNeed == null;
@@ -176,13 +151,9 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
           <div className="flex gap-3">
             <div className="flex flex-col gap-1.5 shrink-0">
               <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Icon</span>
-              <button ref={emojiTriggerRef} type="button"
-                onClick={() => {
-                  if (!showEmojiPicker && emojiTriggerRef.current) {
-                    const r = emojiTriggerRef.current.getBoundingClientRect();
-                    const spaceBelow = window.innerHeight - r.bottom - 8;
-                    setEmojiPos({ top: spaceBelow > 260 ? r.bottom + 4 : r.top - 264, left: r.left });
-                  }
+              <button ref={emojiTriggerRef} type="button" data-emoji-trigger
+                onClick={(e) => {
+                  setEmojiAnchor(e.currentTarget.getBoundingClientRect());
                   setShowEmojiPicker((v) => !v);
                 }}
                 className="w-16 h-10 rounded-xl flex items-center justify-center gap-1.5 text-xl transition-colors hover:bg-[var(--color-elevated)]"
@@ -274,22 +245,10 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
         </div>
       </form>
 
-      {/* Emoji picker */}
-      {showEmojiPicker && emojiPos && (
-        <div ref={emojiPickerRef} className="p-3 rounded-xl grid grid-cols-10 gap-1"
-          style={{ position: 'fixed', top: emojiPos.top, left: emojiPos.left, width: 360, maxHeight: 340,
-                   overflowY: 'auto', zIndex: 9999, background: 'var(--color-elevated)',
-                   backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)',
-                   border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
-          {EMOJI_OPTIONS.map((em) => (
-            <button key={em} type="button"
-              onClick={() => { setForm((f) => ({ ...f, icon: em })); setShowEmojiPicker(false); }}
-              className="w-8 h-8 rounded-lg text-lg flex items-center justify-center hover:bg-[var(--color-elevated)]"
-              style={{ background: form.icon === em ? 'color-mix(in srgb, var(--color-primary) 25%, transparent)' : 'transparent' }}>
-              {em}
-            </button>
-          ))}
-        </div>
+      {showEmojiPicker && emojiAnchor && (
+        <EmojiPicker value={form.icon} anchor={emojiAnchor}
+          onPick={(em) => setForm((f) => ({ ...f, icon: em }))}
+          onClose={() => setShowEmojiPicker(false)} />
       )}
     </div>,
     document.body

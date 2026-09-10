@@ -1,5 +1,6 @@
 'use client';
 
+import EmojiPicker from './EmojiPicker';
 import { useState, useEffect } from 'react';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -36,6 +37,9 @@ export default function ProjectCategoryManager() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [editForm, setEditForm]     = useState({ name: '', icon: '', color: '', type: 'expense' });
+  /** 'add' or a category id — whichever icon button opened the picker. */
+  const [iconPickerFor, setIconPickerFor] = useState<string | null>(null);
+  const [iconAnchor, setIconAnchor] = useState<DOMRect | null>(null);
   const [saving, setSaving]         = useState(false);
 
   /* New category form */
@@ -155,9 +159,13 @@ export default function ProjectCategoryManager() {
                 /* Inline edit row */
                 <div className="flex items-center gap-2 p-2 rounded-xl"
                   style={{ background: 'var(--color-elevated)', border: `1px solid ${editForm.color}30` }}>
-                  <input value={editForm.icon} onChange={(e) => setEditForm((f) => ({ ...f, icon: e.target.value }))}
-                    className="w-9 px-1 py-1.5 text-center text-sm outline-none rounded-lg shrink-0"
-                    style={inputStyle} maxLength={2} />
+                  <button type="button" data-emoji-trigger
+                    aria-label="Choose icon"
+                    onClick={(e) => { setIconAnchor(e.currentTarget.getBoundingClientRect()); setIconPickerFor(cat.id); }}
+                    className="w-9 h-9 flex items-center justify-center text-lg rounded-lg shrink-0 hover:brightness-125"
+                    style={inputStyle}>
+                    {editForm.icon || '📦'}
+                  </button>
                   <input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
                     className="flex-1 px-2.5 py-1.5 text-sm outline-none rounded-lg min-w-0"
                     style={inputStyle} autoFocus />
@@ -230,9 +238,13 @@ export default function ProjectCategoryManager() {
           <form onSubmit={handleAdd}
             className="flex items-center gap-2 p-2 rounded-xl mt-1"
             style={{ background: 'var(--color-elevated)', border: `1px solid ${typeMeta.accent}25` }}>
-            <input value={addForm.icon} onChange={(e) => setAddForm((f) => ({ ...f, icon: e.target.value }))}
-              className="w-9 px-1 py-1.5 text-center text-sm outline-none rounded-lg shrink-0"
-              style={inputStyle} maxLength={2} placeholder="📦" />
+            <button type="button" data-emoji-trigger
+              aria-label="Choose icon"
+              onClick={(e) => { setIconAnchor(e.currentTarget.getBoundingClientRect()); setIconPickerFor('add'); }}
+              className="w-9 h-9 flex items-center justify-center text-lg rounded-lg shrink-0 hover:brightness-125"
+              style={inputStyle}>
+              {addForm.icon || '📦'}
+            </button>
             <input required value={addForm.name} onChange={(e) => setAddForm((f) => ({ ...f, name: e.target.value }))}
               className="flex-1 px-2.5 py-1.5 text-sm outline-none rounded-lg min-w-0"
               style={inputStyle} placeholder="Category name…" autoFocus />
@@ -275,6 +287,18 @@ export default function ProjectCategoryManager() {
           </button>
         )}
       </div>
+
+      {iconPickerFor && iconAnchor && (
+        <EmojiPicker
+          value={iconPickerFor === 'add' ? addForm.icon : editForm.icon}
+          anchor={iconAnchor}
+          onPick={(em) => {
+            if (iconPickerFor === 'add') setAddForm((f) => ({ ...f, icon: em }));
+            else setEditForm((f) => ({ ...f, icon: em }));
+          }}
+          onClose={() => setIconPickerFor(null)}
+        />
+      )}
     </div>
   );
 }
