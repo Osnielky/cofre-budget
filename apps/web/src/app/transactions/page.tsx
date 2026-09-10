@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import RecurringPanel, { emptyRecurring, occurrenceDates, type RecurringState } from '@/components/RecurringPanel';
+import DatePicker from '@/components/DatePicker';
 import Sidebar from '@/components/Sidebar';
 import Avatar from '@/components/Avatar';
 import { useUser } from '@/components/UserProvider';
@@ -202,8 +203,10 @@ export default function TransactionsPage() {
   const [manualTxError, setManualTxError] = useState('');
   const [manualAccOpen, setManualAccOpen] = useState(false);
   const [manualCatOpen, setManualCatOpen] = useState(false);
+  const [manualCatSearch, setManualCatSearch] = useState('');
   const today = new Date().toISOString().slice(0, 10);
-  const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
+  const EMPTY_MANUAL_TX = { name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '', projectId: '', projectCategoryId: '' };
+  const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '', projectId: '', projectCategoryId: '' });
   const [recurring, setRecurring] = useState<RecurringState>(() => emptyRecurring(new Date().toISOString().slice(0, 10)));
   const [debts, setDebts] = useState<DebtLite[]>([]);
   const [splitTx, setSplitTx] = useState<Transaction | null>(null);
@@ -571,7 +574,7 @@ export default function TransactionsPage() {
         setTransactions((prev) => prev.map((t) => t.id === editingTxId ? { ...t, ...updated } : t));
         setShowManualTx(false);
         setEditingTxId(null);
-        setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
+        setManualTx(EMPTY_MANUAL_TX);
         return;
       }
       // A recurring transaction is a rule, not a row: the server materialises
@@ -600,7 +603,7 @@ export default function TransactionsPage() {
         if (!res.ok) { setManualTxError('Could not save the recurring transaction.'); return; }
         await loadTransactions();
         setShowManualTx(false);
-        setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
+        setManualTx(EMPTY_MANUAL_TX);
         setRecurring(emptyRecurring(today));
         return;
       }
@@ -614,16 +617,18 @@ export default function TransactionsPage() {
           amount: finalAmount,
           date: manualTx.date,
           bankAccountId: manualTx.bankAccountId,
-          categoryId: manualTx.debtId ? null : (manualTx.categoryId || null),
+          categoryId: manualTx.debtId || manualTx.projectCategoryId ? null : (manualTx.categoryId || null),
           debtId: manualTx.debtId || null,
           note: manualTx.note || null,
+          projectId: manualTx.projectId || null,
+          projectCategoryId: manualTx.projectCategoryId || null,
         }),
       });
       if (!res.ok) return;
       const created: Transaction = await res.json();
       setTransactions((prev) => [created, ...prev]);
       setShowManualTx(false);
-      setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
+      setManualTx(EMPTY_MANUAL_TX);
     } finally {
       setManualTxSaving(false);
     }
@@ -2294,6 +2299,8 @@ export default function TransactionsPage() {
                                               categoryId: tx.categoryId ?? '',
                                               debtId: tx.debtId ?? '',
                                               note: tx.note ?? '',
+                                              projectId: tx.projectId ?? '',
+                                              projectCategoryId: tx.projectCategoryId ?? '',
                                             });
                                             setManualTxError('');
                                             setShowManualTx(true);
@@ -2407,9 +2414,20 @@ export default function TransactionsPage() {
               const selAcc     = accounts.find((a) => a.id === manualTx.bankAccountId);
               const selCat     = categories.find((c) => c.id === manualTx.categoryId);
               const selDebt    = debts.find((d) => d.id === manualTx.debtId);
+              const mq = manualCatSearch.trim().toLowerCase();
+              const matches = (n: string) => !mq || n.toLowerCase().includes(mq);
               const catOptions = isExpense
-                ? categories.filter((c) => c.type === 'expense' || c.type === 'both')
+                ? categories.filter((c) => (c.type === 'expense' || c.type === 'both') && matches(c.name))
                 : null;
+              // Project categories, flattened so one search covers every project.
+              const selProjCat = manualTx.projectCategoryId
+                ? projects.flatMap((p) => (p.categories ?? []).map((pc) => ({ project: p, cat: pc })))
+                    .find((x) => x.cat.id === manualTx.projectCategoryId)
+                : null;
+              const manualProjOptions = projects.flatMap((p) =>
+                (p.categories ?? [])
+                  .filter((pc) => matches(pc.name) || matches(p.name))
+                  .map((pc) => ({ project: p, cat: pc })));
               const incomePrimary = !isExpense
                 ? categories.filter((c) => c.type === 'income' || c.type === 'both')
                 : null;
@@ -2485,9 +2503,8 @@ export default function TransactionsPage() {
                     <div className="flex gap-3">
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                         <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Transaction date</span>
-                        <input required type="date" value={manualTx.date}
-                          onChange={(e) => {
-                            const date = e.target.value;
+                        <DatePicker value={manualTx.date} ariaLabel="Transaction date"
+                          onChange={(date) => {
                             setManualTx((f) => ({ ...f, date }));
                             // The series starts on the transaction being recorded. Without
                             // this the start stayed at today, so picking Aug 1 silently
@@ -2497,9 +2514,7 @@ export default function TransactionsPage() {
                                 ? r
                                 : { ...r, startDate: date, dayOfMonth: Number(date.slice(8, 10)) || r.dayOfMonth }));
                             }
-                          }}
-                          className="px-3 py-2.5 text-sm outline-none rounded-xl w-full"
-                          style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', colorScheme: 'dark' }} />
+                          }} />
                       </div>
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0" style={{ position: 'relative' }}>
                         {/* Money leaves an account on an expense and arrives on income —
@@ -2547,7 +2562,7 @@ export default function TransactionsPage() {
                       <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                         Category <span style={{ opacity: 0.5, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                       </span>
-                      <button type="button" onClick={() => { setManualCatOpen((o) => !o); setManualAccOpen(false); }}
+                      <button type="button" onClick={() => { setManualCatOpen((o) => !o); setManualAccOpen(false); setManualCatSearch(''); }}
                         className="px-3 py-2.5 text-sm flex items-center gap-2.5 rounded-xl outline-none text-left w-full"
                         style={{ background: 'var(--color-elevated)', border: `1px solid ${selCat ? selCat.color + '44' : 'var(--color-elevated)'}`, color: selCat ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                         {selDebt ? (
@@ -2555,6 +2570,14 @@ export default function TransactionsPage() {
                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
                             <span className="flex-1 font-medium" style={{ color: 'var(--color-card-violet)' }}>
                               {selDebt.direction === 'owed' ? 'Debt payment · ' : 'Debt repayment · '}{selDebt.borrowerName}
+                            </span>
+                          </>
+                        ) : selProjCat ? (
+                          <>
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${selProjCat.cat.color}20` }}>{selProjCat.cat.icon}</span>
+                            <span className="flex-1 min-w-0">
+                              <span className="block font-medium truncate" style={{ color: selProjCat.cat.color }}>{selProjCat.cat.name}</span>
+                              <span className="block text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{selProjCat.project.icon} {selProjCat.project.name}</span>
                             </span>
                           </>
                         ) : selCat ? (
@@ -2568,9 +2591,19 @@ export default function TransactionsPage() {
                         </svg>
                       </button>
                       {manualCatOpen && (
-                        <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
-                          style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', zIndex: 60, maxHeight: 220 }}>
-                          <button type="button" onClick={() => { setManualTx((f) => ({ ...f, categoryId: '' })); setManualCatOpen(false); }}
+                        <div className="absolute top-full left-0 right-0 mt-1 rounded-xl flex flex-col"
+                          style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', zIndex: 60, maxHeight: 340, overflow: 'hidden' }}>
+                          <div className="p-2 shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                            <input autoFocus value={manualCatSearch}
+                              onChange={(e) => setManualCatSearch(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Search categories or projects…"
+                              aria-label="Search categories"
+                              className="w-full px-2.5 py-2 text-xs outline-none rounded-lg"
+                              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
+                          </div>
+                          <div className="overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
+                          <button type="button" onClick={() => { setManualTx((f) => ({ ...f, categoryId: '', projectId: '', projectCategoryId: '' })); setManualCatOpen(false); }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
                             style={{ color: 'var(--color-text-muted)' }}
                             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-elevated)')}
@@ -2644,6 +2677,41 @@ export default function TransactionsPage() {
                               )}
                             </>
                           )}
+
+                          {manualProjOptions.length > 0 && (
+                            <>
+                              <div className="h-px my-1" style={{ background: 'var(--color-border)' }} />
+                              <p className="px-3 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Projects</p>
+                              {manualProjOptions.map(({ project, cat: pc }) => {
+                                const on = manualTx.projectCategoryId === pc.id && manualTx.projectId === project.id;
+                                return (
+                                  <button key={`${project.id}:${pc.id}`} type="button"
+                                    onClick={() => {
+                                      // Project- and budget-categorised are mutually exclusive.
+                                      setManualTx((f) => ({ ...f, projectId: project.id, projectCategoryId: pc.id, categoryId: '', debtId: '' }));
+                                      setManualCatOpen(false);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                                    style={{ background: on ? `${pc.color}18` : 'transparent' }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = `${pc.color}12`)}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = on ? `${pc.color}18` : 'transparent')}>
+                                    <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${pc.color}20` }}>{pc.icon}</span>
+                                    <span className="flex-1 min-w-0 text-left">
+                                      <span className="block font-medium truncate" style={{ color: on ? pc.color : 'var(--color-text-primary)' }}>{pc.name}</span>
+                                      <span className="block text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{project.icon} {project.name}</span>
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </>
+                          )}
+
+                          {catOptions?.length === 0 && manualProjOptions.length === 0 && manualCatSearch.trim() && (
+                            <p className="px-3 py-4 text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>
+                              Nothing matches “{manualCatSearch}”.
+                            </p>
+                          )}
+                          </div>
                         </div>
                       )}
                     </div>

@@ -250,11 +250,21 @@ export class TransactionsService {
     name: string; amount: number; date: string;
     bankAccountId?: string | null; categoryId?: string | null; debtId?: string | null;
     note?: string | null;
+    projectId?: string | null; projectCategoryId?: string | null;
   }): Promise<Transaction> {
     if (dto.bankAccountId) {
       const account = await this.accountRepo.findOneBy({ id: dto.bankAccountId });
       if (!account || account.userId !== userId) throw new ForbiddenException();
     }
+    // A row is either budget-categorised or project-categorised, never both —
+    // otherwise it is counted by a regular budget and a project budget at once.
+    if (dto.categoryId && dto.projectCategoryId) {
+      throw new BadRequestException('A transaction cannot have both a category and a project category');
+    }
+    if (dto.projectCategoryId && !dto.projectId) {
+      throw new BadRequestException('A project category requires its project');
+    }
+    await this.assertOwnsProjectRefs(userId, [{ amount: dto.amount, projectId: dto.projectId, projectCategoryId: dto.projectCategoryId }]);
     if (dto.debtId && !(Math.abs(dto.amount) > 0)) throw new BadRequestException('A debt repayment amount must be non-zero.');
 
     const matchedRule = dto.debtId || dto.categoryId
@@ -271,9 +281,11 @@ export class TransactionsService {
         date: dto.date,
         pending: false,
         note: dto.note ?? null,
-        categoryId: dto.debtId ? undefined : (dto.categoryId ?? matchedRule?.categoryId ?? undefined),
-        categorizedByRuleId: dto.debtId || dto.categoryId ? undefined : (matchedRule?.id ?? undefined),
+        categoryId: dto.debtId || dto.projectCategoryId ? undefined : (dto.categoryId ?? matchedRule?.categoryId ?? undefined),
+        categorizedByRuleId: dto.debtId || dto.categoryId || dto.projectCategoryId ? undefined : (matchedRule?.id ?? undefined),
         debtId: dto.debtId ?? undefined,
+        projectId: dto.projectId ?? undefined,
+        projectCategoryId: dto.projectCategoryId ?? undefined,
       }),
     );
     if (dto.debtId) {
@@ -284,7 +296,7 @@ export class TransactionsService {
         throw e;
       }
     }
-    return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'bankAccount'] });
+    return this.repo.findOne({ where: { id: saved.id }, relations: ['categoryRef', 'bankAccount', 'projectCategoryRef'] });
   }
 
   async updateManual(id: string, userId: string, dto: {
