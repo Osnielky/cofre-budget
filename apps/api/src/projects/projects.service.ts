@@ -24,6 +24,10 @@ export interface ProjectCategoryDto {
   icon?: string;
   color?: string;
   order?: number;
+  /* 'expense' | 'income' — the client already sends this on edit; declaring it
+     keeps updateCategoryById's Object.assign honest. */
+  type?: string;
+  description?: string | null;
 }
 
 export interface CategoryBreakdown {

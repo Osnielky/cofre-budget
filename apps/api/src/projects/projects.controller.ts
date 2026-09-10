@@ -24,10 +24,22 @@ export class ProjectsController {
     return this.service.seedForType(body.type ?? 'other', req.user.id);
   }
 
+  /* `projectType` names the project family (vehicle/property/…); `type` is the
+     category's own expense|income. They used to share the key `type`, so a
+     create silently dropped expense|income and defaulted every new category to
+     expense. `type` is still accepted as the project family when projectType is
+     absent, so a stale client mid-deploy keeps working. */
   @Post('type-categories')
-  createTypeCategory(@Body() dto: ProjectCategoryDto & { type: string }, @Request() req: any) {
-    const { type, ...rest } = dto;
-    return this.service.createCategoryForType(type ?? 'other', req.user.id, rest);
+  createTypeCategory(
+    @Body() dto: ProjectCategoryDto & { projectType?: string; type?: string },
+    @Request() req: any,
+  ) {
+    const { projectType, ...rest } = dto;
+    if (projectType) {
+      return this.service.createCategoryForType(projectType, req.user.id, rest);
+    }
+    const { type, ...legacy } = rest;
+    return this.service.createCategoryForType(type ?? 'other', req.user.id, legacy);
   }
 
   @Patch('type-categories/:catId')
