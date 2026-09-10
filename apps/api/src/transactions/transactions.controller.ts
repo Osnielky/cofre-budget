@@ -67,6 +67,16 @@ export class TransactionsController {
     return this.recurring.stop(id, req.user.id);
   }
 
+  @Patch('recurring/:id/resume')
+  resumeRule(@Param('id') id: string, @Request() req: any) {
+    return this.recurring.resume(id, req.user.id);
+  }
+
+  @Get('recurring/:id/history')
+  ruleHistory(@Param('id') id: string, @Request() req: any) {
+    return this.recurring.history(id, req.user.id);
+  }
+
   @Delete('recurring/:id')
   removeRule(@Param('id') id: string, @Request() req: any, @Query('deleteFuture') deleteFuture?: string) {
     return this.recurring.remove(id, req.user.id, deleteFuture === 'true');

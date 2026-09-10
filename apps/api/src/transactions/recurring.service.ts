@@ -137,11 +137,36 @@ export class RecurringService {
   }
 
   async stop(id: string, userId: string): Promise<RecurringRule> {
+    const rule = await this.own(id, userId);
+    rule.active = false;
+    return this.repo.save(rule);
+  }
+
+  /** Un-pause. Any occurrences that fell due while paused are written on resume. */
+  async resume(id: string, userId: string): Promise<RecurringRule> {
+    const rule = await this.own(id, userId);
+    rule.active = true;
+    const saved = await this.repo.save(rule);
+    await this.materialiseDue(userId);
+    return (await this.repo.findOneBy({ id: saved.id }))!;
+  }
+
+  /** The transactions this rule has already written, newest first. */
+  async history(id: string, userId: string): Promise<Transaction[]> {
+    await this.own(id, userId);
+    return this.txRepo.find({
+      where: { recurringRuleId: id, userId },
+      relations: ['bankAccount', 'categoryRef'],
+      order: { date: 'DESC' },
+      take: 24,
+    });
+  }
+
+  private async own(id: string, userId: string): Promise<RecurringRule> {
     const rule = await this.repo.findOneBy({ id });
     if (!rule) throw new NotFoundException();
     if (rule.userId !== userId) throw new ForbiddenException();
-    rule.active = false;
-    return this.repo.save(rule);
+    return rule;
   }
 
   /**
