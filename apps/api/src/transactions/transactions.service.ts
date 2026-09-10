@@ -25,6 +25,23 @@ export interface CsvRow {
   amount: number;
 }
 
+/**
+ * Sources the user is allowed to delete a row from.
+ *
+ * Plaid is excluded on purpose: those rows are owned by the bank feed and the
+ * next sync would bring a deleted one straight back, so offering delete would
+ * be a lie.
+ *
+ * Deleting a `recurring` row removes that one occurrence only — the rule
+ * survives and keeps producing future months. Nothing re-creates the deleted
+ * row because RecurringService.materialiseDue skips every date at or before
+ * `lastRunDate`, which is a high-water mark rather than a per-row record.
+ * `runCount` is deliberately left alone: a deleted occurrence means "this one
+ * did not happen", so a count-limited series keeps its original schedule
+ * instead of growing a replacement month on the end.
+ */
+const DELETABLE_SOURCES = new Set(['manual', 'recurring', 'csv']);
+
 @Injectable()
 export class TransactionsService {
   constructor(
@@ -332,7 +349,11 @@ export class TransactionsService {
   async deleteManual(id: string, userId: string): Promise<void> {
     const tx = await this.repo.findOneBy({ id, userId });
     if (!tx) throw new NotFoundException();
-    if (tx.source !== 'manual') throw new BadRequestException('Only manual transactions can be deleted');
+    if (!DELETABLE_SOURCES.has(tx.source)) {
+      throw new BadRequestException(
+        'Transactions synced from your bank cannot be deleted — they would return on the next sync',
+      );
+    }
     if (tx.isSplitParent) throw new BadRequestException('Cannot delete a split transaction — unsplit it first');
 
     /* Remove the linked debt payment, if this tx was a debt repayment */

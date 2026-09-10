@@ -1,6 +1,6 @@
 import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { RecurringRule, RecurringUnit } from './recurring-rule.entity';
 import { Transaction } from './transaction.entity';
 
@@ -75,6 +75,7 @@ export class RecurringService {
   constructor(
     @InjectRepository(RecurringRule) private repo: Repository<RecurringRule>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
+    private dataSource: DataSource,
   ) {}
 
   list(userId: string): Promise<RecurringRule[]> {
@@ -103,10 +104,10 @@ export class RecurringService {
 
     // The mockup's "Record the first occurrence as paid": write occurrence 0 up
     // front even when it is dated in the future, so the user sees the ledger
-    // entry they just described.
+    // entry they just described. Goes through the locked path so it cannot race
+    // a concurrent transactions fetch into writing occurrence 0 twice.
     if (dto.recordFirstNow) {
-      await this.writeOccurrence(saved, occurrenceAt(saved, 0));
-      await this.repo.save(saved);
+      await this.materialiseRule(saved.id, occurrenceAt(saved, 0));
     }
 
     await this.materialiseDue(userId);
@@ -177,36 +178,93 @@ export class RecurringService {
    * second is a no-op.
    */
   async materialiseDue(userId: string): Promise<number> {
-    const rules = await this.repo.find({ where: { userId, active: true } });
-    const today = iso(new Date());
-    let written = 0;
+    // Ids only: each rule is re-read under its own lock a moment from now, so
+    // anything loaded here would be stale by the time we acted on it.
+    const candidates = await this.repo
+      .createQueryBuilder('rule')
+      .select('rule.id', 'id')
+      .where('rule.userId = :userId', { userId })
+      .andWhere('rule.active = true')
+      .getRawMany<{ id: string }>();
 
-    for (const rule of rules) {
+    let written = 0;
+    for (const { id } of candidates) written += await this.materialiseRule(id);
+    return written;
+  }
+
+  /**
+   * Materialise one rule's due occurrences, holding a row lock for the duration.
+   *
+   * The lock is what makes concurrent callers safe. Reading `lastRunDate`,
+   * inserting the occurrences and writing `lastRunDate` back is a
+   * read-modify-write, and the transactions page fires two overlapping
+   * `GET /api/transactions` calls (current period + prior period for its
+   * comparisons). Without the lock both requests read the same `lastRunDate`,
+   * neither sees the other's inserts, and the user ends up with two identical
+   * rows for the same occurrence. `SELECT … FOR UPDATE` serialises them: the
+   * second caller waits, re-reads the committed `lastRunDate`, and finds
+   * nothing left to write.
+   *
+   * `force` writes that one date even if it is in the future — the "record the
+   * first occurrence now" box on the new-recurring form.
+   */
+  private async materialiseRule(ruleId: string, force?: string): Promise<number> {
+    return this.dataSource.transaction(async (manager) => {
+      // Query builder rather than findOne: FOR UPDATE cannot be applied to the
+      // nullable side of the outer joins that this entity's eager relations
+      // would add.
+      const rule = await manager
+        .createQueryBuilder(RecurringRule, 'rule')
+        .setLock('pessimistic_write')
+        .where('rule.id = :id', { id: ruleId })
+        .getOne();
+      if (!rule) return 0;
+
+      const today = iso(new Date());
       const dates = occurrenceDates(rule);
+      let written = 0;
       let changed = false;
 
-      for (const date of dates) {
-        if (date > today) break;                        // not due yet
-        if (rule.lastRunDate && date <= rule.lastRunDate) continue; // already written
-        await this.writeOccurrence(rule, date);
+      if (force && !(rule.lastRunDate && force <= rule.lastRunDate)) {
+        await this.writeOccurrence(manager, rule, force);
         written++;
         changed = true;
       }
 
-      // Finished: the last occurrence is written, or the end date has passed.
-      const last = dates[dates.length - 1];
-      if (last && rule.lastRunDate === last) { rule.active = false; changed = true; }
-      if (rule.endDate && today > rule.endDate) { rule.active = false; changed = true; }
-      if (changed) await this.repo.save(rule);
-    }
-    return written;
+      if (rule.active) {
+        for (const date of dates) {
+          if (date > today) break;                        // not due yet
+          if (rule.lastRunDate && date <= rule.lastRunDate) continue; // already written
+          await this.writeOccurrence(manager, rule, date);
+          written++;
+          changed = true;
+        }
+
+        // Finished: the last occurrence is written, or the end date has passed.
+        const last = dates[dates.length - 1];
+        if (last && rule.lastRunDate === last) { rule.active = false; changed = true; }
+        if (rule.endDate && today > rule.endDate) { rule.active = false; changed = true; }
+      }
+
+      // An explicit column update, not save(): `rule` came from a query builder
+      // so its eager relations are undefined, and only bookkeeping changed.
+      if (changed) {
+        await manager.update(RecurringRule, rule.id, {
+          lastRunDate: rule.lastRunDate,
+          runCount: rule.runCount,
+          active: rule.active,
+        });
+      }
+      return written;
+    });
   }
 
   /** Insert one transaction for `date` and advance the rule's bookkeeping. */
-  private async writeOccurrence(rule: RecurringRule, date: string): Promise<void> {
+  private async writeOccurrence(manager: EntityManager, rule: RecurringRule, date: string): Promise<void> {
     if (rule.occurrenceCount != null && rule.runCount >= rule.occurrenceCount) return;
 
-    const tx = this.txRepo.create({
+    const txRepo = manager.getRepository(Transaction);
+    const tx = txRepo.create({
       userId: rule.userId,
       bankAccountId: rule.bankAccountId ?? undefined,
       source: 'recurring',
@@ -219,7 +277,7 @@ export class RecurringService {
       isSplitParent: false,
       recurringRuleId: rule.id,
     });
-    await this.txRepo.save(tx);
+    await txRepo.save(tx);
 
     rule.lastRunDate = date;
     rule.runCount += 1;

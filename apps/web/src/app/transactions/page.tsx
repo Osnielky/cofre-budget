@@ -24,6 +24,11 @@ import StatStrip from './StatStrip';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
+/* Mirrors DELETABLE_SOURCES in the API's TransactionsService. Plaid rows are
+   owned by the bank feed — the next sync would bring a deleted one back — so
+   they get no delete control rather than one that fails. */
+const DELETABLE_SOURCES = new Set(['manual', 'recurring', 'csv']);
+
 interface PickerPos { top: number; left: number; width: number; maxHeight: number; origin: string }
 
 /** Where to put the category picker for a given trigger.
@@ -634,9 +639,38 @@ export default function TransactionsPage() {
     }
   }
 
+  /** Load a transaction back into the manual modal for editing. */
+  function openEditModal(tx: Transaction) {
+    setEditingTxId(tx.id);
+    setManualTx({
+      name: tx.name,
+      amountStr: String(Math.abs(Number(tx.amount))),
+      sign: Number(tx.amount) >= 0 ? '+' : '-',
+      date: tx.date,
+      bankAccountId: tx.bankAccountId ?? '',
+      categoryId: tx.categoryId ?? '',
+      debtId: tx.debtId ?? '',
+      note: tx.note ?? '',
+      projectId: tx.projectId ?? '',
+      projectCategoryId: tx.projectCategoryId ?? '',
+    });
+    setManualTxError('');
+    setShowManualTx(true);
+  }
+
   async function deleteManualTx(id: string) {
     const tx = transactions.find((t) => t.id === id);
-    await fetch(`${API}/transactions/${id}`, { method: 'DELETE', credentials: 'include' });
+    const res = await fetch(`${API}/transactions/${id}`, { method: 'DELETE', credentials: 'include' });
+    if (!res.ok) {
+      // The row stays put rather than vanishing from a delete that never landed.
+      const reason = await res.json().then((b) => b?.message).catch(() => null);
+      if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current);
+      setRuleToast({ kind: 'error', matchLabel: tx?.name ?? '', reason: reason || "Couldn't delete this transaction." });
+      ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+      setDeleteConfirmId(null);
+      setRowMenuTxId(null);
+      return;
+    }
     setTransactions((prev) => prev
       .filter((t) => t.id !== id)
       .map((t) => t.id === tx?.counterpartTxId
@@ -1532,6 +1566,19 @@ export default function TransactionsPage() {
                         const pickerCatsAlt = categories.filter((c) => c.type === secondaryType && (!searchQ || c.name.toLowerCase().includes(searchQ)));
                         const needsCategory = !tx.categoryId && !tx.projectId && !tx.debtId && !txIsTransfer;
 
+                        /* What the row's action cluster is allowed to offer. A split
+                           parent must be recombined before it can be deleted, and
+                           editing stays manual-only: a materialised recurring
+                           occurrence would silently drift from the rule behind it. */
+                        const canDelete  = DELETABLE_SOURCES.has(tx.source) && !tx.isSplitParent;
+                        const canEdit    = tx.source === 'manual';
+                        const canSplit   = !tx.debtId && !txIsTransfer && !tx.parentId;
+                        const canUnsplit = !tx.debtId && !txIsTransfer && !!tx.parentId;
+                        /* Everything else moved into the cluster, so the ⋮ now has
+                           content only for a rule-categorized row. Without this it
+                           would open an empty popover on most rows. */
+                        const hasRowMenu = !!tx.categorizedByRuleId;
+
                         return (
                           <div key={tx.id} className="relative group cursor-pointer"
                             style={{
@@ -2213,28 +2260,90 @@ export default function TransactionsPage() {
                             )}
                           </div>
 
-                          {/* Row actions menu */}
-                          <div className="relative shrink-0">
-                            <button
-                              onClick={(e) => {
-                                if (rowMenuTxId === tx.id) { setRowMenuTxId(null); setDeleteConfirmId(null); return; }
-                                const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                                setRowMenuPos({ top: rect.bottom + 4, left: Math.max(4, rect.right - 210) });
-                                setRowMenuTxId(tx.id);
-                                setDeleteConfirmId(null);
-                              }}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] shrink-0"
-                              style={{ color: 'var(--color-text-muted)' }}
-                              title="More actions">
-                              <KebabIcon />
-                            </button>
+                          {/* Row actions — a delimited cluster of the things you reach
+                              for most, with the ⋮ keeping the long tail. Hidden until
+                              the row is hovered or something inside it takes focus, so
+                              a dense ledger stays quiet; `row-actions` makes it
+                              permanently visible on touch, where nothing hovers.
+                              It always occupies its space, so rows never reflow. */}
+                          <div className={`relative shrink-0 items-center gap-0.5 p-0.5 rounded-lg row-actions opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ${
+                              canSplit || canUnsplit || canEdit || canDelete || hasRowMenu ? 'flex' : 'hidden'
+                            }`}
+                            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+
+                            {canSplit && (
+                              <button onClick={() => { setSplitTx(tx); setRowMenuTxId(null); }}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                                style={{ color: 'var(--color-text-muted)' }}
+                                title="Split into multiple categories" aria-label="Split into multiple categories">
+                                <ScissorsIcon />
+                              </button>
+                            )}
+
+                            {canUnsplit && (
+                              <button onClick={() => { unsplitTransaction(tx); setRowMenuTxId(null); }}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                                style={{ color: 'var(--color-text-muted)' }}
+                                title="Unsplit — recombine into one transaction" aria-label="Unsplit — recombine into one transaction">
+                                <UnsplitIcon />
+                              </button>
+                            )}
+
+                            {canEdit && (
+                              <button onClick={() => { openEditModal(tx); setRowMenuTxId(null); }}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                                style={{ color: 'var(--color-text-muted)' }}
+                                title="Edit transaction" aria-label="Edit transaction">
+                                <PencilIcon />
+                              </button>
+                            )}
+
+                            {canDelete && (
+                              <button
+                                onClick={(e) => {
+                                  if (deleteConfirmId === tx.id) { setRowMenuTxId(null); setDeleteConfirmId(null); return; }
+                                  const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                  setRowMenuPos({ top: rect.bottom + 6, left: Math.max(4, rect.right - 210) });
+                                  setRowMenuTxId(tx.id);
+                                  setDeleteConfirmId(tx.id);
+                                }}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[color-mix(in_srgb,var(--color-rose)_18%,transparent)]"
+                                style={{ color: 'var(--color-rose)' }}
+                                title="Delete transaction" aria-label="Delete transaction">
+                                <TrashIcon />
+                              </button>
+                            )}
+
+                            {hasRowMenu && (
+                              <button
+                                onClick={(e) => {
+                                  if (rowMenuTxId === tx.id) { setRowMenuTxId(null); setDeleteConfirmId(null); return; }
+                                  const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                  setRowMenuPos({ top: rect.bottom + 6, left: Math.max(4, rect.right - 210) });
+                                  setRowMenuTxId(tx.id);
+                                  setDeleteConfirmId(null);
+                                }}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                                style={{ color: 'var(--color-text-muted)' }}
+                                title="More actions" aria-label="More actions">
+                                <KebabIcon />
+                              </button>
+                            )}
 
                             {rowMenuTxId === tx.id && rowMenuPos && createPortal(
                               <div ref={rowMenuRef} className="py-1 rounded-xl overflow-hidden"
                                 style={{ ...glass, position: 'fixed', top: rowMenuPos.top, left: rowMenuPos.left, width: '210px', zIndex: 9999 }}>
                                 {deleteConfirmId === tx.id ? (
                                   <div className="px-3 py-2.5">
-                                    <p className="text-xs font-semibold mb-1.5">Delete this transaction?</p>
+                                    <p className="text-xs font-semibold mb-1.5">
+                                      {tx.source === 'recurring' ? 'Delete this occurrence?' : 'Delete this transaction?'}
+                                    </p>
+                                    {tx.source === 'recurring' && (
+                                      <p className="text-[10px] mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                                        Removes this month only — the schedule keeps running. Stop the
+                                        whole series from Settings → Recurring.
+                                      </p>
+                                    )}
                                     {tx.transferAccountId && (
                                       <p className="text-[10px] mb-2" style={{ color: 'var(--color-rose)' }}>⚠ linked transfer will be unlinked</p>
                                     )}
@@ -2253,24 +2362,10 @@ export default function TransactionsPage() {
                                   </div>
                                 ) : (
                                   <>
-                                    {!tx.debtId && !txIsTransfer && (
-                                      tx.parentId ? (
-                                        <button onClick={() => { unsplitTransaction(tx); setRowMenuTxId(null); }}
-                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
-                                          style={{ color: 'var(--color-text-secondary)' }}>
-                                          ↩ Unsplit — recombine into one transaction
-                                        </button>
-                                      ) : (
-                                        <button onClick={() => { setSplitTx(tx); setRowMenuTxId(null); }}
-                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
-                                          style={{ color: 'var(--color-text-secondary)' }}>
-                                          ✂ Split into multiple categories
-                                        </button>
-                                      )
-                                    )}
+                                    {/* Split, unsplit, edit and delete live in the row's
+                                        icon cluster; what stays here is the long tail. */}
                                     {tx.categorizedByRuleId && (
                                       <>
-                                        <div style={{ borderTop: '1px solid var(--color-border)' }} />
                                         <button onClick={() => uncategorizeOne(tx)}
                                           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
                                           style={{ color: 'var(--color-text-secondary)' }}>
@@ -2280,40 +2375,6 @@ export default function TransactionsPage() {
                                           className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-red-500/20 disabled:opacity-40"
                                           style={{ color: 'var(--color-rose)' }}>
                                           {deletingRuleId === tx.categorizedByRuleId ? 'Deleting rule…' : 'Delete the rule'}
-                                        </button>
-                                      </>
-                                    )}
-                                    {tx.source === 'manual' && (
-                                      <>
-                                        <div style={{ borderTop: '1px solid var(--color-border)' }} />
-                                        <button
-                                          onClick={() => {
-                                            const absAmt = Math.abs(Number(tx.amount));
-                                            setEditingTxId(tx.id);
-                                            setManualTx({
-                                              name: tx.name,
-                                              amountStr: String(absAmt),
-                                              sign: Number(tx.amount) >= 0 ? '+' : '-',
-                                              date: tx.date,
-                                              bankAccountId: tx.bankAccountId ?? '',
-                                              categoryId: tx.categoryId ?? '',
-                                              debtId: tx.debtId ?? '',
-                                              note: tx.note ?? '',
-                                              projectId: tx.projectId ?? '',
-                                              projectCategoryId: tx.projectCategoryId ?? '',
-                                            });
-                                            setManualTxError('');
-                                            setShowManualTx(true);
-                                            setRowMenuTxId(null);
-                                          }}
-                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
-                                          style={{ color: 'var(--color-text-secondary)' }}>
-                                          ✎ Edit transaction
-                                        </button>
-                                        <button onClick={() => setDeleteConfirmId(tx.id)}
-                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-red-500/20"
-                                          style={{ color: 'var(--color-rose)' }}>
-                                          <TrashIcon /> Delete transaction
                                         </button>
                                       </>
                                     )}
@@ -3312,7 +3373,16 @@ function CloseIcon() {
   return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 }
 function TrashIcon() {
-  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF6B6B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>;
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>;
+}
+function ScissorsIcon() {
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>;
+}
+function UnsplitIcon() {
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>;
+}
+function PencilIcon() {
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>;
 }
 function KebabIcon() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>;

@@ -30,7 +30,15 @@ npx nx serve api
 npx nx build api
 ```
 
-No test runner is configured yet.
+Tests run on Vitest: `npm run test:api` and `npm run test:dashboard`.
+
+Most suites use an in-memory sqlite `DataSource`. `recurring.concurrency.test.ts` is
+the exception — it needs real Postgres because it covers a lost update between
+concurrent connections, so it builds a throwaway `recurring_concurrency_test`
+schema and skips itself when no database is reachable.
+
+`apps/api/tsconfig.app.json` excludes `*.test.ts` — test files must stay out of the
+webpack bundle.
 
 ## Environment
 
