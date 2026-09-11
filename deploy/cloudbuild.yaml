@@ -131,9 +131,25 @@ steps:
 
 options:
   logging: CLOUD_LOGGING_ONLY
-  # Default Cloud Build workers are low-CPU (~1 vCPU), and npm install / lint /
-  # test / Nx-webpack / Next-Turbopack compiles are all CPU-bound — a bigger
-  # machine cuts wall-clock time well past what the extra per-minute cost adds.
-  machineType: E2_HIGHCPU_8
+  # No machineType on purpose — do not add one back without reading this.
+  #
+  # Cloud Build's 2,500 free build-minutes a month apply ONLY to the default
+  # pool. Naming any larger machine forfeits the free tier and bills every
+  # build from its first minute, at roughly 5x the default rate.
+  #
+  # This previously ran E2_HIGHCPU_8, which cut wall-clock from ~10min to
+  # ~3-4min (npm install, lint, test, Nx-webpack and Turbopack are all
+  # CPU-bound). The speed was real, but so was the price: on 2026-09-09 Cloud
+  # Build was $0.82 of a $1.18 day — ~51 build-minutes, about 70% of the
+  # project's entire GCP spend — while the same work on the default pool falls
+  # inside the free allowance and costs nothing.
+  #
+  # Deploys here are asynchronous: you push and go do something else. That
+  # makes minutes cheaper than money. If you ever need fast feedback on a
+  # deploy you are actively watching, put `machineType: E2_HIGHCPU_8` back and
+  # accept the bill for that period.
 
-timeout: 1800s
+# Wall-clock, so it has to cover the slower default pool: a build that took
+# ~4min on 8 vCPU can take ~20min on 2. Generous headroom is free — an unused
+# timeout costs nothing, a build killed at 30min costs a whole redeploy.
+timeout: 2700s
