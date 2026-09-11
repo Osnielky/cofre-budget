@@ -2858,7 +2858,16 @@ export default function TransactionsPage() {
               const showList   = transferModalShowMore || !bestMatch;
               const isBestSel  = !!bestMatch && transferModalSelected === bestMatch.id;
               const dayDiff    = bestMatch ? Math.round(Math.abs(new Date(bestMatch.date).getTime() - new Date(srcTx.date).getTime()) / 86400000) : 0;
-              const matchReason = dayDiff === 0 ? 'Same amount and date' : `Same amount, ${dayDiff} day${dayDiff === 1 ? '' : 's'} apart`;
+              /* Describe the match from the actual values. This used to hardcode
+                 "Same amount", which it stated whether or not the amounts were
+                 equal — a +$9.50 deposit was labelled the same amount as a
+                 -$10.00 payment. Say the amount part only when it is true. */
+              const sameAmount = !!bestMatch
+                && Math.round(Math.abs(Number(bestMatch.amount)) * 100) === Math.round(absAmt * 100);
+              const whenPart = dayDiff === 0 ? 'same date' : `${dayDiff} day${dayDiff === 1 ? '' : 's'} apart`;
+              const matchReason = sameAmount
+                ? (dayDiff === 0 ? 'Same amount and date' : `Same amount, ${whenPart}`)
+                : `Amounts differ, ${whenPart}`;
               const otherAccounts = accounts.filter((a) => a.id !== srcTx.bankAccountId)
                 .sort((a, b) => (isLiability(a.accountType) ? 0 : 1) - (isLiability(b.accountType) ? 0 : 1));
 

@@ -466,8 +466,21 @@ export class TransactionsService {
       .andWhere('tx.date <= :to', { to })
       .getMany();
 
+    // Both legs of a transfer are the same money seen twice: identical amount,
+    // opposite direction. The old filter allowed a $1.00 discrepancy and never
+    // checked direction at all, so a +$9.50 deposit was offered a -$10.00
+    // payment — and two deposits could be linked to each other. Compare in
+    // whole cents to keep float arithmetic out of an equality test.
+    const cents = (n: number) => Math.round(n * 100);
+    const wantCents = cents(absAmount);
+    const sourceSign = Math.sign(amount);
+
     return candidates
-      .filter(tx => Math.abs(Math.abs(Number(tx.amount)) - absAmount) < 1.00)
+      .filter(tx => {
+        const other = Number(tx.amount);
+        if (Math.sign(other) === sourceSign) return false;
+        return cents(Math.abs(other)) === wantCents;
+      })
       .sort((a, b) => {
         const ad = Math.abs(new Date(a.date).getTime() - d.getTime());
         const bd = Math.abs(new Date(b.date).getTime() - d.getTime());
