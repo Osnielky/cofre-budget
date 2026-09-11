@@ -112,10 +112,17 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
                 formatter={(v: unknown, name: unknown) =>
                   [money(Number(v)), LABELS[String(name)] ?? String(name)]} />
               <ReferenceLine y={0} stroke={tc.border} />
-              <Bar dataKey="revPersonal" fill={tc.green}  radius={[3, 3, 0, 0]} />
-              <Bar dataKey="revProject"  fill={tc.sky}    radius={[3, 3, 0, 0]} />
-              <Bar dataKey="expPersonal" fill={tc.orange} radius={[3, 3, 0, 0]} />
-              <Bar dataKey="expProject"  fill={tc.amber}  radius={[3, 3, 0, 0]} />
+              {/* Two bars a month, each split by source. Personal sits at the
+                  bottom of its stack as the baseline you read first, project on
+                  top. Only the top segment is rounded — rounding the lower one
+                  would cut a notch into the segment above it. The 2px stroke in
+                  the surface colour is the seam between segments; amber and
+                  orange are the closest pair in the palette and sit directly
+                  adjacent here, where they used to be separated by a gap. */}
+              <Bar dataKey="revPersonal" stackId="income"   fill={tc.green}  stroke={tc.elevated} strokeWidth={2} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="revProject"  stackId="income"   fill={tc.sky}    stroke={tc.elevated} strokeWidth={2} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="expPersonal" stackId="expenses" fill={tc.orange} stroke={tc.elevated} strokeWidth={2} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="expProject"  stackId="expenses" fill={tc.amber}  stroke={tc.elevated} strokeWidth={2} radius={[3, 3, 0, 0]} />
               <Area type="monotone" dataKey="net" stroke={tc.violet} strokeWidth={2.5}
                 fill="url(#ivxNetFade)"
                 dot={{ r: 4, fill: tc.violet, stroke: tc.elevated, strokeWidth: 2 }}
