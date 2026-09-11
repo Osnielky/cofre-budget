@@ -74,7 +74,7 @@ function placePicker(rect: DOMRect): PickerPos {
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null; last4?: string | null }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
-interface Project { id: string; name: string; icon: string; color: string; status: string; type?: string; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[] }
+interface Project { id: string; name: string; icon: string; color: string; status: string; type?: string; imageUrl?: string | null; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[] }
 interface TransferMatch { id: string; name: string; amount: number; date: string; bankAccount: BankAccount | null }
 interface Transaction {
   id: string; name: string; merchantName: string | null; amount: number; date: string; source: string; pending: boolean;
@@ -2084,8 +2084,7 @@ export default function TransactionsPage() {
                                               onClick={() => setPickerProjectDrill(proj.id)}
                                               className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)]"
                                               style={linked ? { background: `${c}12` } : {}}>
-                                              <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                                style={{ background: `${c}20` }}>{proj.icon}</span>
+                                              <ProjectAvatar project={proj} size={24} />
                                               <span className="flex-1 font-medium text-left truncate"
                                                 style={{ color: linked ? c : 'var(--color-text-primary)' }}>
                                                 {proj.name}
@@ -2121,7 +2120,7 @@ export default function TransactionsPage() {
                                           <button onClick={() => { setPickerProjectDrill(null); setMarkAsSaleConfirm(null); setPickerShowPurchasePrompt(false); }}
                                             className="text-sm hover:opacity-70 shrink-0"
                                             style={{ color: 'var(--color-text-muted)' }}>←</button>
-                                          <span className="text-base shrink-0">{proj?.icon}</span>
+                                          {proj && <ProjectAvatar project={proj} size={28} />}
                                           <span className="text-xs font-bold flex-1 truncate" style={{ color: c }}>{proj?.name}</span>
                                           {tx.projectId === pickerProjectDrill && (
                                             <button
@@ -3347,6 +3346,26 @@ export default function TransactionsPage() {
         document.body
       )}
     </div>
+  );
+}
+
+/**
+ * A project's photo, falling back to its emoji on a wash of its own color.
+ *
+ * A car or a house is far quicker to recognise by its picture than by a generic
+ * 🚗, which is the whole point of showing it in the picker. `alt` is empty on
+ * purpose: the project's name always sits directly beside this, so labelling
+ * the image would just make a screen reader announce it twice.
+ */
+function ProjectAvatar({ project, size }: { project: Project; size: number }) {
+  const color = project.color || '#9B6DFF';
+  return (
+    <span className="rounded-lg flex items-center justify-center shrink-0 overflow-hidden"
+      style={{ width: size, height: size, background: `${color}20`, fontSize: size * 0.58 }}>
+      {project.imageUrl
+        ? <img src={project.imageUrl} alt="" className="w-full h-full object-cover" />
+        : project.icon}
+    </span>
   );
 }
 
