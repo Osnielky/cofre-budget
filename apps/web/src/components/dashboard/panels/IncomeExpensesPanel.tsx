@@ -63,9 +63,9 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
   const perMo = (v: number) => `avg ${money(+(v / months).toFixed(2))}/mo`;
   const tiles = [
     { label: 'Total Income',           value: revPersonal, color: tc.green,  icon: I_TRENDUP },
-    { label: 'Total Project Income',   value: revProject,  color: tc.sky,    icon: I_BRIEFCASE },
-    { label: 'Total Expenses',         value: expPersonal, color: tc.orange, icon: I_WALLET },
-    { label: 'Total Project Expenses', value: expProject,  color: tc.amber,  icon: I_FOLDER },
+    { label: 'Total Project Income',   value: revProject,  color: tc.greenSoft, icon: I_BRIEFCASE },
+    { label: 'Total Expenses',         value: expPersonal, color: tc.rose,      icon: I_WALLET },
+    { label: 'Total Project Expenses', value: expProject,  color: tc.roseSoft,  icon: I_FOLDER },
     { label: 'Net Total',              value: net,         color: tc.violet, icon: I_CHART },
   ];
 
@@ -79,7 +79,7 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
   const highlights = data.length ? [
     { label: 'Highest Income Month',  color: tc.green,  icon: I_BARS_UP,
       text: `${monthFull(hiIncomeIdx)} – ${money(data[hiIncomeIdx].revPersonal + data[hiIncomeIdx].revProject)}` },
-    { label: 'Highest Expense Month', color: tc.orange, icon: I_BARS_DN,
+    { label: 'Highest Expense Month', color: tc.rose,   icon: I_BARS_DN,
       text: `${monthFull(hiExpenseIdx)} – ${money(data[hiExpenseIdx].expPersonal + data[hiExpenseIdx].expProject)}` },
     { label: 'Best Net Month',        color: tc.violet, icon: I_TRENDUP,
       text: `${monthFull(bestNetIdx)} – ${money(data[bestNetIdx].net)}` },
@@ -87,11 +87,11 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
 
   return (
     <Panel colSpan={2} loading={loading}
-      title={<><span style={{ color: tc.green }}>Income</span> vs <span style={{ color: tc.orange }}>Expenses</span></>}
+      title={<><span style={{ color: tc.green }}>Income</span> vs <span style={{ color: tc.rose }}>Expenses</span></>}
       subtitle={`${new Date().getFullYear()} · year to date`}
       legend={<Legend items={[
-        { label: 'Income', color: tc.green }, { label: 'Project income', color: tc.sky },
-        { label: 'Expenses', color: tc.orange }, { label: 'Project expenses', color: tc.amber },
+        { label: 'Income', color: tc.green }, { label: 'Project income', color: tc.greenSoft },
+        { label: 'Expenses', color: tc.rose }, { label: 'Project expenses', color: tc.roseSoft },
         { label: 'Net', color: tc.violet, line: true },
       ]} />}>
       {empty ? <PanelEmpty message="No cash-flow activity this year yet." /> : (
@@ -112,17 +112,22 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
                 formatter={(v: unknown, name: unknown) =>
                   [money(Number(v)), LABELS[String(name)] ?? String(name)]} />
               <ReferenceLine y={0} stroke={tc.border} />
-              {/* Two bars a month, each split by source. Personal sits at the
-                  bottom of its stack as the baseline you read first, project on
-                  top. Only the top segment is rounded — rounding the lower one
-                  would cut a notch into the segment above it. The 2px stroke in
-                  the surface colour is the seam between segments; amber and
-                  orange are the closest pair in the palette and sit directly
-                  adjacent here, where they used to be separated by a gap. */}
-              <Bar dataKey="revPersonal" stackId="income"   fill={tc.green}  stroke={tc.elevated} strokeWidth={2} radius={[0, 0, 0, 0]} />
-              <Bar dataKey="revProject"  stackId="income"   fill={tc.sky}    stroke={tc.elevated} strokeWidth={2} radius={[3, 3, 0, 0]} />
-              <Bar dataKey="expPersonal" stackId="expenses" fill={tc.orange} stroke={tc.elevated} strokeWidth={2} radius={[0, 0, 0, 0]} />
-              <Bar dataKey="expProject"  stackId="expenses" fill={tc.amber}  stroke={tc.elevated} strokeWidth={2} radius={[3, 3, 0, 0]} />
+              {/* Two bars a month: one green stack in, one red stack out, each
+                  split by source. Personal sits at the bottom as the baseline
+                  you read first, project as a lighter tint on top. Only the top
+                  segment is rounded — rounding the lower one would cut a notch
+                  into the segment above it — and the 2px stroke in the surface
+                  colour is the seam between them.
+
+                  Green-in/red-out is the finance convention, but the two hues
+                  are indistinguishable under deuteranopia (ΔE 0.2), so identity
+                  must never rest on colour here: income is always the left bar
+                  and expenses always the right, in this fixed order, backed by
+                  the legend and the labelled totals below. Keep it that way. */}
+              <Bar dataKey="revPersonal" stackId="income"   fill={tc.green}     stroke={tc.elevated} strokeWidth={2} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="revProject"  stackId="income"   fill={tc.greenSoft} stroke={tc.elevated} strokeWidth={2} radius={[3, 3, 0, 0]} />
+              <Bar dataKey="expPersonal" stackId="expenses" fill={tc.rose}      stroke={tc.elevated} strokeWidth={2} radius={[0, 0, 0, 0]} />
+              <Bar dataKey="expProject"  stackId="expenses" fill={tc.roseSoft}  stroke={tc.elevated} strokeWidth={2} radius={[3, 3, 0, 0]} />
               <Area type="monotone" dataKey="net" stroke={tc.violet} strokeWidth={2.5}
                 fill="url(#ivxNetFade)"
                 dot={{ r: 4, fill: tc.violet, stroke: tc.elevated, strokeWidth: 2 }}

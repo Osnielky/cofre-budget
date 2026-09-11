@@ -24,6 +24,9 @@ export function useTheme() {
 export interface ThemeColors {
   primary: string; green: string; rose: string; amber: string;
   orange: string; sky: string; violet: string;
+  /* Lighter partners for green/rose, used where one bar is split into two
+     shades of a single hue rather than two separate identities. */
+  greenSoft: string; roseSoft: string;
   textPrimary: string; textSecondary: string; textMuted: string;
   border: string; elevated: string;
 }
@@ -31,6 +34,7 @@ export interface ThemeColors {
 const FALLBACK: ThemeColors = {
   primary: '#1E90FF', green: '#22C55E', rose: '#FF6B6B', amber: '#FBBF24',
   orange: '#F97316', sky: '#38BDF8', violet: '#A855F7',
+  greenSoft: '#A7F3D0', roseSoft: '#FFC9C9',
   textPrimary: '#E6EDF7', textSecondary: '#94A3B8', textMuted: '#5E7095',
   border: 'rgba(30,144,255,0.14)', elevated: 'rgba(21,36,68,0.80)',
 };
@@ -50,6 +54,8 @@ export function useThemeColors(): ThemeColors {
       orange:        v('--color-orange'),
       sky:           v('--color-sky'),
       violet:        v('--color-violet'),
+      greenSoft:     v('--color-green-soft'),
+      roseSoft:      v('--color-rose-soft'),
       textPrimary:   v('--color-text-primary'),
       textSecondary: v('--color-text-secondary'),
       textMuted:     v('--color-text-muted'),

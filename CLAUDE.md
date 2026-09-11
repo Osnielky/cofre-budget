@@ -100,6 +100,19 @@ Tailwind v4 via `@tailwindcss/postcss`. Shape/font tokens live in `apps/web/src/
 
 **Color rules:** `--color-primary` (electric blue `#1E90FF`) and `--color-indigo` are UI accents only — never chart series (blue/indigo/violet are CVD-indistinguishable, protan ΔE 3.2). Chart identity colors are green/sky/orange/amber/violet, resolved at runtime via `useThemeColors()` for recharts. The `.btn-gold` class name is legacy — it is the themed primary CTA button.
 
+**Documented exception — the cash-flow chart.** `IncomeExpensesPanel` deliberately
+uses two shades of one hue per bar instead of the categorical palette: green
+(`--color-green` → `--color-green-soft`) for the income stack, red
+(`--color-rose` → `--color-rose-soft`) for the expense stack. Green-in/red-out is
+the finance convention the user asked for. It is a knowing accessibility
+trade-off: green↔red measures **ΔE 0.2 under deuteranopia** (green↔orange, which
+it replaced, was 6.2), so the two bars are one colour to a red-green colourblind
+reader. It is legitimate only because identity never rests on colour there —
+income is always the left bar, expenses always the right, in a fixed order, plus
+a legend and labelled totals. Preserve that ordering. The within-stack pairs are
+validated: ΔE 21.2 (green) and 20.9 (rose), both ≥ 3:1 contrast. Second shades
+are *tints*, not deeper steps — a darker red loses contrast on the navy surface.
+
 Accent colors: `--color-card-violet #9B6DFF`, `--color-card-green #4FBF7F`, `--color-card-orange #F07A3E`, `--color-card-amber #F5C842`, `--color-card-sky #4BA8D8`.
 
 `global.css` (no "s") is an NX-generated leftover — it is not imported anywhere and can be ignored.

@@ -48,6 +48,15 @@
   --color-sky:      #38BDF8;
   --color-violet:   #A855F7;
 
+  /* Lighter partners for green/rose. Used where one bar is split into two shades
+     of a single hue — the income and expense stacks on the cash-flow chart —
+     rather than two separate identities. Both are tints rather than deeper
+     shades because a darker step loses contrast against the navy surface
+     (#B91C1C measures 2.37:1, under the 3:1 floor). Validated against their
+     base: green ΔE 21.2, rose ΔE 20.9 (normal vision), both >= 3:1 contrast. */
+  --color-green-soft: #A7F3D0;
+  --color-rose-soft:  #FFC9C9;
+
   /* Card accents */
   --color-card-amber:  #FBBF24;
   --color-card-orange: #F97316;
