@@ -20,6 +20,7 @@ import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiab
 const SplitTransactionModal = dynamic(() => import('@/components/SplitTransactionModal'), { ssr: false });
 import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
 import { buildRecurringMap, normalize } from './recurring';
+import { pickProjectSuggestion } from '@/lib/transactions/suggestions';
 import StatStrip from './StatStrip';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -1719,9 +1720,7 @@ export default function TransactionsPage() {
 
                           {/* ── Project category suggestion ── */}
                           {(() => {
-                            if (tx.projectId || tx.categoryId || tx.debtId || txIsTransfer) return null;
-                            const normName = tx.name.replace(/\s+(?:conf#\S+|[A-Z0-9]{6,})$/i, '').trim();
-                            const ph = projectHints[tx.name] ?? projectHints[normName] ?? null;
+                            const ph = pickProjectSuggestion(tx, projectHints, txIsTransfer);
                             if (!ph) return null;
                             const proj = projects.find((p) => p.id === ph.projectId);
                             if (!proj) return null;
