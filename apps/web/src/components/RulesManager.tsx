@@ -71,7 +71,7 @@ export default function RulesManager() {
     setSaving(false);
     if (res.status === 409) { setSaveError('Another rule already matches this text.'); return; }
     if (!res.ok) { setSaveError('Could not save this rule.'); return; }
-    const { rule: updated } = await res.json();
+    const updated = await res.json();
     setRules((prev) => prev.map((r) => (r.id === rule.id ? updated : r)));
     setEditingId(null);
   }

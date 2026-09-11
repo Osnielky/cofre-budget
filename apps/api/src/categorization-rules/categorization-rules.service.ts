@@ -5,11 +5,6 @@ import { CategorizationRule } from './categorization-rule.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { Category } from '../categories/category.entity';
 
-export interface RuleWithApplyCount {
-  rule: CategorizationRule;
-  appliedCount: number;
-}
-
 /* ACH/payroll-style descriptors embed a per-transaction reference number after
    a stable merchant prefix (e.g. "ALPHA STAFFING & DES:PAYROLL ID:XXXXX89608407TK
    INDN:..."), so an exact-match rule built from the raw name would never fire
@@ -29,6 +24,17 @@ function derivePrefixMatch(raw: string): { matchValue: string; matchStrategy: 'e
   return { matchValue: raw, matchStrategy: 'exact' };
 }
 
+/**
+ * Rules are forward-looking only.
+ *
+ * Creating or editing a rule never touches a transaction already in the ledger
+ * — not even an uncategorized one. A rule says what to do with what arrives
+ * next, and silently rewriting rows the user had already reviewed is the
+ * opposite of that. Rules reach new transactions through `matchRule`, which
+ * every ingestion path calls as it writes: Plaid sync, CSV import, manual add.
+ * A back-dated CSV still gets categorized on import — what matters is that the
+ * transaction is new to the system, not the date it carries.
+ */
 @Injectable()
 export class CategorizationRulesService {
   constructor(
@@ -66,7 +72,7 @@ export class CategorizationRulesService {
     return bestOfType('name', candidate.name);
   }
 
-  async create(userId: string, transactionId: string, categoryId: string): Promise<RuleWithApplyCount> {
+  async create(userId: string, transactionId: string, categoryId: string): Promise<CategorizationRule> {
     const tx = await this.txRepo.findOneBy({ id: transactionId, userId });
     if (!tx) throw new NotFoundException('Transaction not found');
 
@@ -97,11 +103,10 @@ export class CategorizationRulesService {
     } catch (err) {
       throw await this.toConflictOrRethrow(err, userId, matchType, matchValue, matchStrategy);
     }
-    const appliedCount = await this.applyToUncategorized(userId, matchType, matchValue, matchStrategy, categoryId, rule.id);
-    return { rule: await this.repo.findOne({ where: { id: rule.id }, relations: ['category'] }), appliedCount };
+    return this.repo.findOne({ where: { id: rule.id }, relations: ['category'] });
   }
 
-  async update(id: string, userId: string, dto: { matchValue?: string; categoryId?: string; matchStrategy?: 'exact' | 'prefix' }): Promise<RuleWithApplyCount> {
+  async update(id: string, userId: string, dto: { matchValue?: string; categoryId?: string; matchStrategy?: 'exact' | 'prefix' }): Promise<CategorizationRule> {
     const rule = await this.repo.findOneBy({ id });
     if (!rule) throw new NotFoundException();
     if (rule.userId !== userId) throw new ForbiddenException();
@@ -143,8 +148,7 @@ export class CategorizationRulesService {
     } catch (err) {
       throw await this.toConflictOrRethrow(err, userId, rule.matchType, rule.matchValue, rule.matchStrategy, rule.id);
     }
-    const appliedCount = await this.applyToUncategorized(userId, rule.matchType, rule.matchValue, rule.matchStrategy, rule.categoryId, rule.id);
-    return { rule: await this.repo.findOne({ where: { id: rule.id }, relations: ['category'] }), appliedCount };
+    return this.repo.findOne({ where: { id: rule.id }, relations: ['category'] });
   }
 
   async remove(id: string, userId: string): Promise<void> {
@@ -183,24 +187,5 @@ export class CategorizationRulesService {
     }
     // Unique violation but no matching row found (shouldn't normally happen) — surface the original error.
     return err as Error;
-  }
-
-  private async applyToUncategorized(userId: string, matchType: 'merchant' | 'name', matchValue: string, matchStrategy: 'exact' | 'prefix', categoryId: string, ruleId: string): Promise<number> {
-    const column = matchType === 'merchant' ? 'merchantName' : 'name';
-    const qb = this.txRepo
-      .createQueryBuilder()
-      .update(Transaction)
-      .set({ categoryId, categorizedByRuleId: ruleId })
-      .where('userId = :userId', { userId })
-      .andWhere('categoryId IS NULL');
-    if (matchStrategy === 'prefix') {
-      // POSITION(...) = 1 avoids LIKE's %/_ wildcard-escaping concerns entirely — a
-      // plain "does this substring start at position 1" check.
-      qb.andWhere(`POSITION(LOWER(:matchValue) IN LOWER(TRIM("${column}"))) = 1`, { matchValue });
-    } else {
-      qb.andWhere(`LOWER(TRIM("${column}")) = LOWER(:matchValue)`, { matchValue });
-    }
-    const result = await qb.execute();
-    return result.affected ?? 0;
   }
 }

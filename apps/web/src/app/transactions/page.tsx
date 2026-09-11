@@ -100,7 +100,7 @@ type Filter    = 'all' | 'uncategorized' | 'expense' | 'income' | 'recurring';
 type RangeMode = 'month' | 'custom';
 
 type RuleToast =
-  | { kind: 'created'; matchLabel: string; matchStrategy?: 'exact' | 'prefix'; appliedCount: number }
+  | { kind: 'created'; matchLabel: string; matchStrategy?: 'exact' | 'prefix' }
   | { kind: 'duplicate'; matchLabel: string }
   | { kind: 'error'; matchLabel: string; reason?: string }
   | { kind: 'categorized'; tx: Transaction; categoryId: string; categoryLabel: string; categoryIcon?: string };
@@ -507,15 +507,14 @@ export default function TransactionsPage() {
       ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
       return;
     }
-    const { rule, appliedCount } = await res.json();
+    const rule = await res.json();
     setRuleToast({
       kind: 'created',
       matchLabel: rule?.matchValue || matchLabel,
       matchStrategy: rule?.matchStrategy,
-      appliedCount,
     });
     ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
-    if (appliedCount > 0) loadTransactions();
+    // No refetch: the rule changes nothing that is already on screen.
   }
 
   async function uncategorizeOne(tx: Transaction) {
@@ -3228,9 +3227,7 @@ export default function TransactionsPage() {
                 <>
                   <p className="text-sm font-semibold">Rule created</p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                    {ruleToast.appliedCount > 0
-                      ? `Applied to ${ruleToast.appliedCount} other transaction${ruleToast.appliedCount !== 1 ? 's' : ''}.`
-                      : ruleToast.matchStrategy === 'prefix'
+                    {ruleToast.matchStrategy === 'prefix'
                       ? `Any transaction starting with "${ruleToast.matchLabel}" will auto-categorize from now on.`
                       : `"${ruleToast.matchLabel}" will auto-categorize from now on.`}
                   </p>
