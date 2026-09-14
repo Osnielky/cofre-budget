@@ -21,7 +21,7 @@ const SplitTransactionModal = dynamic(() => import('@/components/SplitTransactio
 import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
 import { buildRecurringMap, normalize } from './recurring';
 import { pickProjectSuggestion } from '@/lib/transactions/suggestions';
-import { isClosed, closureKind } from '@/lib/projects/closure';
+import { isClosed, closureKind, selectableProjects } from '@/lib/projects/closure';
 import LinkTransferModal from '@/components/LinkTransferModal';
 import StatStrip from './StatStrip';
 
@@ -227,7 +227,7 @@ export default function TransactionsPage() {
   /* Only open projects can be picked. `projects` stays complete on purpose —
      every row pill and the detail panel look a project up by id, so a closed
      project must still resolve or historical transactions lose their label. */
-  const openProjects = useMemo(() => projects.filter((p) => !isClosed(p.status)), [projects]);
+  const openProjects = useMemo(() => selectableProjects(projects), [projects]);
 
   /* name → most-recently-used category (cross-period, loaded once) */
   const [categoryHints, setCategoryHints] = useState<Record<string, { id: string; name: string; icon: string; color: string }>>({});

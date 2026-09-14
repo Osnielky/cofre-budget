@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   closureKind, closureActionLabel, closedStatusFor, isClosed, statusLabel,
-  isValidClosure, SELLABLE_TYPES, TERMINABLE_TYPES,
+  isValidClosure, selectableProjects, SELLABLE_TYPES, TERMINABLE_TYPES,
 } from './closure';
 
 describe('closureKind', () => {
@@ -76,5 +76,33 @@ describe('statusLabel', () => {
     expect(statusLabel('active')).toBe('Active');
     expect(statusLabel('sold')).toBe('Sold');
     expect(statusLabel('terminated')).toBe('Terminated');
+  });
+});
+
+describe('selectableProjects', () => {
+  const pool = [
+    { id: 'a', status: 'active' },
+    { id: 'b', status: 'sold' },
+    { id: 'c', status: 'terminated' },
+    { id: 'd', status: 'active' },
+  ];
+
+  it('keeps only the projects still open', () => {
+    expect(selectableProjects(pool).map((p) => p.id)).toEqual(['a', 'd']);
+  });
+
+  it('treats a project with no status as open', () => {
+    // Some callers carry a trimmed Project shape that never loaded status.
+    expect(selectableProjects([{ id: 'x' }]).map((p) => p.id)).toEqual(['x']);
+  });
+
+  it('preserves order', () => {
+    expect(selectableProjects(pool)[0].id).toBe('a');
+  });
+
+  it('returns a new array rather than mutating the input', () => {
+    const out = selectableProjects(pool);
+    expect(out).not.toBe(pool);
+    expect(pool).toHaveLength(4);
   });
 });

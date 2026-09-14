@@ -13,11 +13,13 @@ import {
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 
+import { selectableProjects } from '@/lib/projects/closure';
+
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
-interface Project { id: string; name: string; icon: string; color?: string | null; categories?: ProjectCategory[] }
+interface Project { id: string; name: string; icon: string; color?: string | null; status?: string; categories?: ProjectCategory[] }
 interface Transaction {
   id: string; name: string; amount: number; date: string;
   categoryId: string | null; bankAccountId: string;
@@ -158,9 +160,12 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
     setOpenPickerUid(null);
   }
 
-  /** Flattened project categories, for searching across every project at once. */
+  /** Flattened project categories, for searching across every project at once.
+      Closed projects are dropped here, not from `projects` itself — resolve()
+      above still needs them so a line already filed against a sold or
+      terminated project keeps its name and colour. */
   const projectOptions = useMemo(
-    () => projects.flatMap((p) => (p.categories ?? []).map((c) => ({ project: p, cat: c }))),
+    () => selectableProjects(projects).flatMap((p) => (p.categories ?? []).map((c) => ({ project: p, cat: c }))),
     [projects],
   );
 

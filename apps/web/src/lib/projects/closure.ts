@@ -48,6 +48,21 @@ export function isClosed(status: string): boolean {
   return status === 'sold' || status === 'terminated';
 }
 
+/**
+ * The projects a user may still file a transaction against.
+ *
+ * Use this for every *selectable* list — the category picker, the split modal,
+ * suggestion chips. Never use it for a lookup by id: a transaction already
+ * linked to a closed project still has to resolve its name, icon and colour, so
+ * display paths must keep reading the full list or historical rows go blank.
+ *
+ * A project with no status at all counts as open; some callers carry a trimmed
+ * Project shape that never loaded the field.
+ */
+export function selectableProjects<T extends { status?: string }>(projects: T[]): T[] {
+  return projects.filter((p) => !isClosed(p.status ?? 'active'));
+}
+
 export function statusLabel(status: string): string {
   if (status === 'sold') return 'Sold';
   if (status === 'terminated') return 'Terminated';
