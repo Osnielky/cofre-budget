@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative, assetMix, netWorthTrend } from './derive';
+import { makeBucketer, isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative, assetMix, netWorthTrend } from './derive';
 import type { Transaction, Category, BankAccount, Debt, Project } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
@@ -170,6 +170,27 @@ describe('categoryTotals', () => {
       [],
     );
     expect(out[0].id).toBe('uncat');
+  });
+});
+
+describe('makeBucketer', () => {
+  // The transactions-page insights donut reuses this with its own row shape —
+  // a bare Bucketable, not a full dashboard Transaction.
+  const bucket = makeBucketer([proj({ id: 'p1', name: 'Founding Venture', icon: '🏗️', color: '#9B6DFF' })]);
+
+  it('prefers the budget category', () => {
+    expect(bucket({ categoryRef: cat({ id: 'f', name: 'Food' }), projectId: 'p1' }).id).toBe('f');
+  });
+  it('falls back to the project category', () => {
+    expect(bucket({ categoryRef: null, projectCategoryRef: { id: 'pc1', name: 'Founding Capital', icon: '💰', color: '#F5C842' }, projectId: 'p1' }))
+      .toMatchObject({ id: 'proj:pc1', name: 'Founding Capital' });
+  });
+  it('falls back to the project when it has no project category', () => {
+    expect(bucket({ categoryRef: null, projectCategoryRef: null, projectId: 'p1' }))
+      .toMatchObject({ id: 'project:p1', name: 'Founding Venture' });
+  });
+  it('reports a row with no project at all as uncategorized', () => {
+    expect(bucket({ categoryRef: null, projectId: null }).id).toBe('uncat');
   });
 });
 

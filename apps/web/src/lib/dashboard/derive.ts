@@ -1,5 +1,5 @@
 import { isTrackingAccount, isLiability, accountTypeMeta } from '@/lib/accountTypes';
-import type { Transaction, Budget, BankAccount, Debt, Project } from './types';
+import type { Transaction, Budget, BankAccount, Debt, Project, Category, ProjectCategory } from './types';
 
 /** Transfers between own accounts + debt repayments — excluded everywhere. */
 export function isTransfer(t: Transaction): boolean {
@@ -81,7 +81,7 @@ const OTHER = { id: 'other', name: 'Other', icon: '·', color: '#6B6B8A' };
  * `project:` for a whole project) so they can never collide with each other or
  * with a budget category that happens to share an id.
  */
-function bucketOf(t: Transaction, projects: Map<string, Project>): { id: string; name: string; icon: string; color: string } {
+function bucketOf(t: Bucketable, projects: Map<string, BucketProject>): Bucket {
   if (t.categoryRef) return t.categoryRef;
   const pc = t.projectCategoryRef;
   if (pc) return { id: `proj:${pc.id}`, name: pc.name, icon: pc.icon || '📁', color: pc.color };
@@ -90,13 +90,30 @@ function bucketOf(t: Transaction, projects: Map<string, Project>): { id: string;
   return UNCAT;
 }
 
-export function categoryTotals(txs: Transaction[], dir: 'income' | 'expense', projects: Project[] = []): CategorySlice[] {
-  const sign = dir === 'income' ? 1 : -1;
+export interface Bucket { id: string; name: string; icon: string; color: string }
+/* Deliberately narrower than Transaction/Project so screens with their own row
+   types (the transactions-page insights donut) can reuse the same bucketing
+   instead of growing a second, divergent copy of it. */
+export type Bucketable = {
+  categoryRef: Category | null;
+  projectCategoryRef?: ProjectCategory | null;
+  projectId: string | null;
+};
+export type BucketProject = Pick<Project, 'id' | 'name' | 'icon' | 'color'>;
+
+/** Build the project lookup once, then apply it per row. */
+export function makeBucketer(projects: BucketProject[] = []): (t: Bucketable) => Bucket {
   const byId = new Map(projects.map((p) => [p.id, p]));
+  return (t) => bucketOf(t, byId);
+}
+
+export function categoryTotals(txs: Transaction[], dir: 'income' | 'expense', projects: BucketProject[] = []): CategorySlice[] {
+  const sign = dir === 'income' ? 1 : -1;
+  const bucket = makeBucketer(projects);
   const map = new Map<string, CategorySlice>();
   for (const t of txs) {
     if (!inCashFlow(t) || Math.sign(Number(t.amount)) !== sign) continue;
-    const c = bucketOf(t, byId);
+    const c = bucket(t);
     const key = c.id;
     const cur = map.get(key) ?? { id: key, name: c.name, icon: c.icon, color: c.color, value: 0, pct: 0 };
     cur.value = +(cur.value + Math.abs(Number(t.amount))).toFixed(2);
@@ -137,7 +154,7 @@ export interface ExpenseChange {
   current: number; previous: number; delta: number; pct: number | null;
 }
 
-export function expenseChanges(yearTx: Transaction[], monthKey: string, projects: Project[] = []): { changes: ExpenseChange[]; unchanged: number } {
+export function expenseChanges(yearTx: Transaction[], monthKey: string, projects: BucketProject[] = []): { changes: ExpenseChange[]; unchanged: number } {
   const [y, m] = monthKey.split('-').map(Number);
   const prev = new Date(y, m - 2); // previous month
   const prevKey = monthKeyOf(prev);
@@ -218,7 +235,7 @@ export interface FixedVariableSplit {
   fixed: CategorySlice[]; variable: CategorySlice[];
 }
 
-export function fixedVariable(yearTx: Transaction[], monthKey: string, projects: Project[] = []): FixedVariableSplit {
+export function fixedVariable(yearTx: Transaction[], monthKey: string, projects: BucketProject[] = []): FixedVariableSplit {
   const txs = txInMonth(yearTx, monthKey).filter((t) => inCashFlow(t) && Number(t.amount) < 0);
   const fixed = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed === true), 'expense', projects);
   const variable = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed !== true), 'expense', projects);

@@ -2,15 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { RecurringInfo, normalize } from './recurring';
+import { makeBucketer } from '@/lib/dashboard/derive';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string }
+interface ProjectCategory { id: string; name: string; icon: string; color: string }
+interface Project { id: string; name: string; icon: string; color: string; categories?: ProjectCategory[] }
 interface Transaction {
   id: string; name: string; amount: number; date: string; source: string;
   categoryId: string | null; categoryRef: Category | null;
   bankAccountId: string; bankAccount: BankAccount | null;
+  projectId: string | null;
+  projectCategoryId: string | null;
   note: string | null;
   debtId?: string | null;
 }
@@ -23,6 +28,7 @@ interface InsightsPanelProps {
   onClose: () => void;
   transactions: Transaction[];
   prevTransactions: Transaction[];
+  projects: Project[];
   recurringMap: Map<string, RecurringInfo>;
   subscriptions: SubscriptionStore;
   onSubscriptionChange: (next: SubscriptionStore) => void;
@@ -31,7 +37,7 @@ interface InsightsPanelProps {
 }
 
 export function InsightsPanel({
-  selectedTx, onClose, transactions, prevTransactions, recurringMap,
+  selectedTx, onClose, transactions, prevTransactions, projects, recurringMap,
   subscriptions, onSubscriptionChange, onNoteUpdate,
   currentMonth,
 }: InsightsPanelProps) {
@@ -73,7 +79,7 @@ export function InsightsPanel({
         ) : (
           <>
             <SpendingInsight transactions={transactions} prevTransactions={prevTransactions} />
-            <SpendingByCategory transactions={transactions} />
+            <SpendingByCategory transactions={transactions} projects={projects} />
             <DigestView
               transactions={transactions}
               recurringMap={recurringMap}
@@ -759,13 +765,22 @@ function SpendingInsight({ transactions, prevTransactions }: { transactions: Tra
 }
 
 /* ── Mini donut + top-5 legend of this window's expenses ── */
-function SpendingByCategory({ transactions }: { transactions: Transaction[] }) {
-  const UNCAT = { id: 'uncat', name: 'Uncategorized', icon: '', color: '#6B6B8A' };
+function SpendingByCategory({ transactions, projects }: { transactions: Transaction[]; projects: Project[] }) {
+  /* Same bucketing as the dashboard donut: a project-linked row carries no
+     budget category, so keying on categoryRef alone filed every project
+     expense — categorised or not — under "Uncategorized". */
+  const bucket = makeBucketer(projects);
   const m = new Map<string, { name: string; color: string; total: number }>();
   for (const t of transactions) {
     if (Number(t.amount) >= 0 || t.categoryRef?.type === 'transfer' || t.debtId) continue;
-    const c = t.categoryRef && t.categoryRef.type === 'expense' ? t.categoryRef : t.categoryRef ? null : UNCAT;
-    if (!c) continue;
+    // A negative row on a non-expense budget category isn't spending.
+    if (t.categoryRef && t.categoryRef.type !== 'expense') continue;
+    const proj = t.projectId ? projects.find((p) => p.id === t.projectId) : null;
+    const c = bucket({
+      categoryRef: t.categoryRef,
+      projectCategoryRef: t.projectCategoryId ? proj?.categories?.find((pc) => pc.id === t.projectCategoryId) ?? null : null,
+      projectId: t.projectId,
+    });
     const cur = m.get(c.id) ?? { name: c.name, color: c.color, total: 0 };
     cur.total += Math.abs(Number(t.amount));
     m.set(c.id, cur);

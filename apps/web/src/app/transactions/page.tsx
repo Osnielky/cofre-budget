@@ -3072,6 +3072,7 @@ export default function TransactionsPage() {
           transactions={transactions}
           recurringMap={recurringMap}
           prevTransactions={prevTransactions}
+          projects={projects}
           subscriptions={subscriptions}
           onSubscriptionChange={handleSubscriptionChange}
           onNoteUpdate={handleNoteUpdate}
@@ -3093,6 +3094,7 @@ export default function TransactionsPage() {
               transactions={transactions}
               recurringMap={recurringMap}
               prevTransactions={prevTransactions}
+              projects={projects}
               subscriptions={subscriptions}
               onSubscriptionChange={handleSubscriptionChange}
               onNoteUpdate={handleNoteUpdate}
