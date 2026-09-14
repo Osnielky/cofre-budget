@@ -21,6 +21,7 @@ const SplitTransactionModal = dynamic(() => import('@/components/SplitTransactio
 import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
 import { buildRecurringMap, normalize } from './recurring';
 import { pickProjectSuggestion } from '@/lib/transactions/suggestions';
+import { isClosed, closureKind } from '@/lib/projects/closure';
 import LinkTransferModal from '@/components/LinkTransferModal';
 import StatStrip from './StatStrip';
 
@@ -222,6 +223,11 @@ export default function TransactionsPage() {
 
   const [ruleToast, setRuleToast] = useState<RuleToast | null>(null);
   const ruleToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* Only open projects can be picked. `projects` stays complete on purpose —
+     every row pill and the detail panel look a project up by id, so a closed
+     project must still resolve or historical transactions lose their label. */
+  const openProjects = useMemo(() => projects.filter((p) => !isClosed(p.status)), [projects]);
 
   /* name → most-recently-used category (cross-period, loaded once) */
   const [categoryHints, setCategoryHints] = useState<Record<string, { id: string; name: string; icon: string; color: string }>>({});
@@ -1730,7 +1736,9 @@ export default function TransactionsPage() {
                           {(() => {
                             const ph = pickProjectSuggestion(tx, projectHints, txIsTransfer);
                             if (!ph) return null;
-                            const proj = projects.find((p) => p.id === ph.projectId);
+                            /* openProjects, not projects: a closed project must not be
+                               offered as a one-click suggestion either. */
+                            const proj = openProjects.find((p) => p.id === ph.projectId);
                             if (!proj) return null;
                             return (
                               <button
@@ -2075,12 +2083,12 @@ export default function TransactionsPage() {
                                     )}
 
                                     {/* Projects section */}
-                                    {projects.length > 0 && (
+                                    {openProjects.length > 0 && (
                                       <>
                                         <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
                                         <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
                                           style={{ color: 'var(--color-text-muted)' }}>Projects</p>
-                                        {projects.map((proj) => {
+                                        {openProjects.map((proj) => {
                                           const c = proj.color || '#9B6DFF';
                                           const linked = tx.projectId === proj.id;
                                           return (
@@ -2217,8 +2225,12 @@ export default function TransactionsPage() {
                                           </>
                                         )}
 
-                                        {/* Mark as SOLD — only for income txs on active projects */}
-                                        {Number(tx.amount) > 0 && proj?.status !== 'sold' && (
+                                        {/* Mark as SOLD — income txs on active projects, and only
+                                            for types that are actually sold. A service or trading
+                                            project ends by being terminated from the Projects page;
+                                            offering "sold" here would just earn a 400 from the API. */}
+                                        {Number(tx.amount) > 0 && proj && !isClosed(proj.status)
+                                          && closureKind(proj.type ?? '') === 'sale' && (
                                           <>
                                             <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
                                             {markAsSaleConfirm === proj?.id ? (

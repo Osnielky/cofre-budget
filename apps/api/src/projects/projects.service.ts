@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Project } from './project.entity';
 import { ProjectCategory } from './project-category.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { isValidClosure, closedStatusFor } from './closure';
 
 export interface ProjectDto {
   name: string;
@@ -219,6 +220,25 @@ export class ProjectsService {
     const project = await this.repo.findOneBy({ id });
     if (!project) throw new NotFoundException();
     if (project.userId !== userId) throw new ForbiddenException();
+
+    if (dto.status !== undefined) {
+      // A service isn't "sold" and a car isn't "terminated". The UI already
+      // offers only the right verb, but the rule has to hold here too or it
+      // only exists in one client.
+      const type = dto.type ?? project.type;
+      if (!isValidClosure(type, dto.status)) {
+        throw new BadRequestException(
+          `A ${type} project cannot be marked "${dto.status}" — use "${closedStatusFor(type)}" instead.`,
+        );
+      }
+      // Reactivating clears the closure, so a revived project never carries a
+      // stale sale price into its P&L.
+      if (dto.status === 'active') {
+        project.salePrice = null;
+        project.saleDate = null;
+      }
+    }
+
     Object.assign(project, dto);
     await this.repo.save(project);
     return this.withStats(project);

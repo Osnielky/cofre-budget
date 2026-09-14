@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { closureKind, closureActionLabel, isClosed, statusLabel } from '@/lib/projects/closure';
 import { createPortal } from 'react-dom';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
@@ -100,6 +101,11 @@ export default function ProjectsPage() {
   const [showForm, setShowForm]       = useState(false);
   const [editing, setEditing]         = useState<Project | null>(null);
   const [showSell, setShowSell]       = useState<Project | null>(null);
+  const [showTerminate, setShowTerminate] = useState<Project | null>(null);
+  const [terminateDate, setTerminateDate] = useState('');
+  const [terminating, setTerminating] = useState(false);
+  const [reactivating, setReactivating] = useState<string | null>(null);
+  const [closureError, setClosureError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<Project | null>(null);
   const [deleting, setDeleting]       = useState<string | null>(null);
 
@@ -278,6 +284,48 @@ export default function ProjectsPage() {
     } finally { setSaving(false); }
   }
 
+  /* Close an ongoing operation. No sale price — a business that ends has a
+     lifetime P&L, not a gain against cost basis. saleDate carries the close
+     date; see the status comment on the Project entity. */
+  async function handleTerminate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!showTerminate) return;
+    setTerminating(true);
+    setClosureError('');
+    try {
+      const res = await fetch(`${API}/projects/${showTerminate.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ status: 'terminated', saleDate: terminateDate || null }),
+      });
+      if (!res.ok) {
+        setClosureError(await res.json().then((b) => b?.message).catch(() => null) || 'Could not terminate this project.');
+        return;
+      }
+      const updated: Project = await res.json();
+      setProjects((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+      setShowTerminate(null);
+    } finally { setTerminating(false); }
+  }
+
+  /* Bring a closed project back. The API clears salePrice/saleDate so a revived
+     project never carries a stale sale into its P&L. */
+  async function reactivate(project: Project) {
+    setReactivating(project.id);
+    setClosureError('');
+    try {
+      const res = await fetch(`${API}/projects/${project.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ status: 'active' }),
+      });
+      if (!res.ok) {
+        setClosureError('Could not reactivate this project.');
+        return;
+      }
+      const updated: Project = await res.json();
+      setProjects((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+    } finally { setReactivating(null); }
+  }
+
   /* Mark as sold */
   async function handleSell(e: React.FormEvent) {
     e.preventDefault();
@@ -452,9 +500,12 @@ export default function ProjectsPage() {
               </div>
             )}
 
-            {projects.map((p) => {
+            {[...projects]
+              .sort((a, b) => Number(isClosed(a.status)) - Number(isClosed(b.status)))
+              .map((p) => {
               const color      = p.color || '#9B6DFF';
               const sold       = p.status === 'sold';
+              const closed     = isClosed(p.status);
               const isSelected = selectedId === p.id;
               return (
                 <button key={p.id}
@@ -467,6 +518,9 @@ export default function ProjectsPage() {
                       : 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)',
                     border: isSelected ? `1px solid ${color}55` : '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)',
                     boxShadow: isSelected ? `0 2px 16px ${color}15` : 'none',
+                    /* Closed projects stay visible but recede — they are history,
+                       not something you are still working on. */
+                    opacity: closed && !isSelected ? 0.55 : 1,
                   }}>
                   <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 overflow-hidden"
                     style={{ background: `${color}25`, border: `1px solid ${color}35` }}>
@@ -482,8 +536,8 @@ export default function ProjectsPage() {
                         {PROJECT_TYPES.find((t) => t.value === p.type)?.label ?? p.type}
                       </span>
                       <span className="text-[10px] font-semibold"
-                        style={{ color: sold ? 'var(--color-green)' : 'var(--color-amber)' }}>
-                        {sold ? '✓ Sold' : '● Active'}
+                        style={{ color: sold ? 'var(--color-green)' : closed ? 'var(--color-text-muted)' : 'var(--color-amber)' }}>
+                        {sold ? '✓ Sold' : closed ? '■ Terminated' : '● Active'}
                       </span>
                     </div>
                   </div>
@@ -518,8 +572,9 @@ export default function ProjectsPage() {
                 </div>
               );
 
-              const color = sel.color || '#9B6DFF';
-              const sold  = sel.status === 'sold';
+              const color  = sel.color || '#9B6DFF';
+              const closed = isClosed(sel.status);
+              const sold   = sel.status === 'sold';
 
               return (
                 <div className="flex flex-col">
@@ -552,9 +607,16 @@ export default function ProjectsPage() {
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md"
                           style={sold
                             ? { background: 'color-mix(in srgb, var(--color-green) 18%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 40%, transparent)' }
+                            : closed
+                            ? { background: 'color-mix(in srgb, var(--color-text-muted) 18%, transparent)', color: 'var(--color-text-muted)', border: '1px solid color-mix(in srgb, var(--color-text-muted) 40%, transparent)' }
                             : { background: 'color-mix(in srgb, var(--color-amber) 16%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 40%, transparent)' }}>
-                          {sold ? '✓ Sold' : '● Active'}
+                          {sold ? '✓ Sold' : closed ? '■ Terminated' : '● Active'}
                         </span>
+                        {closed && sel.saleDate && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-md" style={{ color: 'var(--color-text-muted)' }}>
+                            {sold ? 'Sold' : 'Closed'} {sel.saleDate}
+                          </span>
+                        )}
                         {sel.type === 'trading' && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md"
                             style={{ background: 'color-mix(in srgb, var(--color-violet) 14%, transparent)', color: 'var(--color-violet)', border: '1px solid color-mix(in srgb, var(--color-violet) 35%, transparent)' }}>
@@ -568,11 +630,25 @@ export default function ProjectsPage() {
                     </div>
                     {/* Actions */}
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {!sold && (
+                      {!closed && closureKind(sel.type) === 'sale' && (
                         <button onClick={() => { setShowSell(sel); setSellForm({ salePrice: '', saleDate: new Date().toISOString().slice(0, 10) }); }}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl hover:brightness-110"
                           style={{ background: 'rgba(79,191,127,0.18)', color: '#4FBF7F', border: '1px solid rgba(79,191,127,0.38)' }}>
-                          Mark Sold
+                          {closureActionLabel(sel.type)}
+                        </button>
+                      )}
+                      {!closed && closureKind(sel.type) === 'termination' && (
+                        <button onClick={() => { setShowTerminate(sel); setTerminateDate(new Date().toISOString().slice(0, 10)); }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl hover:brightness-110"
+                          style={{ background: 'color-mix(in srgb, var(--color-text-muted) 18%, transparent)', color: 'var(--color-text-secondary)', border: '1px solid color-mix(in srgb, var(--color-text-muted) 38%, transparent)' }}>
+                          {closureActionLabel(sel.type)}
+                        </button>
+                      )}
+                      {closed && (
+                        <button onClick={() => reactivate(sel)} disabled={reactivating === sel.id}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl hover:brightness-110 disabled:opacity-40"
+                          style={{ background: 'color-mix(in srgb, var(--color-amber) 16%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 40%, transparent)' }}>
+                          {reactivating === sel.id ? 'Reactivating…' : 'Reactivate'}
                         </button>
                       )}
                       <button onClick={() => openEdit(sel)}
@@ -1246,6 +1322,59 @@ export default function ProjectsPage() {
         )}
 
         {/* ── Mark as Sold modal ── */}
+        {showTerminate && createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+            onMouseDown={(e) => { if (e.target === e.currentTarget) setShowTerminate(null); }}>
+            <form onSubmit={handleTerminate}
+              className="w-full max-w-md flex flex-col gap-5 p-6 rounded-2xl"
+              style={{ background: 'var(--color-surface)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
+
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 overflow-hidden"
+                  style={{ background: `${showTerminate.color}30` }}>
+                  {showTerminate.imageUrl
+                    ? <img src={showTerminate.imageUrl} alt="" className="w-full h-full object-cover" />
+                    : showTerminate.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-base truncate">Terminate {showTerminate.name}?</p>
+                  <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                    It stops appearing when you categorize transactions. Everything already
+                    linked to it stays exactly as it is.
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="terminate-date" className="text-xs font-semibold">When did it close?</label>
+                <input id="terminate-date" type="date" value={terminateDate}
+                  onChange={(e) => setTerminateDate(e.target.value)}
+                  className="w-full mt-1.5 px-3 py-2.5 text-sm outline-none rounded-xl"
+                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
+              </div>
+
+              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                You can reactivate it later from this page.
+              </p>
+
+              {closureError && <p className="text-xs" style={{ color: 'var(--color-rose)' }}>{closureError}</p>}
+
+              <div className="flex items-center justify-between gap-3">
+                <button type="button" onClick={() => setShowTerminate(null)}
+                  className="px-4 py-2 text-sm font-medium rounded-xl"
+                  style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
+                <button type="submit" disabled={terminating}
+                  className="px-5 py-2 text-sm font-bold rounded-xl hover:brightness-110 disabled:opacity-40"
+                  style={{ background: 'color-mix(in srgb, var(--color-text-muted) 22%, transparent)', color: 'var(--color-text-primary)', border: '1px solid color-mix(in srgb, var(--color-text-muted) 45%, transparent)' }}>
+                  {terminating ? 'Terminating…' : 'Terminate project'}
+                </button>
+              </div>
+            </form>
+          </div>,
+          document.body
+        )}
+
         {showSell && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
