@@ -1,12 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative, assetMix, netWorthTrend } from './derive';
-import type { Transaction, Category, BankAccount, Debt } from './types';
+import type { Transaction, Category, BankAccount, Debt, Project } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
   return { id: 'c1', name: 'Food', icon: '🍔', color: '#fff', type: 'expense', ...p };
 }
 export function acct(p: Partial<BankAccount> = {}): BankAccount {
   return { id: 'a1', bankName: 'B', accountName: 'A', accountType: 'checking', color: '#fff', balance: 0, ...p };
+}
+export function proj(p: Partial<Project> = {}): Project {
+  return {
+    id: 'p1', name: 'Project', icon: '📁', color: '#9B6DFF', type: 'other', status: 'active',
+    expenses: 0, income: 0, costBasis: 0, netGain: null, roi: null, purchasePrice: 0, ...p,
+  };
 }
 export function debt(p: Partial<Debt> = {}): Debt {
   return { remaining: 0, status: 'open', direction: 'lent', ...p };
@@ -128,6 +134,41 @@ describe('categoryTotals', () => {
 
   it('still reports a row with neither kind of category as uncategorized', () => {
     const out = categoryTotals([tx({ amount: -10, categoryRef: null, projectCategoryRef: null })] as never, 'expense');
+    expect(out[0].id).toBe('uncat');
+  });
+
+  // Linking a transaction to a project without picking a project category is a
+  // first-class state — the picker offers "No specific category", and
+  // markAsPurchase() always links that way. Those rows count as categorised on
+  // the transactions page, so the donut must not file them under Uncategorized.
+  it('attributes a project-linked row with no project category to the project', () => {
+    const out = categoryTotals(
+      [tx({ amount: -2330, categoryRef: null, projectCategoryRef: null, projectId: 'p1' })] as never,
+      'expense',
+      [proj({ id: 'p1', name: 'Founding Venture', icon: '🏗️', color: '#9B6DFF' })],
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: 'project:p1', name: 'Founding Venture', icon: '🏗️', color: '#9B6DFF', value: 2330 });
+  });
+
+  it('keeps the project bucket separate from its own project categories', () => {
+    const out = categoryTotals(
+      [
+        tx({ amount: -2330, categoryRef: null, projectCategoryRef: null, projectId: 'p1' }),
+        tx({ amount: -21700, categoryRef: null, projectId: 'p1', projectCategoryRef: { id: 'pc1', name: 'Founding Capital', icon: '💰', color: '#F5C842' } }),
+      ] as never,
+      'expense',
+      [proj({ id: 'p1', name: 'Founding Venture' })],
+    );
+    expect(out.map((s) => [s.id, s.value])).toEqual([['proj:pc1', 21700], ['project:p1', 2330]]);
+  });
+
+  it('falls back to uncategorized when the project cannot be resolved', () => {
+    const out = categoryTotals(
+      [tx({ amount: -10, categoryRef: null, projectCategoryRef: null, projectId: 'gone' })] as never,
+      'expense',
+      [],
+    );
     expect(out[0].id).toBe('uncat');
   });
 });

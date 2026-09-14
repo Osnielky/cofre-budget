@@ -1,5 +1,5 @@
 import { isTrackingAccount, isLiability, accountTypeMeta } from '@/lib/accountTypes';
-import type { Transaction, Budget, BankAccount, Debt } from './types';
+import type { Transaction, Budget, BankAccount, Debt, Project } from './types';
 
 /** Transfers between own accounts + debt repayments — excluded everywhere. */
 export function isTransfer(t: Transaction): boolean {
@@ -69,22 +69,34 @@ const OTHER = { id: 'other', name: 'Other', icon: '·', color: '#6B6B8A' };
  * A row linked to a project carries `projectCategoryRef` and, by the app's own
  * convention, `categoryId = null`. Keying on the budget category alone would
  * therefore file all project activity under "Uncategorized" — which is what it
- * used to do. Project categories are namespaced so they can never collide with
- * a budget category that happens to share an id.
+ * used to do.
+ *
+ * Picking a project category is optional: the project picker offers "No
+ * specific category" and `markAsPurchase()` always links that way, so
+ * `projectId` set with `projectCategoryId` null is a first-class state that the
+ * transactions page counts as categorised. Those rows fall back to a bucket for
+ * the project itself rather than to "Uncategorized", so the two views agree.
+ *
+ * Both project buckets are namespaced (`proj:` for a project category,
+ * `project:` for a whole project) so they can never collide with each other or
+ * with a budget category that happens to share an id.
  */
-function bucketOf(t: Transaction): { id: string; name: string; icon: string; color: string } {
+function bucketOf(t: Transaction, projects: Map<string, Project>): { id: string; name: string; icon: string; color: string } {
   if (t.categoryRef) return t.categoryRef;
   const pc = t.projectCategoryRef;
   if (pc) return { id: `proj:${pc.id}`, name: pc.name, icon: pc.icon || '📁', color: pc.color };
+  const p = t.projectId ? projects.get(t.projectId) : null;
+  if (p) return { id: `project:${p.id}`, name: p.name, icon: p.icon || '📁', color: p.color };
   return UNCAT;
 }
 
-export function categoryTotals(txs: Transaction[], dir: 'income' | 'expense'): CategorySlice[] {
+export function categoryTotals(txs: Transaction[], dir: 'income' | 'expense', projects: Project[] = []): CategorySlice[] {
   const sign = dir === 'income' ? 1 : -1;
+  const byId = new Map(projects.map((p) => [p.id, p]));
   const map = new Map<string, CategorySlice>();
   for (const t of txs) {
     if (!inCashFlow(t) || Math.sign(Number(t.amount)) !== sign) continue;
-    const c = bucketOf(t);
+    const c = bucketOf(t, byId);
     const key = c.id;
     const cur = map.get(key) ?? { id: key, name: c.name, icon: c.icon, color: c.color, value: 0, pct: 0 };
     cur.value = +(cur.value + Math.abs(Number(t.amount))).toFixed(2);
@@ -125,12 +137,12 @@ export interface ExpenseChange {
   current: number; previous: number; delta: number; pct: number | null;
 }
 
-export function expenseChanges(yearTx: Transaction[], monthKey: string): { changes: ExpenseChange[]; unchanged: number } {
+export function expenseChanges(yearTx: Transaction[], monthKey: string, projects: Project[] = []): { changes: ExpenseChange[]; unchanged: number } {
   const [y, m] = monthKey.split('-').map(Number);
   const prev = new Date(y, m - 2); // previous month
   const prevKey = monthKeyOf(prev);
-  const cur = categoryTotals(txInMonth(yearTx, monthKey), 'expense');
-  const before = new Map(categoryTotals(txInMonth(yearTx, prevKey), 'expense').map((s) => [s.id, s]));
+  const cur = categoryTotals(txInMonth(yearTx, monthKey), 'expense', projects);
+  const before = new Map(categoryTotals(txInMonth(yearTx, prevKey), 'expense', projects).map((s) => [s.id, s]));
   const all: ExpenseChange[] = [];
   const seen = new Set<string>();
   for (const s of cur) {
@@ -206,10 +218,10 @@ export interface FixedVariableSplit {
   fixed: CategorySlice[]; variable: CategorySlice[];
 }
 
-export function fixedVariable(yearTx: Transaction[], monthKey: string): FixedVariableSplit {
+export function fixedVariable(yearTx: Transaction[], monthKey: string, projects: Project[] = []): FixedVariableSplit {
   const txs = txInMonth(yearTx, monthKey).filter((t) => inCashFlow(t) && Number(t.amount) < 0);
-  const fixed = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed === true), 'expense');
-  const variable = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed !== true), 'expense');
+  const fixed = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed === true), 'expense', projects);
+  const variable = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed !== true), 'expense', projects);
   const fixedTotal = +fixed.reduce((s, x) => s + x.value, 0).toFixed(2);
   const variableTotal = +variable.reduce((s, x) => s + x.value, 0).toFixed(2);
   const all = fixedTotal + variableTotal;

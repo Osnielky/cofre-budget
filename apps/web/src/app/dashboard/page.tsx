@@ -86,10 +86,10 @@ export default function DashboardPage() {
 
   const d = useMemo(() => {
     const monthTx = txInMonth(yearTx, month);
-    const expenseSlices = categoryTotals(monthTx, 'expense');
+    const expenseSlices = categoryTotals(monthTx, 'expense', projects);
     const forPeriod = (p: string) => (p === 'ytd' ? yearTx : txInMonth(yearTx, p));
-    const incomeSlices = categoryTotals(forPeriod(incomePeriod), 'income');
-    const yearExpenseSlices = categoryTotals(forPeriod(expensePeriod), 'expense');
+    const incomeSlices = categoryTotals(forPeriod(incomePeriod), 'income', projects);
+    const yearExpenseSlices = categoryTotals(forPeriod(expensePeriod), 'expense', projects);
     return {
       cashFlow: monthlyCashFlow(yearTx, now),
       trend: trendSeries(yearTx, now, 12),   // full YTD; the panel slices per selected range
@@ -100,14 +100,14 @@ export default function DashboardPage() {
       incomeTotal: incomeSlices.reduce((s, x) => s + x.value, 0),
       calendar: calendarDays(yearTx, month),
       pace: spendingPace(budgets, yearTx, month, now),
-      fixedVar: fixedVariable(yearTx, month),
+      fixedVar: fixedVariable(yearTx, month, projects),
       netWorth: netWorthBreakdown(accounts, debts, yearTx, month),
-      changes: expenseChanges(yearTx, month),
+      changes: expenseChanges(yearTx, month, projects),
       merchants: topMerchants(monthTx),
       daily: dailyCumulative(yearTx, month, now),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yearTx, month, budgets, accounts, debts, incomePeriod, expensePeriod]);
+  }, [yearTx, month, budgets, accounts, debts, projects, incomePeriod, expensePeriod]);
 
   /* ── Stat-card derivations (ported verbatim from the pre-refactor page) ── */
   const isDebtAcc    = (a: (typeof accounts)[number]) => isLiability(a.accountType);
