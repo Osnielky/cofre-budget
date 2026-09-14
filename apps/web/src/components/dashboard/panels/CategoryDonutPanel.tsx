@@ -111,10 +111,33 @@ export default function CategoryDonutPanel({ title, subtitle, slices, total, loa
             </div>
           </div>
 
-          {/* Footer stats — only the ones derivable from this panel's data */}
-          {top && smallest && (
-            <div className="grid grid-cols-2 gap-2.5 pt-3 mt-auto" style={{ borderTop: '1px solid var(--color-border)' }}>
-              {[{ label: 'Top category', s: top }, { label: 'Smallest category', s: smallest }].map(({ label, s }) => (
+          {/* Footer stats — only the ones derivable from this panel's data.
+              The total always shows; top/smallest need at least two categories
+              to mean anything, so they come and go independently. */}
+          {top && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-3 mt-auto" style={{ borderTop: '1px solid var(--color-border)' }}>
+
+              {/* Deliberately uncoloured: the other two cards borrow their slice's
+                  colour because that colour is that category's identity in the
+                  donut. A total is not a slice, so tinting it would imply one. */}
+              <div className="flex items-center gap-2.5 rounded-xl py-2 px-3 min-w-0"
+                style={{ border: 'var(--glass-border)', background: 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)' }}>
+                <span className="w-7 h-7 rounded-lg flex items-center justify-center text-[13px] font-bold shrink-0"
+                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+                  aria-hidden="true">Σ</span>
+                <div className="min-w-0">
+                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>Total</p>
+                  <p className="text-xs font-bold truncate">{subtitle}</p>
+                </div>
+                <div className="ml-auto text-right shrink-0">
+                  <p className="text-xs font-bold tabular-nums">${fmt(total)}</p>
+                  <p className="text-[9.5px]" style={{ color: 'var(--color-text-muted)' }}>
+                    {slices.length} {slices.length === 1 ? 'category' : 'categories'}
+                  </p>
+                </div>
+              </div>
+
+              {([{ label: 'Top category', s: top }, ...(smallest ? [{ label: 'Smallest category', s: smallest }] : [])]).map(({ label, s }) => (
                 <div key={label} className="flex items-center gap-2.5 rounded-xl py-2 px-3 min-w-0"
                   style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${s.color} 4%, transparent)` }}>
                   <IconChip slice={s} />
