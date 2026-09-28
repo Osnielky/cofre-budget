@@ -75,6 +75,9 @@ PLAID_ENV                 # sandbox | development | production
 PLAID_WEBHOOK_URL          # e.g. https://<host>/api/plaid/webhook — enables automatic sync
 PLAID_OAUTH_REDIRECT_URI   # e.g. https://<host>/settings/plaid-oauth-redirect — must also be
                             # registered in the Plaid dashboard's Allowed redirect URIs
+PROXY_SHARED_SECRET        # optional locally; set on BOTH Cloud Run services. The web
+                            # middleware forwards the client IP to the API with it so rate
+                            # limits are per client, not per web-service address
 ```
 
 `NEXT_PUBLIC_API_URL` in the web app defaults to `http://localhost:3333/api`.

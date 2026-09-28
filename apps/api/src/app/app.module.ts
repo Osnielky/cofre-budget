@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ClientIpThrottlerGuard } from '../common/client-ip-throttler.guard';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import databaseConfig from '../config/database.config';
@@ -25,7 +26,7 @@ import { HealthController } from '../health/health.controller';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [databaseConfig] }),
-    // Global rate limiting: 100 requests per minute per IP
+    // Global rate limiting: 100 requests per minute per client IP (see ClientIpThrottlerGuard)
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -50,8 +51,8 @@ import { HealthController } from '../health/health.controller';
   ],
   controllers: [HealthController],
   providers: [
-    // Apply ThrottlerGuard globally — all routes inherit the 100 req/min default
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Apply globally — all routes inherit the 100 req/min default
+    { provide: APP_GUARD, useClass: ClientIpThrottlerGuard },
   ],
 })
 export class AppModule {}

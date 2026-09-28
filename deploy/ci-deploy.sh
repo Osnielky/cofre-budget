@@ -11,6 +11,8 @@
 # Secrets required in Secret Manager (this script references them; it does not
 # create them): DB_PASS JWT_SECRET GOOGLE_CLIENT_SECRET RESEND_API_KEY
 # PLAID_SECRET STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET ANTHROPIC_API_KEY
+# PROXY_SHARED_SECRET (both services: web forwards the client IP to the API
+# with it, the API trusts that IP for rate limiting only when it matches)
 #
 set -euo pipefail
 
@@ -23,7 +25,7 @@ gcloud run deploy cofre-api \
   --min-instances=0 --max-instances=2 --memory=512Mi \
   --add-cloudsql-instances "${SQL_CONN}" \
   --set-env-vars "NODE_ENV=production,DB_HOST=/cloudsql/${SQL_CONN},DB_PORT=5432,DB_USER=${DB_USER},DB_NAME=${DB_NAME},JWT_EXPIRES_IN=7d,GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},MAIL_FROM=${MAIL_FROM},PLAID_CLIENT_ID=${PLAID_CLIENT_ID},PLAID_ENV=production,STRIPE_PRICE_PRO_MONTHLY=${STRIPE_PRICE_PRO_MONTHLY},STRIPE_PRICE_PRO_YEARLY=${STRIPE_PRICE_PRO_YEARLY},STRIPE_PRICE_ELITE_MONTHLY=${STRIPE_PRICE_ELITE_MONTHLY},STRIPE_PRICE_ELITE_YEARLY=${STRIPE_PRICE_ELITE_YEARLY}" \
-  --set-secrets "DB_PASS=DB_PASS:latest,JWT_SECRET=JWT_SECRET:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,RESEND_API_KEY=RESEND_API_KEY:latest,PLAID_SECRET=PLAID_SECRET:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest"
+  --set-secrets "DB_PASS=DB_PASS:latest,JWT_SECRET=JWT_SECRET:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,RESEND_API_KEY=RESEND_API_KEY:latest,PLAID_SECRET=PLAID_SECRET:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,PROXY_SHARED_SECRET=PROXY_SHARED_SECRET:latest"
 
 API_URL="$(gcloud run services describe cofre-api --region "${REGION}" --format='value(status.url)')"
 echo "  API at ${API_URL}"
@@ -32,7 +34,8 @@ echo "▶ Deploying web (proxies /api → ${API_URL})…"
 gcloud run deploy cofre-web \
   --image "${WEB_IMAGE}" --region "${REGION}" --allow-unauthenticated \
   --min-instances=0 --max-instances=2 --memory=512Mi \
-  --set-env-vars "API_PROXY_URL=${API_URL}"
+  --set-env-vars "API_PROXY_URL=${API_URL}" \
+  --set-secrets "PROXY_SHARED_SECRET=PROXY_SHARED_SECRET:latest"
 
 WEB_URL="$(gcloud run services describe cofre-web --region "${REGION}" --format='value(status.url)')"
 echo "  Web at ${WEB_URL}"
