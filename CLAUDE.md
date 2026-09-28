@@ -78,6 +78,8 @@ PLAID_OAUTH_REDIRECT_URI   # e.g. https://<host>/settings/plaid-oauth-redirect â
 PROXY_SHARED_SECRET        # optional locally; set on BOTH Cloud Run services. The web
                             # middleware forwards the client IP to the API with it so rate
                             # limits are per client, not per web-service address
+GOOGLE_CLOUD_PROJECT       # set by ci-deploy.sh; links API log entries to Cloud Trace
+SLOW_REQUEST_MS / SLOW_QUERY_MS / SLOW_EXTERNAL_MS   # optional log thresholds (1000/500/2000)
 ```
 
 `NEXT_PUBLIC_API_URL` in the web app defaults to `http://localhost:3333/api`.
@@ -93,6 +95,12 @@ NestJS modules wired in `app/app.module.ts`:
 | `config/database.config.ts` | TypeORM options via `@nestjs/config`. Entity list lives in `config/entities.ts`; `config/data-source.ts` is the same connection for the TypeORM CLI. **Entities and migrations must be imported explicitly** â€” glob paths don't work in the webpack bundle. |
 | `users/` | `User` entity + `UsersService`. Password column has `select: false`; use `createQueryBuilder().addSelect('user.password')` to load it. |
 | `auth/` | Passport local + JWT strategies. JWT stored as `httpOnly` cookie `access_token`. Login: `POST /api/auth/login`. |
+
+**Logging.** Everything logs as Cloud Logging JSON through `common/logging/`: `CloudLogger`
+backs every `new Logger(Name)`, `requestLoggingMiddleware` writes one line per request and
+holds the request context (request ID, user ID, trace) that every entry picks up, and
+`timed(service, operation, fn)` wraps calls to outside services. Never log bodies, tokens,
+emails or amounts. Queries and alert commands: `docs/observability.md`.
 
 **Key quirks:**
 - `cookie-parser` must be imported as `import cookieParser = require('cookie-parser')` (CommonJS interop).
