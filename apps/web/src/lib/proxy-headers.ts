@@ -9,11 +9,18 @@ export const PROXY_KEY_HEADER = 'x-cofre-proxy-key';
  *
  * Cloud Run's front end appends the caller's address to X-Forwarded-For, so the
  * last entry is the real client; earlier entries are whatever the client sent.
+ * Each proxied request also gets a fresh x-request-id, which the API logs and
+ * echoes back, so one ID follows the request through both services.
  */
-export function proxyRequestHeaders(incoming: Headers, secret: string | undefined): Headers {
+export function proxyRequestHeaders(
+  incoming: Headers,
+  secret: string | undefined,
+  requestId: string = crypto.randomUUID(),
+): Headers {
   const headers = new Headers(incoming);
   headers.delete(PROXY_CLIENT_IP_HEADER);
   headers.delete(PROXY_KEY_HEADER);
+  headers.set('x-request-id', requestId);
 
   const clientIp = incoming.get('x-forwarded-for')?.split(',').map((s) => s.trim()).filter(Boolean).pop();
   if (secret && clientIp) {

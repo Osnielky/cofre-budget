@@ -28,6 +28,12 @@ describe('proxyRequestHeaders', () => {
     expect(out.has(PROXY_KEY_HEADER)).toBe(false);
   });
 
+  it('sets a fresh request id, replacing a client-supplied one', () => {
+    const out = proxyRequestHeaders(new Headers({ 'x-request-id': 'forged' }), SECRET, 'req-fixed-123');
+    expect(out.get('x-request-id')).toBe('req-fixed-123');
+    expect(proxyRequestHeaders(new Headers(), undefined).get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
   it('keeps the rest of the request headers', () => {
     const out = proxyRequestHeaders(new Headers({ cookie: 'access_token=abc', 'x-forwarded-for': '203.0.113.7' }), SECRET);
     expect(out.get('cookie')).toBe('access_token=abc');

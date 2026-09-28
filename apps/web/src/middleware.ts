@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { isUsableSessionToken } from './lib/session-token';
 import { proxyRequestHeaders } from './lib/proxy-headers';
 
-const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/privacy', '/terms', '/report-error', '/pricing'];
+const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/privacy', '/terms', '/report-error', '/report-vitals', '/pricing'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

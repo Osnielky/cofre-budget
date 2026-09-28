@@ -1,15 +1,20 @@
+import type { Instrumentation } from 'next';
+
 /**
  * Next's hook for errors thrown during server rendering, route handlers, or
- * server actions. Logged via console.error so Cloud Run forwards it to Cloud
- * Logging, where GCP Error Reporting auto-detects and groups the stack trace.
+ * server actions. Written as Cloud Logging JSON in Error Reporting's format so
+ * GCP groups the stack trace; the path is logged without its query string.
  */
-export async function onRequestError(
-  error: unknown,
-  request: { path: string; method: string },
-  context: { routerKind: string; routeType: string; routePath: string },
-) {
-  console.error(
-    `[${context.routeType}] ${request.method} ${request.path} (${context.routePath})`,
-    error instanceof Error ? error.stack : error,
-  );
-}
+export const onRequestError: Instrumentation.onRequestError = async (err, request, context) => {
+  const { writeLog, REPORTED_ERROR_TYPE } = await import('./lib/log');
+  const e = err as Error & { digest?: string };
+  writeLog('ERROR', `[${context.routeType}] ${request.method} ${request.path.split('?')[0]} — ${e?.message ?? String(err)}`, {
+    '@type': REPORTED_ERROR_TYPE,
+    ...(e?.stack ? { stack_trace: e.stack } : {}),
+    ...(e?.digest ? { digest: e.digest } : {}),
+    routePath: context.routePath,
+    routeType: context.routeType,
+    routerKind: context.routerKind,
+    source: 'next-server',
+  });
+};
