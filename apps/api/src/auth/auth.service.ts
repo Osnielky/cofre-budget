@@ -18,6 +18,10 @@ export class AuthService {
   private get jwtSecret(): string {
     return this.config.get<string>('JWT_SECRET') as string;
   }
+  // Separate key so a verification link can never pass as any other token.
+  private get verifySecret(): string {
+    return `${this.jwtSecret}:verify-email`;
+  }
   private get frontendUrl(): string {
     return this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }
@@ -32,7 +36,7 @@ export class AuthService {
   login(user: User) {
     const { password: _p, ...safeUser } = user as any;
     return {
-      access_token: this.jwtService.sign({ sub: user.id, email: user.email }),
+      access_token: this.jwtService.sign({ sub: user.id, email: user.email, typ: 'access' }),
       user: safeUser,
     };
   }
@@ -54,7 +58,7 @@ export class AuthService {
   private async sendVerificationLink(user: User): Promise<void> {
     const token = this.jwtService.sign(
       { sub: user.id, purpose: 'verify' },
-      { secret: this.jwtSecret, expiresIn: '24h' },
+      { secret: this.verifySecret, expiresIn: '24h' },
     );
     const link = `${this.frontendUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
     await this.mail.sendVerification(user.email, user.name, link);
@@ -68,7 +72,7 @@ export class AuthService {
   // Returns the FRONTEND_URL the controller should redirect to.
   async verifyEmail(token: string): Promise<string> {
     try {
-      const payload = this.jwtService.verify<{ sub: string; purpose: string }>(token, { secret: this.jwtSecret });
+      const payload = this.jwtService.verify<{ sub: string; purpose: string }>(token, { secret: this.verifySecret });
       if (payload.purpose !== 'verify') throw new Error('bad purpose');
       await this.usersService.markEmailVerified(payload.sub);
       return `${this.frontendUrl}/login?verified=1`;

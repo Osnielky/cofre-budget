@@ -41,6 +41,12 @@ export class GmailService {
     this.encKey = deriveKey(secret);
   }
 
+  // The state travels through Google's redirect URL, so it must not be signed
+  // with the session key — otherwise it could be replayed as a login token.
+  private get stateSecret(): string {
+    return `${this.config.get<string>('JWT_SECRET')}:gmail-oauth-state`;
+  }
+
   private makeOAuth2Client() {
     return new google.auth.OAuth2(
       this.config.get<string>('GOOGLE_CLIENT_ID'),
@@ -50,7 +56,10 @@ export class GmailService {
   }
 
   buildAuthUrl(userId: string, nonce: string): string {
-    const state = this.jwtService.sign({ userId, nonce }, { expiresIn: '5m' });
+    const state = this.jwtService.sign(
+      { userId, nonce, purpose: 'gmail-oauth-state' },
+      { secret: this.stateSecret, expiresIn: '5m' },
+    );
     const client = this.makeOAuth2Client();
     return client.generateAuthUrl({
       access_type: 'offline',
@@ -64,7 +73,10 @@ export class GmailService {
     let userId: string;
     let stateNonce: string;
     try {
-      const payload = this.jwtService.verify(state) as { userId: string; nonce: string };
+      const payload = this.jwtService.verify(state, { secret: this.stateSecret }) as {
+        userId: string; nonce: string; purpose: string;
+      };
+      if (payload.purpose !== 'gmail-oauth-state') throw new Error('bad purpose');
       userId = payload.userId;
       stateNonce = payload.nonce;
     } catch {

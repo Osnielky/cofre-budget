@@ -18,7 +18,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; email: string }) {
+  // Every token the API signs shares JWT_SECRET, so the signature alone doesn't
+  // make a token a session. Only login access tokens carry typ: 'access'.
+  async validate(payload: { sub?: unknown; typ?: unknown }) {
+    if (payload.typ !== 'access' || typeof payload.sub !== 'string' || !payload.sub) return null;
     return this.usersService.findById(payload.sub);
   }
 }

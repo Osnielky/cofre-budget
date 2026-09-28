@@ -11,6 +11,8 @@ export class UsersService {
   ) {}
 
   findById(id: string): Promise<User | null> {
+    // findOneBy drops undefined keys from the WHERE, which would return the first user.
+    if (!id) return Promise.resolve(null);
     return this.repo.findOneBy({ id });
   }
 
