@@ -6,9 +6,15 @@ import * as express from 'express';
 import { AppModule } from './app/app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { configureTrustProxy } from './common/client-ip-throttler.guard';
+import { CloudLogger } from './common/logging/cloud-logger';
+import { requestLoggingMiddleware } from './common/logging/request-logging.middleware';
+import { log, errorFields, describeError } from './common/logging/log';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: false, bufferLogs: true });
+  app.useLogger(new CloudLogger());
+  // First, so every later middleware and handler runs inside the request's log context.
+  app.use(requestLoggingMiddleware);
   configureTrustProxy(app);
   app.use(
     express.json({
@@ -30,5 +36,13 @@ async function bootstrap() {
   await app.listen(port);
   Logger.log(`🚀 API running on: http://localhost:${port}/api`);
 }
+
+process.on('unhandledRejection', (reason) =>
+  log('ERROR', `Unhandled rejection: ${describeError(reason)}`, errorFields(reason)),
+);
+process.on('uncaughtException', (err) => {
+  log('ERROR', `Uncaught exception: ${err.message}`, errorFields(err));
+  process.exit(1);
+});
 
 bootstrap();

@@ -1,40 +1,40 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { log, errorFields, describeError } from '../logging/log';
+import { currentRequestContext } from '../logging/request-context';
 
 /**
- * Catches everything that reaches Nest's exception layer. HttpExceptions pass
- * through with their own response body (only logged if 5xx); anything else is
- * an unexpected bug — its full stack goes to stderr (Cloud Run forwards this
- * to Cloud Logging, where GCP Error Reporting auto-detects and groups it) and
- * the client only ever sees a generic message, never the stack trace.
+ * Catches everything that reaches Nest's exception layer. 5xx and unexpected
+ * errors are logged once with their stack in Error Reporting's format; a
+ * handled 4xx adds its message to the request's log line instead. Clients
+ * never see a stack trace.
  */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  private readonly logger = new Logger('UnhandledException');
-
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const request = ctx.getRequest<Request>();
     const response = ctx.getResponse<Response>();
+    const path = request.url.split('?')[0];
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       if (status >= 500) {
-        this.logger.error(`${request.method} ${request.url} → ${status}`, exception.stack);
+        log('ERROR', `${request.method} ${path} → ${status}: ${exception.message}`, errorFields(exception));
+      } else {
+        const reqCtx = currentRequestContext();
+        if (reqCtx) reqCtx.error = exception.message;
       }
       response.status(status).json(exception.getResponse());
       return;
     }
 
-    this.logger.error(
-      `${request.method} ${request.url} → 500`,
-      exception instanceof Error ? exception.stack : String(exception),
-    );
+    log('ERROR', `${request.method} ${path} → 500: ${describeError(exception)}`, errorFields(exception));
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
       message: 'Internal server error',
       timestamp: new Date().toISOString(),
-      path: request.url,
+      path,
     });
   }
 }
