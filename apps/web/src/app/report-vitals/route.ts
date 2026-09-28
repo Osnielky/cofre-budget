@@ -1,16 +1,10 @@
 import { parseVital } from '@/lib/web-vitals';
 import { writeLog } from '@/lib/log';
+import { readJsonBody } from '@/lib/report-body';
 
-/** Real-user Core Web Vitals from WebVitals.tsx (sendBeacon, text body). */
+/** Real-user Core Web Vitals from WebVitals.tsx (sendBeacon, text body). Public, so size-capped. */
 export async function POST(request: Request) {
-  const text = await request.text().catch(() => '');
-  let body: unknown = null;
-  try {
-    body = JSON.parse(text);
-  } catch {
-    // not JSON — dropped by parseVital below
-  }
-  const vital = parseVital(body);
+  const vital = parseVital(await readJsonBody(request, 2048));
   if (vital) {
     writeLog(vital.rating === 'poor' ? 'WARNING' : 'INFO', `web-vital ${vital.name} ${Math.round(vital.value)} ${vital.page}`, {
       webVital: vital,

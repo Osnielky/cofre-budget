@@ -18,12 +18,29 @@ export function setLogSink(next: Sink | null): void {
 
 const pretty = () => process.env.NODE_ENV !== 'production' && sink === defaultSink;
 
+const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+
+/**
+ * Masks email addresses anywhere in an entry — SDK error messages quote them
+ * (Stripe: "Invalid email address: …"). Depth-limited and cycle-safe.
+ */
+function redact(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+  if (typeof value === 'string') return value.replace(EMAIL, '[email]');
+  if (!value || typeof value !== 'object' || depth > 6) return value;
+  if (seen.has(value)) return '[circular]';
+  seen.add(value);
+  if (Array.isArray(value)) return value.map((v) => redact(v, depth + 1, seen));
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(value)) out[k] = redact(v, depth + 1, seen);
+  return out;
+}
+
 /**
  * One JSON object per line — the shape Cloud Logging parses into severity,
  * message, trace link and jsonPayload fields. Never throws.
  */
 export function log(severity: Severity, message: string, fields: Record<string, unknown> = {}): void {
-  const entry: Record<string, unknown> = { severity, message, time: new Date().toISOString(), ...fields };
+  const entry = redact({ severity, message, time: new Date().toISOString(), ...fields }) as Record<string, unknown>;
   const ctx = currentRequestContext();
   if (ctx) {
     entry.requestId = ctx.requestId;

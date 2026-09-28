@@ -27,6 +27,6 @@ export function parseVital(body: unknown): Vital | null {
   if (typeof name !== 'string' || !NAMES.has(name)) return null;
   if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   if (typeof rating !== 'string' || !RATINGS.has(rating)) return null;
-  if (typeof page !== 'string' || !page.startsWith('/')) return null;
+  if (typeof page !== 'string' || !page.startsWith('/') || page.length > 500) return null;
   return { name, value, rating, page: normalizePage(page) };
 }

@@ -164,7 +164,7 @@ export class GmailService {
 
     const messages = listRes.data.messages ?? [];
     const results: RawReceipt[] = [];
-    this.logger.log(`Gmail search "${query}" matched ${messages.length} message(s) for user ${userId}`);
+    this.logger.log(`Gmail receipt search matched ${messages.length} message(s)`);
 
     for (const msg of messages) {
       if (!msg.id) continue;
@@ -175,18 +175,18 @@ export class GmailService {
       const dateHeader = this.extractHeader(headers, 'Date') || null;
       const body = this.extractBody(full.data.payload);
       if (!body) {
-        this.logger.warn(`No text/html body extracted for message ${msg.id} ("${subject}"), mimeType=${full.data.payload?.mimeType}, skipping`);
+        this.logger.warn(`No text/html body extracted for message ${msg.id}, mimeType=${full.data.payload?.mimeType}, skipping`);
         continue;
       }
       let parsed: ReturnType<typeof parseReceiptEmail>;
       try {
         parsed = parseReceiptEmail({ html: body, subject, from, dateHeader });
       } catch (err) {
-        this.logger.warn(`Failed to parse message ${msg.id} ("${subject}"): ${(err as Error)?.message}, skipping`);
+        this.logger.warn(`Failed to parse message ${msg.id}: ${(err as Error)?.message}, skipping`);
         continue;
       }
       if (!parsed) {
-        this.logger.warn(`No total found in message ${msg.id} ("${subject}"), skipping — likely not a receipt`);
+        this.logger.warn(`No total found in message ${msg.id}, skipping — likely not a receipt`);
         continue;
       }
       results.push({ gmailMessageId: msg.id, subject, ...parsed });

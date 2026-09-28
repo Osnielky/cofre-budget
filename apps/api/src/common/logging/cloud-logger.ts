@@ -24,6 +24,9 @@ export class CloudLogger implements LoggerService {
     if (severity === 'ERROR') {
       const cause = message instanceof Error ? message : args.find((a) => a instanceof Error || typeof a === 'string');
       Object.assign(fields, errorFields(cause ?? message));
+      // e.g. Plaid's err.response.data: error_code, error_message, request_id.
+      const details = args.filter((a) => a !== cause && !(a instanceof Error) && typeof a !== 'string');
+      if (details.length) fields.details = details;
     } else if (args.length) {
       fields.details = args.map((a) => (a instanceof Error ? a.message : a));
     }

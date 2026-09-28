@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { BadRequestException, Controller, Get, Module, INestApplication } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Module, INestApplication, Res } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { requestLoggingMiddleware, traceField } from './request-logging.middleware';
 import { setLogSink } from './log';
@@ -17,11 +17,20 @@ class Routes {
   health() { return { status: 'ok' }; }
   async slow() { await new Promise((r) => setTimeout(r, 30)); return {}; }
   me() { setRequestUser('user-9'); return {}; }
+  async stream(res: any) {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.write('data: hi\n\n');
+    await new Promise((r) => setTimeout(r, 30));
+    res.end();
+  }
+  async hang() { await new Promise((r) => setTimeout(r, 200)); return {}; }
 }
 const route = (path: string, key: keyof Routes) =>
   Get(path)(Routes.prototype, key, Object.getOwnPropertyDescriptor(Routes.prototype, key)!);
 route('ok', 'ok'); route('items/:id', 'item'); route('boom', 'boom'); route('bad', 'bad');
 route('throws-string', 'throwsString'); route('health', 'health'); route('slow', 'slow'); route('me', 'me');
+route('stream', 'stream'); route('hang', 'hang');
+Res()(Routes.prototype, 'stream', 0);
 Controller()(Routes);
 class TestModule {}
 Module({ controllers: [Routes] })(TestModule);
@@ -111,6 +120,29 @@ describe('request logging', () => {
   it('skips successful health checks', async () => {
     await get('/api/health');
     expect(requestLines()).toHaveLength(0);
+  });
+
+  it('does not flag a streamed response as slow — it is held open on purpose', async () => {
+    process.env.SLOW_REQUEST_MS = '20';
+    try {
+      await get('/api/stream');
+    } finally {
+      delete process.env.SLOW_REQUEST_MS;
+    }
+    expect(requestLines()[0]).toMatchObject({ severity: 'INFO', route: '/api/stream' });
+    expect(requestLines()[0].slow).toBeUndefined();
+  });
+
+  it('logs a request the client abandoned before the response finished', async () => {
+    const ctrl = new AbortController();
+    const pending = fetch(`${base}/api/hang`, { signal: ctrl.signal }).catch(() => null);
+    await new Promise((r) => setTimeout(r, 30));
+    ctrl.abort();
+    await pending;
+    await new Promise((r) => setTimeout(r, 250));
+    expect(requestLines()).toHaveLength(1);
+    expect(requestLines()[0]).toMatchObject({ severity: 'WARNING', aborted: true, route: '/api/hang' });
+    expect(requestLines()[0].httpRequest.status).toBe(499);
   });
 
   it('carries the authenticated user id', async () => {

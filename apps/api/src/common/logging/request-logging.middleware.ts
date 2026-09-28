@@ -29,18 +29,30 @@ export function requestLoggingMiddleware(req: Request, res: Response, next: Next
     trace: traceField(req.headers['x-cloud-trace-context'], process.env.GOOGLE_CLOUD_PROJECT),
   };
   const start = process.hrtime.bigint();
-  res.on('finish', () => runWithRequestContext(ctx, () => logRequest(req, res, ctx, start)));
+  let logged = false;
+  const done = (aborted: boolean) => {
+    if (logged) return;
+    logged = true;
+    runWithRequestContext(ctx, () => logRequest(req, res, ctx, start, aborted));
+  };
+  res.on('finish', () => done(false));
+  // A client or Cloud Run's front end hanging up first emits 'close' without
+  // 'finish' — those are often the slowest requests, so they must still log.
+  res.on('close', () => done(!res.writableFinished));
   runWithRequestContext(ctx, next);
 }
 
-function logRequest(req: Request, res: Response, ctx: RequestContext, start: bigint): void {
+function logRequest(req: Request, res: Response, ctx: RequestContext, start: bigint, aborted: boolean): void {
   const path = (req.originalUrl ?? req.url).split('?')[0];
-  const status = res.statusCode;
+  // 499 = client closed the request (nginx's convention; Cloud Logging shows it as-is).
+  const status = aborted ? 499 : res.statusCode;
   if (path === '/api/health' && status < 400) return;
 
   const latencyMs = Number(process.hrtime.bigint() - start) / 1e6;
   const route = req.route?.path ? `${req.baseUrl ?? ''}${req.route.path}` : undefined;
-  const slow = latencyMs >= slowMs();
+  // Server-sent event streams (AI chat) stay open on purpose; their length isn't slowness.
+  const streaming = String(res.getHeader('content-type') ?? '').startsWith('text/event-stream');
+  const slow = !streaming && latencyMs >= slowMs();
   const severity: Severity = status >= 500 ? 'ERROR' : status >= 400 || slow ? 'WARNING' : 'INFO';
 
   log(severity, `${req.method} ${route ?? path} ${status} ${Math.round(latencyMs)}ms`, {
@@ -55,6 +67,8 @@ function logRequest(req: Request, res: Response, ctx: RequestContext, start: big
     route,
     latencyMs: Math.round(latencyMs),
     ...(slow ? { slow: true } : {}),
+    ...(streaming ? { streaming: true } : {}),
+    ...(aborted ? { aborted: true } : {}),
     ...(ctx.error ? { error: ctx.error } : {}),
   });
 }

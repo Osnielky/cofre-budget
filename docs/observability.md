@@ -12,7 +12,7 @@ appear only by their internal ID.
 
 | Entry | Service | Key fields | Severity |
 |---|---|---|---|
-| One line per API request | cofre-api | `httpRequest` (method, url, status, latency, remoteIp), `route` (e.g. `/api/transactions/:id`), `latencyMs`, `requestId`, `userId`, `slow`, `error` (4xx message) | INFO; WARNING for 4xx or ≥ `SLOW_REQUEST_MS`; ERROR for 5xx |
+| One line per API request | cofre-api | `httpRequest` (method, url, status, latency, remoteIp — Cloud Logging lifts this to the entry's top-level `httpRequest`), `route` (e.g. `/api/transactions/:id`), `latencyMs`, `requestId`, `userId`, `slow`, `streaming` (AI chat, never `slow`), `aborted` (client hung up; status 499), `error` (4xx message) | INFO; WARNING for 4xx, 499 or ≥ `SLOW_REQUEST_MS`; ERROR for 5xx |
 | API error with stack | cofre-api | `stack_trace`, `requestId`, `userId` | ERROR (Error Reporting) |
 | Slow / failed DB query | cofre-api | `dbSlowQuery` or `dbQueryError`, `durationMs`, `sql` | WARNING |
 | Outside service call | cofre-api | `external.{service, operation, durationMs, ok, slow, error, errorCode}` — services: plaid, stripe, anthropic, gmail, resend | INFO; WARNING if slow; ERROR if it failed |
@@ -22,7 +22,10 @@ appear only by their internal ID.
 | Real-user page speed | cofre-web | `webVital.{name, value, rating, page}` — LCP, INP, CLS, FCP, TTFB | INFO; WARNING when `rating` is `poor` |
 
 Every API response carries an `x-request-id` header. The web app creates the ID
-for each proxied request, so one ID follows a request through both services.
+for each request it proxies and the API logs it, so the ID from a response
+header finds every API entry for that request. (The web service doesn't write
+its own line per proxied request.) Email addresses are masked as `[email]` in
+every API entry, including SDK error messages.
 
 Thresholds are env vars on cofre-api: `SLOW_REQUEST_MS` (1000), `SLOW_QUERY_MS`
 (500), `SLOW_EXTERNAL_MS` (2000; the AI chat uses 30000).
@@ -41,8 +44,11 @@ jsonPayload.userId="PASTE-USER-ID"
 # Slow API requests
 resource.labels.service_name="cofre-api" jsonPayload.slow=true
 
-# 5xx responses
-resource.labels.service_name="cofre-api" jsonPayload.httpRequest.status>=500
+# 5xx responses (httpRequest is a top-level field, not under jsonPayload)
+resource.labels.service_name="cofre-api" httpRequest.status>=500
+
+# Requests the client abandoned (timeouts, closed tabs)
+resource.labels.service_name="cofre-api" jsonPayload.aborted=true
 
 # Slow database queries
 jsonPayload.dbSlowQuery=true
@@ -76,7 +82,7 @@ ALERT_EMAIL=you@example.com   # where alerts go
 cat > /tmp/api-latency.yaml <<'EOF'
 name: api_request_latency
 description: API request latency in ms, by route
-filter: resource.type="cloud_run_revision" AND resource.labels.service_name="cofre-api" AND jsonPayload.latencyMs>=0
+filter: resource.type="cloud_run_revision" AND resource.labels.service_name="cofre-api" AND jsonPayload.latencyMs>=0 AND NOT jsonPayload.streaming=true
 valueExtractor: EXTRACT(jsonPayload.latencyMs)
 labelExtractors:
   route: EXTRACT(jsonPayload.route)
@@ -95,16 +101,27 @@ EOF
 gcloud logging metrics create api_request_latency --project=$PROJECT --config-from-file=/tmp/api-latency.yaml
 ```
 
-View it in Metrics Explorer: metric `logging/user/api_request_latency`, aggregation
+Streamed AI chat responses are left out: they stay open for the whole answer on
+purpose and would dominate every percentile. View the metric in Metrics Explorer: metric `logging/user/api_request_latency`, aggregation
 95th percentile, group by `route`. That shows the slowest routes first.
 
 ### 2. Error count (log-based metric)
 
 ```bash
 gcloud logging metrics create cofre_errors --project=$PROJECT \
-  --description="ERROR entries from cofre-api and cofre-web" \
-  --log-filter='resource.type="cloud_run_revision" AND resource.labels.service_name=("cofre-api" OR "cofre-web") AND severity>=ERROR'
+  --description="Server-side ERROR entries from cofre-api and cofre-web" \
+  --log-filter='resource.type="cloud_run_revision" AND resource.labels.service_name=("cofre-api" OR "cofre-web") AND severity>=ERROR AND NOT jsonPayload.source="browser"'
+
+gcloud logging metrics create cofre_browser_errors --project=$PROJECT \
+  --description="Browser error reports posted to /report-error" \
+  --log-filter='resource.type="cloud_run_revision" AND resource.labels.service_name="cofre-web" AND jsonPayload.source="browser"'
 ```
+
+Browser reports get their own metric because `/report-error` is public: anyone
+can post to it, so it must not be able to trip the server-error alert. One
+failing request usually writes 2–3 ERROR entries (the outside-call line, the
+error with its stack, the request line), so "more than 5" below is about two
+or three failed requests.
 
 ### 3. Email channel for alerts
 
@@ -139,6 +156,10 @@ conditions:
 EOF
 gcloud alpha monitoring policies create --project=$PROJECT --policy-from-file=/tmp/alert-errors.yaml
 ```
+
+To alert on browser errors too, copy the file above with
+`logging.googleapis.com/user/cofre_browser_errors`, a higher `thresholdValue`
+(say 20) and a different `displayName`.
 
 ### 5. Alert: API getting slow
 

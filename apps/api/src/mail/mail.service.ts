@@ -82,12 +82,22 @@ export class MailService {
     await this.sendPlain(to, 'Your balance statement', `Statement for ${esc(borrowerName)}`, body);
   }
 
+  // Resend's SDK never throws — a rejected key, unverified domain or rate limit
+  // comes back as { error } — so turn that into a failure timed() and callers see.
+  private async deliver(to: string, subject: string, html: string): Promise<void> {
+    await timed('resend', 'emails.send', async () => {
+      const result = await this.resend!.emails.send({ from: this.from, to, subject, html });
+      if (result.error) throw Object.assign(new Error(result.error.message), { code: result.error.name });
+      return result;
+    });
+  }
+
   private async sendPlain(to: string, subject: string, heading: string, bodyHtml: string): Promise<void> {
-    if (!this.resend) { this.logger.warn(`[dev] email not sent (no RESEND_API_KEY): "${subject}" → ${to}`); return; }
+    if (!this.resend) { this.logger.warn(`[dev] email not sent (no RESEND_API_KEY): "${subject}"`); return; }
     try {
-      await timed('resend', 'emails.send', () => this.resend.emails.send({ from: this.from, to, subject, html: this.templatePlain(heading, bodyHtml) }));
+      await this.deliver(to, subject, this.templatePlain(heading, bodyHtml));
     } catch (err) {
-      this.logger.error(`Failed to send "${subject}" to ${to}`, err as Error);
+      this.logger.error(`Failed to send "${subject}"`, err as Error);
       throw err;
     }
   }
@@ -111,11 +121,11 @@ export class MailService {
   }
 
   private async send(to: string, subject: string, heading: string, body: string, cta: string, link: string): Promise<void> {
-    if (!this.resend) { this.logger.warn(`[dev] email not sent (no RESEND_API_KEY): "${subject}" → ${to}`); return; }
+    if (!this.resend) { this.logger.warn(`[dev] email not sent (no RESEND_API_KEY): "${subject}"`); return; }
     try {
-      await timed('resend', 'emails.send', () => this.resend.emails.send({ from: this.from, to, subject, html: this.template(heading, body, cta, link) }));
+      await this.deliver(to, subject, this.template(heading, body, cta, link));
     } catch (err) {
-      this.logger.error(`Failed to send "${subject}" to ${to}`, err as Error);
+      this.logger.error(`Failed to send "${subject}"`, err as Error);
       throw err;
     }
   }

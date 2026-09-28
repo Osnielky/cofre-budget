@@ -35,6 +35,15 @@ describe('log()', () => {
   });
 });
 
+describe('email redaction', () => {
+  it('masks email addresses in the message and in string fields', () => {
+    log('WARNING', 'Invalid email address: owner@cofre.dev', { external: { error: 'Invalid email address: owner@cofre.dev' } });
+    expect(JSON.stringify(lines[0])).not.toContain('owner@cofre.dev');
+    expect(lines[0].message).toBe('Invalid email address: [email]');
+    expect(lines[0].external.error).toBe('Invalid email address: [email]');
+  });
+});
+
 describe('errorFields()', () => {
   it('marks the entry for Error Reporting with the stack', () => {
     const f = errorFields(new Error('boom'));
@@ -68,6 +77,11 @@ describe('CloudLogger', () => {
   it('logs error(message, errorObject, context)', () => {
     logger.error('sync failed', new Error('inner'), 'PlaidService');
     expect(lines[0].stack_trace).toContain('inner');
+  });
+
+  it('keeps a plain-object detail passed to error()', () => {
+    logger.error('linkTokenCreate failed', { error_code: 'INVALID_FIELD', error_message: 'client_name is required' }, 'PlaidService');
+    expect(lines[0].details).toEqual([{ error_code: 'INVALID_FIELD', error_message: 'client_name is required' }]);
   });
 
   it('logs an object message as JSON text', () => {

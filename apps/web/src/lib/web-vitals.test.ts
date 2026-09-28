@@ -16,6 +16,10 @@ describe('parseVital', () => {
     expect(parseVital({ name: 'LCP', value: 1, rating: 'good', page: 'https://evil.example' })).toBeNull();
   });
 
+  it('rejects an oversized page', () => {
+    expect(parseVital({ name: 'LCP', value: 1, rating: 'good', page: '/' + 'a'.repeat(5000) })).toBeNull();
+  });
+
   it('normalises the page so ids do not fragment it', () => {
     expect(parseVital({ name: 'INP', value: 90, rating: 'good', page: '/projects/123e4567-e89b-42d3-a456-426614174000?tab=1' })!.page)
       .toBe('/projects/:id');
