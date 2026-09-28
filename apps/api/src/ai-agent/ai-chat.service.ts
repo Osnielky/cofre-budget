@@ -5,6 +5,7 @@ import { AiConversationsService } from './ai-conversations.service';
 import { AiReadToolsService } from './ai-read-tools.service';
 import { AiProposeToolsService } from './ai-propose-tools.service';
 import type { AiMessageWidget, SavingsTrendWidgetData, SafeToSpendWidgetData } from './ai-message.entity';
+import { timed } from '../common/logging/timed';
 
 const MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 8192;
@@ -206,15 +207,18 @@ export class AiChatService {
       stream: true,
     });
 
-    for await (const messageStream of runner) {
-      for await (const event of messageStream) {
-        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-          onTextDelta(event.delta.text);
+    // The whole streamed exchange, tool rounds included — slow by nature, so a
+    // higher bar than other outside calls before it counts as slow.
+    const finalMessage = await timed('anthropic', 'chat', async () => {
+      for await (const messageStream of runner) {
+        for await (const event of messageStream) {
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+            onTextDelta(event.delta.text);
+          }
         }
       }
-    }
-
-    const finalMessage = await runner.done();
+      return runner.done();
+    }, { slowMs: 30_000 });
     const text = finalMessage.content
       .filter((b): b is Anthropic.Beta.Messages.BetaTextBlock => b.type === 'text')
       .map((b) => b.text)

@@ -6,6 +6,7 @@ import Stripe from 'stripe';
 import { User } from '../users/user.entity';
 import { Subscription } from './subscription.entity';
 import { mapStripeSubscription, PriceIdMap } from './billing.mapping';
+import { timed } from '../common/logging/timed';
 
 @Injectable()
 export class BillingService {
@@ -60,7 +61,7 @@ export class BillingService {
   async getOrCreateCustomer(userId: string): Promise<string> {
     const user = await this.users.findOneByOrFail({ id: userId });
     if (user.stripeCustomerId) return user.stripeCustomerId;
-    const customer = await this.stripe.customers.create({ email: user.email, metadata: { userId } });
+    const customer = await timed('stripe', 'customers.create', () => this.stripe.customers.create({ email: user.email, metadata: { userId } }));
     await this.users.update(userId, { stripeCustomerId: customer.id });
     return customer.id;
   }
@@ -73,14 +74,14 @@ export class BillingService {
       );
     }
     const customerId = await this.getOrCreateCustomer(userId);
-    const session = await this.stripe.checkout.sessions.create({
+    const session = await timed('stripe', 'checkout.sessions.create', () => this.stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       line_items: [{ price: this.priceIdFor(tier, interval), quantity: 1 }],
       subscription_data: { trial_period_days: 15 },
       success_url: `${this.frontendUrl}/settings?checkout=success`,
       cancel_url: `${this.frontendUrl}/pricing`,
-    });
+    }));
     if (!session.url) throw new Error('Stripe did not return a Checkout URL');
     return { url: session.url };
   }
@@ -116,33 +117,33 @@ export class BillingService {
 
   async switchTier(userId: string, tier: 'pro' | 'elite', interval: 'month' | 'year'): Promise<void> {
     const existing = await this.subs.findOneByOrFail({ userId });
-    const stripeSub = await this.stripe.subscriptions.retrieve(existing.stripeSubscriptionId);
+    const stripeSub = await timed('stripe', 'subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(existing.stripeSubscriptionId));
     const itemId = stripeSub.items.data[0].id;
-    await this.stripe.subscriptions.update(existing.stripeSubscriptionId, {
+    await timed('stripe', 'subscriptions.update', () => this.stripe.subscriptions.update(existing.stripeSubscriptionId, {
       items: [{ id: itemId, price: this.priceIdFor(tier, interval) }],
       proration_behavior: 'create_prorations',
-    });
+    }));
     // The customer.subscription.updated webhook is what actually persists the change.
   }
 
   async cancel(userId: string): Promise<void> {
     const existing = await this.subs.findOneByOrFail({ userId });
-    await this.stripe.subscriptions.update(existing.stripeSubscriptionId, { cancel_at_period_end: true });
+    await timed('stripe', 'subscriptions.update', () => this.stripe.subscriptions.update(existing.stripeSubscriptionId, { cancel_at_period_end: true }));
   }
 
   async createPortalLink(userId: string): Promise<{ url: string }> {
     const user = await this.users.findOneByOrFail({ id: userId });
     if (!user.stripeCustomerId) throw new Error('User has no Stripe customer yet');
-    const session = await this.stripe.billingPortal.sessions.create({
+    const session = await timed('stripe', 'billingPortal.sessions.create', () => this.stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
       return_url: `${this.frontendUrl}/settings`,
       flow_data: { type: 'payment_method_update' },
-    });
+    }));
     return { url: session.url };
   }
 
   async retrieveSubscription(id: string): Promise<Stripe.Subscription> {
-    return this.stripe.subscriptions.retrieve(id);
+    return timed('stripe', 'subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(id));
   }
 
   async getCustomerContact(stripeCustomerId: string): Promise<{ email: string; name: string } | null> {
@@ -151,11 +152,11 @@ export class BillingService {
   }
 
   async createPortalLinkForCustomer(stripeCustomerId: string): Promise<{ url: string }> {
-    const session = await this.stripe.billingPortal.sessions.create({
+    const session = await timed('stripe', 'billingPortal.sessions.create', () => this.stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
       return_url: `${this.frontendUrl}/settings`,
       flow_data: { type: 'payment_method_update' },
-    });
+    }));
     return { url: session.url };
   }
 }

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
+import { timed } from '../common/logging/timed';
 
 function money(n: number): string {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -84,7 +85,7 @@ export class MailService {
   private async sendPlain(to: string, subject: string, heading: string, bodyHtml: string): Promise<void> {
     if (!this.resend) { this.logger.warn(`[dev] email not sent (no RESEND_API_KEY): "${subject}" → ${to}`); return; }
     try {
-      await this.resend.emails.send({ from: this.from, to, subject, html: this.templatePlain(heading, bodyHtml) });
+      await timed('resend', 'emails.send', () => this.resend.emails.send({ from: this.from, to, subject, html: this.templatePlain(heading, bodyHtml) }));
     } catch (err) {
       this.logger.error(`Failed to send "${subject}" to ${to}`, err as Error);
       throw err;
@@ -112,7 +113,7 @@ export class MailService {
   private async send(to: string, subject: string, heading: string, body: string, cta: string, link: string): Promise<void> {
     if (!this.resend) { this.logger.warn(`[dev] email not sent (no RESEND_API_KEY): "${subject}" → ${to}`); return; }
     try {
-      await this.resend.emails.send({ from: this.from, to, subject, html: this.template(heading, body, cta, link) });
+      await timed('resend', 'emails.send', () => this.resend.emails.send({ from: this.from, to, subject, html: this.template(heading, body, cta, link) }));
     } catch (err) {
       this.logger.error(`Failed to send "${subject}" to ${to}`, err as Error);
       throw err;

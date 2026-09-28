@@ -15,6 +15,7 @@ import { Transaction } from '../transactions/transaction.entity';
 import { User } from '../users/user.entity';
 import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.util';
 import { CategorizationRulesService } from '../categorization-rules/categorization-rules.service';
+import { timed } from '../common/logging/timed';
 
 export interface PreviewAccount {
   plaidAccountId: string;
@@ -80,7 +81,7 @@ export class PlaidService {
     if (!user) throw new NotFoundException('User not found');
     if (user.plaidUserId) return user.plaidUserId;
 
-    const res = await this.client.userCreate({ client_user_id: userId });
+    const res = await timed('plaid', 'userCreate', () => this.client.userCreate({ client_user_id: userId }));
     user.plaidUserId = res.data.user_id;
     await this.userRepo.save(user);
     return user.plaidUserId;
@@ -91,7 +92,7 @@ export class PlaidService {
     const webhook = this.config.get<string>('PLAID_WEBHOOK_URL');
     const redirectUri = this.config.get<string>('PLAID_OAUTH_REDIRECT_URI');
     try {
-      const res = await this.client.linkTokenCreate({
+      const res = await timed('plaid', 'linkTokenCreate', () => this.client.linkTokenCreate({
         user_id: plaidUserId,
         client_name: 'Cofre Budget',
         products: [Products.Transactions],
@@ -99,7 +100,7 @@ export class PlaidService {
         language: 'en',
         ...(webhook ? { webhook } : {}),
         ...(redirectUri ? { redirect_uri: redirectUri } : {}),
-      });
+      }));
       return res.data.link_token;
     } catch (err) {
       this.logger.error('linkTokenCreate failed', (err as any)?.response?.data ?? err);
@@ -120,7 +121,7 @@ export class PlaidService {
     institutionName: string,
     plan: 'free' | 'pro' | 'elite',
   ): Promise<PreviewExchangeResult> {
-    const exchangeRes = await this.client.itemPublicTokenExchange({ public_token: publicToken });
+    const exchangeRes = await timed('plaid', 'itemPublicTokenExchange', () => this.client.itemPublicTokenExchange({ public_token: publicToken }));
     const { access_token, item_id } = exchangeRes.data;
 
     let item = await this.itemRepo.findOneBy({ itemId: item_id });
@@ -128,7 +129,7 @@ export class PlaidService {
       if (plan === 'pro') {
         const count = await this.itemRepo.count({ where: { userId } });
         if (count >= 4) {
-          await this.client.itemRemove({ access_token });
+          await timed('plaid', 'itemRemove', () => this.client.itemRemove({ access_token }));
           throw new ForbiddenException({
             message: 'Pro is limited to 4 linked institutions — upgrade to Elite for unlimited.',
             code: 'INSTITUTION_LIMIT_REACHED',
@@ -141,7 +142,7 @@ export class PlaidService {
     await this.itemRepo.save(item);
 
     const manualAccounts = await this.accountRepo.find({ where: { userId, provider: 'manual' } });
-    const balanceRes = await this.client.accountsBalanceGet({ access_token });
+    const balanceRes = await timed('plaid', 'accountsBalanceGet', () => this.client.accountsBalanceGet({ access_token }));
     const accounts: PreviewAccount[] = [];
 
     for (const pa of balanceRes.data.accounts) {
@@ -196,7 +197,7 @@ export class PlaidService {
     if (!item) throw new NotFoundException('Bank connection not found');
 
     const accessToken = decryptToken(item.accessToken, this.encKey);
-    const balanceRes = await this.client.accountsBalanceGet({ access_token: accessToken });
+    const balanceRes = await timed('plaid', 'accountsBalanceGet', () => this.client.accountsBalanceGet({ access_token: accessToken }));
     const byId = new Map(balanceRes.data.accounts.map((a) => [a.account_id, a]));
 
     const accounts: BankAccount[] = [];
@@ -252,7 +253,7 @@ export class PlaidService {
     await this.runSync(item, accessToken);
 
     /* Refresh balances */
-    const balanceRes = await this.client.accountsBalanceGet({ access_token: accessToken });
+    const balanceRes = await timed('plaid', 'accountsBalanceGet', () => this.client.accountsBalanceGet({ access_token: accessToken }));
     for (const pa of balanceRes.data.accounts) {
       const account = await this.accountRepo.findOneBy({ plaidAccountId: pa.account_id });
       if (account) {
@@ -326,7 +327,7 @@ export class PlaidService {
       };
 
       while (hasMore) {
-        const res = await this.client.transactionsSync({ access_token: accessToken, cursor });
+        const res = await timed('plaid', 'transactionsSync', () => this.client.transactionsSync({ access_token: accessToken, cursor }));
 
         for (const pt of [...res.data.added, ...res.data.modified]) {
           const account = await getAccount(pt.account_id);
@@ -434,7 +435,7 @@ export class PlaidService {
 
     try {
       const accessToken = decryptToken(item.accessToken, this.encKey);
-      await this.client.itemRemove({ access_token: accessToken });
+      await timed('plaid', 'itemRemove', () => this.client.itemRemove({ access_token: accessToken }));
       await this.itemRepo.remove(item);
     } catch (err) {
       this.logger.error(`Failed to remove Plaid item ${item.itemId}`, err);
@@ -456,7 +457,7 @@ export class PlaidService {
     const webhook = this.config.get<string>('PLAID_WEBHOOK_URL');
     const redirectUri = this.config.get<string>('PLAID_OAUTH_REDIRECT_URI');
     try {
-      const res = await this.client.linkTokenCreate({
+      const res = await timed('plaid', 'linkTokenCreate', () => this.client.linkTokenCreate({
         user_id: plaidUserId,
         client_name: 'Cofre Budget',
         access_token: accessToken,
@@ -464,7 +465,7 @@ export class PlaidService {
         language: 'en',
         ...(webhook ? { webhook } : {}),
         ...(redirectUri ? { redirect_uri: redirectUri } : {}),
-      });
+      }));
       return res.data.link_token;
     } catch (err) {
       this.logger.error('linkTokenCreate (reconnect) failed', (err as any)?.response?.data ?? err);

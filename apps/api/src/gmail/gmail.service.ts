@@ -7,6 +7,7 @@ import { google } from 'googleapis';
 import { ConnectedApp } from '../connected-apps/connected-app.entity';
 import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.util';
 import { parseReceiptEmail } from './receipt-parser';
+import { timed } from '../common/logging/timed';
 
 export interface RawReceiptItem {
   name: string;
@@ -87,7 +88,7 @@ export class GmailService {
     }
 
     const client = this.makeOAuth2Client();
-    const { tokens } = await client.getToken(code);
+    const { tokens } = await timed('gmail', 'getToken', () => client.getToken(code));
     client.setCredentials(tokens);
 
     const oauth2 = google.oauth2({ version: 'v2', auth: client });
@@ -133,7 +134,7 @@ export class GmailService {
     // Only refresh if the token is expired or about to expire (within 60 seconds)
     const isExpired = !conn.tokenExpiry || Date.now() >= Number(conn.tokenExpiry) - 60_000;
     if (isExpired) {
-      const { credentials } = await client.refreshAccessToken();
+      const { credentials } = await timed('gmail', 'refreshAccessToken', () => client.refreshAccessToken());
       client.setCredentials(credentials);
       if (credentials.access_token && credentials.access_token !== decryptToken(conn.accessToken, this.encKey)) {
         conn.accessToken = encryptToken(credentials.access_token, this.encKey);
@@ -155,11 +156,11 @@ export class GmailService {
     const client = await this.getAuthorizedClient(userId);
     const gmail = google.gmail({ version: 'v1', auth: client });
 
-    const listRes = await gmail.users.messages.list({
+    const listRes = await timed('gmail', 'users.messages.list', () => gmail.users.messages.list({
       userId: 'me',
       q: query,
       maxResults,
-    });
+    }));
 
     const messages = listRes.data.messages ?? [];
     const results: RawReceipt[] = [];
@@ -167,7 +168,7 @@ export class GmailService {
 
     for (const msg of messages) {
       if (!msg.id) continue;
-      const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
+      const full = await timed('gmail', 'users.messages.get', () => gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' }));
       const headers = full.data.payload?.headers ?? [];
       const subject = this.extractHeader(headers, 'Subject');
       const from = this.extractHeader(headers, 'From');

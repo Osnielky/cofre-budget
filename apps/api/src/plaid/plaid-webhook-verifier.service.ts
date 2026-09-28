@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
 import { verifyPlaidWebhookSignature, PlaidJWK } from './plaid-webhook-signature';
+import { timed } from '../common/logging/timed';
 
 const POSITIVE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const NEGATIVE_CACHE_TTL_MS = 60 * 1000;
@@ -45,7 +46,7 @@ export class PlaidWebhookVerifierService {
     }
 
     try {
-      const res = await this.client.webhookVerificationKeyGet({ key_id: kid });
+      const res = await timed('plaid', 'webhookVerificationKeyGet', () => this.client.webhookVerificationKeyGet({ key_id: kid }));
       const jwk: PlaidJWK = {
         kty: res.data.key.kty,
         crv: res.data.key.crv,
