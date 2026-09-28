@@ -9,7 +9,11 @@
     "build:api": "nx build api",
     "seed": "node -r dotenv/config dist/seed.js",
     "test:api": "vitest run --root apps/api",
-    "test:dashboard": "vitest run --root apps/web"
+    "test:dashboard": "vitest run --root apps/web",
+    "migration:generate": "sh -c 'SWC_NODE_PROJECT=apps/api/tsconfig.app.json node -r @swc-node/register node_modules/typeorm/cli.js migration:generate -d apps/api/src/config/data-source.ts apps/api/src/migrations/$0'",
+    "migration:run": "SWC_NODE_PROJECT=apps/api/tsconfig.app.json node -r @swc-node/register node_modules/typeorm/cli.js migration:run -d apps/api/src/config/data-source.ts",
+    "migration:show": "SWC_NODE_PROJECT=apps/api/tsconfig.app.json node -r @swc-node/register node_modules/typeorm/cli.js migration:show -d apps/api/src/config/data-source.ts",
+    "migration:check": "SWC_NODE_PROJECT=apps/api/tsconfig.app.json node -r @swc-node/register node_modules/typeorm/cli.js migration:generate -d apps/api/src/config/data-source.ts --check apps/api/src/migrations/Check"
   },
   "devDependencies": {
     "@eslint/js": "^9.8.0",

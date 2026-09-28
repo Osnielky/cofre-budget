@@ -32,10 +32,25 @@ npx nx build api
 
 Tests run on Vitest: `npm run test:api` and `npm run test:dashboard`.
 
-Most suites use an in-memory sqlite `DataSource`. `recurring.concurrency.test.ts` is
-the exception — it needs real Postgres because it covers a lost update between
-concurrent connections, so it builds a throwaway `recurring_concurrency_test`
-schema and skips itself when no database is reachable.
+Most suites use an in-memory sqlite `DataSource`. Two need real Postgres and skip
+themselves when no database is reachable: `recurring.concurrency.test.ts` covers a
+lost update between concurrent connections (throwaway `recurring_concurrency_test`
+schema), and `migrations/migrations.test.ts` checks that the migrations build
+exactly the entity schema — it fails when an entity changes without a migration.
+
+## Database migrations
+
+`synchronize` is off; the API applies pending migrations on boot (`migrationsRun`).
+After changing an entity:
+
+```bash
+npm run migration:generate -- <Name>   # diffs entities vs your local DB
+# then add the class to apps/api/src/migrations/index.ts (explicit list, no globs)
+npm run migration:check                # exits non-zero if a diff is still unmigrated
+```
+
+The baseline migration skips itself on databases `synchronize` already built
+(production and existing dev DBs), so it only creates tables on a fresh database.
 
 `apps/api/tsconfig.app.json` excludes `*.test.ts` — test files must stay out of the
 webpack bundle.
@@ -72,14 +87,14 @@ NestJS modules wired in `app/app.module.ts`:
 
 | Module | Responsibility |
 |---|---|
-| `config/database.config.ts` | TypeORM options via `@nestjs/config`. **Entities must be imported explicitly** — glob paths don't work in the webpack bundle. |
+| `config/database.config.ts` | TypeORM options via `@nestjs/config`. Entity list lives in `config/entities.ts`; `config/data-source.ts` is the same connection for the TypeORM CLI. **Entities and migrations must be imported explicitly** — glob paths don't work in the webpack bundle. |
 | `users/` | `User` entity + `UsersService`. Password column has `select: false`; use `createQueryBuilder().addSelect('user.password')` to load it. |
 | `auth/` | Passport local + JWT strategies. JWT stored as `httpOnly` cookie `access_token`. Login: `POST /api/auth/login`. |
 
 **Key quirks:**
 - `cookie-parser` must be imported as `import cookieParser = require('cookie-parser')` (CommonJS interop).
 - `apps/api/.swcrc` sets `target: "es2017"`, `keepClassNames: true`, and `decoratorMetadata: true` — required for `PassportStrategy` mixin and TypeORM decorators to work under SWC.
-- Adding a new entity: import it in `database.config.ts` and add to the `entities` array.
+- Adding a new entity: add it to `ENTITIES` in `config/entities.ts`, then generate a migration.
 
 ### Web (`apps/web/src/`)
 
