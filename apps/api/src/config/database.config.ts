@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ENTITIES } from './entities';
 import { MIGRATIONS } from '../migrations';
+import { TypeOrmLogger, slowQueryMs } from '../common/logging/typeorm-logger';
 
 export default registerAs('database', (): TypeOrmModuleOptions => ({
   type: 'postgres',
@@ -18,7 +19,9 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   synchronize: false,
   migrations: MIGRATIONS,
   migrationsRun: true,
-  logging: false,
+  // Slow (> SLOW_QUERY_MS) and failed queries only, without parameter values.
+  logger: new TypeOrmLogger(),
+  maxQueryExecutionTime: slowQueryMs(),
   ssl: (() => {
     if (!process.env.DB_HOST?.includes('supabase.co')) return false;
     const caPath = ['supabase-ca.crt.crt', 'supabase-ca.crt'].map(f => path.resolve(process.cwd(), f)).find(p => fs.existsSync(p)) ?? '';
