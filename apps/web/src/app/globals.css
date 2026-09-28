@@ -253,6 +253,18 @@ body::before {
   box-shadow: 0 8px 28px rgba(30, 144, 255, 0.50);
 }
 
+/* Top-tier CTA (Elite plan). Built from the theme's amber so a new theme only
+   has to redefine --color-card-amber / --color-base. */
+.btn-premium {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-card-amber) 70%, white), var(--color-card-amber));
+  color: var(--color-base);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--color-card-amber) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.btn-premium:hover {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-card-amber) 55%, white), color-mix(in srgb, var(--color-card-amber) 90%, white));
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--color-card-amber) 50%, transparent);
+}
+
 /* ── Budget amount slider ──
    Driven by two per-instance custom properties set inline by the caller:
    --slider-accent (the selected category's colour) and --slider-pct (fill width).

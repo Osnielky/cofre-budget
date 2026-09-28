@@ -188,10 +188,23 @@ export default function BillingTab() {
   // but User.plan has already reset to 'free' — treat it the same as "no subscription" so a
   // churned customer sees the resubscribe CTAs instead of management buttons for a dead subscription.
   if (!sub || sub.status === 'canceled') {
+    const plan = user?.plan ?? 'free';
     return (
       <div>
-        <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--color-text-primary)' }}>Plan &amp; billing</h2>
-        <PricingCards onSelectFree={() => {}} onSelectPaid={startCheckout} currentTier={user?.plan ?? 'free'} />
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold" style={{ color: 'var(--color-text-primary)' }}>Plan &amp; billing</h2>
+            <p className="mt-1 text-sm sm:text-base" style={{ color: 'var(--color-text-secondary)' }}>Choose the right plan for your financial life</p>
+          </div>
+          <span
+            className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-full text-sm"
+            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+          >
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--color-primary)' }} />
+            Current plan: <span className="font-bold capitalize" style={{ color: 'var(--color-text-primary)' }}>{plan}</span>
+          </span>
+        </div>
+        <PricingCards onSelectFree={() => {}} onSelectPaid={startCheckout} currentTier={plan} />
       </div>
     );
   }

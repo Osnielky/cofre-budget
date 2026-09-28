@@ -10,16 +10,104 @@ const PRICES: Record<'pro' | 'elite', { month: number; year: number }> = {
   elite: { month: 7.99, year: 76.7 },
 };
 
-type FeatureValue = boolean | string;
+/* ── Icons — inline SVG, colored by the caller through currentColor ── */
 
-const FEATURES: { label: string; free: FeatureValue; pro: FeatureValue; elite: FeatureValue }[] = [
-  { label: 'Manual accounts & CSV import', free: true, pro: true, elite: true },
-  { label: 'Budgets & spending tracking', free: true, pro: true, elite: true },
-  { label: 'Debts & loans tracking', free: true, pro: true, elite: true },
-  { label: 'Savings goals & net-worth trajectory', free: true, pro: true, elite: true },
-  { label: 'Receipt scanning via Gmail', free: true, pro: true, elite: true },
-  { label: 'Automatic bank sync (Plaid)', free: false, pro: true, elite: true },
-  { label: 'Linked institutions', free: '—', pro: 'Up to 4', elite: 'Unlimited' },
+type IconName =
+  | 'wallet' | 'bank' | 'gem' | 'link' | 'infinity' | 'minus' | 'sparkle' | 'check'
+  | 'upload' | 'pie' | 'coin-hand' | 'goal' | 'receipt';
+
+function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
+  const p = { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, 'aria-hidden': true };
+  switch (name) {
+    case 'wallet':
+      return <svg {...p}><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H17a2 2 0 0 1 2 2v1" /><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /><path d="M16 12.5h4.5v3H16a1.5 1.5 0 0 1 0-3Z" /></svg>;
+    case 'bank':
+      return <svg {...p}><path d="M3.5 9 12 4l8.5 5" /><path d="M5 9.5h14" /><path d="M6.5 10v7M10 10v7M14 10v7M17.5 10v7" /><path d="M4 19.5h16" /></svg>;
+    case 'gem':
+      return <svg {...p}><path d="M6.5 4.5h11l3.5 5-9 10-9-10 3.5-5Z" /><path d="M3 9.5h18M9.5 4.5 8 9.5l4 10 4-10-1.5-5" /></svg>;
+    case 'link':
+      return <svg {...p}><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1" /><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1" /></svg>;
+    case 'infinity':
+      return <svg {...p}><path d="M12 12c-2-2.7-3.6-4-5.5-4a4 4 0 0 0 0 8c1.9 0 3.5-1.3 5.5-4Zm0 0c2 2.7 3.6 4 5.5 4a4 4 0 0 0 0-8c-1.9 0-3.5 1.3-5.5 4Z" /></svg>;
+    case 'minus':
+      return <svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M8.5 12h7" /></svg>;
+    case 'sparkle':
+      return <svg {...p}><path d="M12 3.5 13.8 9l5.7 1.8-5.7 1.9L12 18.5l-1.8-5.8L4.5 10.8 10.2 9 12 3.5Z" /><path d="M19 16.5v3M17.5 18h3" /></svg>;
+    case 'check':
+      return <svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="m8.5 12.2 2.3 2.3 4.7-4.8" /></svg>;
+    case 'upload':
+      return <svg {...p}><path d="M4 7.5V17a2.5 2.5 0 0 0 2.5 2.5h11A2.5 2.5 0 0 0 20 17V9.5A2.5 2.5 0 0 0 17.5 7H12l-2-2.5H6.5A2.5 2.5 0 0 0 4 7Z" /><path d="M12 16.5v-6M9.5 13l2.5-2.5 2.5 2.5" /></svg>;
+    case 'pie':
+      return <svg {...p}><path d="M12 3.5v8.5h8.5A8.5 8.5 0 1 1 12 3.5Z" /><path d="M15 3.8A8.5 8.5 0 0 1 20.2 9H15V3.8Z" /></svg>;
+    case 'coin-hand':
+      return <svg {...p}><circle cx="14.5" cy="7.5" r="4" /><path d="M14.5 5.8v3.4M13.3 6.5h1.8a.8.8 0 0 1 0 1.6h-1.2a.8.8 0 0 0 0 1.6h1.8" /><path d="M3.5 14.5h3l3.5 1.5h3.5a1.5 1.5 0 0 1 0 3H9" /><path d="M13.5 18.5 18 16a1.5 1.5 0 0 1 1.8 2.3L15 21H6.5l-3-1.5" /></svg>;
+    case 'goal':
+      return <svg {...p}><path d="M5 20v-5M10 20v-8M15 20v-4" /><path d="M19.5 20V5.5" /><path d="M19.5 5.5 15 7l4.5 2" /></svg>;
+    case 'receipt':
+      return <svg {...p}><path d="M5 11v8.5h14V11" /><path d="m5 11 7 4.5 7-4.5" /><path d="M7.5 9V4.5h9V9" /><path d="M10 7h4" /></svg>;
+  }
+}
+
+/* ── Plan definitions: the copy each card shows ── */
+
+type Feature = { icon: IconName; label: string; muted?: boolean };
+
+interface PlanDef {
+  tier: Tier;
+  name: string;
+  tagline: string;
+  icon: IconName;
+  /** CSS variable for the plan's accent (icon, border, bullet icons). */
+  accent: string;
+  features: Feature[];
+}
+
+const PLANS: PlanDef[] = [
+  {
+    tier: 'free',
+    name: 'Free',
+    tagline: 'The essentials to get started',
+    icon: 'wallet',
+    accent: 'var(--color-card-violet)',
+    features: [
+      { icon: 'minus', label: 'Automatic bank sync unavailable', muted: true },
+      { icon: 'minus', label: 'Ask Cofre AI assistant unavailable', muted: true },
+    ],
+  },
+  {
+    tier: 'pro',
+    name: 'Pro',
+    tagline: 'Spend less time managing money',
+    icon: 'bank',
+    accent: 'var(--color-primary)',
+    features: [
+      { icon: 'bank', label: 'Everything in Free' },
+      { icon: 'link', label: 'Automatic bank sync with Plaid' },
+      { icon: 'bank', label: 'Up to 4 linked institutions' },
+      { icon: 'sparkle', label: 'Ask Cofre AI assistant' },
+    ],
+  },
+  {
+    tier: 'elite',
+    name: 'Elite',
+    tagline: 'Connect your complete financial life',
+    icon: 'gem',
+    accent: 'var(--color-card-amber)',
+    features: [
+      { icon: 'bank', label: 'Everything in Pro' },
+      { icon: 'link', label: 'Automatic bank sync with Plaid' },
+      { icon: 'infinity', label: 'Unlimited linked institutions' },
+      { icon: 'sparkle', label: 'Ask Cofre AI assistant' },
+    ],
+  },
+];
+
+const EVERY_PLAN: { icon: IconName; label: string; accent: string }[] = [
+  { icon: 'upload', label: 'Manual accounts & CSV import', accent: 'var(--color-card-violet)' },
+  { icon: 'pie', label: 'Budgets & spending tracking', accent: 'var(--color-card-sky)' },
+  { icon: 'coin-hand', label: 'Debts & loans tracking', accent: 'var(--color-card-green)' },
+  { icon: 'goal', label: 'Savings goals & net worth', accent: 'var(--color-card-violet)' },
+  { icon: 'receipt', label: 'Receipt scanning via Gmail', accent: 'var(--color-card-red)' },
 ];
 
 const glass: React.CSSProperties = {
@@ -30,90 +118,161 @@ const glass: React.CSSProperties = {
   boxShadow: 'var(--glass-shadow)',
 };
 
+const tint = (color: string, pct: number) => `color-mix(in srgb, ${color} ${pct}%, transparent)`;
+
 function money(n: number): string {
   return n.toFixed(2);
 }
 
-function FeatureRow({ value, label, isLast }: { value: FeatureValue; label: string; isLast: boolean }) {
+/* ── Pieces ── */
+
+function IntervalToggle({ interval, onChange }: { interval: Interval; onChange: (i: Interval) => void }) {
   return (
     <div
-      className="flex items-center justify-between gap-3 py-2.5 text-sm"
-      style={{ borderBottom: isLast ? 'none' : '1px solid var(--color-border)' }}
+      role="radiogroup"
+      aria-label="Billing interval"
+      className="inline-flex items-center gap-1 p-1 rounded-full"
+      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}
     >
-      <span className="flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
-        {value === false ? (
-          <span aria-hidden style={{ color: 'var(--color-text-muted)' }}>✕</span>
-        ) : (
-          <span aria-hidden style={{ color: 'var(--color-green)' }}>✓</span>
-        )}
-        {label}
+      {(['month', 'year'] as Interval[]).map((i) => {
+        const active = interval === i;
+        return (
+          <button
+            key={i}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            onClick={() => onChange(i)}
+            className={`px-4 sm:px-6 py-2 rounded-full text-sm font-semibold cursor-pointer transition-colors ${active ? 'btn-gold' : ''}`}
+            style={active ? undefined : { color: 'var(--color-text-secondary)' }}
+          >
+            {i === 'month' ? 'Monthly' : 'Annually'}
+          </button>
+        );
+      })}
+      <span
+        className="ml-1 mr-1 text-xs font-bold px-2.5 py-1 rounded-full whitespace-nowrap"
+        style={{ background: tint('var(--color-primary)', 14), color: 'var(--color-primary)', border: `1px solid ${tint('var(--color-primary)', 30)}` }}
+      >
+        Save 20%
       </span>
-      {typeof value === 'string' && (
-        <span className="font-semibold shrink-0" style={{ color: 'var(--color-text-secondary)' }}>{value}</span>
-      )}
     </div>
   );
 }
 
-function Card({
-  name,
-  priceMonth,
-  priceYear,
+function PlanCard({
+  plan,
   interval,
   isCurrent,
+  recommended,
   onSelect,
-  ctaLabel,
-  featureKey,
 }: {
-  name: string;
-  priceMonth: number;
-  priceYear: number;
+  plan: PlanDef;
   interval: Interval;
   isCurrent: boolean;
+  recommended: boolean;
   onSelect: () => void;
-  ctaLabel: string;
-  featureKey: 'free' | 'pro' | 'elite';
 }) {
-  const price = interval === 'month' ? priceMonth : priceYear / 12;
-  const yearlySavings = priceMonth * 12 - priceYear;
+  const prices = plan.tier === 'free' ? null : PRICES[plan.tier];
+  const price = !prices ? 0 : interval === 'month' ? prices.month : prices.year / 12;
+  const highlighted = plan.tier !== 'free';
 
   return (
     <div
-      className="rounded-2xl p-6 flex flex-col"
+      className="card-lift relative rounded-2xl p-5 sm:p-6 flex flex-col"
       style={{
         ...glass,
-        border: isCurrent ? '2px solid var(--color-primary)' : glass.border,
+        border: highlighted ? `1.5px solid ${tint(plan.accent, 70)}` : glass.border,
+        boxShadow: highlighted ? `0 0 0 1px ${tint(plan.accent, 15)}, 0 10px 40px ${tint(plan.accent, 18)}` : glass.boxShadow,
       }}
     >
-      <h3 className="text-lg font-bold" style={{ color: 'var(--color-text-primary)' }}>{name}</h3>
-      <p className="mt-3">
-        <span className="text-3xl font-bold" style={{ color: 'var(--color-text-primary)' }}>${money(price)}</span>
-        <span className="text-sm font-normal" style={{ color: 'var(--color-text-muted)' }}>/mo</span>
-      </p>
-      {priceMonth > 0 && (
-        <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
-          {interval === 'year'
-            ? `billed annually · save $${money(yearlySavings)} a year`
-            : 'billed monthly'}
-        </p>
+      {recommended && (
+        <span
+          className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap"
+          style={{ background: plan.accent, color: 'var(--color-base)' }}
+        >
+          Recommended
+        </span>
       )}
+
+      <div className="flex items-start gap-4">
+        <span
+          className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+          style={{ background: tint(plan.accent, 16), border: `1px solid ${tint(plan.accent, 35)}`, color: plan.accent }}
+        >
+          <Icon name={plan.icon} size={30} />
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{plan.name}</h3>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{plan.tagline}</p>
+        </div>
+      </div>
+
+      <p className="mt-6">
+        <span className="text-4xl font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>${plan.tier === 'free' ? '0' : money(price)}</span>
+        <span className="text-sm ml-1" style={{ color: 'var(--color-text-muted)' }}>/mo</span>
+      </p>
+      <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+        {!prices
+          ? 'Free forever'
+          : interval === 'year'
+            ? `Billed annually · save $${money(prices.month * 12 - prices.year)} a year`
+            : 'Billed monthly'}
+      </p>
 
       {isCurrent ? (
         <span
-          className="w-full mt-6 py-2 rounded-full font-semibold text-center text-sm"
-          style={{ background: 'color-mix(in srgb, var(--color-primary) 16%, transparent)', color: 'var(--color-primary)' }}
+          className="w-full mt-6 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
+          style={{ background: tint('var(--color-primary)', 10), border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
         >
+          <span style={{ color: 'var(--color-primary)' }}><Icon name="check" size={18} /></span>
           Your current plan
         </span>
       ) : (
-        <button onClick={onSelect} className="btn-gold w-full mt-6 py-2 rounded-full font-semibold">
-          {ctaLabel}
+        <button
+          onClick={onSelect}
+          className={`${plan.tier === 'elite' ? 'btn-premium' : plan.tier === 'pro' ? 'btn-gold' : ''} w-full mt-6 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer`}
+          // Free is the quiet option: outlined, so the paid trials carry the emphasis.
+          style={plan.tier === 'free' ? { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' } : undefined}
+        >
+          {plan.tier === 'free' ? 'Get started' : 'Start 15-day free trial'}
+          <span aria-hidden>→</span>
         </button>
       )}
 
-      <div className="mt-6 flex flex-col">
-        {FEATURES.map((f, i) => (
-          <FeatureRow key={f.label} label={f.label} value={f[featureKey]} isLast={i === FEATURES.length - 1} />
+      <div className="mt-6 pt-5 flex flex-col gap-3.5" style={{ borderTop: '1px solid var(--color-border)' }}>
+        {plan.features.map((f) => (
+          <div key={f.label} className="flex items-center gap-3 text-sm">
+            <span className="shrink-0" style={{ color: f.muted ? 'var(--color-text-muted)' : plan.accent }}>
+              <Icon name={f.icon} size={20} />
+            </span>
+            <span style={{ color: f.muted ? 'var(--color-text-secondary)' : 'var(--color-text-primary)' }}>{f.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function IncludedInEveryPlan() {
+  return (
+    <div className="mt-6 rounded-2xl p-5 sm:p-6" style={glass}>
+      <h3 className="text-lg font-bold mb-4" style={{ color: 'var(--color-text-primary)' }}>Included in every plan</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        {EVERY_PLAN.map((f) => (
+          <div
+            key={f.label}
+            className="flex items-center gap-3 p-2.5 rounded-xl"
+            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}
+          >
+            <span
+              className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: tint(f.accent, 16), color: f.accent }}
+            >
+              <Icon name={f.icon} size={22} />
+            </span>
+            <span className="text-sm leading-snug" style={{ color: 'var(--color-text-primary)' }}>{f.label}</span>
+          </div>
         ))}
       </div>
     </div>
@@ -133,67 +292,24 @@ export default function PricingCards({
 
   return (
     <div>
-      <div className="flex items-center justify-center gap-6 mb-10">
-        {(['month', 'year'] as Interval[]).map((i) => (
-          <label key={i} className="flex items-center gap-2 cursor-pointer select-none">
-            <span
-              className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
-              style={{ border: `2px solid ${interval === i ? 'var(--color-primary)' : 'var(--color-border)'}` }}
-            >
-              {interval === i && <span className="w-2 h-2 rounded-full" style={{ background: 'var(--color-primary)' }} />}
-            </span>
-            <input
-              type="radio"
-              name="billing-interval"
-              className="sr-only"
-              checked={interval === i}
-              onChange={() => setInterval(i)}
-            />
-            <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-              {i === 'month' ? 'Monthly' : 'Annually'}
-            </span>
-          </label>
-        ))}
-        <span
-          className="text-xs font-bold px-2.5 py-1 rounded-full"
-          style={{ background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}
-        >
-          Save 20%
-        </span>
+      <div className="flex justify-center mb-8">
+        <IntervalToggle interval={interval} onChange={setInterval} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card
-          name="Free"
-          priceMonth={0}
-          priceYear={0}
-          interval={interval}
-          isCurrent={currentTier === 'free'}
-          onSelect={onSelectFree}
-          ctaLabel="Get started"
-          featureKey="free"
-        />
-        <Card
-          name="Pro"
-          priceMonth={PRICES.pro.month}
-          priceYear={PRICES.pro.year}
-          interval={interval}
-          isCurrent={currentTier === 'pro'}
-          onSelect={() => onSelectPaid('pro', interval)}
-          ctaLabel="Start 15-day free trial"
-          featureKey="pro"
-        />
-        <Card
-          name="Elite"
-          priceMonth={PRICES.elite.month}
-          priceYear={PRICES.elite.year}
-          interval={interval}
-          isCurrent={currentTier === 'elite'}
-          onSelect={() => onSelectPaid('elite', interval)}
-          ctaLabel="Start 15-day free trial"
-          featureKey="elite"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-5 lg:gap-6">
+        {PLANS.map((plan) => (
+          <PlanCard
+            key={plan.tier}
+            plan={plan}
+            interval={interval}
+            isCurrent={currentTier === plan.tier}
+            recommended={plan.tier === 'pro'}
+            onSelect={plan.tier === 'free' ? onSelectFree : () => onSelectPaid(plan.tier as 'pro' | 'elite', interval)}
+          />
+        ))}
       </div>
+
+      <IncludedInEveryPlan />
     </div>
   );
 }
