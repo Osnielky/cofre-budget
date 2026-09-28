@@ -106,6 +106,10 @@ emails or amounts. Queries and alert commands: `docs/observability.md`.
 - `cookie-parser` must be imported as `import cookieParser = require('cookie-parser')` (CommonJS interop).
 - `apps/api/.swcrc` sets `target: "es2017"`, `keepClassNames: true`, and `decoratorMetadata: true` — required for `PassportStrategy` mixin and TypeORM decorators to work under SWC.
 - Adding a new entity: add it to `ENTITIES` in `config/entities.ts`, then generate a migration.
+- Never spread or `Object.assign` a request body onto an entity. DTOs are plain types (no validation
+  layer strips unknown keys), so copy fields with `pickFields(dto, ALLOWED_FIELDS)` from
+  `common/http/pick-fields.ts` or assign them one by one — a client-sent `id` makes `save()`
+  overwrite another user's row.
 
 ### Web (`apps/web/src/`)
 

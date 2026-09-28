@@ -4,8 +4,9 @@ import { Repository } from 'typeorm';
 import { Category } from './category.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { Budget } from '../budgets/budget.entity';
-import { UpsertCategoryDto } from './dto/upsert-category.dto';
+import { UpsertCategoryDto, CATEGORY_FIELDS } from './dto/upsert-category.dto';
 import { CategorizationRule, ruleIdentityKey } from '../categorization-rules/categorization-rule.entity';
+import { pickFields } from '../common/http/pick-fields';
 
 const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'createdAt' | 'updatedAt' | 'isFixed' | 'wantNeed'>[] = [
   { name: 'Food & Dining',  icon: '🍔', color: '#F07A3E', type: 'expense',  description: 'Restaurants, groceries, coffee & snacks' },
@@ -73,14 +74,14 @@ export class CategoriesService {
   }
 
   create(userId: string, dto: UpsertCategoryDto): Promise<Category> {
-    return this.repo.save(this.repo.create({ ...dto, userId, isDefault: false }));
+    return this.repo.save(this.repo.create({ ...pickFields(dto, CATEGORY_FIELDS), userId, isDefault: false }));
   }
 
   async update(id: string, userId: string, dto: UpsertCategoryDto): Promise<Category> {
     const cat = await this.repo.findOneBy({ id });
     if (!cat) throw new NotFoundException();
     if (cat.userId !== userId) throw new ForbiddenException();
-    Object.assign(cat, dto);
+    Object.assign(cat, pickFields(dto, CATEGORY_FIELDS));
     return this.repo.save(cat);
   }
 

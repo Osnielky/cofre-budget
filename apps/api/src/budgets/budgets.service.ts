@@ -304,7 +304,9 @@ export class BudgetsService {
       this.applySettings(existing, dto);
       await this.repo.save(existing);
     } else {
-      await this.repo.save(this.repo.create({ ...dto, userId, sourceMonth: dto.month }));
+      const row = this.repo.create({ userId, categoryId: dto.categoryId, amount: dto.amount, month: dto.month, sourceMonth: dto.month, projectId: dto.projectId ?? null });
+      this.applySettings(row, dto);
+      await this.repo.save(row);
     }
     await this.propagateForward(userId, dto.categoryId!, dto.amount, dto.month, dto.projectId);
     return this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } }) as Promise<Budget>;

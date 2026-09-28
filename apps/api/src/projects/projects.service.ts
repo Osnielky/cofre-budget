@@ -5,6 +5,7 @@ import { Project } from './project.entity';
 import { ProjectCategory } from './project-category.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { isValidClosure, closedStatusFor } from './closure';
+import { pickFields } from '../common/http/pick-fields';
 
 export interface ProjectDto {
   name: string;
@@ -30,6 +31,10 @@ export interface ProjectCategoryDto {
   type?: string;
   description?: string | null;
 }
+
+/** Fields a client may set on a project / project category; id, userId, projectType are server-owned. */
+const PROJECT_FIELDS = ['name', 'type', 'icon', 'color', 'description', 'imageUrl', 'purchasePrice', 'purchaseDate', 'status', 'salePrice', 'saleDate'] as const satisfies readonly (keyof ProjectDto)[];
+const PROJECT_CATEGORY_FIELDS = ['name', 'icon', 'color', 'order', 'type', 'description'] as const satisfies readonly (keyof ProjectCategoryDto)[];
 
 export interface CategoryBreakdown {
   id: string;
@@ -201,7 +206,7 @@ export class ProjectsService {
   }
 
   async create(userId: string, dto: ProjectDto): Promise<ProjectWithStats> {
-    const project = await this.repo.save(this.repo.create({ ...dto, userId }));
+    const project = await this.repo.save(this.repo.create({ ...pickFields(dto, PROJECT_FIELDS), userId }));
     const type    = dto.type ?? 'other';
 
     /* Only seed defaults if this type has no categories yet for this user */
@@ -239,7 +244,7 @@ export class ProjectsService {
       }
     }
 
-    Object.assign(project, dto);
+    Object.assign(project, pickFields(dto, PROJECT_FIELDS));
     await this.repo.save(project);
     return this.withStats(project);
   }
@@ -285,7 +290,7 @@ export class ProjectsService {
     if (project.userId !== userId) throw new ForbiddenException();
     const count = await this.catRepo.countBy({ userId, projectType: project.type });
     return this.catRepo.save(
-      this.catRepo.create({ ...dto, userId, projectType: project.type ?? 'other', order: dto.order ?? count }),
+      this.catRepo.create({ ...pickFields(dto, PROJECT_CATEGORY_FIELDS), userId, projectType: project.type ?? 'other', order: dto.order ?? count }),
     );
   }
 
@@ -295,7 +300,7 @@ export class ProjectsService {
     if (project.userId !== userId) throw new ForbiddenException();
     const cat = await this.catRepo.findOneBy({ id: catId, userId });
     if (!cat) throw new NotFoundException();
-    Object.assign(cat, dto);
+    Object.assign(cat, pickFields(dto, PROJECT_CATEGORY_FIELDS));
     return this.catRepo.save(cat);
   }
 
@@ -326,14 +331,14 @@ export class ProjectsService {
   async createCategoryForType(type: string, userId: string, dto: ProjectCategoryDto): Promise<ProjectCategory> {
     const count = await this.catRepo.countBy({ userId, projectType: type });
     return this.catRepo.save(
-      this.catRepo.create({ ...dto, userId, projectType: type, order: dto.order ?? count }),
+      this.catRepo.create({ ...pickFields(dto, PROJECT_CATEGORY_FIELDS), userId, projectType: type, order: dto.order ?? count }),
     );
   }
 
   async updateCategoryById(catId: string, userId: string, dto: Partial<ProjectCategoryDto>): Promise<ProjectCategory> {
     const cat = await this.catRepo.findOneBy({ id: catId, userId });
     if (!cat) throw new NotFoundException();
-    Object.assign(cat, dto);
+    Object.assign(cat, pickFields(dto, PROJECT_CATEGORY_FIELDS));
     return this.catRepo.save(cat);
   }
 

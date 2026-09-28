@@ -5,7 +5,8 @@ import { BankAccount } from './bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { PlaidItem } from '../plaid/plaid-item.entity';
 import { PlaidService } from '../plaid/plaid.service';
-import { CreateBankAccountDto } from './dto/create-bank-account.dto';
+import { CreateBankAccountDto, BANK_ACCOUNT_FIELDS } from './dto/create-bank-account.dto';
+import { pickFields } from '../common/http/pick-fields';
 
 @Injectable()
 export class BankAccountsService {
@@ -54,7 +55,7 @@ export class BankAccountsService {
   }
 
   create(userId: string, dto: CreateBankAccountDto): Promise<BankAccount> {
-    const account = this.repo.create({ ...dto, userId });
+    const account = this.repo.create({ ...pickFields(dto, BANK_ACCOUNT_FIELDS), userId });
     return this.repo.save(account);
   }
 
@@ -62,7 +63,7 @@ export class BankAccountsService {
     const account = await this.repo.findOneBy({ id });
     if (!account) throw new NotFoundException();
     if (account.userId !== userId) throw new ForbiddenException();
-    Object.assign(account, dto);
+    Object.assign(account, pickFields(dto, BANK_ACCOUNT_FIELDS));
     return this.repo.save(account);
   }
 

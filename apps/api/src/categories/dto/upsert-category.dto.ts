@@ -7,3 +7,6 @@ export class UpsertCategoryDto {
   isFixed?: boolean;
   wantNeed?: 'want' | 'need' | null;
 }
+
+/** The fields a client may set; id, userId and isDefault are server-owned. */
+export const CATEGORY_FIELDS = ['name', 'icon', 'color', 'type', 'description', 'isFixed', 'wantNeed'] as const satisfies readonly (keyof UpsertCategoryDto)[];
