@@ -6,6 +6,7 @@ import { AppModule } from './app/app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { configureTrustProxy } from './common/client-ip-throttler.guard';
 import { configureBodyParsers } from './common/http/body-parsers';
+import { configureSecurityHeaders } from './common/http/security-headers';
 import { CloudLogger } from './common/logging/cloud-logger';
 import { requestLoggingMiddleware } from './common/logging/request-logging.middleware';
 import { log, errorFields, describeError } from './common/logging/log';
@@ -16,6 +17,7 @@ async function bootstrap() {
   // First, so every later middleware and handler runs inside the request's log context.
   app.use(requestLoggingMiddleware);
   configureTrustProxy(app);
+  configureSecurityHeaders(app);
   configureBodyParsers(app);
   app.use(cookieParser());
   app.setGlobalPrefix('api');
