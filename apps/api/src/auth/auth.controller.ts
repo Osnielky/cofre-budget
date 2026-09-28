@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { GoogleCallbackGuard } from './guards/google-callback.guard';
 import { cookieOptions } from '../common/http/cookies';
 
 const COOKIE_OPTS = cookieOptions(undefined, 7 * 24 * 60 * 60 * 1000);
@@ -105,12 +106,13 @@ export class AuthController {
   @Get('google')
   googleLogin() { /* passport redirects */ }
 
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleCallbackGuard)
   @Get('google/callback')
   googleCallback(@Request() req: any, @Res() res: Response) {
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    if (!req.user) return res.redirect(`${frontendUrl}/login?error=google`);
     const result = this.authService.login(req.user);
     res.cookie('access_token', result.access_token, COOKIE_OPTS);
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
     return res.redirect(`${frontendUrl}/dashboard`);
   }
 }

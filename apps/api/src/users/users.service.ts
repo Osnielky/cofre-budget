@@ -67,6 +67,14 @@ export class UsersService {
 
     user = await this.repo.findOneBy({ email: profile.email });
     if (user) {
+      // An unverified account's password and name were set by whoever
+      // registered the address — possibly not its owner. Google has just
+      // proven ownership, so that password must not keep working; the owner
+      // can set one with "forgot password".
+      if (!user.emailVerified) {
+        await this.repo.update(user.id, { password: null as unknown as string });
+        user.name = profile.name;
+      }
       user.googleId = profile.id;
       if (!user.name) user.name = profile.name;
       if (!user.avatarUrl && profile.avatarUrl) user.avatarUrl = profile.avatarUrl;

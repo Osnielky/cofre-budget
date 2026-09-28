@@ -28,6 +28,7 @@ function LoginInner() {
 
   const verified = params.get('verified') === '1';
   const linkError = params.get('error') === 'verify';
+  const googleError = params.get('error') === 'google';
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -76,6 +77,11 @@ function LoginInner() {
       {linkError && (
         <p className="w-full text-sm text-center mb-4" style={{ color: 'var(--color-rose)' }}>
           That verification link is invalid or expired. Sign in to get a new one.
+        </p>
+      )}
+      {googleError && (
+        <p className="w-full text-sm text-center mb-4" style={{ color: 'var(--color-rose)' }}>
+          Google couldn&rsquo;t confirm a verified email for that account. Try another account or sign in with email.
         </p>
       )}
 
