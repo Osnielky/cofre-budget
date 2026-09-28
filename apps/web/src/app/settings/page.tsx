@@ -20,6 +20,7 @@ import BillingTab from '@/components/BillingTab';
 import { useTheme } from '@/components/ThemeProvider';
 import { THEMES } from '@/lib/theme';
 import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
+import { connectBankError } from '@/lib/connect-bank-error';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -241,6 +242,7 @@ function SettingsPageInner() {
   const [reconnectItemId, setReconnectItemId] = useState<string | null>(null);
   const [mergeReview, setMergeReview] = useState<PreviewExchangeResult | null>(null);
   const [error, setError] = useState('');
+  const [upgradeNotice, setUpgradeNotice] = useState('');
   const [typeOpen, setTypeOpen] = useState(false);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -316,15 +318,22 @@ function SettingsPageInner() {
   const openPlaidLink = async () => {
     setConnecting(true);
     setLinkMode('connect');
+    setUpgradeNotice('');
     try {
       const res = await fetch(`${API}/plaid/link-token`, { method: 'POST', credentials: 'include' });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const failure = connectBankError(res.status, await res.json().catch(() => null));
+        if (failure.upgrade) setUpgradeNotice(failure.message);
+        else setError(failure.message);
+        setConnecting(false);
+        return;
+      }
       const { link_token } = await res.json();
       sessionStorage.setItem('plaidLinkToken', link_token);
       sessionStorage.setItem('plaidLinkMode', 'connect');
       setLinkToken(link_token);
     } catch {
-      setError('Could not open bank connection. Check your Plaid credentials.');
+      setError(connectBankError(0, null).message);
       setConnecting(false);
     }
   };
@@ -582,6 +591,23 @@ function SettingsPageInner() {
                   <span className="mt-0.5">⚠️</span>
                   <p className="flex-1" style={{ color: 'var(--color-rose)' }}>{error}</p>
                   <button onClick={() => setError('')}
+                    className="text-xs font-semibold shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {/* Plan gate (free plan, or Pro's institution limit): point at Billing, not at Plaid */}
+              {upgradeNotice && (
+                <div className="px-4 py-3 rounded-xl flex flex-wrap items-center gap-3 text-sm"
+                  style={{ background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>
+                  <span>✨</span>
+                  <p className="flex-1 min-w-[200px]" style={{ color: 'var(--color-text-primary)' }}>{upgradeNotice}</p>
+                  <button onClick={() => { setUpgradeNotice(''); setActiveTab('billing'); }}
+                    className="btn-gold py-2 px-4 text-xs font-semibold shrink-0 cursor-pointer" style={{ borderRadius: 12 }}>
+                    See plans
+                  </button>
+                  <button onClick={() => setUpgradeNotice('')} aria-label="Dismiss"
                     className="text-xs font-semibold shrink-0" style={{ color: 'var(--color-text-muted)' }}>
                     ✕
                   </button>

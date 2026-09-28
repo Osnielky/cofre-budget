@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not } from 'typeorm';
 import {
   Configuration,
   PlaidApi,
@@ -318,6 +318,21 @@ export class PlaidService {
       let hasMore = true;
       const rules = await this.rulesService.getActiveRules(item.userId);
       const accountCache = new Map<string, BankAccount | null>();
+      /* A merged account's own history (manual entries, CSV imports) and Plaid's
+         overlap from the cutover date on. Each of the user's rows can absorb one
+         Plaid transaction with the same date and amount, so the overlap isn't
+         doubled while two genuinely separate identical charges both survive. */
+      const consumed = new Set<string>();
+      const alreadyTracked = async (accountId: string, date: string, amount: number): Promise<boolean> => {
+        const candidates = await this.txRepo.find({
+          where: { bankAccountId: accountId, userId: item.userId, date, source: Not('plaid') },
+          select: ['id', 'amount'],
+        });
+        const hit = candidates.find((t) => !consumed.has(t.id) && Math.abs(Number(t.amount) - amount) < 0.005);
+        if (!hit) return false;
+        consumed.add(hit.id);
+        return true;
+      };
 
       const getAccount = async (plaidAccountId: string): Promise<BankAccount | null> => {
         if (accountCache.has(plaidAccountId)) return accountCache.get(plaidAccountId) ?? null;
@@ -364,6 +379,7 @@ export class PlaidService {
 
           const cutoff = cutoverDates?.get(pt.account_id);
           if (cutoff && pt.date < cutoff) continue;
+          if (cutoff && (await alreadyTracked(account.id, pt.date, -(pt.amount)))) continue;
 
           const matchedRule = this.rulesService.matchRule(rules, { merchantName: pt.merchant_name, name: pt.name });
           await this.txRepo.save(
@@ -371,6 +387,7 @@ export class PlaidService {
               userId: item.userId,
               bankAccountId: account.id,
               externalId: pt.transaction_id,
+              source: 'plaid',
               /* Plaid: positive = debit; we flip so positive = money in */
               amount: -(pt.amount),
               name: pt.name,
@@ -385,7 +402,8 @@ export class PlaidService {
         }
 
         for (const rt of res.data.removed) {
-          const victim = await this.txRepo.findOneBy({ externalId: rt.transaction_id, userId: item.userId });
+          // Only ever a transaction Plaid itself created — never the user's own entries.
+          const victim = await this.txRepo.findOneBy({ externalId: rt.transaction_id, userId: item.userId, source: 'plaid' });
           if (victim) {
             /* A split parent's children have no externalId of their own — Plaid never
                references them directly, so they'd otherwise be orphaned (and still

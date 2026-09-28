@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import PricingCards from './PricingCards';
 import { useUser } from './UserProvider';
 
@@ -75,6 +75,9 @@ async function waitForSubscriptionChange(
 
 export default function BillingTab() {
   const { user, refetch } = useUser();
+  // refetch is a new function each render; read it through a ref so load() stays stable.
+  const refetchRef = useRef(refetch);
+  refetchRef.current = refetch;
   const [sub, setSub] = useState<SubscriptionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -94,6 +97,9 @@ export default function BillingTab() {
         : await fetchSubscription();
       setSub(result);
       setLoadError(false);
+      // The plan lives on the user (sidebar badge, Ask Cofre, Connect Bank), so
+      // reload it too — otherwise the app still says "Basic" until a page refresh.
+      if (isCheckoutSuccess && result) refetchRef.current();
     } catch {
       // A genuinely absent subscription resolves above (as `null`) — landing here means
       // the fetch itself failed. Keep whatever `sub` we last had and show an error state
