@@ -2,10 +2,10 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser = require('cookie-parser');
-import * as express from 'express';
 import { AppModule } from './app/app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { configureTrustProxy } from './common/client-ip-throttler.guard';
+import { configureBodyParsers } from './common/http/body-parsers';
 import { CloudLogger } from './common/logging/cloud-logger';
 import { requestLoggingMiddleware } from './common/logging/request-logging.middleware';
 import { log, errorFields, describeError } from './common/logging/log';
@@ -16,15 +16,7 @@ async function bootstrap() {
   // First, so every later middleware and handler runs inside the request's log context.
   app.use(requestLoggingMiddleware);
   configureTrustProxy(app);
-  app.use(
-    express.json({
-      limit: '5mb',
-      verify: (req: any, _res, buf) => {
-        req.rawBody = buf;
-      },
-    }),
-  );
-  app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+  configureBodyParsers(app);
   app.use(cookieParser());
   app.setGlobalPrefix('api');
   app.useGlobalFilters(new AllExceptionsFilter());
