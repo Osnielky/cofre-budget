@@ -278,7 +278,7 @@ export default function IntegrationsTab({ status, loading, onDisconnect, onManag
             <div>
               <p className="font-bold text-[15px]">More integrations</p>
               <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>We&apos;re always adding new integrations.</p>
-              <a href="mailto:support@cofre.app?subject=Integration%20request" className="text-xs font-semibold mt-2 inline-block" style={{ color: 'var(--color-violet)' }}>
+              <a href="mailto:support@budgetcofre.com?subject=Integration%20request" className="text-xs font-semibold mt-2 inline-block" style={{ color: 'var(--color-violet)' }}>
                 Request an integration →
               </a>
             </div>

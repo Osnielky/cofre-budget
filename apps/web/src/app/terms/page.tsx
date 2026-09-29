@@ -68,7 +68,7 @@ export default function TermsOfServicePage() {
 
       <H2>10. Contact</H2>
       <p>Questions about these terms? Email{' '}
-        <a href="mailto:support@cofre.app" style={{ color: 'var(--color-primary)' }}>support@cofre.app</a>.</p>
+        <a href="mailto:support@budgetcofre.com" style={{ color: 'var(--color-primary)' }}>support@budgetcofre.com</a>.</p>
     </LegalPageShell>
   );
 }

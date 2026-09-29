@@ -91,7 +91,7 @@ export default function PrivacyPolicyPage() {
 
       <H2>9. Contact</H2>
       <p>Questions about this policy or your data? Email{' '}
-        <a href="mailto:support@cofre.app" style={{ color: 'var(--color-primary)' }}>support@cofre.app</a>.</p>
+        <a href="mailto:support@budgetcofre.com" style={{ color: 'var(--color-primary)' }}>support@budgetcofre.com</a>.</p>
     </LegalPageShell>
   );
 }

@@ -6,7 +6,7 @@
 # `env:` block of the deploy step:
 #   PROJECT_ID SHA REGION REPO SQL_CONN DB_NAME DB_USER GOOGLE_CLIENT_ID
 #   PLAID_CLIENT_ID MAIL_FROM STRIPE_PRICE_PRO_MONTHLY STRIPE_PRICE_PRO_YEARLY
-#   STRIPE_PRICE_ELITE_MONTHLY STRIPE_PRICE_ELITE_YEARLY
+#   STRIPE_PRICE_ELITE_MONTHLY STRIPE_PRICE_ELITE_YEARLY PUBLIC_URL (optional; defaults to the cofre-web run.app URL)
 #
 # Secrets required in Secret Manager (this script references them; it does not
 # create them): DB_PASS JWT_SECRET GOOGLE_CLIENT_SECRET RESEND_API_KEY
@@ -39,12 +39,15 @@ gcloud run deploy cofre-web \
 
 WEB_URL="$(gcloud run services describe cofre-web --region "${REGION}" --format='value(status.url)')"
 echo "  Web at ${WEB_URL}"
+# The address users actually visit — the custom domain when one is mapped.
+PUBLIC_URL="${PUBLIC_URL:-${WEB_URL}}"
+echo "  Public at ${PUBLIC_URL}"
 
-echo "▶ Syncing API FRONTEND_URL + Google callback + Gmail redirect + Plaid redirect → ${WEB_URL}…"
+echo "▶ Syncing API FRONTEND_URL + Google callback + Gmail redirect + Plaid redirect → ${PUBLIC_URL}…"
 gcloud run services update cofre-api --region "${REGION}" \
-  --update-env-vars "FRONTEND_URL=${WEB_URL},GOOGLE_CALLBACK_URL=${WEB_URL}/api/auth/google/callback,GOOGLE_GMAIL_REDIRECT_URI=${WEB_URL}/api/gmail/callback,PLAID_WEBHOOK_URL=${API_URL}/api/plaid/webhook,PLAID_OAUTH_REDIRECT_URI=${WEB_URL}/settings/plaid-oauth-redirect"
+  --update-env-vars "FRONTEND_URL=${PUBLIC_URL},GOOGLE_CALLBACK_URL=${PUBLIC_URL}/api/auth/google/callback,GOOGLE_GMAIL_REDIRECT_URI=${PUBLIC_URL}/api/gmail/callback,PLAID_WEBHOOK_URL=${API_URL}/api/plaid/webhook,PLAID_OAUTH_REDIRECT_URI=${PUBLIC_URL}/settings/plaid-oauth-redirect"
 
 echo ""
 echo "✅ Deployed."
-echo "   Web: ${WEB_URL}"
+echo "   Web: ${PUBLIC_URL} (Cloud Run: ${WEB_URL})"
 echo "   API: ${API_URL}/api"

@@ -2,11 +2,15 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { isUsableSessionToken } from './lib/session-token';
 import { proxyRequestHeaders } from './lib/proxy-headers';
+import { canonicalRedirect } from './lib/canonical-host';
 
 const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/privacy', '/terms', '/report-error', '/report-vitals', '/pricing'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  const canonical = canonicalRedirect(req.headers.get('host'), pathname, req.nextUrl.search);
+  if (canonical) return NextResponse.redirect(canonical, 308);
 
   // /api/* is rewritten to the API service (next.config.js). The API authenticates
   // on its own; this only tells it which client the request came from.
