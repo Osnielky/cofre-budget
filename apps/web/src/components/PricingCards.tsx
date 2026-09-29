@@ -50,7 +50,8 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
 
 /* ── Plan definitions: the copy each card shows ── */
 
-type Feature = { icon: IconName; label: string; muted?: boolean };
+/** `unavailable` renders muted and struck through, so the card also reads as a comparison. */
+type Feature = { icon: IconName; label: string; unavailable?: boolean };
 
 interface PlanDef {
   tier: Tier;
@@ -70,8 +71,18 @@ const PLANS: PlanDef[] = [
     icon: 'wallet',
     accent: 'var(--color-card-violet)',
     features: [
-      { icon: 'minus', label: 'Automatic bank sync unavailable', muted: true },
-      { icon: 'minus', label: 'Ask Cofre AI assistant unavailable', muted: true },
+      { icon: 'check', label: 'Unlimited manual accounts & CSV import' },
+      { icon: 'check', label: 'Transactions with categories, splits & notes' },
+      { icon: 'check', label: 'Budgets & spending tracking' },
+      { icon: 'check', label: 'Recurring payments' },
+      { icon: 'check', label: 'Auto-categorization rules' },
+      { icon: 'check', label: 'Projects & assets tracking' },
+      { icon: 'check', label: 'Debts & loans tracking' },
+      { icon: 'check', label: 'Savings goals & net worth' },
+      { icon: 'check', label: 'Receipt scanning via Gmail' },
+      { icon: 'minus', label: 'Automatic bank sync with Plaid', unavailable: true },
+      { icon: 'minus', label: 'Linked bank institutions', unavailable: true },
+      { icon: 'minus', label: 'Ask Cofre AI assistant', unavailable: true },
     ],
   },
   {
@@ -243,10 +254,16 @@ function PlanCard({
       <div className="mt-6 pt-5 flex flex-col gap-3.5" style={{ borderTop: '1px solid var(--color-border)' }}>
         {plan.features.map((f) => (
           <div key={f.label} className="flex items-center gap-3 text-sm">
-            <span className="shrink-0" style={{ color: f.muted ? 'var(--color-text-muted)' : plan.accent }}>
+            <span className="shrink-0" style={{ color: f.unavailable ? 'var(--color-text-muted)' : plan.accent }}>
               <Icon name={f.icon} size={20} />
             </span>
-            <span style={{ color: f.muted ? 'var(--color-text-secondary)' : 'var(--color-text-primary)' }}>{f.label}</span>
+            {f.unavailable ? (
+              <span className="line-through" style={{ color: 'var(--color-text-muted)' }}>
+                <span className="sr-only">Not included: </span>{f.label}
+              </span>
+            ) : (
+              <span style={{ color: 'var(--color-text-primary)' }}>{f.label}</span>
+            )}
           </div>
         ))}
       </div>
