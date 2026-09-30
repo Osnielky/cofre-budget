@@ -26,12 +26,12 @@ substitutions:
   # (kept separate from the apex Workspace domain). RESEND_API_KEY lives in
   # Secret Manager.
   _MAIL_FROM: Cofre <no-reply@notify.osmioservices.com>
-  # Sandbox (test mode) Price IDs from the Stripe dashboard — swap to live-mode
-  # Price IDs once billing is verified end-to-end and ready to accept real payments.
-  _STRIPE_PRICE_PRO_MONTHLY: price_1UBFyP3EUUzxViMvgWjZpAb4
-  _STRIPE_PRICE_PRO_YEARLY: price_1UBG223EUUzxViMvNXXZFVDp
-  _STRIPE_PRICE_ELITE_MONTHLY: price_1UBFz63EUUzxViMvk6meqFzC
-  _STRIPE_PRICE_ELITE_YEARLY: price_1UBG2Z3EUUzxViMv4Z57m17a
+  # Live-mode Price IDs from the Stripe dashboard. They must belong to the same
+  # account as the STRIPE_SECRET_KEY secret, or Checkout fails with "No such price".
+  _STRIPE_PRICE_PRO_MONTHLY: price_1ULSGA4IWM368ReluEGBJuXa
+  _STRIPE_PRICE_PRO_YEARLY: price_1ULSLV4IWM368RelorMRdUOI
+  _STRIPE_PRICE_ELITE_MONTHLY: price_1ULSPW4IWM368RelFZy6TkKl
+  _STRIPE_PRICE_ELITE_YEARLY: price_1ULSSX4IWM368RelztPVGLS8
   # Public address users visit (Cloud Run domain mapping on cofre-web). Used for
   # FRONTEND_URL, the Google/Gmail OAuth callbacks and the Plaid OAuth redirect;
   # it must match the redirect URIs registered in the Google and Plaid dashboards.
