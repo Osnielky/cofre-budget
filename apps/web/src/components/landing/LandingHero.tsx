@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { HOME_HEADLINE } from '@/lib/seo';
 import { TRIAL_DAYS } from '@/lib/plans';
+import { tint } from './landing-styles';
 import ChatMockup from './mockups/ChatMockup';
 import AccountsMockup from './mockups/AccountsMockup';
 
@@ -26,6 +27,9 @@ export default function LandingHero() {
         </p>
       </div>
       <div className="relative flex flex-col items-center lg:items-end gap-4">
+        <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: tint('var(--color-primary)', 16), color: 'var(--color-primary)' }}>
+          Bank sync &amp; Ask Cofre · Pro
+        </span>
         <AccountsMockup className="lg:mr-16" />
         <ChatMockup className="lg:-mt-6" />
       </div>
