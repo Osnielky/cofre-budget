@@ -3,8 +3,7 @@ import type { NextRequest } from 'next/server';
 import { isUsableSessionToken } from './lib/session-token';
 import { proxyRequestHeaders } from './lib/proxy-headers';
 import { canonicalRedirect } from './lib/canonical-host';
-
-const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/privacy', '/terms', '/report-error', '/report-vitals', '/pricing'];
+import { routeDecision } from './lib/route-access';
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -21,17 +20,15 @@ export function middleware(req: NextRequest) {
   }
 
   const token = req.cookies.get('access_token')?.value;
+  const decision = routeDecision(pathname, !!token && isUsableSessionToken(token));
 
-  const validToken = token && isUsableSessionToken(token);
-  const isPublic = PUBLIC_PATHS.includes(pathname);
-
-  if (!validToken && !isPublic) {
+  if (decision === 'to-login') {
     const res = NextResponse.redirect(new URL('/login', req.url));
     // Clear stale cookie
     if (token) res.cookies.delete('access_token');
     return res;
   }
-  if (validToken && pathname === '/login') {
+  if (decision === 'to-dashboard') {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
   return NextResponse.next();
