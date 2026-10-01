@@ -1,7 +1,7 @@
 import LegalPageShell from '@/components/LegalPageShell';
 
 export const metadata = {
-  title: 'Privacy Policy — Cofre',
+  title: 'Privacy Policy',
   description: 'How Cofre collects, uses, and protects your data, including Gmail and bank account data.',
 };
 

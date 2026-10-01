@@ -1,14 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { PLAN_PRICES } from '@/lib/plans';
 
 type Tier = 'free' | 'pro' | 'elite';
 type Interval = 'month' | 'year';
-
-const PRICES: Record<'pro' | 'elite', { month: number; year: number }> = {
-  pro: { month: 4.99, year: 47.9 },
-  elite: { month: 7.99, year: 76.7 },
-};
 
 /* ── Icons — inline SVG, colored by the caller through currentColor ── */
 
@@ -184,7 +180,7 @@ function PlanCard({
   recommended: boolean;
   onSelect: () => void;
 }) {
-  const prices = plan.tier === 'free' ? null : PRICES[plan.tier];
+  const prices = plan.tier === 'free' ? null : PLAN_PRICES[plan.tier];
   const price = !prices ? 0 : interval === 'month' ? prices.month : prices.year / 12;
   const highlighted = plan.tier !== 'free';
 

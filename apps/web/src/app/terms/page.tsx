@@ -1,7 +1,7 @@
 import LegalPageShell from '@/components/LegalPageShell';
 
 export const metadata = {
-  title: 'Terms of Service — Cofre',
+  title: 'Terms of Service',
   description: 'The terms that govern your use of Cofre.',
 };
 
