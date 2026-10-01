@@ -1,9 +1,13 @@
 import type { Metadata } from 'next';
-import { HOME_TITLE, HOME_DESCRIPTION, SITE_URL } from '@/lib/seo';
+import { HOME_TITLE, HOME_DESCRIPTION, SITE_URL, softwareAppJsonLd, serializeJsonLd } from '@/lib/seo';
 import LandingNav from '@/components/landing/LandingNav';
 import LandingHero from '@/components/landing/LandingHero';
 import FeatureBlock from '@/components/landing/FeatureBlock';
 import WealthPathBand from '@/components/landing/WealthPathBand';
+import TrustSection from '@/components/landing/TrustSection';
+import LandingPricing from '@/components/landing/LandingPricing';
+import LandingFaq from '@/components/landing/LandingFaq';
+import LandingFooter from '@/components/landing/LandingFooter';
 import AccountsMockup from '@/components/landing/mockups/AccountsMockup';
 import ChatMockup from '@/components/landing/mockups/ChatMockup';
 import SpendingMockup from '@/components/landing/mockups/SpendingMockup';
@@ -46,7 +50,12 @@ export default function HomePage() {
           <SpendingMockup />
         </FeatureBlock>
         <WealthPathBand />
+        <TrustSection />
+        <LandingPricing />
+        <LandingFaq />
       </main>
+      <LandingFooter />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(softwareAppJsonLd()) }} />
     </div>
   );
 }
