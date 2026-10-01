@@ -32,7 +32,7 @@ export default function LandingFaq() {
       </h2>
       <div className="mt-8 flex flex-col gap-3">
         {FAQS.map((f) => (
-          <details key={f.q} className="group rounded-2xl px-5 py-4" style={glassCard}>
+          <details key={f.q} className="group rounded-[var(--radius-card)] px-5 py-4" style={glassCard}>
             <summary className="cursor-pointer list-none flex items-center justify-between gap-4 font-semibold" style={{ color: 'var(--color-text-primary)' }}>
               {f.q}
               <span aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-45" style={{ color: 'var(--color-text-muted)' }}>+</span>

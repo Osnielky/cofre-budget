@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -33,8 +34,11 @@ export function useUser() {
 }
 
 export default function UserProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  // Signed-in users never render `/` (middleware redirects them to /dashboard),
+  // so an anonymous homepage visit has no session to fetch — skip the call.
   const [user, setUser]       = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(pathname !== '/');
 
   function fetchUser() {
     setLoading(true);
@@ -44,7 +48,14 @@ export default function UserProvider({ children }: { children: React.ReactNode }
       .catch(() => setLoading(false));
   }
 
-  useEffect(() => { fetchUser(); }, []);
+  useEffect(() => {
+    if (pathname === '/') {
+      setLoading(false);
+      return;
+    }
+    fetchUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <UserContext.Provider value={{ user, loading, clearUser: () => setUser(null), refetch: fetchUser }}>

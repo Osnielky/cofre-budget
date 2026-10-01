@@ -4,12 +4,12 @@ const ROWS = [
   { label: 'Groceries', amount: 486, pct: 78, color: 'var(--color-card-green)' },
   { label: 'Dining & delivery', amount: 412, pct: 66, color: 'var(--color-card-orange)', flag: '38% over last month' },
   { label: 'Transport', amount: 198, pct: 32, color: 'var(--color-card-sky)' },
-  { label: 'Subscriptions', amount: 87, pct: 14, color: 'var(--color-card-violet)', flag: '2 unused' },
+  { label: 'Subscriptions', amount: 87, pct: 14, color: 'var(--color-card-violet)' },
 ];
 
 export default function SpendingMockup({ className = '' }: { className?: string }) {
   return (
-    <figure aria-label="Spending by category with dining and unused subscriptions flagged" className={`w-full max-w-md rounded-[var(--radius-card)] p-4 sm:p-5 ${className}`} style={glassCard}>
+    <figure aria-label="Spending by category with dining flagged" className={`w-full max-w-md rounded-[var(--radius-card)] p-4 sm:p-5 ${className}`} style={glassCard}>
       <div aria-hidden="true" className="flex flex-col gap-3.5">
         <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>This month</span>
         {ROWS.map((r) => (

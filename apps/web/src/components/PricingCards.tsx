@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { PLAN_PRICES } from '@/lib/plans';
+import { PLAN_PRICES, TRIAL_DAYS } from '@/lib/plans';
 
 type Tier = 'free' | 'pro' | 'elite';
 type Interval = 'month' | 'year';
@@ -242,7 +242,7 @@ function PlanCard({
           // Free is the quiet option: outlined, so the paid trials carry the emphasis.
           style={plan.tier === 'free' ? { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' } : undefined}
         >
-          {plan.tier === 'free' ? 'Get started' : 'Start 15-day free trial'}
+          {plan.tier === 'free' ? 'Get started' : `Start ${TRIAL_DAYS}-day free trial`}
           <span aria-hidden>→</span>
         </button>
       )}

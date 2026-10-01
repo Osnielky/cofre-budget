@@ -30,7 +30,7 @@ export default function OpengraphImage() {
           {HOME_HEADLINE}
         </div>
         <div style={{ marginTop: 28, fontSize: 30, color: '#94A3B8' }}>
-          Bank sync · AI answers · Your path to $1M
+          Bank sync & AI answers on Pro · Your path to $1M
         </div>
       </div>
     ),

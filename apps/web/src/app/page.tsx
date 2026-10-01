@@ -16,12 +16,14 @@ export const metadata: Metadata = {
   title: { absolute: HOME_TITLE },
   description: HOME_DESCRIPTION,
   alternates: { canonical: SITE_URL },
+  openGraph: { url: SITE_URL, title: HOME_TITLE, description: HOME_DESCRIPTION },
+  twitter: { title: HOME_TITLE, description: HOME_DESCRIPTION },
 };
 
 // Signed-in visitors never get here — middleware sends them to /dashboard.
 export default function HomePage() {
   return (
-    <div className="min-h-dvh overflow-x-hidden">
+    <div className="min-h-dvh overflow-x-clip">
       <LandingNav />
       <main>
         <LandingHero />

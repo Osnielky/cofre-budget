@@ -18,8 +18,8 @@ export default function WealthPathBand() {
             Every dollar, <span style={goldText}>on the way to a million.</span>
           </p>
           <p className="mt-4 text-base sm:text-lg max-w-xl" style={{ color: 'var(--color-text-secondary)' }}>
-            Set a net-worth goal and Cofre shows whether you&rsquo;re ahead or behind pace — and what the money you
-            stop wasting does to the date you get there.
+            Set a net-worth goal and Cofre shows whether you&rsquo;re ahead or behind pace — and when you&rsquo;ll
+            get there at your current rate.
           </p>
         </div>
         <div className="flex justify-center lg:justify-end"><ProjectionMockup /></div>

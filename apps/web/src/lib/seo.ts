@@ -6,7 +6,7 @@ export const SITE_NAME = 'Cofre';
 export const HOME_HEADLINE = 'Your bank, synced. Your money questions, answered.';
 export const HOME_TITLE = 'Cofre — Budgeting on autopilot, with an AI that answers your money questions';
 export const HOME_DESCRIPTION =
-  'Cofre syncs your bank transactions automatically and answers your money questions with AI, so you can cut wasteful spending and see your path to $1M.';
+  'Cofre helps you cut wasteful spending and see your path to $1M. Pro adds automatic bank sync and an AI that answers your money questions.';
 
 /** Public pages, in sitemap order. */
 export const INDEXABLE_PATHS = ['/', '/pricing', '/signup', '/login', '/privacy', '/terms'] as const;
