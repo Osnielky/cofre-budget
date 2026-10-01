@@ -8,7 +8,7 @@ const FAQS: { q: string; a: string }[] = [
   },
   {
     q: 'How does bank sync work?',
-    a: 'You connect your bank through Plaid, the service many finance apps use. Plaid sends Cofre your accounts, balances and recent transactions; your bank login goes to Plaid, never to us.',
+    a: 'You connect your bank through Plaid. Plaid sends Cofre your accounts, balances and up to 90 days of transactions; your bank login goes to Plaid, never to us.',
   },
   {
     q: 'Is my data safe?',
