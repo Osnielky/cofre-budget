@@ -11,7 +11,7 @@ function H2({ children }: { children: React.ReactNode }) {
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalPageShell title="Privacy Policy" updated="July 23, 2026">
+    <LegalPageShell title="Privacy Policy" updated="October 1, 2026">
       <p>
         <strong style={{ color: 'var(--color-text-primary)' }}>Draft notice:</strong> this is a first-draft privacy
         policy describing what Cofre actually collects and does with your data today. It has not yet been reviewed
@@ -34,6 +34,14 @@ export default function PrivacyPolicyPage() {
         bank account, we receive your account name, type, balance, currency, and up to 90 days of transaction
         history from Plaid. The access token Plaid issues us is encrypted at rest (AES-256-GCM) and is never shown
         to us in readable form.</p>
+      <p><strong style={{ color: 'var(--color-text-primary)' }}>Ask Cofre (AI assistant)</strong> — when you use
+        Ask Cofre, your question and the data it looks up to answer it (transactions, categories, budgets, accounts,
+        debts and your net-worth goal) are sent to Anthropic, which provides the Claude model that writes the reply.
+        Your conversations are saved in your Cofre account so you can return to them. Ask Cofre can only propose
+        changes, which you must confirm; it cannot move money.</p>
+      <p><strong style={{ color: 'var(--color-text-primary)' }}>Payments (Stripe)</strong> — if you subscribe to a
+        paid plan, Stripe processes the payment. Your card details go directly to Stripe; Cofre never sees or stores
+        your card number. We keep your Stripe customer id and subscription status.</p>
       <p><strong style={{ color: 'var(--color-text-primary)' }}>Gmail data</strong> — if you connect Gmail, Cofre
         requests read-only access (<code>gmail.readonly</code>) to search for receipt, order-confirmation, and
         invoice emails whose subject line looks like a receipt, order confirmation, or invoice — regardless of
@@ -65,6 +73,10 @@ export default function PrivacyPolicyPage() {
       <ul className="list-disc pl-5 flex flex-col gap-1.5">
         <li><strong style={{ color: 'var(--color-text-primary)' }}>Plaid</strong> — bank account linking and
           transaction data.</li>
+        <li><strong style={{ color: 'var(--color-text-primary)' }}>Anthropic</strong> — provides the AI model behind
+          Ask Cofre, as described above.</li>
+        <li><strong style={{ color: 'var(--color-text-primary)' }}>Stripe</strong> — subscription payments and
+          billing.</li>
         <li><strong style={{ color: 'var(--color-text-primary)' }}>Google</strong> — Gmail and Google Sign-In, as
           described above.</li>
         <li><strong style={{ color: 'var(--color-text-primary)' }}>Resend</strong> — delivers transactional email
