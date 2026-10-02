@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { HOME_TITLE, HOME_DESCRIPTION, SITE_URL, softwareAppJsonLd, serializeJsonLd } from '@/lib/seo';
+import { HOME_TITLE, HOME_DESCRIPTION, SITE_NAME, SITE_URL, softwareAppJsonLd, serializeJsonLd } from '@/lib/seo';
 import LandingNav from '@/components/landing/LandingNav';
 import LandingHero from '@/components/landing/LandingHero';
 import FeatureBlock from '@/components/landing/FeatureBlock';
@@ -16,8 +16,9 @@ export const metadata: Metadata = {
   title: { absolute: HOME_TITLE },
   description: HOME_DESCRIPTION,
   alternates: { canonical: SITE_URL },
-  openGraph: { url: SITE_URL, title: HOME_TITLE, description: HOME_DESCRIPTION },
-  twitter: { title: HOME_TITLE, description: HOME_DESCRIPTION },
+  // Next replaces (not merges) nested metadata objects, so repeat the root's generic fields.
+  openGraph: { type: 'website', siteName: SITE_NAME, url: SITE_URL, title: HOME_TITLE, description: HOME_DESCRIPTION },
+  twitter: { card: 'summary_large_image', title: HOME_TITLE, description: HOME_DESCRIPTION },
 };
 
 // Signed-in visitors never get here — middleware sends them to /dashboard.
