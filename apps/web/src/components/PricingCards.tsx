@@ -1,14 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { PLAN_PRICES, TRIAL_DAYS } from '@/lib/plans';
 
 type Tier = 'free' | 'pro' | 'elite';
 type Interval = 'month' | 'year';
-
-const PRICES: Record<'pro' | 'elite', { month: number; year: number }> = {
-  pro: { month: 4.99, year: 47.9 },
-  elite: { month: 7.99, year: 76.7 },
-};
 
 /* ── Icons — inline SVG, colored by the caller through currentColor ── */
 
@@ -184,7 +180,7 @@ function PlanCard({
   recommended: boolean;
   onSelect: () => void;
 }) {
-  const prices = plan.tier === 'free' ? null : PRICES[plan.tier];
+  const prices = plan.tier === 'free' ? null : PLAN_PRICES[plan.tier];
   const price = !prices ? 0 : interval === 'month' ? prices.month : prices.year / 12;
   const highlighted = plan.tier !== 'free';
 
@@ -246,7 +242,7 @@ function PlanCard({
           // Free is the quiet option: outlined, so the paid trials carry the emphasis.
           style={plan.tier === 'free' ? { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' } : undefined}
         >
-          {plan.tier === 'free' ? 'Get started' : 'Start 15-day free trial'}
+          {plan.tier === 'free' ? 'Get started' : `Start ${TRIAL_DAYS}-day free trial`}
           <span aria-hidden>→</span>
         </button>
       )}
