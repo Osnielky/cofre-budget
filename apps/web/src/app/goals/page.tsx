@@ -15,7 +15,7 @@ function currentMonth() { return new Date().toISOString().slice(0, 7); }
 
 export default function GoalsPage() {
   const { data: goal, loading: goalLoading, error: goalError, setTargetDate } = useNetWorthGoal();
-  const { accounts, debts, yearTx, error: dataError } = useDashboardData();
+  const { accounts, debts, yearTx, loading: dataLoading, error: dataError } = useDashboardData();
   const history = useNetWorthHistory();
   const breakdown = netWorthBreakdown(accounts, debts, yearTx, currentMonth());
 
@@ -39,7 +39,7 @@ export default function GoalsPage() {
             </Link>
           </div>
 
-          {goalLoading ? (
+          {goalLoading || dataLoading ? (
             <p style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
           ) : !goal ? (
             <p style={{ color: 'var(--color-rose)' }}>{goalError ?? 'Could not load your net worth goal.'}</p>

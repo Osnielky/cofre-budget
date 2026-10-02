@@ -39,7 +39,7 @@ export function rangeSummary(points: HistoryPoint[]): RangeSummary | null {
   return { start, end, growth, pct };
 }
 
-export interface Crossing { level: Level; date: string; value: number }
+export interface Crossing { level: Level; date: string; value: number; estimated: boolean }
 
 /** The first point at or above each level threshold, counting only real crossings
  *  (the previous point was below). Dips and recoveries don't add a second marker. */
@@ -48,7 +48,7 @@ export function milestoneCrossings(points: HistoryPoint[]): Crossing[] {
   for (const level of LEVELS) {
     for (let i = 1; i < points.length; i++) {
       if (points[i - 1].value < level.threshold && points[i].value >= level.threshold) {
-        out.push({ level, date: points[i].date, value: points[i].value });
+        out.push({ level, date: points[i].date, value: points[i].value, estimated: points[i].estimated });
         break;
       }
     }

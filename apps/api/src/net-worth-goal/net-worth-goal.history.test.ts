@@ -26,8 +26,8 @@ async function makeDataSource() {
 }
 
 /** Net worth = the stubbed account balance; debts stubbed empty. */
-function makeService(balance: number) {
-  const bankAccounts = { findAllByUser: vi.fn().mockResolvedValue([{ accountType: 'checking', balance: String(balance) }]) };
+function makeService(balance: number, withAccount = true) {
+  const bankAccounts = { findAllByUser: vi.fn().mockResolvedValue(withAccount ? [{ accountType: 'checking', balance: String(balance) }] : []) };
   const debts = { findAll: vi.fn().mockResolvedValue([]) };
   return new NetWorthGoalService(
     ds.getRepository(User),
@@ -89,5 +89,23 @@ describe('NetWorthGoalService snapshots', () => {
     // End of Feb = end of Mar (100, no later activity) minus March's cash flow (+40 only).
     const feb = out.points.find((p) => p.date === '2020-02-29');
     expect(feb).toEqual({ date: '2020-02-29', value: 60, estimated: true });
+  });
+
+  it('does not double-count split parents and their children', async () => {
+    const txs = ds.getRepository(Transaction);
+    const base = { userId: userA.id, name: 'x', source: 'manual', pending: false };
+    await txs.save(txs.create({ ...base, isSplitParent: false, amount: 1, date: '2020-01-10' }));
+    const parent = await txs.save(txs.create({ ...base, isSplitParent: true, amount: 100, date: '2020-03-10' }));
+    await txs.save(txs.create({ ...base, isSplitParent: false, parentId: parent.id, amount: 60, date: '2020-03-10' }));
+    await txs.save(txs.create({ ...base, isSplitParent: false, parentId: parent.id, amount: 40, date: '2020-03-10' }));
+    const out = await makeService(500).history(userA.id);
+    const feb = out.points.find((p) => p.date === '2020-02-29');
+    expect(feb).toEqual({ date: '2020-02-29', value: 400, estimated: true });
+  });
+
+  it('writes no snapshot when the user has no accounts or debts yet', async () => {
+    await makeService(0, false).get(userA.id);
+    await makeService(0, false).history(userA.id);
+    expect(await ds.getRepository(NetWorthSnapshot).countBy({ userId: userA.id })).toBe(0);
   });
 });

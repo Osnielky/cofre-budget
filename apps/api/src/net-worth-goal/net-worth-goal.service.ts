@@ -32,7 +32,7 @@ export class NetWorthGoalService {
     private debts: DebtsService,
   ) {}
 
-  private async currentNetWorth(userId: string): Promise<number> {
+  private async currentNetWorth(userId: string): Promise<{ value: number; hasData: boolean }> {
     const [accounts, debts] = await Promise.all([
       this.bankAccounts.findAllByUser(userId),
       this.debts.findAll(userId),
@@ -44,7 +44,7 @@ export class NetWorthGoalService {
     const payables = openDebts.filter((d) => d.direction === 'owed').reduce((s, d) => s + Number(d.remaining), 0);
     const assets = assetAccts.reduce((s, a) => s + Number(a.balance), 0) + receivables;
     const liabilities = liabAccts.reduce((s, a) => s + Math.abs(Number(a.balance)), 0) + payables;
-    return +(assets - liabilities).toFixed(2);
+    return { value: +(assets - liabilities).toFixed(2), hasData: accounts.length > 0 || openDebts.length > 0 };
   }
 
   /** Upserts today's snapshot. Never throws: the goal must load even if this write fails. */
@@ -60,12 +60,13 @@ export class NetWorthGoalService {
   }
 
   async history(userId: string) {
-    const current = await this.currentNetWorth(userId);
-    await this.recordSnapshot(userId, current);
+    const { value: current, hasData } = await this.currentNetWorth(userId);
+    // A $0 snapshot taken before any account exists would anchor the history at zero.
+    if (hasData) await this.recordSnapshot(userId, current);
     const [snaps, txs] = await Promise.all([
       this.snapshots.find({ where: { userId }, order: { date: 'ASC' } }),
       this.transactions.find({
-        where: { userId },
+        where: { userId, isSplitParent: false },
         relations: { categoryRef: true, bankAccount: true },
         select: {
           id: true, date: true, amount: true, debtId: true,
@@ -89,8 +90,8 @@ export class NetWorthGoalService {
 
   async get(userId: string) {
     const user = await this.users.findOneByOrFail({ id: userId });
-    const current = await this.currentNetWorth(userId);
-    await this.recordSnapshot(userId, current);
+    const { value: current, hasData } = await this.currentNetWorth(userId);
+    if (hasData) await this.recordSnapshot(userId, current);
     const baselineValue = user.netWorthGoalBaselineValue != null ? Number(user.netWorthGoalBaselineValue) : null;
     const progress = computeGoalProgress({
       current,
@@ -125,7 +126,7 @@ export class NetWorthGoalService {
       user.netWorthGoalBaselineDate = null;
     } else {
       if (user.netWorthGoalTargetDate == null) {
-        const current = await this.currentNetWorth(userId);
+        const { value: current } = await this.currentNetWorth(userId);
         user.netWorthGoalBaselineValue = current.toFixed(2);
         user.netWorthGoalBaselineDate = toDateOnly(new Date());
       }
