@@ -2,21 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-
-/** Grouped so the list can be scanned, and so search has something to match on. */
-export const EMOJI_GROUPS: { label: string; emojis: string[] }[] = [
-  { label: 'Food & drink', emojis: ['🍔','🍕','🍣','🌮','🍜','🥗','🥩','🍱','☕','🧃','🍺','🥤','🍷','🧋','🍦','🧁','🛒','🥦','🍎','🥑','🧀','🥐','🍳','🥘'] },
-  { label: 'Transport', emojis: ['🚗','🚕','🏎️','🚙','🚐','🛻','🚌','🚎','✈️','🚂','🚲','🛵','⛽','🛺','🚁','🛳️','🚢','🚀','🛸','🛞','🅿️','🚦','🗺️'] },
-  { label: 'Shopping & style', emojis: ['🛍️','👗','👟','👔','👜','💍','🕶️','🧣','🎁','🏷️','🧸'] },
-  { label: 'Home & tools', emojis: ['🏠','🏡','🛋️','🪑','🛏️','🚿','🪣','🧹','🧺','🔧','🔨','🪛','🧰','💡','🔌','🖼️','🪞','🔑','🪴','📦','🗑️','📬'] },
-  { label: 'Health', emojis: ['💊','🏥','🏃','🧘','🦷','❤️','🧠','🩺','🩹','🩻','🧬','💉','🏋️','🚴','🧗','⛷️','🫀','🫁','🧴','🧼','🪥','🌡️'] },
-  { label: 'Fun', emojis: ['🎬','🎮','🎵','🎭','📚','🎨','🎲','🏆','🎯','🎸','🎹','🎺','🎻','🥁','🎤','🎧','🎪','🎠','🎡','🎢','🎟️','🃏','🐾'] },
-  { label: 'Work & tech', emojis: ['💻','📱','⌨️','🖥️','📷','📹','💼','📊','📋','📌','🗓️','✏️','📝','🔍','📡','🤖','⌚','📺','📻','🔭','🎓','🔬','🧪','🧲','⚗️','📖','📓'] },
-  { label: 'Money', emojis: ['💰','💳','💵','🪙','💎','📈','📉','🏦','🤑','💸'] },
-  { label: 'Travel & nature', emojis: ['🏖️','🏕️','🧳','🏔️','🌋','🏝️','🗼','🗽','🏰','🌃','🌆','🌿','🌸','🌺','🌻','🍁','🍄','🌊','⛰️','🌈','☀️','🌙','⭐','❄️','🔥','💧','🌱','✨','⚡','🧧'] },
-];
-
-const ALL = EMOJI_GROUPS.flatMap((g) => g.emojis);
+import { EMOJI_GROUPS } from '@/lib/emoji-groups';
 
 interface Props {
   value: string;
@@ -135,4 +121,3 @@ export default function EmojiPicker({ value, onPick, anchor, onClose }: Props) {
   );
 }
 
-export { ALL as EMOJI_OPTIONS };

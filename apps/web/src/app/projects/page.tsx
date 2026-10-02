@@ -8,6 +8,7 @@ import {
   Tooltip, CartesianGrid, ReferenceLine,
 } from 'recharts';
 import Sidebar from '@/components/Sidebar';
+import ProjectCategoryForm, { ProjectCategoryValues } from './ProjectCategoryForm';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -124,7 +125,6 @@ export default function ProjectsPage() {
 
   /* Category management */
   const [showCatForm, setShowCatForm]   = useState<string | null>(null); // projectId
-  const [catForm, setCatForm]           = useState({ name: '', icon: '📦', color: '#9B6DFF' });
   const [savingCat, setSavingCat]       = useState(false);
   const [deletingCat, setDeletingCat]   = useState<string | null>(null);
   const [seedingCat, setSeedingCat]     = useState<string | null>(null);
@@ -376,16 +376,15 @@ export default function ProjectsPage() {
   }
 
   /* Add project category */
-  async function handleAddCat(e: React.FormEvent, projectId: string) {
-    e.preventDefault(); setSavingCat(true);
+  async function handleAddCat(projectId: string, values: ProjectCategoryValues) {
+    setSavingCat(true);
     try {
       const res = await fetch(`${API}/projects/${projectId}/categories`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify(catForm),
+        body: JSON.stringify(values),
       });
       if (!res.ok) return;
       await loadDetail(projectId);
-      setCatForm({ name: '', icon: '📦', color: '#9B6DFF' });
       setShowCatForm(null);
     } finally { setSavingCat(false); }
   }
@@ -887,7 +886,7 @@ export default function ProjectsPage() {
                             style={{ background: 'rgba(155,109,255,0.15)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.28)' }}>
                             {seedingCat === sel.id ? '…' : '✦ Restore'}
                           </button>
-                          <button onClick={() => { setShowCatForm(showCatForm === sel.id ? null : sel.id); setCatForm({ name: '', icon: '📦', color: '#9B6DFF' }); }}
+                          <button onClick={() => setShowCatForm(showCatForm === sel.id ? null : sel.id)}
                             className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1.5 rounded-lg hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] whitespace-nowrap"
                             style={{ color: 'var(--color-text-muted)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                             <PlusIcon /> Add
@@ -896,27 +895,8 @@ export default function ProjectsPage() {
                       </div>
 
                       {!collapsedCats[sel.id] && showCatForm === sel.id && (
-                        <form onSubmit={(e) => handleAddCat(e, sel.id)}
-                          className="flex items-center gap-2 p-2 rounded-xl"
-                          style={{ background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 10%, transparent)' }}>
-                          <input value={catForm.icon} onChange={(e) => setCatForm((f) => ({ ...f, icon: e.target.value }))}
-                            className="w-9 px-1 py-1.5 text-center text-sm outline-none rounded-lg"
-                            style={inputStyle} maxLength={2} placeholder="📦" />
-                          <input required value={catForm.name} onChange={(e) => setCatForm((f) => ({ ...f, name: e.target.value }))}
-                            className="flex-1 px-2 py-1.5 text-xs outline-none rounded-lg" style={inputStyle} placeholder="Category name…" />
-                          <div className="grid grid-cols-7 gap-1 shrink-0">
-                            {PRESET_COLORS.map((c) => (
-                              <button key={c} type="button" onClick={() => setCatForm((f) => ({ ...f, color: c }))}
-                                className="w-4 h-4 rounded-full transition-transform hover:scale-110"
-                                style={{ background: c, outline: catForm.color === c ? `2px solid ${c}` : 'none', outlineOffset: '1.5px' }} />
-                            ))}
-                          </div>
-                          <button type="submit" disabled={savingCat}
-                            className="px-2.5 py-1.5 text-xs font-semibold rounded-lg hover:brightness-110 disabled:opacity-50"
-                            style={{ background: 'var(--color-card-violet)', color: 'white' }}>
-                            {savingCat ? '…' : 'Add'}
-                          </button>
-                        </form>
+                        <ProjectCategoryForm projectType={sel.type} colors={PRESET_COLORS} saving={savingCat}
+                          onSubmit={(values) => handleAddCat(sel.id, values)} onCancel={() => setShowCatForm(null)} />
                       )}
 
                       {!collapsedCats[sel.id] && (
