@@ -14,6 +14,7 @@ import {
 } from '@dnd-kit/sortable';
 
 import { selectableProjects } from '@/lib/projects/closure';
+import { fillRestAmount } from '@/lib/transactions/split';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -88,6 +89,8 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
   const [openPickerUid, setOpenPickerUid] = useState<string | null>(null);
   const [pickerSearch, setPickerSearch] = useState('');
   const [pickerRect, setPickerRect] = useState<DOMRect | null>(null);
+  /** Project whose categories the picker is showing; null = the top-level list. */
+  const [pickerProjectId, setPickerProjectId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   function togglePicker(uid: string, e: React.MouseEvent<HTMLButtonElement>) {
@@ -95,6 +98,9 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
     setPickerRect(e.currentTarget.getBoundingClientRect());
     setOpenPickerUid(uid);
     setPickerSearch('');
+    // Reopening a row filed under a project goes straight to that project's list.
+    const line = lines.find((l) => l.uid === uid);
+    setPickerProjectId(line?.projectCategoryId ? line.projectId ?? null : null);
   }
 
   // Close the category menu on outside-press / scroll / resize.
@@ -169,8 +175,16 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
     [projects],
   );
 
+  /** Open projects that have categories, for the picker's project list. */
+  const pickerProjects = useMemo(
+    () => selectableProjects(projects).filter((p) => (p.categories ?? []).length > 0),
+    [projects],
+  );
+
   const allocated = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
   const remaining = absTotal - allocated;
+  /** What the last line needs so the split balances; null when nothing is left for it. */
+  const fillRest = fillRestAmount(absTotal, lines.map((l) => l.amount), lines.length - 1);
   const balanced = Math.abs(remaining) < 0.01;
 
   function updateLine(idx: number, patch: Partial<SplitLine>) {
@@ -505,6 +519,8 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                       // so "kitchen" finds the Kitchen Reno project's categories too.
                       const fpc = projectOptions.filter(({ project, cat: pc }) =>
                         !q || pc.name.toLowerCase().includes(q) || project.name.toLowerCase().includes(q));
+                      // Typing always searches everything, even from inside a project.
+                      const drillProject = !q && pickerProjectId ? pickerProjects.find((p) => p.id === pickerProjectId) ?? null : null;
 
                       const renderCat = (c: Category) => (
                         <button
@@ -519,7 +535,8 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                         </button>
                       );
 
-                      const renderProjectCat = ({ project, cat: pc }: { project: Project; cat: ProjectCategory }) => {
+                      // showProject=false inside a project's own list, where the project is already the header.
+                      const renderProjectCat = ({ project, cat: pc }: { project: Project; cat: ProjectCategory }, showProject = true) => {
                         const on = line.projectCategoryId === pc.id && line.projectId === project.id;
                         return (
                           <button
@@ -531,9 +548,11 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-base shrink-0" style={{ background: `${pc.color}20` }}>{pc.icon}</span>
                             <span className="flex-1 min-w-0 text-left">
                               <span className="font-medium block truncate" style={{ color: on ? pc.color : 'var(--color-text-primary)' }}>{pc.name}</span>
-                              <span className="block truncate text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
-                                {project.icon} {project.name}
-                              </span>
+                              {showProject && (
+                                <span className="block truncate text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                                  {project.icon} {project.name}
+                                </span>
+                              )}
                             </span>
                             {on && <span style={{ color: pc.color }}>✓</span>}
                           </button>
@@ -572,7 +591,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                           </div>
 
                           <div className="py-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
-                            {cat && !q && (
+                            {cat && !q && !drillProject && (
                               <button
                                 onClick={() => { updateLine(idx, { categoryId: '', projectId: undefined, projectCategoryId: undefined }); setOpenPickerUid(null); }}
                                 className="w-full flex items-center gap-2 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--color-elevated)]"
@@ -581,21 +600,66 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                                 <span>✕</span><span>Remove</span>
                               </button>
                             )}
-                            {fp.map(renderCat)}
-                            {fs.length > 0 && (
+                            {drillProject ? (
                               <>
-                                <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-                                {fs.map(renderCat)}
+                                {/* One project's categories, with a way back to the full list. */}
+                                <button
+                                  type="button"
+                                  onClick={() => setPickerProjectId(null)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold transition-colors hover:bg-[var(--color-elevated)]"
+                                  style={{ color: 'var(--color-text-secondary)', borderBottom: '1px solid var(--color-border)' }}
+                                >
+                                  <span aria-hidden="true">‹</span>
+                                  <span className="truncate">{drillProject.icon} {drillProject.name}</span>
+                                  <span className="ml-auto text-[10px] font-normal" style={{ color: 'var(--color-text-muted)' }}>All categories</span>
+                                </button>
+                                {projectOptions.filter(({ project }) => project.id === drillProject.id).map((o) => renderProjectCat(o, false))}
+                              </>
+                            ) : (
+                              <>
+                                {fp.map(renderCat)}
+                                {fs.length > 0 && (
+                                  <>
+                                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+                                    {fs.map(renderCat)}
+                                  </>
+                                )}
+                                {q ? (
+                                  // Searching stays flat: project categories show their project underneath.
+                                  fpc.length > 0 && (
+                                    <>
+                                      <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+                                      <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Projects</p>
+                                      {fpc.map((o) => renderProjectCat(o))}
+                                    </>
+                                  )
+                                ) : pickerProjects.length > 0 && (
+                                  <>
+                                    <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
+                                    <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Projects</p>
+                                    {pickerProjects.map((p) => {
+                                      const holdsSelection = line.projectId === p.id && !!line.projectCategoryId;
+                                      const tint = p.color ?? PROJECT_FALLBACK;
+                                      return (
+                                        <button
+                                          key={p.id}
+                                          type="button"
+                                          onClick={() => setPickerProjectId(p.id)}
+                                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors hover:bg-[var(--color-elevated)]"
+                                        >
+                                          <span className="w-6 h-6 rounded-lg flex items-center justify-center text-base shrink-0" style={{ background: `${tint}20` }}>{p.icon}</span>
+                                          <span className="font-medium flex-1 min-w-0 text-left truncate" style={{ color: 'var(--color-text-primary)' }}>{p.name}</span>
+                                          {holdsSelection && <span className="text-[10px]" style={{ color: tint }}>●</span>}
+                                          <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{(p.categories ?? []).length}</span>
+                                          <span aria-hidden="true" style={{ color: 'var(--color-text-muted)' }}>›</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </>
+                                )}
                               </>
                             )}
-                            {fpc.length > 0 && (
-                              <>
-                                <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-                                <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Projects</p>
-                                {fpc.map(renderProjectCat)}
-                              </>
-                            )}
-                            {fp.length === 0 && fs.length === 0 && fpc.length === 0 && (
+                            {!drillProject && fp.length === 0 && fs.length === 0 && fpc.length === 0 && (
                               <p className="px-3 py-4 text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>No categories match “{pickerSearch}”.</p>
                             )}
                           </div>
@@ -663,6 +727,22 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                 </Sortable>
               );
             })}
+            {fillRest !== null && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => updateAmount(lines.length - 1, fillRest)}
+                  aria-label={`Fill the last line with the remaining $${fillRest}`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110"
+                  style={{ background: 'color-mix(in srgb, var(--color-amber) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 35%, transparent)', color: 'var(--color-amber)' }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  </svg>
+                  Fill rest · ${fillRest}
+                </button>
+              </div>
+            )}
           </div>
           </SortableContext>
           </DndContext>
