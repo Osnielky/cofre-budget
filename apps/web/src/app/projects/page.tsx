@@ -686,7 +686,9 @@ export default function ProjectsPage() {
 
                     {/* ── Charts ── */}
                     {(() => {
-                      const isBusiness = sel.type === 'business' || sel.type === 'service';
+                      // Projects that earn money (businesses, trading) chart income against costs;
+                      // held assets (vehicle, property, other) chart cost only.
+                      const showRevenue = sel.type === 'business' || sel.type === 'service' || sel.type === 'trading';
 
                       /* Build cumulative lines from all transactions */
                       const allTxsSorted = [...(sel.transactions ?? [])]
@@ -730,8 +732,8 @@ export default function ProjectsPage() {
                         </div>
                       ) : null;
 
-                      const chartTitle    = isBusiness ? 'Revenue vs Expenses' : 'Expenses Over Time';
-                      const chartSubtitle = isBusiness ? 'Cumulative income & costs' : 'Cumulative since purchase';
+                      const chartTitle    = showRevenue ? 'Revenue vs Expenses' : 'Expenses Over Time';
+                      const chartSubtitle = showRevenue ? 'Cumulative income & costs' : 'Cumulative since purchase';
                       const hasData       = lineData.length >= 2;
 
                       return (
@@ -746,7 +748,7 @@ export default function ProjectsPage() {
                                 <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{chartSubtitle}</p>
                               </div>
                               <div className="flex items-center gap-2">
-                                {isBusiness && (
+                                {showRevenue && (
                                   <span className="text-[10px] flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                                     <span className="w-5 h-0.5 inline-block rounded" style={{ background: '#4FBF7F' }} /> Income
                                   </span>
@@ -786,7 +788,7 @@ export default function ProjectsPage() {
                                   <Tooltip content={<LineTip />} cursor={{ stroke: 'rgba(138,147,166,0.35)', strokeWidth: 1 }} />
                                   <Area type="monotone" dataKey="expenses" stroke="#F07A3E" strokeWidth={2}
                                     fill={`url(#expGrad-${sel.id})`} dot={false} activeDot={{ r: 4, fill: '#F07A3E', strokeWidth: 0 }} />
-                                  {isBusiness && (
+                                  {showRevenue && (
                                     <Area type="monotone" dataKey="income" stroke="#4FBF7F" strokeWidth={2}
                                       fill={`url(#incGrad-${sel.id})`} dot={false} activeDot={{ r: 4, fill: '#4FBF7F', strokeWidth: 0 }} />
                                   )}
