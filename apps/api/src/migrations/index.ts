@@ -1,5 +1,6 @@
 // Listed explicitly (not a glob) so they are bundled by webpack. Append new
 // migrations here after generating them.
 import { Baseline1790610365591 } from './1790610365591-Baseline';
+import { NetWorthSnapshots1790968124309 } from './1790968124309-NetWorthSnapshots';
 
-export const MIGRATIONS = [Baseline1790610365591];
+export const MIGRATIONS = [Baseline1790610365591, NetWorthSnapshots1790968124309];

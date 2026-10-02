@@ -12,6 +12,11 @@ export class NetWorthGoalController {
     return this.service.get(req.user.id);
   }
 
+  @Get('history')
+  history(@Request() req: any) {
+    return this.service.history(req.user.id);
+  }
+
   @Patch()
   setTargetDate(@Request() req: any, @Body() body: { targetDate?: string | null }) {
     return this.service.setTargetDate(req.user.id, body?.targetDate);
