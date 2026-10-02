@@ -12,7 +12,7 @@ function Card({ label, color, icon, children }: {
   label: string; color: string; icon: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <div className="flex-1 min-w-56 rounded-2xl p-4"
+    <div className="rounded-2xl p-4 min-w-0"
       style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color }}>{label}</span>
@@ -29,7 +29,7 @@ export default function JourneyStats({ netWorth, monthNet }: Props) {
   const p = levelProgress(netWorth);
 
   return (
-    <div className="flex gap-3 flex-wrap">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
       <Card label="Net worth" color="var(--color-primary)"
         icon={<svg width="16" height="16" viewBox="0 0 24 24" {...ICON}><path d="M3 17l6-6 4 4 7-7" /><path d="M14 8h6v6" /></svg>}>
         <p className="font-extrabold tabular-nums leading-none" style={{ fontSize: 26 }}>{money(netWorth)}</p>
@@ -40,7 +40,7 @@ export default function JourneyStats({ netWorth, monthNet }: Props) {
         </p>
       </Card>
 
-      <Card label="The million" color="var(--color-card-violet)"
+      <Card label="Million goal" color="var(--color-card-violet)"
         icon={<svg width="16" height="16" viewBox="0 0 24 24" {...ICON}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /></svg>}>
         <p className="font-extrabold tabular-nums leading-none" style={{ fontSize: 26 }}>
           {p.pctOfTarget.toFixed(2)}%
@@ -65,7 +65,7 @@ export default function JourneyStats({ netWorth, monthNet }: Props) {
           </span>
           <div className="min-w-0">
             <p className="text-base font-bold leading-tight truncate">
-              {p.currentLevel ? `Level ${p.current} · ${p.currentLevel.name}` : 'Not started'}
+              {p.currentLevel ? `Level ${p.current} · ${p.currentLevel.name}` : 'Level 0 · Getting started'}
             </p>
             <p className="text-xs mt-0.5" style={{ color: 'var(--color-green)' }}>
               {p.currentLevel ? `$${p.currentLevel.threshold.toLocaleString()} milestone reached` : 'Reach $5,000 to unlock Level 1'}
