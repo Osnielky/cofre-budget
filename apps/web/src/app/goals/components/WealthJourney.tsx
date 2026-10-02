@@ -29,10 +29,6 @@ export default function WealthJourney({ netWorth }: Props) {
             Every milestone brings the million closer.
           </p>
         </div>
-        <span className="px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0"
-          style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-          Current stage · {p.current > 0 ? `Level ${p.current}` : 'Getting started'}
-        </span>
       </div>
 
       {/* The track. Horizontally scrollable so eight nodes never squash on a phone. */}
@@ -99,12 +95,6 @@ export default function WealthJourney({ netWorth }: Props) {
           </div>
         </div>
       </div>
-
-      <p className="text-center text-xs mt-3" style={{ color: 'var(--color-text-secondary)' }}>
-        {p.next
-          ? <>Next unlock: <strong>Level {p.next.n} · {p.next.name}</strong></>
-          : <>Every level complete — you reached the million.</>}
-      </p>
     </div>
   );
 }

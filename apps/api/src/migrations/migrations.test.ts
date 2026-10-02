@@ -69,6 +69,8 @@ describe.skipIf(!hasDb)('database migrations', { timeout: 30_000 }, () => {
     // Production today: tables made by synchronize, no migrations table.
     const synced = source('migrations_test_synced', { synchronize: true });
     await synced.initialize();
+    // Tables added by post-baseline migrations did not exist when production was synchronized.
+    await synced.query(`DROP TABLE "net_worth_snapshots"`);
     await synced.query(`INSERT INTO "users" ("email", "name") VALUES ('owner@cofre.dev', 'Owner')`);
     await synced.destroy();
 
