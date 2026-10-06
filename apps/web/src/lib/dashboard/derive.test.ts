@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeBucketer, isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative, assetMix, netWorthTrend } from './derive';
+import { makeBucketer, isTransfer, isSavings, savedTotal, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative, assetMix, netWorthTrend } from './derive';
 import type { Transaction, Category, BankAccount, Debt, Project } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
@@ -48,6 +48,31 @@ describe('inCashFlow', () => {
   });
   it('tolerates null bankAccount', () => {
     expect(inCashFlow(tx({ bankAccount: null }))).toBe(true);
+  });
+  it('excludes savings-type categories (money still yours)', () => {
+    expect(inCashFlow(tx({ categoryRef: cat({ type: 'savings' }) }))).toBe(false);
+  });
+});
+
+describe('isSavings / savedTotal', () => {
+  const inv = cat({ id: 'inv', name: 'Investments', type: 'savings' });
+  it('flags savings-type categories only', () => {
+    expect(isSavings(tx({ categoryRef: inv }))).toBe(true);
+    expect(isSavings(tx())).toBe(false);
+    expect(isSavings(tx({ categoryRef: null }))).toBe(false);
+  });
+  it('nets contributions against withdrawals and ignores other categories', () => {
+    expect(savedTotal([
+      tx({ amount: -2000, categoryRef: inv }),
+      tx({ amount: 300, categoryRef: inv }),
+      tx({ amount: -50 }),
+    ])).toBe(1700);
+  });
+  it('ignores the receiving side on a tracking account', () => {
+    expect(savedTotal([
+      tx({ amount: -2000, categoryRef: inv }),
+      tx({ amount: 2000, categoryRef: inv, bankAccount: acct({ accountType: 'investment' }) }),
+    ])).toBe(2000);
   });
 });
 
@@ -104,6 +129,7 @@ describe('categoryTotals', () => {
     const out = categoryTotals([
       tx({ amount: -75, categoryRef: food }), tx({ amount: -25, categoryRef: gas }),
       tx({ amount: 500, categoryRef: cat({ id: 'i', type: 'income' }) }), // ignored for dir=expense
+      tx({ amount: -2000, categoryRef: cat({ id: 's', type: 'savings' }) }), // savings is not spending
     ], 'expense');
     expect(out.map((s) => [s.id, s.value, s.pct])).toEqual([['f', 75, 75], ['g', 25, 25]]);
   });

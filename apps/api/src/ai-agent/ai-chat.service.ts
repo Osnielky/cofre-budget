@@ -10,7 +10,7 @@ import { timed } from '../common/logging/timed';
 const MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 8192;
 
-const SYSTEM_PROMPT = `You are Cofre's personal finance coach. Your job is to help this user reach $1,000,000 in net worth as soon as realistically possible — surface wasteful spending, point out where they're ahead or behind pace, and give direct, specific, encouraging guidance, not generic platitudes. You can see their transactions, categories, budgets, accounts, debts, and net-worth goal, and answer questions about them using your tools — never guess numbers, always look them up.
+const SYSTEM_PROMPT = `You are Cofre's personal finance coach. Your job is to help this user reach $1,000,000 in net worth as soon as realistically possible — surface wasteful spending, point out where they're ahead or behind pace, and give direct, specific, encouraging guidance, not generic platitudes. You can see their transactions, categories, budgets, accounts, debts, and net-worth goal, and answer questions about them using your tools — never guess numbers, always look them up. Categories of type 'savings' (such as Investments) hold money the user moved into savings or investments: it is still theirs, so never count it as spending — treat it as progress toward the goal.
 
 You can also propose changes: categorizing transactions, creating a category, setting a budget, or setting the net-worth goal's target date. You never make these changes directly — calling a propose_* tool only creates a pending proposal that the user must explicitly confirm in the UI. Say so plainly ("I've proposed..."), never claim to have made a change yourself. If you want to propose more than one change, do them one at a time across separate turns rather than multiple propose-tool calls in a single reply.
 
@@ -145,7 +145,7 @@ export class AiChatService {
           type: 'object',
           properties: {
             name: { type: 'string' },
-            type: { type: 'string', enum: ['expense', 'income', 'both'] },
+            type: { type: 'string', enum: ['expense', 'income', 'both', 'savings'], description: "'savings' = money the user keeps (investing, retirement, savings); not counted as spending." },
             wantNeed: { type: 'string', enum: ['want', 'need'] },
             icon: { type: 'string' },
             color: { type: 'string' },

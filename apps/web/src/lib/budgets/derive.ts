@@ -108,14 +108,14 @@ export function monthTotals(spending: BudgetWithSpent[], month: string, now: Dat
 
 export interface UnbudgetedSlice { categoryId: string; category: Category; total: number }
 
-/** Expense spend on categories with no budget row this month (income/transfer excluded). */
+/** Expense spend on categories with no budget row this month (income/transfer/savings excluded). */
 export function unbudgetedSpending(txs: Transaction[], budgets: BudgetWithSpent[]): UnbudgetedSlice[] {
   const budgetedIds = new Set(budgets.map((b) => b.categoryId).filter((id): id is string => !!id));
   const map = new Map<string, UnbudgetedSlice>();
   for (const t of txs) {
     if (Number(t.amount) >= 0) continue;
     const cat = t.categoryRef;
-    if (!cat || cat.type === 'income' || cat.type === 'transfer') continue;
+    if (!cat || cat.type === 'income' || cat.type === 'transfer' || cat.type === 'savings') continue;
     if (budgetedIds.has(cat.id)) continue;
     const cur = map.get(cat.id) ?? { categoryId: cat.id, category: cat, total: 0 };
     cur.total = +(cur.total + Math.abs(Number(t.amount))).toFixed(2);

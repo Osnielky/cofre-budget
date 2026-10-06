@@ -877,6 +877,8 @@ export default function TransactionsPage() {
   /* ── derived data ── */
   // Excluded from income/expense totals: transfers between own accounts, and debt repayments
   const isTransfer = (t: Transaction) => t.categoryRef?.type === 'transfer' || !!t.debtId;
+  /** Neither income nor spending: transfers plus money moved into savings. */
+  const isNonSpending = (t: Transaction) => isTransfer(t) || t.categoryRef?.type === 'savings';
   const openDebts = debts.filter((d) => d.status === 'open');
   const uncategorizedCount = transactions.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
   /* Current + previous window: gives buildRecurringMap the ≥2 months it needs
@@ -898,8 +900,8 @@ export default function TransactionsPage() {
   const isRecurringTx = (t: Transaction) => Number(t.amount) < 0 && recurringMap.has(normalize(t.name));
   const visible = transactions.filter((t) => {
     if (filter === 'uncategorized' && (t.categoryId || t.projectId || isTransfer(t))) return false;
-    if (filter === 'expense'       && (Number(t.amount) >= 0 || isTransfer(t))) return false;
-    if (filter === 'income'        && (Number(t.amount) < 0  || isTransfer(t))) return false;
+    if (filter === 'expense'       && (Number(t.amount) >= 0 || isNonSpending(t))) return false;
+    if (filter === 'income'        && (Number(t.amount) < 0  || isNonSpending(t))) return false;
     if (filter === 'recurring'     && !isRecurringTx(t)) return false;
     if (accountFilter !== 'all'    && t.bankAccountId !== accountFilter) return false;
     if (categoryFilter !== 'all'   && t.categoryId !== categoryFilter) return false;
@@ -1404,8 +1406,8 @@ export default function TransactionsPage() {
             accountGroups.map(([accountId, txList]) => {
               const acc        = txList[0]?.bankAccount;
               const isCollapsed = collapsed.has(accountId);
-              const accIncome       = txList.filter((t) => Number(t.amount) >= 0 && !isTransfer(t)).reduce((s, t) => s + Number(t.amount), 0);
-              const accExpense      = txList.filter((t) => Number(t.amount) < 0  && !isTransfer(t)).reduce((s, t) => s + Number(t.amount), 0);
+              const accIncome       = txList.filter((t) => Number(t.amount) >= 0 && !isNonSpending(t)).reduce((s, t) => s + Number(t.amount), 0);
+              const accExpense      = txList.filter((t) => Number(t.amount) < 0  && !isNonSpending(t)).reduce((s, t) => s + Number(t.amount), 0);
               const accUncategorized = txList.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
               const accColor        = acc?.color || '#9B6DFF';
 
@@ -1577,7 +1579,7 @@ export default function TransactionsPage() {
                         const primaryType   = isIncome ? 'income' : 'expense';
                         const secondaryType = isIncome ? 'expense' : 'income';
                         const searchQ       = pickerSearch.toLowerCase();
-                        const pickerCats    = categories.filter((c) => (c.type === primaryType || c.type === 'transfer') && (!searchQ || c.name.toLowerCase().includes(searchQ)));
+                        const pickerCats    = categories.filter((c) => (c.type === primaryType || c.type === 'transfer' || c.type === 'savings') && (!searchQ || c.name.toLowerCase().includes(searchQ)));
                         const pickerCatsAlt = categories.filter((c) => c.type === secondaryType && (!searchQ || c.name.toLowerCase().includes(searchQ)));
                         const needsCategory = !tx.categoryId && !tx.projectId && !tx.debtId && !txIsTransfer;
 
@@ -2493,7 +2495,7 @@ export default function TransactionsPage() {
               const mq = manualCatSearch.trim().toLowerCase();
               const matches = (n: string) => !mq || n.toLowerCase().includes(mq);
               const catOptions = isExpense
-                ? categories.filter((c) => (c.type === 'expense' || c.type === 'both') && matches(c.name))
+                ? categories.filter((c) => (c.type === 'expense' || c.type === 'both' || c.type === 'savings') && matches(c.name))
                 : null;
               // Project categories, flattened so one search covers every project.
               const selProjCat = manualTx.projectCategoryId
@@ -2508,7 +2510,7 @@ export default function TransactionsPage() {
                 ? categories.filter((c) => c.type === 'income' || c.type === 'both')
                 : null;
               const incomeSecondary = !isExpense
-                ? categories.filter((c) => c.type === 'expense')
+                ? categories.filter((c) => c.type === 'expense' || c.type === 'savings')
                 : null;
               const amt        = parseFloat(manualTx.amountStr) || 0;
               return (

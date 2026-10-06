@@ -11,13 +11,7 @@ function H2({ children }: { children: React.ReactNode }) {
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalPageShell title="Privacy Policy" updated="October 1, 2026">
-      <p>
-        <strong style={{ color: 'var(--color-text-primary)' }}>Draft notice:</strong> this is a first-draft privacy
-        policy describing what Cofre actually collects and does with your data today. It has not yet been reviewed
-        by a lawyer — treat it as accurate but not final.
-      </p>
-
+    <LegalPageShell title="Privacy Policy" updated="October 5, 2026">
       <p>
         Cofre (&ldquo;Cofre&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) is a personal budget tracker operated by
         Osmio Services. This policy explains what information we collect when you use the Cofre web app, why we
@@ -89,19 +83,33 @@ export default function PrivacyPolicyPage() {
       <p>You can disconnect Gmail or a bank account at any time from Settings → Integrations — this revokes our
         access token immediately. To delete your account and all associated data, contact us at the email below.</p>
 
-      <H2>6. Security</H2>
+      <H2>6. Cookies and local storage</H2>
+      <p>Cofre uses one essential cookie, <code>access_token</code>, to keep you signed in. It is
+        <code> httpOnly</code>, so scripts on the page can&rsquo;t read it. Your browser&rsquo;s local storage keeps
+        display preferences such as your chosen theme. We don&rsquo;t use advertising cookies or third-party ad
+        trackers.</p>
+
+      <H2>7. Data retention and deletion</H2>
+      <p>We keep your data for as long as your account is open. You can erase your financial data at any time from
+        Settings → Data &amp; Privacy. When you ask us to delete your account, we delete your account and its data from our
+        production database within 30 days. Copies in encrypted backups expire on their normal schedule. Payment
+        records held by Stripe are kept as required by tax and accounting law. Disconnecting Gmail or a bank revokes
+        our access token immediately.</p>
+
+      <H2>8. Security</H2>
       <p>Passwords are hashed with bcrypt and never stored in plain text. OAuth tokens for Gmail and bank
         connections are encrypted at rest with AES-256-GCM. All traffic to Cofre is encrypted in transit (HTTPS).
         No security measure is perfect, and we cannot guarantee absolute security.</p>
 
-      <H2>7. Children&rsquo;s privacy</H2>
-      <p>Cofre is not directed to children under 13, and we do not knowingly collect data from them.</p>
+      <H2>9. Children&rsquo;s privacy</H2>
+      <p>Cofre is for adults (18+) and is not directed to children. We do not knowingly collect data from
+        children under 13.</p>
 
-      <H2>8. Changes to this policy</H2>
+      <H2>10. Changes to this policy</H2>
       <p>We may update this policy as Cofre changes. We&rsquo;ll update the &ldquo;Last updated&rdquo; date above
         when we do.</p>
 
-      <H2>9. Contact</H2>
+      <H2>11. Contact</H2>
       <p>Questions about this policy or your data? Email{' '}
         <a href="mailto:support@budgetcofre.com" style={{ color: 'var(--color-primary)' }}>support@budgetcofre.com</a>.</p>
     </LegalPageShell>

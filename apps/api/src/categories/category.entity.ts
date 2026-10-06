@@ -29,7 +29,8 @@ export class Category {
   @Column()
   color: string;
 
-  /* 'expense' | 'income' | 'both' */
+  /* 'expense' | 'income' | 'both' | 'savings' | 'transfer'
+     savings and transfer are neither income nor spending. */
   @Column({ default: 'expense' })
   type: string;
 

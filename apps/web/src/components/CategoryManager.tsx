@@ -81,6 +81,7 @@ export default function CategoryManager() {
   const expenseCats  = categories.filter((c) => c.type === 'expense');
   const bothCats     = categories.filter((c) => c.type === 'both');
   const incomeCats   = categories.filter((c) => c.type === 'income');
+  const savingsCats  = categories.filter((c) => c.type === 'savings');
   const transferCats = categories.filter((c) => c.type === 'transfer');
 
   return (
@@ -136,8 +137,15 @@ export default function CategoryManager() {
             onEdit={startEdit} onDelete={openDeleteConfirm} deletingId={deletingId}
           />
 
-          {/* ── Transfers column ── */}
+          {/* ── Savings + Transfers column ── */}
           <div className="flex flex-col gap-3">
+            {savingsCats.length > 0 && (
+              <CategoryColumn
+                title="Savings" color="#9B6DFF" icon="🏦"
+                cats={savingsCats}
+                onEdit={startEdit} onDelete={openDeleteConfirm} deletingId={deletingId}
+              />
+            )}
             <CategoryColumn
               title="Transfers" color="#6B6B8A" icon="🔄"
               cats={transferCats}

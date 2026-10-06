@@ -90,6 +90,13 @@ export default function SignupPage() {
           style={{ letterSpacing: '0.18em' }}>
           {loading ? 'Creating account…' : 'Create account'}
         </button>
+
+        <p className="text-[11.5px] text-center leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+          By creating an account, you agree to our{' '}
+          <Link href="/terms" className="underline" style={{ color: 'inherit' }}>Terms of Service</Link>
+          {' '}and{' '}
+          <Link href="/privacy" className="underline" style={{ color: 'inherit' }}>Privacy Policy</Link>.
+        </p>
       </form>
 
       <p className="mt-5 text-[12px]" style={{ color: 'rgba(242,241,234,0.6)' }}>

@@ -6,9 +6,22 @@ export function isTransfer(t: Transaction): boolean {
   return t.categoryRef?.type === 'transfer' || !!t.debtId;
 }
 
-/** Cash-flow eligible: not a transfer, not on a net-worth-only tracking account. */
+/** Money moved into savings/investments — still yours, so neither income nor spending. */
+export function isSavings(t: Transaction): boolean {
+  return t.categoryRef?.type === 'savings';
+}
+
+/** Cash-flow eligible: not a transfer or savings, not on a net-worth-only tracking account. */
 export function inCashFlow(t: Transaction): boolean {
-  return !isTransfer(t) && !isTrackingAccount(t.bankAccount?.accountType ?? '');
+  return !isTransfer(t) && !isSavings(t) && !isTrackingAccount(t.bankAccount?.accountType ?? '');
+}
+
+/** Net amount put into savings-type categories (outflows minus withdrawals). */
+export function savedTotal(txs: Transaction[]): number {
+  const sum = txs
+    .filter((t) => isSavings(t) && !t.debtId && !isTrackingAccount(t.bankAccount?.accountType ?? ''))
+    .reduce((s, t) => s - Number(t.amount), 0);
+  return +sum.toFixed(2);
 }
 
 export function txInMonth(txs: Transaction[], monthKey: string): Transaction[] {

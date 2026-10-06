@@ -20,6 +20,7 @@ const TYPE_META: Record<string, { label: string; color: string }> = {
   expense:  { label: 'Expense',  color: 'var(--color-orange)' },
   income:   { label: 'Income',   color: 'var(--color-green)' },
   both:     { label: 'Both',     color: 'var(--color-primary)' },
+  savings:  { label: 'Savings',  color: 'var(--color-violet)' },
   transfer: { label: 'Transfer', color: '#6B6B8A' },
 };
 
@@ -27,6 +28,7 @@ const TYPE_TIPS: Record<string, string> = {
   expense:  'Used for money going out — groceries, rent, subscriptions, etc.',
   income:   'Used for money coming in — salary, freelance income, refunds, etc.',
   both:     'Can appear on both sides — useful for flexible categories like "Other".',
+  savings:  'Money you keep — investing, retirement, savings. Counted as saved, not as spending.',
   transfer: 'Excluded from budget calculations and income/expense totals.',
 };
 
@@ -122,7 +124,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
           {/* Type pill group */}
           <div className="flex flex-col gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</span>
-            <div className="grid grid-cols-4 gap-1.5 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               {Object.entries(TYPE_META).map(([val, meta]) => (
                 <button key={val} type="button"
                   onClick={() => setForm((f) => ({ ...f, type: val }))}
