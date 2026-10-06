@@ -104,7 +104,7 @@ export class AiReadToolsService {
       .select('SUBSTRING(tx.date::text, 1, 7)', 'month')
       .addSelect('COALESCE(SUM(tx.amount), 0)', 'net')
       .where('tx.userId = :userId', { userId })
-      .andWhere("(cat.type IS NULL OR cat.type != 'transfer')")
+      .andWhere("(cat.type IS NULL OR cat.type NOT IN ('transfer', 'savings'))")
       .andWhere('tx.debtId IS NULL')
       .andWhere('(ba."accountType" IS NULL OR ba."accountType" NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] })
       .andWhere('SUBSTRING(tx.date::text, 1, 7) IN (:...keys)', { keys })

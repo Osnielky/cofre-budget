@@ -33,7 +33,7 @@ const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'created
   { name: 'Cash-reward',    icon: '🎁', color: '#F5C842', type: 'income',   description: 'Credit card cash back, bank rewards & bonuses' },
   { name: 'Salary',         icon: '💼', color: '#4FBF7F', type: 'income',   description: 'Regular employment income' },
   { name: 'Freelance',      icon: '💻', color: '#9B6DFF', type: 'income',   description: 'Contract & self-employment earnings' },
-  { name: 'Investments',    icon: '📈', color: '#F5C842', type: 'income',   description: 'Dividends, returns & capital gains' },
+  { name: 'Investments',    icon: '📈', color: '#F5C842', type: 'savings',  description: 'Money you invest or save — brokerage, retirement & savings contributions' },
   { name: 'Other',               icon: '📦', color: '#5C5C78', type: 'both',     description: 'Anything that doesn\'t fit another category' },
   { name: 'Credit Card Payment', icon: '💳', color: '#6B6B8A', type: 'transfer', description: 'Paying off your credit card balance' },
   { name: 'Internal Transfer',   icon: '🔄', color: '#6B6B8A', type: 'transfer', description: 'Moving money between your own accounts' },

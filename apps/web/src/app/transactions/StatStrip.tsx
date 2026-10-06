@@ -35,7 +35,8 @@ const I_SYNC  = 'M21 12a9 9 0 1 1-2.6-6.4 M21 3v5h-5';
 
 const money = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const isTransfer = (t: TxLite) => t.categoryRef?.type === 'transfer' || !!t.debtId;
+/** Transfers and savings moves are neither income nor spending. */
+const isTransfer = (t: TxLite) => t.categoryRef?.type === 'transfer' || t.categoryRef?.type === 'savings' || !!t.debtId;
 const income   = (l: TxLite[]) => l.filter((t) => !isTransfer(t) && Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
 const expenses = (l: TxLite[]) => l.filter((t) => !isTransfer(t) && Number(t.amount) < 0).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
 

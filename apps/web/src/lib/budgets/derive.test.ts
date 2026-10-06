@@ -142,6 +142,7 @@ describe('unbudgetedSpending', () => {
       tx({ categoryRef: cat({ id: 'c2', name: 'Gifts' }), amount: -36 }),
       tx({ categoryRef: cat({ id: 'c3', name: 'Salary', type: 'income' }), amount: 100 }), // income -> excluded
       tx({ categoryRef: null, amount: -15 }),                        // uncategorized -> excluded
+      tx({ categoryRef: cat({ id: 'c4', name: 'Investments', type: 'savings' }), amount: -2000 }), // savings -> excluded
     ];
     const result = unbudgetedSpending(txs, budgets);
     expect(result).toEqual([{ categoryId: 'c2', category: cat({ id: 'c2', name: 'Gifts' }), total: 86 }]);

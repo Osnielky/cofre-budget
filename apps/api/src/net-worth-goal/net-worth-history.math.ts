@@ -11,11 +11,11 @@ export interface TxForHistory {
   accountType: string | null;
 }
 
-/** Same rule as the web's inCashFlow(): transfers, debt payments and
- *  tracking-account activity move money around without changing net worth. */
+/** Same rule as the web's inCashFlow(): transfers, savings moves, debt payments
+ *  and tracking-account activity move money around without changing net worth. */
 export function isCashFlowTx(t: TxForHistory): boolean {
   if (t.debtId) return false;
-  if (t.categoryType === 'transfer') return false;
+  if (t.categoryType === 'transfer' || t.categoryType === 'savings') return false;
   if (t.accountType && isTrackingType(t.accountType)) return false;
   return true;
 }

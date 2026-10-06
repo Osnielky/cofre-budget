@@ -10,7 +10,7 @@ import { isLiability } from '@/lib/accountTypes';
 import {
   monthlyCashFlow, trendSeries, categoryTotals, foldOther, txInMonth,
   calendarDays, spendingPace, fixedVariable, netWorthBreakdown,
-  expenseChanges, topMerchants, isTransfer, inCashFlow, dailyCumulative,
+  expenseChanges, topMerchants, inCashFlow, savedTotal, dailyCumulative,
 } from '@/lib/dashboard/derive';
 import type { Budget } from '@/lib/dashboard/types';
 import StatCardsRow, { type StatCardDef } from '@/components/dashboard/StatCardsRow';
@@ -114,6 +114,7 @@ export default function DashboardPage() {
   const income       = transactions.filter(t => Number(t.amount) > 0  && inCashFlow(t)).reduce((s,t) => s + Number(t.amount), 0);
   const expenses     = transactions.filter(t => Number(t.amount) < 0  && inCashFlow(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
   const net          = income - expenses;
+  const invested     = savedTotal(transactions);
   const savingsRate  = income > 0 ? (net / income * 100) : 0;
   const isIncomeBudget  = (b: Budget) => b.category?.type === 'income' || !!b.projectCategoryId;
   const spendingBudgets = budgets.filter(b => !isIncomeBudget(b));
@@ -131,8 +132,8 @@ export default function DashboardPage() {
 
   /* Prev month comparison from yearTx */
   const prevM    = prevMonth(month);
-  const prevInc  = yearTx.filter(t => t.date.startsWith(prevM) && Number(t.amount) > 0  && !isTransfer(t)).reduce((s,t) => s + Number(t.amount), 0);
-  const prevExp  = yearTx.filter(t => t.date.startsWith(prevM) && Number(t.amount) < 0  && !isTransfer(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
+  const prevInc  = yearTx.filter(t => t.date.startsWith(prevM) && Number(t.amount) > 0  && inCashFlow(t)).reduce((s,t) => s + Number(t.amount), 0);
+  const prevExp  = yearTx.filter(t => t.date.startsWith(prevM) && Number(t.amount) < 0  && inCashFlow(t)).reduce((s,t) => s + Math.abs(Number(t.amount)), 0);
   const incDelta = prevInc > 0 ? ((income - prevInc) / prevInc * 100) : 0;
   const expDelta = prevExp > 0 ? ((expenses - prevExp) / prevExp * 100) : 0;
   const prevNet  = prevInc - prevExp;
@@ -152,7 +153,7 @@ export default function DashboardPage() {
       accent: tc.green, icon: 'trendup', spark: d.daily.map(p => p.income) },
     { label: 'Monthly Expenses', value: money(expenses), delta: expDelta, inverseDelta: true, sub: `vs ${monthShort(prevM)}: ${money(prevExp)}`,
       accent: tc.orange, icon: 'trenddn', spark: d.daily.map(p => p.expenses) },
-    { label: 'Monthly Savings',  value: money(net), delta: savDelta, sub: income > 0 ? `${savingsRate.toFixed(1)}% savings rate` : 'vs last month',
+    { label: 'Monthly Savings',  value: money(net), delta: savDelta, sub: [income > 0 ? `${savingsRate.toFixed(1)}% savings rate` : null, invested > 0 ? `${money(invested)} invested` : null].filter(Boolean).join(' · ') || 'vs last month',
       accent: tc.violet, icon: 'savings', spark: d.daily.map(p => p.net) },
     { label: 'Budget Remaining', value: money(budgetRemaining), delta: null, sub: totalBudgeted > 0 ? `of ${money(totalBudgeted)} budgeted` : 'no budgets set',
       accent: tc.amber, icon: 'budget', spark: totalBudgeted > 0 ? d.daily.map(p => totalBudgeted - p.expenses) : [] },

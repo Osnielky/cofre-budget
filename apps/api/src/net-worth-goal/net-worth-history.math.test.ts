@@ -79,6 +79,7 @@ describe('isCashFlowTx', () => {
   const base = { date: '2026-09-01', amount: -10, debtId: null, categoryType: 'expense', accountType: 'checking' };
   it('counts an ordinary transaction', () => expect(isCashFlowTx(base)).toBe(true));
   it('ignores transfers', () => expect(isCashFlowTx({ ...base, categoryType: 'transfer' })).toBe(false));
+  it('ignores savings moves', () => expect(isCashFlowTx({ ...base, categoryType: 'savings' })).toBe(false));
   it('ignores debt payments', () => expect(isCashFlowTx({ ...base, debtId: 'd1' })).toBe(false));
   it('ignores tracking accounts', () => expect(isCashFlowTx({ ...base, accountType: 'investment' })).toBe(false));
   it('counts transactions with no category or account', () =>
