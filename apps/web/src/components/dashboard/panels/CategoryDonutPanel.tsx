@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useThemeColors } from '@/components/ThemeProvider';
 import Panel, { PanelEmpty } from '../Panel';
 import { makeChartTheme, fmt } from '../chartTheme';
 import type { CategorySlice } from '@/lib/dashboard/derive';
+import { distinctColors } from '@/lib/dashboard/distinctColors';
 
 export interface PeriodOption { value: string; label: string }
 
@@ -30,9 +31,15 @@ function IconChip({ slice }: { slice: CategorySlice }) {
   );
 }
 
-export default function CategoryDonutPanel({ title, subtitle, slices, total, loading, colSpan = 1, period, periodOptions, onPeriodChange }: Props) {
+export default function CategoryDonutPanel({ title, subtitle, slices: rawSlices, total, loading, colSpan = 1, period, periodOptions, onPeriodChange }: Props) {
   const tc = useThemeColors();
   const th = makeChartTheme(tc);
+  /* Categories often share a colour (several greens for income); recolour clashes
+     from the chart palette so every slice in this donut is its own colour. */
+  const slices = useMemo(() => {
+    const colors = distinctColors(rawSlices.map((s) => s.color), [tc.green, tc.sky, tc.amber, tc.orange, tc.violet, tc.rose].filter(Boolean));
+    return rawSlices.map((s, i) => (colors[i] === s.color ? s : { ...s, color: colors[i] }));
+  }, [rawSlices, tc]);
   const [mode, setMode] = useState<'amount' | 'percent'>('amount');
   const max = slices.reduce((m, s) => Math.max(m, s.value), 0) || 1;
   const top = slices[0];
