@@ -3,20 +3,21 @@
 import { useState } from 'react';
 import { useThemeColors } from '@/components/ThemeProvider';
 import Panel, { PanelEmpty } from '../Panel';
+import type { ReactNode } from 'react';
 import { fmt } from '../chartTheme';
 import type { CalendarCell } from '@/lib/dashboard/derive';
 
 const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const RAMP_ALPHA = [0, 0.18, 0.38, 0.62, 0.9]; // intensity 0..4 → sky opacity
 
-export default function SpendingCalendarPanel({ cells, monthLabel, loading }: {
-  cells: CalendarCell[]; monthLabel: string; loading: boolean;
+export default function SpendingCalendarPanel({ cells, monthLabel, picker, loading }: {
+  cells: CalendarCell[]; monthLabel: string; picker?: ReactNode; loading: boolean;
 }) {
   const tc = useThemeColors();
   const [hover, setHover] = useState<CalendarCell | null>(null);
   const empty = !loading && cells.every((c) => c.total === 0);
   return (
-    <Panel title="Daily Spending" subtitle={monthLabel} loading={loading}>
+    <Panel title="Daily Spending" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading}>
       {empty ? <PanelEmpty message="No spending recorded this month." /> : (
         <div className="flex flex-col gap-2">
           <div className="grid grid-cols-7 gap-1 text-center">

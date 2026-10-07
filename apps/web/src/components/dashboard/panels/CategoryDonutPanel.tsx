@@ -7,8 +7,8 @@ import Panel, { PanelEmpty } from '../Panel';
 import { makeChartTheme, fmt } from '../chartTheme';
 import type { CategorySlice } from '@/lib/dashboard/derive';
 import { distinctColors } from '@/lib/dashboard/distinctColors';
+import PeriodSelect, { type PeriodOption } from '../PeriodSelect';
 
-export interface PeriodOption { value: string; label: string }
 
 interface Props {
   title: string; subtitle: string;
@@ -60,12 +60,7 @@ export default function CategoryDonutPanel({ title, subtitle, slices: rawSlices,
       legend={(
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
           {periodOptions && periodOptions.length > 0 && onPeriodChange && (
-            <select value={period} onChange={(e) => onPeriodChange(e.target.value)}
-              aria-label={`${title} period`}
-              className="px-2 py-1 rounded-md text-[10.5px] font-semibold outline-none cursor-pointer"
-              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-              {periodOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            <PeriodSelect value={period ?? ''} options={periodOptions} onChange={onPeriodChange} ariaLabel={`${title} period`} />
           )}
           {slices.length > 0 && <>{toggleBtn('amount', '$ Amount')}{toggleBtn('percent', '% Percent')}</>}
         </div>
