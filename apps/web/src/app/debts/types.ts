@@ -1,4 +1,8 @@
-export interface Payment { id: string; amount: number; date: string; note: string | null; transactionId: string | null }
+export interface Payment {
+  id: string; amount: number; date: string; note: string | null; transactionId: string | null;
+  /** The transaction this payment was recorded from, when there is one. */
+  transaction?: { name: string; accountName: string | null } | null;
+}
 
 export interface Debt {
   id: string; borrowerName: string; borrowerEmail: string | null; principal: number;
