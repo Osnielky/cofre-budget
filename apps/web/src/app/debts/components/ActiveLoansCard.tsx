@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { avatarColor, initials } from '@/lib/avatar';
 import { fmt, today, fmtDate, inDays } from '../format';
 import type { Debt, DebtDetail } from '../types';
+import { paymentHistory, historySummary } from '@/lib/debts/history';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -247,24 +248,7 @@ export default function ActiveLoansCard({ debts, loading, reload }: Props) {
                     {detail.payments.length === 0 ? (
                       <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No repayments logged yet — record each one above as it arrives.</p>
                     ) : (
-                      <div className="flex flex-col gap-1.5">
-                        <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
-                          Repayment history · {detail.payments.length}
-                        </p>
-                        {detail.payments.map((p) => (
-                          <div key={p.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg" style={{ background: 'var(--color-surface)' }}>
-                            <span style={{ color: 'var(--color-text-muted)' }}>{fmtDate(p.date)}{p.note ? ` · ${p.note}` : ''}</span>
-                            <span className="flex items-center gap-3">
-                              <span className="font-bold tabular-nums" style={{ color: d.direction === 'owed' ? 'var(--color-orange)' : 'var(--color-green)' }}>
-                                {d.direction === 'owed' ? '−' : '+'}${fmt(p.amount)}
-                              </span>
-                              {p.transactionId
-                                ? <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>via transaction</span>
-                                : <button onClick={() => deletePayment(p.id)} className="hover:opacity-70" style={{ color: 'var(--color-text-muted)' }}>✕</button>}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                      <RepaymentHistory detail={detail} onDelete={deletePayment} />
                     )}
                   </div>
                 )}
@@ -278,6 +262,109 @@ export default function ActiveLoansCard({ debts, loading, reload }: Props) {
         <div className="fixed bottom-6 right-6 px-4 py-2.5 rounded-xl text-sm font-semibold z-50"
           style={{ background: 'var(--popover-bg)', border: '1px solid var(--color-border)', color: 'var(--color-green)' }}>{toast}</div>
       )}
+    </div>
+  );
+}
+
+/* ── Repayment history: running balance per payment + pace summary ── */
+
+function monthYear(ym: string) {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(y, m - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function SummaryChip({ label, value, tone, className = '' }: { label: string; value: string; tone?: string; className?: string }) {
+  return (
+    <div className={`flex flex-col gap-0.5 px-3 py-2 rounded-xl min-w-0 ${className}`} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+      <span className="text-[9.5px] font-bold uppercase tracking-wider truncate" style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+      <span className="text-[13px] font-bold tabular-nums truncate" style={{ color: tone ?? 'var(--color-text-primary)' }}>{value}</span>
+    </div>
+  );
+}
+
+function RepaymentHistory({ detail, onDelete }: { detail: DebtDetail; onDelete: (paymentId: string) => void }) {
+  const owed = detail.direction === 'owed';
+  const rows = paymentHistory(Number(detail.principal), detail.payments, detail.startDate);
+  const s = historySummary(Number(detail.remaining), detail.payments, today());
+  const amountTone = owed ? 'var(--color-orange)' : 'var(--color-green)';
+  const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
+        Repayment history · {rows.length}
+      </p>
+
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <SummaryChip label="Average" value={`$${fmt(s.avgPayment)}`} />
+        <SummaryChip label="Largest" value={`$${fmt(s.largest)}`} />
+        <SummaryChip label="Typical gap" value={s.avgDaysBetween != null ? `~${days(s.avgDaysBetween)}` : '—'} />
+        <SummaryChip label="Last paid" value={s.lastPaymentDaysAgo == null ? '—' : s.lastPaymentDaysAgo === 0 ? 'Today' : `${days(s.lastPaymentDaysAgo)} ago`} />
+        <SummaryChip label="Est. payoff" className="col-span-2 sm:col-span-1"
+          value={Number(detail.remaining) <= 0 ? 'Paid off' : s.projectedPayoff ? monthYear(s.projectedPayoff) : '—'}
+          tone={Number(detail.remaining) <= 0 ? 'var(--color-green)' : undefined} />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        {rows.map((p) => {
+          const source = p.transaction
+            ? `${p.transaction.name}${p.transaction.accountName ? ` · ${p.transaction.accountName}` : ''}`
+            : p.transactionId ? 'Linked transaction' : 'Recorded manually';
+          return (
+            <div key={p.id} className="flex flex-col gap-1.5 text-xs py-2 px-2.5 rounded-lg" style={{ background: 'var(--color-surface)' }}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-md"
+                      style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>#{p.seq}</span>
+                    <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>{fmtDate(p.date)}</span>
+                    {p.paidOff && (
+                      <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>PAID OFF</span>
+                    )}
+                  </p>
+                  <p className="mt-1 truncate text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                    {p.note ? `${p.note} · ` : ''}{source}
+                  </p>
+                </div>
+                <div className="flex items-start gap-2.5 shrink-0">
+                  <div className="text-right">
+                    <p className="font-bold tabular-nums" style={{ color: amountTone }}>{owed ? '−' : '+'}${fmt(p.amount)}</p>
+                    <p className="text-[10.5px] tabular-nums mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{p.shareOfPrincipal}% of loan</p>
+                  </div>
+                  {!p.transactionId && (
+                    <button onClick={() => onDelete(p.id)} aria-label="Delete payment" className="hover:opacity-70 pt-0.5" style={{ color: 'var(--color-text-muted)' }}>✕</button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${p.pctRepaid}%`, background: 'var(--color-green)' }} />
+                </div>
+                <span className="text-[10.5px] tabular-nums shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                  {p.pctRepaid}% {owed ? 'paid back' : 'repaid'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-3 flex-wrap text-[10.5px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
+                <span>
+                  {owed ? 'Paid back' : 'Repaid'} so far <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>${fmt(p.paidSoFar)}</span>
+                  {p.daysSincePrev != null && (
+                    <> · {p.daysSincePrev === 0 ? 'same day as previous' : `${days(p.daysSincePrev)} after ${p.sinceLoanStart ? 'the loan' : 'previous'}`}</>
+                  )}
+                </span>
+                <span>
+                  Pending after{' '}
+                  <span className="font-bold" style={{ color: p.remainingAfter > 0 ? 'var(--color-orange)' : 'var(--color-green)' }}>
+                    ${fmt(p.remainingAfter)}
+                  </span>
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

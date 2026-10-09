@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Debt } from './debt.entity';
 import { DebtPayment } from './debt-payment.entity';
 import { Transaction } from '../transactions/transaction.entity';
@@ -77,7 +77,16 @@ export class DebtsService {
   async findOne(id: string, userId: string) {
     const debt = await this.owned(id, userId);
     const payments = await this.payments.find({ where: { debtId: id }, order: { date: 'DESC', createdAt: 'DESC' } });
-    return { ...(await this.withBalance(debt)), payments };
+    // Payments recorded from a transaction show which transaction and account they came from.
+    const txIds = payments.map((p) => p.transactionId).filter((t): t is string => !!t);
+    const txs = txIds.length
+      ? await this.txRepo.find({ where: { id: In(txIds), userId }, relations: { bankAccount: true } })
+      : [];
+    const txById = new Map(txs.map((t) => [t.id, { name: t.merchantName || t.name, accountName: t.bankAccount?.accountName ?? null }]));
+    return {
+      ...(await this.withBalance(debt)),
+      payments: payments.map((p) => ({ ...p, transaction: p.transactionId ? txById.get(p.transactionId) ?? null : null })),
+    };
   }
 
   async create(userId: string, dto: CreateDebtDto): Promise<DebtWithBalance> {
