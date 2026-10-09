@@ -223,10 +223,13 @@ export function calendarDays(yearTx: Transaction[], monthKey: string): CalendarC
 export interface PaceStats { monthPct: number; budgetPct: number; projected: number; overBy: number; hasBudgets: boolean }
 
 export function spendingPace(budgets: Budget[], yearTx: Transaction[], monthKey: string, now: Date): PaceStats {
-  const spendingBudgets = budgets.filter((b) => b.category ? b.category.type !== 'income' : true);
+  const spendingBudgets = budgets.filter((b) => !b.projectCategoryId && b.category?.type !== 'income');
   const totalBudget = spendingBudgets.reduce((s, b) => s + Number(b.amount), 0);
+  // Measure only what the budgets cover — unbudgeted rent against a $100 food
+  // budget would read as thousands of percent over.
+  const budgeted = new Set(spendingBudgets.map((b) => b.category?.id).filter(Boolean));
   const spent = txInMonth(yearTx, monthKey)
-    .filter((t) => inCashFlow(t) && Number(t.amount) < 0)
+    .filter((t) => inCashFlow(t) && Number(t.amount) < 0 && !!t.categoryRef && budgeted.has(t.categoryRef.id))
     .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
   const [y, m] = monthKey.split('-').map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();

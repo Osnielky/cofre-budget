@@ -297,6 +297,21 @@ describe('spendingPace', () => {
     expect(out.projected).toBeCloseTo(1240, 0);
     expect(out.overBy).toBeCloseTo(240, 0);
   });
+  it('only counts spending in budgeted categories', () => {
+    // A $100 Food budget must not be measured against unbudgeted rent.
+    const food = { id: 'b1', amount: 100, spent: 0, category: cat({ id: 'food' }) };
+    const out = spendingPace([food], [
+      tx({ date: '2026-07-05', amount: -80, categoryRef: cat({ id: 'food' }) }),
+      tx({ date: '2026-07-01', amount: -1300, categoryRef: cat({ id: 'rent', name: 'Rent' }) }),
+      tx({ date: '2026-07-02', amount: -40, categoryRef: null }),
+    ], '2026-07', new Date(2026, 6, 31));
+    expect(out.budgetPct).toBe(80);
+    expect(out.overBy).toBe(-20);
+  });
+  it('ignores project-category budgets (income targets)', () => {
+    const target = { id: 'b2', amount: 5000, spent: 0, category: null, projectCategoryId: 'pc1' };
+    expect(spendingPace([target], [], '2026-07', new Date(2026, 6, 15)).hasBudgets).toBe(false);
+  });
   it('flags missing budgets', () => {
     expect(spendingPace([], [], '2026-07', new Date(2026, 6, 15)).hasBudgets).toBe(false);
   });

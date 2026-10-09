@@ -6,6 +6,9 @@ import Sidebar from '@/components/Sidebar';
 import { useUser } from '@/components/UserProvider';
 import { useThemeColors } from '@/components/ThemeProvider';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { usePanelMonth, useMonthBudgets } from '@/hooks/usePanelMonth';
+import { monthOptionKeys } from '@/lib/dashboard/panelMonth';
+import PeriodSelect from '@/components/dashboard/PeriodSelect';
 import { isLiability } from '@/lib/accountTypes';
 import {
   monthlyCashFlow, trendSeries, categoryTotals, foldOther, txInMonth,
@@ -84,9 +87,22 @@ export default function DashboardPage() {
     return [{ value: 'ytd', label: 'Year to date' }, ...months.map((m) => ({ value: m, label: periodLabel(m) }))];
   }, [yearTx]);
 
+  // Ranking, budget, calendar and pace panels each pick their own month; they
+  // follow the header month until the user chooses another one.
+  const [rankMonth, setRankMonth] = usePanelMonth(month);
+  const [budgetMonth, setBudgetMonth] = usePanelMonth(month);
+  const [calMonth, setCalMonth] = usePanelMonth(month);
+  const [paceMonth, setPaceMonth] = usePanelMonth(month);
+  const budgetPanel = useMonthBudgets(budgetMonth, month, budgets);
+  const pacePanel = useMonthBudgets(paceMonth, month, budgets);
+  const monthPicker = (value: string, onChange: (m: string) => void, panel: string) => (
+    <PeriodSelect value={value} onChange={onChange} ariaLabel={`${panel} month`}
+      options={monthOptionKeys(yearTx.map((t) => t.date), month, value).map((m) => ({ value: m, label: periodLabel(m) }))} />
+  );
+
   const d = useMemo(() => {
     const monthTx = txInMonth(yearTx, month);
-    const expenseSlices = categoryTotals(monthTx, 'expense', projects);
+    const rankSlices = categoryTotals(txInMonth(yearTx, rankMonth), 'expense', projects);
     const forPeriod = (p: string) => (p === 'ytd' ? yearTx : txInMonth(yearTx, p));
     const incomeSlices = categoryTotals(forPeriod(incomePeriod), 'income', projects);
     const yearExpenseSlices = categoryTotals(forPeriod(expensePeriod), 'expense', projects);
@@ -95,11 +111,11 @@ export default function DashboardPage() {
       trend: trendSeries(yearTx, now, 12),   // full YTD; the panel slices per selected range
       expenseDonut: foldOther(yearExpenseSlices, 7),
       expenseTotal: yearExpenseSlices.reduce((s, x) => s + x.value, 0),
-      ranking: expenseSlices.slice(0, 7),
+      ranking: rankSlices.slice(0, 7),
       incomeSlices: foldOther(incomeSlices, 6),
       incomeTotal: incomeSlices.reduce((s, x) => s + x.value, 0),
-      calendar: calendarDays(yearTx, month),
-      pace: spendingPace(budgets, yearTx, month, now),
+      calendar: calendarDays(yearTx, calMonth),
+      pace: spendingPace(pacePanel.budgets, yearTx, paceMonth, now),
       fixedVar: fixedVariable(yearTx, month, projects),
       netWorth: netWorthBreakdown(accounts, debts, yearTx, month),
       changes: expenseChanges(yearTx, month, projects),
@@ -107,7 +123,7 @@ export default function DashboardPage() {
       daily: dailyCumulative(yearTx, month, now),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yearTx, month, budgets, accounts, debts, projects, incomePeriod, expensePeriod]);
+  }, [yearTx, month, budgets, accounts, debts, projects, incomePeriod, expensePeriod, rankMonth, calMonth, paceMonth, pacePanel.budgets]);
 
   /* ── Stat-card derivations (ported verbatim from the pre-refactor page) ── */
   const isDebtAcc    = (a: (typeof accounts)[number]) => isLiability(a.accountType);
@@ -234,10 +250,14 @@ export default function DashboardPage() {
               slices={d.expenseDonut} total={d.expenseTotal} loading={loading}
               period={expensePeriod} periodOptions={periodOptions} onPeriodChange={setExpensePeriod} />
 
-            <CategoryRankingPanel slices={d.ranking} loading={loading} />
-            <BudgetActualPanel budgets={spendingBudgets} monthLabel={monthLabel(month)} loading={loading} />
-            <SpendingCalendarPanel cells={d.calendar} monthLabel={monthLabel(month)} loading={loading} />
-            <SpendingPacePanel pace={d.pace} monthLabel={monthLabel(month)} loading={loading} />
+            <CategoryRankingPanel slices={d.ranking} monthLabel={monthLabel(rankMonth)}
+              picker={monthPicker(rankMonth, setRankMonth, 'Category ranking')} loading={loading} />
+            <BudgetActualPanel budgets={budgetPanel.budgets.filter((b) => !isIncomeBudget(b))} monthLabel={monthLabel(budgetMonth)}
+              picker={monthPicker(budgetMonth, setBudgetMonth, 'Budget vs actual')} loading={loading || budgetPanel.loading} />
+            <SpendingCalendarPanel cells={d.calendar} monthLabel={monthLabel(calMonth)}
+              picker={monthPicker(calMonth, setCalMonth, 'Daily spending')} loading={loading} />
+            <SpendingPacePanel pace={d.pace} monthLabel={monthLabel(paceMonth)}
+              picker={monthPicker(paceMonth, setPaceMonth, 'Spending pace')} loading={loading || pacePanel.loading} />
 
             <FixedVariablePanel split={d.fixedVar} monthLabel={monthLabel(month)} loading={loading} />
             <RecurringTimelinePanel />

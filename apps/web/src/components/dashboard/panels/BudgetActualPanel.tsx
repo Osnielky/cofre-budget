@@ -2,15 +2,16 @@
 
 import { useThemeColors } from '@/components/ThemeProvider';
 import Panel, { PanelEmpty } from '../Panel';
+import type { ReactNode } from 'react';
 import { fmt } from '../chartTheme';
 import type { Budget } from '@/lib/dashboard/types';
 
-export default function BudgetActualPanel({ budgets, monthLabel, loading }: {
-  budgets: Budget[]; monthLabel: string; loading: boolean;
+export default function BudgetActualPanel({ budgets, monthLabel, picker, loading }: {
+  budgets: Budget[]; monthLabel: string; picker?: ReactNode; loading: boolean;
 }) {
   const tc = useThemeColors();
   return (
-    <Panel title="Budget vs Actual" subtitle={monthLabel} loading={loading}>
+    <Panel title="Budget vs Actual" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading}>
       {budgets.length === 0 ? <PanelEmpty message="No budgets set. Create budgets to track spending against targets." /> : (
         <ul className="flex flex-col gap-2.5">
           {budgets.map((b) => {
