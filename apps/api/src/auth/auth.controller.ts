@@ -2,11 +2,13 @@ import { Controller, Post, Get, Patch, Body, Query, UseGuards, Request, Res, Htt
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleCallbackGuard } from './guards/google-callback.guard';
+import { isAdminEmail } from '../admin/admin-emails';
 import { cookieOptions } from '../common/http/cookies';
 
 const COOKIE_OPTS = cookieOptions(undefined, 7 * 24 * 60 * 60 * 1000);
@@ -18,6 +20,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private usersService: UsersService,
+    private config: ConfigService,
   ) {}
 
   // 5 attempts per 15 minutes — brute-force protection
@@ -83,7 +86,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@Request() req: any) {
-    return req.user;
+    return { ...req.user, isAdmin: isAdminEmail(req.user?.email, this.config.get<string>('ADMIN_EMAILS')) };
   }
 
   @SkipThrottle()
