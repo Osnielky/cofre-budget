@@ -21,6 +21,7 @@ import { CategorizationRulesModule } from '../categorization-rules/categorizatio
 import { NetWorthGoalModule } from '../net-worth-goal/net-worth-goal.module';
 import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { BillingModule } from '../billing/billing.module';
+import { AdminModule } from '../admin/admin.module';
 import { HealthController } from '../health/health.controller';
 
 @Module({
@@ -48,6 +49,7 @@ import { HealthController } from '../health/health.controller';
     NetWorthGoalModule,
     AiAgentModule,
     BillingModule,
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [

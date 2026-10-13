@@ -59,6 +59,7 @@ export class AdminService {
         'u."googleId" IS NOT NULL AS "isGoogle"', 'u."emailVerified" AS "emailVerified"',
         'u."createdAt" AS "createdAt"', 'u."lastSeenAt" AS "lastSeenAt"'])
       .orderBy('u."createdAt"', 'DESC')
+      .addOrderBy('u.id', 'DESC')
       .offset((page - 1) * ADMIN_PAGE_SIZE)
       .limit(ADMIN_PAGE_SIZE)
       .getRawMany();
