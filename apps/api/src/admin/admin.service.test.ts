@@ -42,6 +42,9 @@ describe('AdminService.stats', () => {
     const s = await service.stats(NOW);
     expect(s.users).toMatchObject({ total: 3, new7d: 1, new30d: 2, verified: 2, unverified: 1, bySignup: { google: 1, email: 2 } });
     expect(s.users.weeklySignups.reduce((a, w) => a + w.count, 0)).toBe(2); // ago(200) is outside 12 weeks
+    // ago(2) = 2026-10-11 (Sun) -> week of 2026-10-05; ago(10) = 2026-10-03 (Sat) -> week of 2026-09-28
+    expect(s.users.weeklySignups.find((w) => w.week === '2026-10-05')?.count).toBe(1);
+    expect(s.users.weeklySignups.find((w) => w.week === '2026-09-28')?.count).toBe(1);
   });
 
   it('computes plans, subscription statuses and MRR from active subscriptions only', async () => {
@@ -73,6 +76,41 @@ describe('AdminService.stats', () => {
     const s = await service.stats(NOW);
     expect(s.engagement).toMatchObject({ active1d: 1, active7d: 2, active30d: 2 });
     expect(s.engagement.avgTransactionsPerActiveUser).toBe(2); // 4 tx ÷ 2 active
+  });
+
+  it('ignores inactive users\' recent transactions in the per-active-user average', async () => {
+    const a = await user({ email: 'a@x.com', lastSeenAt: ago(1) });
+    const never = await user({ email: 'n@x.com' });
+    const stale = await user({ email: 's@x.com', lastSeenAt: ago(60) });
+    const tx = ds.getRepository(Transaction);
+    let i = 0;
+    for (const [u, n] of [[a, 3], [never, 5], [stale, 5]] as [User, number][]) {
+      for (let k = 0; k < n; k++) {
+        await tx.save(tx.create({ userId: u.id, name: `t${i++}`, amount: -1, date: '2026-10-01', source: 'manual' } as Partial<Transaction>));
+      }
+    }
+    const s = await service.stats(NOW);
+    expect(s.engagement.active30d).toBe(1);
+    expect(s.engagement.avgTransactionsPerActiveUser).toBe(3); // only a's 3 tx
+  });
+
+  it('counts users with budgets, projects and a net worth goal, and subscription churn windows', async () => {
+    const a = await user({ email: 'a@x.com', netWorthGoalTargetDate: '2030-01-01' });
+    const b = await user({ email: 'b@x.com' });
+    const c = await user({ email: 'c@x.com' });
+    await ds.getRepository('Budget').save({ userId: a.id, month: '2026-10', amount: 100 });
+    await ds.getRepository('Budget').save({ userId: a.id, month: '2026-09', amount: 100 });
+    await ds.getRepository('Project').save({ userId: b.id, name: 'Car' });
+    await ds.getRepository('Project').save({ userId: b.id, name: 'House' });
+    const subs = ds.getRepository(Subscription);
+    await subs.save(subs.create({ userId: a.id, stripeSubscriptionId: 's1', tier: 'pro', interval: 'month', status: 'canceled' }));
+    await subs.save(subs.create({ userId: b.id, stripeSubscriptionId: 's2', tier: 'pro', interval: 'month', status: 'canceled' }));
+    await subs.save(subs.create({ userId: c.id, stripeSubscriptionId: 's3', tier: 'pro', interval: 'month', status: 'active' }));
+    await ds.query('UPDATE subscriptions SET "createdAt" = ?, "updatedAt" = ? WHERE "stripeSubscriptionId" = ?', [sqlTs(90), sqlTs(90), 's2']);
+    const s = await service.stats(NOW);
+    expect(s.engagement).toMatchObject({ withBudgets: 1, withProjects: 1, withNetWorthGoal: 1 });
+    expect(s.revenue.new30d).toBe(2); // s1, s3 (s2 is 90 days old)
+    expect(s.revenue.canceled30d).toBe(1); // s1 only; s2 canceled long ago
   });
 
   it('groups Plaid connections in error by code and counts bank-linked users', async () => {

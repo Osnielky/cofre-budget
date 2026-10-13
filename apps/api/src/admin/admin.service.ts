@@ -50,12 +50,14 @@ export class AdminService {
       this.count('subscriptions', 't."cancelAtPeriodEnd" = :v AND t.status IN (:...s)', { v: true, s: ['active', 'trialing'] }),
       this.ds.createQueryBuilder().select('t.tier', 'tier').addSelect('t."interval"', 'interval').from('subscriptions', 't').where('t.status = :s', { s: 'active' }).getRawMany(),
       this.count('subscriptions', 't."createdAt" >= :c', { c: d30 }),
+      // Approximates "canceled in the last 30 days" via updatedAt (no canceledAt column).
       this.count('subscriptions', 't.status = :s AND t."updatedAt" >= :c', { s: 'canceled', c: d30 }),
       this.count('users', 't."lastSeenAt" >= :c', { c: d1 }),
       this.count('users', 't."lastSeenAt" >= :c', { c: d7 }),
       this.count('users', 't."lastSeenAt" >= :c', { c: d30 }),
       this.count('plaid_items', undefined, {}, distinctUsers),
-      this.count('transactions', 't."createdAt" >= :c', { c: d30 }),
+      // Numerator population must match the active30d denominator: only users seen in the last 30 days.
+      this.count('transactions', 't."createdAt" >= :c AND t."userId" IN (SELECT u.id FROM users u WHERE u."lastSeenAt" >= :c)', { c: d30 }),
       this.count('budgets', undefined, {}, distinctUsers),
       this.count('projects', undefined, {}, distinctUsers),
       this.count('users', 't."netWorthGoalTargetDate" IS NOT NULL'),
