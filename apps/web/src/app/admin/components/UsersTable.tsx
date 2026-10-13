@@ -10,11 +10,11 @@ const PLAN = { free: 'Basic', pro: 'Pro', elite: 'Elite' } as const;
 const date = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const sub = (u: AdminUserRow) => `${PLAN[u.plan]}${u.subscriptionStatus ? ` · ${u.subscriptionStatus.replace('_', ' ')}` : ''}`;
 
-export default function UsersTable() {
+export default function UsersTable({ refreshKey }: { refreshKey: number }) {
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const { data, loading, error } = useAdminUsers(search, page);
+  const { data, loading, error } = useAdminUsers(search, page, refreshKey);
 
   // Debounce typing; a new search always starts on page 1.
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function UsersTable() {
       legend={
         <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Search email or name"
           aria-label="Search users" maxLength={100}
-          className="px-3 py-1.5 rounded-lg text-sm outline-none w-full sm:w-64"
+          className="px-3 py-1.5 rounded-lg text-sm outline-none focus-visible:[box-shadow:0_0_0_2px_var(--color-primary)] w-full sm:w-64"
           style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
       }>
       {error ? <PanelEmpty message={error} />
@@ -38,12 +38,12 @@ export default function UsersTable() {
         : (
           <div className="flex flex-col gap-3" style={{ opacity: loading ? 0.6 : 1 }}>
             {/* Desktop table */}
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-[11px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                     {['User', 'Plan', 'Sign-up', 'Joined', 'Last seen', 'Banks', 'Transactions'].map((h) => (
-                      <th key={h} className="py-2 pr-4 font-semibold">{h}</th>
+                      <th key={h} scope="col" className="py-2 pr-4 font-semibold">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -69,7 +69,7 @@ export default function UsersTable() {
             </div>
 
             {/* Phone cards */}
-            <div className="md:hidden flex flex-col gap-2">
+            <div className="lg:hidden flex flex-col gap-2">
               {data.rows.map((u) => (
                 <div key={u.id} className="rounded-xl p-3 text-sm" style={{ border: 'var(--glass-border)' }}>
                   <p className="font-semibold truncate">{u.name || '—'}</p>

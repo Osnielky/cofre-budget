@@ -28,7 +28,7 @@ export function useAdminStats() {
   return { data, loading, notFound, error, reload };
 }
 
-export function useAdminUsers(search: string, page: number) {
+export function useAdminUsers(search: string, page: number, refreshKey = 0) {
   const [data, setData] = useState<AdminUsersPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export function useAdminUsers(search: string, page: number) {
       .catch((e: Error) => { if (e.name !== 'AbortError') setError(e.message); })
       .finally(() => { if (!ctrl.signal.aborted) setLoading(false); });
     return () => ctrl.abort();
-  }, [search, page]);
+  }, [search, page, refreshKey]);
 
   return { data, loading, error };
 }

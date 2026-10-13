@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useAdminStats } from '@/hooks/useAdmin';
 import AdminStatTiles from './components/AdminStatTiles';
@@ -11,6 +12,8 @@ import UsersTable from './components/UsersTable';
 
 export default function AdminPage() {
   const { data, loading, notFound, error, reload } = useAdminStats();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refresh = () => { reload(); setRefreshKey((k) => k + 1); };
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -24,25 +27,30 @@ export default function AdminPage() {
             </div>
           ) : (
             <>
+              {!data && loading && (
+                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
+              )}
+              {data && (
               <div className="flex items-end justify-between gap-3 flex-wrap">
                 <div>
                   <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(26px, 3vw, 38px)' }}>Admin</h1>
                   <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-                    {data ? `Updated ${new Date(data.generatedAt).toLocaleTimeString()}` : 'How Cofre is doing'}
+                    {`Updated ${new Date(data.generatedAt).toLocaleTimeString()}`}
                   </p>
                 </div>
-                <button type="button" onClick={reload} disabled={loading}
+                <button type="button" onClick={refresh} disabled={loading}
                   className="px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-40"
                   style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                   {loading ? 'Refreshing…' : 'Refresh'}
                 </button>
               </div>
+              )}
 
               {error && (
                 <div className="flex items-center justify-between gap-4 rounded-2xl px-5 py-3.5 flex-wrap"
                   style={{ background: 'color-mix(in srgb, var(--color-rose) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-rose) 25%, transparent)' }}>
                   <span className="text-sm" style={{ color: 'var(--color-rose)' }}>{error}</span>
-                  <button onClick={reload} className="text-xs font-semibold uppercase cursor-pointer" style={{ color: 'var(--color-rose)' }}>Retry</button>
+                  <button type="button" onClick={reload} className="text-xs font-semibold uppercase cursor-pointer" style={{ color: 'var(--color-rose)' }}>Retry</button>
                 </div>
               )}
 
@@ -51,11 +59,11 @@ export default function AdminPage() {
                   <AdminStatTiles s={data} />
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
                     {/* Panel's colSpan={2} only spans at xl, so the wide panels are wrapped to span a full row at md; Engagement fills the odd cell at md and sits beside Users at xl. */}
-                    <div className="md:col-span-2 xl:col-span-2 min-w-0 flex flex-col"><SignupsChart weeks={data.users.weeklySignups} /></div>
+                    <div className="md:col-span-2 xl:col-span-2 min-w-0 flex flex-col [&>*]:flex-1"><SignupsChart weeks={data.users.weeklySignups} /></div>
                     <PlansPanel r={data.revenue} />
                     <HealthPanel h={data.health} />
-                    <div className="md:col-span-2 xl:col-span-1 min-w-0 flex flex-col"><EngagementPanel e={data.engagement} total={data.users.total} /></div>
-                    <div className="md:col-span-2 xl:col-span-3 min-w-0 flex flex-col"><UsersTable /></div>
+                    <div className="md:col-span-2 xl:col-span-1 min-w-0 flex flex-col [&>*]:flex-1"><EngagementPanel e={data.engagement} total={data.users.total} /></div>
+                    <div className="md:col-span-2 xl:col-span-3 min-w-0 flex flex-col [&>*]:flex-1"><UsersTable refreshKey={refreshKey} /></div>
                   </div>
                 </>
               )}
