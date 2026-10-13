@@ -14,6 +14,7 @@ interface User {
   plan?: 'free' | 'pro' | 'elite';
   emailVerified?: boolean;
   createdAt?: string;
+  isAdmin?: boolean;
 }
 
 export type { User };
