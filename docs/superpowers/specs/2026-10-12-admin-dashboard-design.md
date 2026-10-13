@@ -28,8 +28,10 @@ sign the page exists.
   means **no admins**.
 - Deployed as a **Secret Manager secret** `ADMIN_EMAILS`, mounted on the API by
   adding `ADMIN_EMAILS=ADMIN_EMAILS:latest` to `--set-secrets` in
-  `deploy/ci-deploy.sh` (prod) and `cloudbuild.dev.yaml` (dev). It must be a
-  secret, not a hand-set env var: both deploys pass `--set-env-vars` /
+  `deploy/ci-deploy.sh` (the live pipeline: `deploy/cloudbuild.yaml` →
+  `ci-deploy.sh`; the root `cloudbuild.dev.yaml` is unused and not touched). The
+  secret already exists in `cofre-dev`. It must be a
+  secret, not a hand-set env var: the deploy passes `--set-env-vars` /
   `--set-secrets`, which replace the full list and would wipe a manual value.
   The secret must exist before the first deploy that references it, or the
   deploy fails. A changed value is picked up by the next revision.
