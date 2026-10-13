@@ -26,6 +26,14 @@ sign the page exists.
 
 - `ADMIN_EMAILS`: comma-separated, trimmed, compared lowercase. Unset or empty
   means **no admins**.
+- Deployed as a **Secret Manager secret** `ADMIN_EMAILS`, mounted on the API by
+  adding `ADMIN_EMAILS=ADMIN_EMAILS:latest` to `--set-secrets` in
+  `deploy/ci-deploy.sh` (prod) and `cloudbuild.dev.yaml` (dev). It must be a
+  secret, not a hand-set env var: both deploys pass `--set-env-vars` /
+  `--set-secrets`, which replace the full list and would wipe a manual value.
+  The secret must exist before the first deploy that references it, or the
+  deploy fails. A changed value is picked up by the next revision.
+  Locally it is a plain line in `.env`; CLAUDE.md's env list gains it.
 - `isAdminEmail(email, raw)` — pure helper in `apps/api/src/admin/admin-emails.ts`.
 - `AdminGuard` (`apps/api/src/admin/admin.guard.ts`) runs after `JwtAuthGuard`
   and throws `NotFoundException` for non-admins, so admin routes are
