@@ -24,7 +24,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: { sub?: unknown; typ?: unknown }) {
     if (payload.typ !== 'access' || typeof payload.sub !== 'string' || !payload.sub) return null;
     const user = await this.usersService.findById(payload.sub);
-    if (user) setRequestUser(user.id);
+    if (user) {
+      setRequestUser(user.id);
+      // The WHERE in touchLastSeen is the race guard; skip the write here so most requests never hit the DB.
+      const seen = user.lastSeenAt ? new Date(user.lastSeenAt).getTime() : 0;
+      if (!user.lastSeenAt || Date.now() - seen >= 60 * 60 * 1000) {
+        void this.usersService.touchLastSeen(user.id);
+      }
+    }
     return user;
   }
 }

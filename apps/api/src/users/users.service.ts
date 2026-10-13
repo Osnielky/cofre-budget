@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User)
     private repo: Repository<User>,
@@ -14,6 +16,24 @@ export class UsersService {
     // findOneBy drops undefined keys from the WHERE, which would return the first user.
     if (!id) return Promise.resolve(null);
     return this.repo.findOneBy({ id });
+  }
+
+  /**
+   * Records activity for admin "active users" counts. At most one write per user
+   * per hour (the WHERE skips fresh rows), never bumps updatedAt, and never
+   * rejects: callers fire and forget it.
+   */
+  async touchLastSeen(id: string, now: Date = new Date()): Promise<void> {
+    try {
+      await this.repo.createQueryBuilder()
+        .update(User)
+        .set({ lastSeenAt: now, updatedAt: () => '"updatedAt"' })
+        .where('id = :id', { id })
+        .andWhere('("lastSeenAt" IS NULL OR "lastSeenAt" < :stale)', { stale: new Date(now.getTime() - 60 * 60 * 1000) })
+        .execute();
+    } catch (err) {
+      this.logger.warn(`touchLastSeen failed: ${(err as Error).message}`);
+    }
   }
 
   findByEmail(email: string): Promise<User | null> {

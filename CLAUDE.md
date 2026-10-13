@@ -78,6 +78,8 @@ PLAID_OAUTH_REDIRECT_URI   # e.g. https://<host>/settings/plaid-oauth-redirect â
 PROXY_SHARED_SECRET        # optional locally; set on BOTH Cloud Run services. The web
                             # middleware forwards the client IP to the API with it so rate
                             # limits are per client, not per web-service address
+ADMIN_EMAILS               # comma-separated login emails allowed into /admin (Secret Manager
+                            # in Cloud Run); unset = nobody is an admin
 GOOGLE_CLOUD_PROJECT       # set by ci-deploy.sh; links API log entries to Cloud Trace
 SLOW_REQUEST_MS / SLOW_QUERY_MS / SLOW_EXTERNAL_MS   # optional log thresholds (1000/500/2000)
 ```

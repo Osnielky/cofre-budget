@@ -117,3 +117,41 @@ describe('UsersService.findById', () => {
     expect(await users.findById(undefined as unknown as string)).toBeNull();
   });
 });
+
+describe('JwtStrategy — last-seen touch is throttled before it reaches the DB', () => {
+  const HOUR = 60 * 60 * 1000;
+  function setup(user: unknown) {
+    const touched: string[] = [];
+    const svc = {
+      findById: async () => user,
+      touchLastSeen: async (id: string) => { touched.push(id); },
+    };
+    const strategy = new JwtStrategy(fakeConfig(), svc as unknown as UsersService);
+    return { strategy, touched };
+  }
+  const payload = { sub: 'u1', typ: 'access' };
+
+  it('does not touch when the user is missing', async () => {
+    const { strategy, touched } = setup(null);
+    expect(await strategy.validate(payload)).toBeNull();
+    expect(touched).toEqual([]);
+  });
+
+  it('does not touch when lastSeenAt is under an hour old', async () => {
+    const { strategy, touched } = setup({ id: 'u1', lastSeenAt: new Date(Date.now() - HOUR / 2) });
+    await strategy.validate(payload);
+    expect(touched).toEqual([]);
+  });
+
+  it('touches when lastSeenAt is null', async () => {
+    const { strategy, touched } = setup({ id: 'u1', lastSeenAt: null });
+    await strategy.validate(payload);
+    expect(touched).toEqual(['u1']);
+  });
+
+  it('touches when lastSeenAt is over an hour old', async () => {
+    const { strategy, touched } = setup({ id: 'u1', lastSeenAt: new Date(Date.now() - HOUR - 1000) });
+    await strategy.validate(payload);
+    expect(touched).toEqual(['u1']);
+  });
+});
