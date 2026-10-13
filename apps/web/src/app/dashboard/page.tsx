@@ -11,7 +11,7 @@ import { monthOptionKeys } from '@/lib/dashboard/panelMonth';
 import PeriodSelect from '@/components/dashboard/PeriodSelect';
 import { isLiability } from '@/lib/accountTypes';
 import {
-  monthlyCashFlow, trendSeries, categoryTotals, categoryMonthly, foldOther, txInMonth,
+  monthlyCashFlow, trendSeries, categoryTotals, categoryMonthly, categoryTrendGroups, foldOther, txInMonth,
   fixedVariable, netWorthBreakdown,
   expenseChanges, topMerchants, inCashFlow, savedTotal, dailyCumulative,
 } from '@/lib/dashboard/derive';
@@ -112,8 +112,9 @@ export default function DashboardPage() {
     const forPeriod = (p: string) => (p === 'ytd' ? yearTx : txInMonth(yearTx, p));
     const incomeSlices = categoryTotals(forPeriod(incomePeriod), 'income', projects);
     const yearExpenseSlices = categoryTotals(forPeriod(expensePeriod), 'expense', projects);
-    const trendCategories = categoryTotals(yearTx, 'expense', projects);
-    const trendId = trendCat && trendCategories.some((c) => c.id === trendCat) ? trendCat : trendCategories[0]?.id ?? '';
+    const trendGroups = categoryTrendGroups(yearTx, projects);
+    const trendOptions = trendGroups.flatMap((g) => g.options);
+    const trendId = trendCat && trendOptions.some((c) => c.id === trendCat) ? trendCat : trendOptions[0]?.id ?? '';
     return {
       cashFlow: monthlyCashFlow(yearTx, now),
       trend: trendSeries(yearTx, now, 12),   // full YTD; the panel slices per selected range
@@ -122,7 +123,7 @@ export default function DashboardPage() {
       ranking: rankSlices.slice(0, 7),
       incomeSlices: foldOther(incomeSlices, 6),
       incomeTotal: incomeSlices.reduce((s, x) => s + x.value, 0),
-      trendCategories,
+      trendGroups,
       trendId,
       trendData: trendId ? categoryMonthly(yearTx, trendId, now, projects) : [],
       fixedVar: fixedVariable(yearTx, month, projects),
@@ -269,9 +270,9 @@ export default function DashboardPage() {
             <SpendingPacePanel pace={d.pace} monthLabel={monthLabel(paceMonth)}
               picker={monthPicker(paceMonth, setPaceMonth, 'Spending pace')} loading={loading || pacePanel.loading} />
             */}
-            <CategoryTrendPanel categories={d.trendCategories} selectedId={d.trendId} onSelect={setTrendCat}
+            <CategoryTrendPanel groups={d.trendGroups} selectedId={d.trendId} onSelect={setTrendCat}
               data={d.trendData}
-              budget={(() => { const b = budgets.find((x) => x.category?.id === d.trendId || (!!x.projectCategoryId && `proj:${x.projectCategoryId}` === d.trendId)); return b ? Number(b.amount) : null; })()}
+              budget={(() => { const b = spendingBudgets.find((x) => x.category?.id === d.trendId); return b ? Number(b.amount) : null; })()}
               loading={loading} />
 
             <FixedVariablePanel split={d.fixedVar} monthLabel={monthLabel(month)} loading={loading} />

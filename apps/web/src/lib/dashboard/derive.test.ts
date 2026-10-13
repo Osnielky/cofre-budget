@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeBucketer, isTransfer, isSavings, savedTotal, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, categoryMonthly, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative, assetMix, netWorthTrend } from './derive';
+import { makeBucketer, isTransfer, isSavings, savedTotal, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, categoryMonthly, categoryTrendGroups, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative, assetMix, netWorthTrend } from './derive';
 import type { Transaction, Category, BankAccount, Debt, Project } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
@@ -119,6 +119,34 @@ describe('trendSeries', () => {
   });
   it('clamps to January when fewer months exist', () => {
     expect(trendSeries([], new Date(2026, 2, 15))).toHaveLength(3); // Jan, Feb, Mar
+  });
+});
+
+describe('categoryTrendGroups', () => {
+  const house = proj({ id: 'p1', name: 'Rental House', icon: '🏠', color: '#F07A3E' });
+  const shop = proj({ id: 'p2', name: 'Shop', icon: '🛠', color: '#4BA8D8' });
+  const repairs = { id: 'pc1', name: 'Repairs', icon: '🔧', color: '#999' };
+
+  it('puts personal categories first, then one group per project ordered by spend', () => {
+    const out = categoryTrendGroups([
+      tx({ amount: -50, categoryRef: cat({ id: 'f', name: 'Food' }) }),
+      tx({ amount: -30, categoryRef: null, projectId: 'p1', projectCategoryRef: repairs }),
+      tx({ amount: -90, categoryRef: null, projectId: 'p2' }),
+    ], [house, shop]);
+    expect(out.map((g) => g.label)).toEqual(['Personal', 'Shop', 'Rental House']);
+    expect(out[0]).toMatchObject({ project: null });
+    expect(out[0].options.map((o) => o.id)).toEqual(['f']);
+    expect(out[2]).toMatchObject({ project: { id: 'p1', name: 'Rental House', icon: '🏠', color: '#F07A3E' } });
+    expect(out[2].options.map((o) => [o.id, o.name])).toEqual([['proj:pc1', 'Repairs']]);
+  });
+
+  it('names a project\'s uncategorised spending "All of <project>"', () => {
+    const out = categoryTrendGroups([tx({ amount: -90, categoryRef: null, projectId: 'p2' })], [shop]);
+    expect(out[0].options[0]).toMatchObject({ id: 'project:p2', name: 'All of Shop' });
+  });
+
+  it('ignores income and returns no groups when nothing was spent', () => {
+    expect(categoryTrendGroups([tx({ amount: 500 })], [])).toEqual([]);
   });
 });
 

@@ -153,6 +153,44 @@ export function categoryMonthly(yearTx: Transaction[], bucketId: string, now: Da
   });
 }
 
+export interface TrendGroup {
+  label: string;
+  /** null for personal categories; the owning project otherwise. */
+  project: BucketProject | null;
+  options: CategorySlice[];
+}
+
+/**
+ * Expense buckets for the category-trend picker: personal categories first, then
+ * one group per project (ordered by spend) holding its project categories and
+ * an "All of <project>" bucket for its uncategorised spending.
+ */
+export function categoryTrendGroups(yearTx: Transaction[], projects: BucketProject[] = []): TrendGroup[] {
+  const slices = categoryTotals(yearTx, 'expense', projects);
+  // proj:<projectCategoryId> buckets don't carry their project; the transactions do.
+  const ownerOf = new Map<string, string>();
+  for (const t of yearTx) {
+    if (!t.categoryRef && t.projectCategoryRef && t.projectId) ownerOf.set(`proj:${t.projectCategoryRef.id}`, t.projectId);
+  }
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  const personal: CategorySlice[] = [];
+  const perProject = new Map<string, { project: BucketProject; options: CategorySlice[]; total: number }>();
+  for (const s of slices) {
+    const projectId = s.id.startsWith('project:') ? s.id.slice('project:'.length) : ownerOf.get(s.id);
+    const project = projectId ? byId.get(projectId) : undefined;
+    if (!project) { personal.push(s); continue; }
+    const group = perProject.get(project.id) ?? { project, options: [], total: 0 };
+    group.options.push(s.id.startsWith('project:') ? { ...s, name: `All of ${project.name}` } : s);
+    group.total += s.value;
+    perProject.set(project.id, group);
+  }
+  const groups: TrendGroup[] = personal.length ? [{ label: 'Personal', project: null, options: personal }] : [];
+  for (const g of [...perProject.values()].sort((a, b) => b.total - a.total)) {
+    groups.push({ label: g.project.name, project: g.project, options: g.options });
+  }
+  return groups;
+}
+
 export function foldOther(slices: CategorySlice[], max: number): CategorySlice[] {
   if (slices.length <= max) return slices;
   const head = slices.slice(0, max - 1);
