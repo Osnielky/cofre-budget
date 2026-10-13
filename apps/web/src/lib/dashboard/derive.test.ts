@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { makeBucketer, isTransfer, isSavings, savedTotal, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative, assetMix, netWorthTrend } from './derive';
+import { makeBucketer, isTransfer, isSavings, savedTotal, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, categoryMonthly, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative, assetMix, netWorthTrend } from './derive';
 import type { Transaction, Category, BankAccount, Debt, Project } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
@@ -119,6 +119,27 @@ describe('trendSeries', () => {
   });
   it('clamps to January when fewer months exist', () => {
     expect(trendSeries([], new Date(2026, 2, 15))).toHaveLength(3); // Jan, Feb, Mar
+  });
+});
+
+describe('categoryMonthly', () => {
+  it('sums one category per month, Jan..current, ignoring other buckets and income', () => {
+    const food = cat({ id: 'f' });
+    const out = categoryMonthly([
+      tx({ date: '2026-05-03', amount: -40, categoryRef: food }),
+      tx({ date: '2026-05-20', amount: -10.5, categoryRef: food }),
+      tx({ date: '2026-07-01', amount: -25, categoryRef: food }),
+      tx({ date: '2026-07-02', amount: -99, categoryRef: cat({ id: 'g' }) }),
+      tx({ date: '2026-07-02', amount: 15, categoryRef: food }), // refund, not spend
+    ], 'f', NOW);
+    expect(out).toHaveLength(7);
+    expect(out[4]).toEqual({ month: 'May', key: '2026-05', value: 50.5 });
+    expect(out[5].value).toBe(0);
+    expect(out[6].value).toBe(25);
+  });
+  it('matches project buckets by their namespaced id', () => {
+    const out = categoryMonthly([tx({ categoryRef: null, projectId: 'p1' })], 'project:p1', NOW, [proj()]);
+    expect(out[6].value).toBe(10);
   });
 });
 

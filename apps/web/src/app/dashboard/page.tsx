@@ -11,8 +11,8 @@ import { monthOptionKeys } from '@/lib/dashboard/panelMonth';
 import PeriodSelect from '@/components/dashboard/PeriodSelect';
 import { isLiability } from '@/lib/accountTypes';
 import {
-  monthlyCashFlow, trendSeries, categoryTotals, foldOther, txInMonth,
-  calendarDays, spendingPace, fixedVariable, netWorthBreakdown,
+  monthlyCashFlow, trendSeries, categoryTotals, categoryMonthly, foldOther, txInMonth,
+  fixedVariable, netWorthBreakdown,
   expenseChanges, topMerchants, inCashFlow, savedTotal, dailyCumulative,
 } from '@/lib/dashboard/derive';
 import type { Budget } from '@/lib/dashboard/types';
@@ -22,8 +22,10 @@ import CashFlowTrendPanel from '@/components/dashboard/panels/CashFlowTrendPanel
 import CategoryDonutPanel from '@/components/dashboard/panels/CategoryDonutPanel';
 import CategoryRankingPanel from '@/components/dashboard/panels/CategoryRankingPanel';
 import BudgetActualPanel from '@/components/dashboard/panels/BudgetActualPanel';
-import SpendingCalendarPanel from '@/components/dashboard/panels/SpendingCalendarPanel';
-import SpendingPacePanel from '@/components/dashboard/panels/SpendingPacePanel';
+// Hidden for now in favour of CategoryTrendPanel — restore with the JSX below.
+// import SpendingCalendarPanel from '@/components/dashboard/panels/SpendingCalendarPanel';
+// import SpendingPacePanel from '@/components/dashboard/panels/SpendingPacePanel';
+import CategoryTrendPanel from '@/components/dashboard/panels/CategoryTrendPanel';
 import FixedVariablePanel from '@/components/dashboard/panels/FixedVariablePanel';
 import RecurringTimelinePanel from '@/components/dashboard/panels/RecurringTimelinePanel';
 import NetWorthGoalPanel from '@/components/dashboard/panels/NetWorthGoalPanel';
@@ -87,14 +89,18 @@ export default function DashboardPage() {
     return [{ value: 'ytd', label: 'Year to date' }, ...months.map((m) => ({ value: m, label: periodLabel(m) }))];
   }, [yearTx]);
 
-  // Ranking, budget, calendar and pace panels each pick their own month; they
-  // follow the header month until the user chooses another one.
+  // Ranking and budget panels each pick their own month; they follow the
+  // header month until the user chooses another one.
   const [rankMonth, setRankMonth] = usePanelMonth(month);
   const [budgetMonth, setBudgetMonth] = usePanelMonth(month);
-  const [calMonth, setCalMonth] = usePanelMonth(month);
-  const [paceMonth, setPaceMonth] = usePanelMonth(month);
   const budgetPanel = useMonthBudgets(budgetMonth, month, budgets);
-  const pacePanel = useMonthBudgets(paceMonth, month, budgets);
+  // Hidden with the calendar and pace panels:
+  // const [calMonth, setCalMonth] = usePanelMonth(month);
+  // const [paceMonth, setPaceMonth] = usePanelMonth(month);
+  // const pacePanel = useMonthBudgets(paceMonth, month, budgets);
+
+  // Category trend: null means "the biggest spending category this year".
+  const [trendCat, setTrendCat] = useState<string | null>(null);
   const monthPicker = (value: string, onChange: (m: string) => void, panel: string) => (
     <PeriodSelect value={value} onChange={onChange} ariaLabel={`${panel} month`}
       options={monthOptionKeys(yearTx.map((t) => t.date), month, value).map((m) => ({ value: m, label: periodLabel(m) }))} />
@@ -106,6 +112,8 @@ export default function DashboardPage() {
     const forPeriod = (p: string) => (p === 'ytd' ? yearTx : txInMonth(yearTx, p));
     const incomeSlices = categoryTotals(forPeriod(incomePeriod), 'income', projects);
     const yearExpenseSlices = categoryTotals(forPeriod(expensePeriod), 'expense', projects);
+    const trendCategories = categoryTotals(yearTx, 'expense', projects);
+    const trendId = trendCat && trendCategories.some((c) => c.id === trendCat) ? trendCat : trendCategories[0]?.id ?? '';
     return {
       cashFlow: monthlyCashFlow(yearTx, now),
       trend: trendSeries(yearTx, now, 12),   // full YTD; the panel slices per selected range
@@ -114,8 +122,9 @@ export default function DashboardPage() {
       ranking: rankSlices.slice(0, 7),
       incomeSlices: foldOther(incomeSlices, 6),
       incomeTotal: incomeSlices.reduce((s, x) => s + x.value, 0),
-      calendar: calendarDays(yearTx, calMonth),
-      pace: spendingPace(pacePanel.budgets, yearTx, paceMonth, now),
+      trendCategories,
+      trendId,
+      trendData: trendId ? categoryMonthly(yearTx, trendId, now, projects) : [],
       fixedVar: fixedVariable(yearTx, month, projects),
       netWorth: netWorthBreakdown(accounts, debts, yearTx, month),
       changes: expenseChanges(yearTx, month, projects),
@@ -123,7 +132,7 @@ export default function DashboardPage() {
       daily: dailyCumulative(yearTx, month, now),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yearTx, month, budgets, accounts, debts, projects, incomePeriod, expensePeriod, rankMonth, calMonth, paceMonth, pacePanel.budgets]);
+  }, [yearTx, month, budgets, accounts, debts, projects, incomePeriod, expensePeriod, rankMonth, trendCat]);
 
   /* ── Stat-card derivations (ported verbatim from the pre-refactor page) ── */
   const isDebtAcc    = (a: (typeof accounts)[number]) => isLiability(a.accountType);
@@ -254,10 +263,16 @@ export default function DashboardPage() {
               picker={monthPicker(rankMonth, setRankMonth, 'Category ranking')} loading={loading} />
             <BudgetActualPanel budgets={budgetPanel.budgets.filter((b) => !isIncomeBudget(b))} monthLabel={monthLabel(budgetMonth)}
               picker={monthPicker(budgetMonth, setBudgetMonth, 'Budget vs actual')} loading={loading || budgetPanel.loading} />
+            {/* Hidden for now — Daily Spending calendar and Spending Pace.
             <SpendingCalendarPanel cells={d.calendar} monthLabel={monthLabel(calMonth)}
               picker={monthPicker(calMonth, setCalMonth, 'Daily spending')} loading={loading} />
             <SpendingPacePanel pace={d.pace} monthLabel={monthLabel(paceMonth)}
               picker={monthPicker(paceMonth, setPaceMonth, 'Spending pace')} loading={loading || pacePanel.loading} />
+            */}
+            <CategoryTrendPanel categories={d.trendCategories} selectedId={d.trendId} onSelect={setTrendCat}
+              data={d.trendData}
+              budget={(() => { const b = budgets.find((x) => x.category?.id === d.trendId || (!!x.projectCategoryId && `proj:${x.projectCategoryId}` === d.trendId)); return b ? Number(b.amount) : null; })()}
+              loading={loading} />
 
             <FixedVariablePanel split={d.fixedVar} monthLabel={monthLabel(month)} loading={loading} />
             <RecurringTimelinePanel />

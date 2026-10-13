@@ -138,6 +138,21 @@ export function categoryTotals(txs: Transaction[], dir: 'income' | 'expense', pr
   return slices;
 }
 
+export interface CategoryMonth { month: string; key: string; value: number }
+
+/** One expense bucket's monthly spend, Jan..current month (yearTx starts Jan 1). */
+export function categoryMonthly(yearTx: Transaction[], bucketId: string, now: Date, projects: BucketProject[] = []): CategoryMonth[] {
+  const year = now.getFullYear();
+  const bucket = makeBucketer(projects);
+  return Array.from({ length: now.getMonth() + 1 }, (_, i) => {
+    const key = `${year}-${String(i + 1).padStart(2, '0')}`;
+    const value = txInMonth(yearTx, key)
+      .filter((t) => inCashFlow(t) && Number(t.amount) < 0 && bucket(t).id === bucketId)
+      .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+    return { month: MONTHS_SHORT[i], key, value: +value.toFixed(2) };
+  });
+}
+
 export function foldOther(slices: CategorySlice[], max: number): CategorySlice[] {
   if (slices.length <= max) return slices;
   const head = slices.slice(0, max - 1);
