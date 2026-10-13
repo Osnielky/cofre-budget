@@ -71,6 +71,8 @@ describe.skipIf(!hasDb)('database migrations', { timeout: 30_000 }, () => {
     await synced.initialize();
     // Tables added by post-baseline migrations did not exist when production was synchronized.
     await synced.query(`DROP TABLE "net_worth_snapshots"`);
+    // Columns added by post-baseline migrations likewise.
+    await synced.query(`ALTER TABLE "users" DROP COLUMN "lastSeenAt"`);
     await synced.query(`INSERT INTO "users" ("email", "name") VALUES ('owner@cofre.dev', 'Owner')`);
     await synced.destroy();
 

@@ -53,6 +53,11 @@ export class User {
   @Column({ type: 'varchar', nullable: true, default: null })
   plaidUserId: string | null;
 
+  /* Last authenticated request, refreshed at most hourly (UsersService.touchLastSeen).
+     Null until the user's first request after this column shipped. */
+  @Column({ type: Date, nullable: true, default: null })
+  lastSeenAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

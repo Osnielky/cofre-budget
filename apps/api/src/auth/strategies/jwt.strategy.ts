@@ -24,7 +24,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: { sub?: unknown; typ?: unknown }) {
     if (payload.typ !== 'access' || typeof payload.sub !== 'string' || !payload.sub) return null;
     const user = await this.usersService.findById(payload.sub);
-    if (user) setRequestUser(user.id);
+    if (user) {
+      setRequestUser(user.id);
+      void this.usersService.touchLastSeen(user.id);
+    }
     return user;
   }
 }
