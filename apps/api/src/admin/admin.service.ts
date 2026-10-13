@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { daysAgo, weeklyBuckets } from './admin-stats.math';
 import { estimateMrr, type BillingInterval, type PaidTier } from './plan-prices';
-import type { AdminStats } from './admin.types';
+import type { AdminStats, AdminUserRow, AdminUsersPage } from './admin.types';
 
 const num = (v: unknown) => Number(v ?? 0) || 0;
 
@@ -12,6 +12,15 @@ function toDate(v: unknown): Date {
   const s = String(v);
   return new Date(s.includes('T') || s.includes('Z') ? s : `${s.replace(' ', 'T')}Z`);
 }
+
+export const ADMIN_PAGE_SIZE = 50;
+
+/** LIKE pattern that matches `s` literally (escape char: backslash). */
+function likeContains(s: string): string {
+  return `%${s.toLowerCase().replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+const iso = (v: unknown): string | null => (v == null ? null : toDate(v).toISOString());
 
 /**
  * Read-only, app-wide aggregates for the admin page. Everything is computed on
@@ -27,6 +36,64 @@ export class AdminService {
     const qb = this.ds.createQueryBuilder().select(expr, 'n').from(table, 't');
     if (where) qb.where(where, params);
     return num((await qb.getRawOne())?.n);
+  }
+
+  async users(q: { search?: string; page?: string | number }): Promise<AdminUsersPage> {
+    const search = (q.search ?? '').trim().slice(0, 100);
+    const base = () => {
+      const qb = this.ds.createQueryBuilder().from('users', 'u');
+      if (search) {
+        qb.where(`(LOWER(u.email) LIKE :q ESCAPE '\\' OR LOWER(COALESCE(u.name, '')) LIKE :q ESCAPE '\\')`, { q: likeContains(search) });
+      }
+      return qb;
+    };
+
+    const total = num((await base().select('COUNT(*)', 'n').getRawOne())?.n);
+    const lastPage = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+    const asked = Math.floor(Number(q.page));
+    const page = Number.isFinite(asked) && asked >= 1 ? Math.min(asked, lastPage) : 1;
+
+    // Explicit column list: nothing financial or secret can reach the response.
+    const users = await base()
+      .select(['u.id AS id', 'u.email AS email', 'u.name AS name', 'u.plan AS plan',
+        'u."googleId" IS NOT NULL AS "isGoogle"', 'u."emailVerified" AS "emailVerified"',
+        'u."createdAt" AS "createdAt"', 'u."lastSeenAt" AS "lastSeenAt"'])
+      .orderBy('u."createdAt"', 'DESC')
+      .offset((page - 1) * ADMIN_PAGE_SIZE)
+      .limit(ADMIN_PAGE_SIZE)
+      .getRawMany();
+
+    const ids = users.map((u) => u.id as string);
+    const perUser = async (table: string) => {
+      if (!ids.length) return new Map<string, number>();
+      const rows = await this.ds.createQueryBuilder().select('t."userId"', 'userId').addSelect('COUNT(*)', 'n')
+        .from(table, 't').where('t."userId" IN (:...ids)', { ids }).groupBy('t."userId"').getRawMany();
+      return new Map(rows.map((r) => [r.userId as string, num(r.n)]));
+    };
+    const [bankLinks, txCounts, subRows] = await Promise.all([
+      perUser('plaid_items'),
+      perUser('transactions'),
+      ids.length
+        ? this.ds.createQueryBuilder().select('t."userId"', 'userId').addSelect('t.status', 'status')
+            .from('subscriptions', 't').where('t."userId" IN (:...ids)', { ids }).getRawMany()
+        : Promise.resolve([] as { userId: string; status: string }[]),
+    ]);
+    const subStatus = new Map(subRows.map((r) => [r.userId as string, r.status as AdminUserRow['subscriptionStatus']]));
+
+    const rows: AdminUserRow[] = users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      name: u.name ?? null,
+      plan: u.plan,
+      subscriptionStatus: subStatus.get(u.id) ?? null,
+      signupMethod: num(u.isGoogle) || u.isGoogle === true ? 'google' : 'email',
+      emailVerified: u.emailVerified === true || num(u.emailVerified) === 1,
+      createdAt: iso(u.createdAt) as string,
+      lastSeenAt: iso(u.lastSeenAt),
+      bankLinks: bankLinks.get(u.id) ?? 0,
+      transactions: txCounts.get(u.id) ?? 0,
+    }));
+    return { rows, total, page, pageSize: ADMIN_PAGE_SIZE };
   }
 
   async stats(now: Date): Promise<AdminStats> {
