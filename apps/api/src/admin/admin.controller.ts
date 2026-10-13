@@ -1,11 +1,11 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminJwtGuard } from './admin-jwt.guard';
 import { AdminGuard } from './admin.guard';
 import { AdminService } from './admin.service';
 
-/* Read-only. Non-admins get 404 from AdminGuard. Search text is never logged. */
+/* Read-only. Anonymous visitors (AdminJwtGuard) and non-admins (AdminGuard) both get 404. Search text is never logged. */
 @Controller('admin')
-@UseGuards(JwtAuthGuard, AdminGuard)
+@UseGuards(AdminJwtGuard, AdminGuard)
 export class AdminController {
   constructor(private admin: AdminService) {}
 

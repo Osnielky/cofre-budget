@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { AdminController } from './admin.controller';
 import { AdminGuard } from './admin.guard';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminJwtGuard } from './admin-jwt.guard';
 
 describe('AdminController', () => {
-  it('protects every route with JwtAuthGuard then AdminGuard', () => {
-    expect(Reflect.getMetadata(GUARDS_METADATA, AdminController)).toEqual([JwtAuthGuard, AdminGuard]);
+  it('protects every route with AdminJwtGuard then AdminGuard', () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, AdminController)).toEqual([AdminJwtGuard, AdminGuard]);
   });
 
   it('passes search and page through to the service', async () => {
