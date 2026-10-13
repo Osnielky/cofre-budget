@@ -122,6 +122,24 @@ describe('trendSeries', () => {
   });
 });
 
+describe('income trends', () => {
+  it('categoryMonthly sums income for a category when dir is income', () => {
+    const salary = cat({ id: 's', name: 'Salary', type: 'income' });
+    const out = categoryMonthly([
+      tx({ date: '2026-07-01', amount: 2000, categoryRef: salary }),
+      tx({ date: '2026-07-02', amount: -40, categoryRef: salary }), // a refund-like outflow is not income
+    ], 's', NOW, [], 'income');
+    expect(out[6].value).toBe(2000);
+  });
+  it('categoryTrendGroups lists income buckets when dir is income', () => {
+    const out = categoryTrendGroups([
+      tx({ amount: 900, categoryRef: cat({ id: 's', name: 'Salary', type: 'income' }) }),
+      tx({ amount: -50, categoryRef: cat({ id: 'f', name: 'Food' }) }),
+    ], [], 'income');
+    expect(out.flatMap((g) => g.options.map((o) => o.id))).toEqual(['s']);
+  });
+});
+
 describe('categoryTrendGroups', () => {
   const house = proj({ id: 'p1', name: 'Rental House', icon: '🏠', color: '#F07A3E' });
   const shop = proj({ id: 'p2', name: 'Shop', icon: '🛠', color: '#4BA8D8' });

@@ -140,14 +140,15 @@ export function categoryTotals(txs: Transaction[], dir: 'income' | 'expense', pr
 
 export interface CategoryMonth { month: string; key: string; value: number }
 
-/** One expense bucket's monthly spend, Jan..current month (yearTx starts Jan 1). */
-export function categoryMonthly(yearTx: Transaction[], bucketId: string, now: Date, projects: BucketProject[] = []): CategoryMonth[] {
+/** One bucket's monthly spend (or income), Jan..current month (yearTx starts Jan 1). */
+export function categoryMonthly(yearTx: Transaction[], bucketId: string, now: Date, projects: BucketProject[] = [], dir: 'income' | 'expense' = 'expense'): CategoryMonth[] {
+  const sign = dir === 'income' ? 1 : -1;
   const year = now.getFullYear();
   const bucket = makeBucketer(projects);
   return Array.from({ length: now.getMonth() + 1 }, (_, i) => {
     const key = `${year}-${String(i + 1).padStart(2, '0')}`;
     const value = txInMonth(yearTx, key)
-      .filter((t) => inCashFlow(t) && Number(t.amount) < 0 && bucket(t).id === bucketId)
+      .filter((t) => inCashFlow(t) && Math.sign(Number(t.amount)) === sign && bucket(t).id === bucketId)
       .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
     return { month: MONTHS_SHORT[i], key, value: +value.toFixed(2) };
   });
@@ -161,12 +162,12 @@ export interface TrendGroup {
 }
 
 /**
- * Expense buckets for the category-trend picker: personal categories first, then
+ * Expense (or income) buckets for the category-trend picker: personal categories first, then
  * one group per project (ordered by spend) holding its project categories and
  * an "All of <project>" bucket for its uncategorised spending.
  */
-export function categoryTrendGroups(yearTx: Transaction[], projects: BucketProject[] = []): TrendGroup[] {
-  const slices = categoryTotals(yearTx, 'expense', projects);
+export function categoryTrendGroups(yearTx: Transaction[], projects: BucketProject[] = [], dir: 'income' | 'expense' = 'expense'): TrendGroup[] {
+  const slices = categoryTotals(yearTx, dir, projects);
   // proj:<projectCategoryId> buckets don't carry their project; the transactions do.
   const ownerOf = new Map<string, string>();
   for (const t of yearTx) {

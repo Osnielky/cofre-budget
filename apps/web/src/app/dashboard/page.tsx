@@ -99,7 +99,8 @@ export default function DashboardPage() {
   // const [paceMonth, setPaceMonth] = usePanelMonth(month);
   // const pacePanel = useMonthBudgets(paceMonth, month, budgets);
 
-  // Category trend: null means "the biggest spending category this year".
+  // Category trends: null means "the biggest category of that kind this year".
+  const [incomeTrendCat, setIncomeTrendCat] = useState<string | null>(null);
   const [trendCat, setTrendCat] = useState<string | null>(null);
   const monthPicker = (value: string, onChange: (m: string) => void, panel: string) => (
     <PeriodSelect value={value} onChange={onChange} ariaLabel={`${panel} month`}
@@ -112,9 +113,12 @@ export default function DashboardPage() {
     const forPeriod = (p: string) => (p === 'ytd' ? yearTx : txInMonth(yearTx, p));
     const incomeSlices = categoryTotals(forPeriod(incomePeriod), 'income', projects);
     const yearExpenseSlices = categoryTotals(forPeriod(expensePeriod), 'expense', projects);
-    const trendGroups = categoryTrendGroups(yearTx, projects);
-    const trendOptions = trendGroups.flatMap((g) => g.options);
-    const trendId = trendCat && trendOptions.some((c) => c.id === trendCat) ? trendCat : trendOptions[0]?.id ?? '';
+    const trendFor = (dir: 'income' | 'expense', picked: string | null) => {
+      const groups = categoryTrendGroups(yearTx, projects, dir);
+      const options = groups.flatMap((g) => g.options);
+      const id = picked && options.some((c) => c.id === picked) ? picked : options[0]?.id ?? '';
+      return { groups, id, data: id ? categoryMonthly(yearTx, id, now, projects, dir) : [] };
+    };
     return {
       cashFlow: monthlyCashFlow(yearTx, now),
       trend: trendSeries(yearTx, now, 12),   // full YTD; the panel slices per selected range
@@ -123,9 +127,8 @@ export default function DashboardPage() {
       ranking: rankSlices.slice(0, 7),
       incomeSlices: foldOther(incomeSlices, 6),
       incomeTotal: incomeSlices.reduce((s, x) => s + x.value, 0),
-      trendGroups,
-      trendId,
-      trendData: trendId ? categoryMonthly(yearTx, trendId, now, projects) : [],
+      incomeTrend: trendFor('income', incomeTrendCat),
+      expenseTrend: trendFor('expense', trendCat),
       fixedVar: fixedVariable(yearTx, month, projects),
       netWorth: netWorthBreakdown(accounts, debts, yearTx, month),
       changes: expenseChanges(yearTx, month, projects),
@@ -133,7 +136,7 @@ export default function DashboardPage() {
       daily: dailyCumulative(yearTx, month, now),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [yearTx, month, budgets, accounts, debts, projects, incomePeriod, expensePeriod, rankMonth, trendCat]);
+  }, [yearTx, month, budgets, accounts, debts, projects, incomePeriod, expensePeriod, rankMonth, incomeTrendCat, trendCat]);
 
   /* ── Stat-card derivations (ported verbatim from the pre-refactor page) ── */
   const isDebtAcc    = (a: (typeof accounts)[number]) => isLiability(a.accountType);
@@ -260,6 +263,20 @@ export default function DashboardPage() {
               slices={d.expenseDonut} total={d.expenseTotal} loading={loading}
               period={expensePeriod} periodOptions={periodOptions} onPeriodChange={setExpensePeriod} />
 
+            {/* Income left, expenses right; each spans the full row below xl. */}
+            <div className="md:col-span-2 min-w-0 flex flex-col [&>*]:flex-1">
+              <CategoryTrendPanel kind="income" groups={d.incomeTrend.groups} selectedId={d.incomeTrend.id} onSelect={setIncomeTrendCat}
+                data={d.incomeTrend.data}
+                budget={(() => { const b = incomeTargets.find((x) => x.category?.id === d.incomeTrend.id || (!!x.projectCategoryId && `proj:${x.projectCategoryId}` === d.incomeTrend.id)); return b ? Number(b.amount) : null; })()}
+                loading={loading} />
+            </div>
+            <div className="md:col-span-2 min-w-0 flex flex-col [&>*]:flex-1">
+              <CategoryTrendPanel kind="expense" groups={d.expenseTrend.groups} selectedId={d.expenseTrend.id} onSelect={setTrendCat}
+                data={d.expenseTrend.data}
+                budget={(() => { const b = spendingBudgets.find((x) => x.category?.id === d.expenseTrend.id); return b ? Number(b.amount) : null; })()}
+                loading={loading} />
+            </div>
+
             <CategoryRankingPanel slices={d.ranking} monthLabel={monthLabel(rankMonth)}
               picker={monthPicker(rankMonth, setRankMonth, 'Category ranking')} loading={loading} />
             <BudgetActualPanel budgets={budgetPanel.budgets.filter((b) => !isIncomeBudget(b))} monthLabel={monthLabel(budgetMonth)}
@@ -270,24 +287,25 @@ export default function DashboardPage() {
             <SpendingPacePanel pace={d.pace} monthLabel={monthLabel(paceMonth)}
               picker={monthPicker(paceMonth, setPaceMonth, 'Spending pace')} loading={loading || pacePanel.loading} />
             */}
-            <CategoryTrendPanel groups={d.trendGroups} selectedId={d.trendId} onSelect={setTrendCat}
-              data={d.trendData}
-              budget={(() => { const b = spendingBudgets.find((x) => x.category?.id === d.trendId); return b ? Number(b.amount) : null; })()}
-              loading={loading} />
-
             <FixedVariablePanel split={d.fixedVar} monthLabel={monthLabel(month)} loading={loading} />
             <RecurringTimelinePanel />
+
             <NetWorthGoalPanel />
             <NetWorthPanel data={d.netWorth} loading={loading} />
-
             <ExpenseChangePanel changes={d.changes.changes} unchanged={d.changes.unchanged}
               monthLabel={monthLabel(month)} prevMonthLabel={monthLabel(prevM)} loading={loading} />
             <TopMerchantsPanel merchants={d.merchants} loading={loading} />
-            <SubscriptionsPanel />
 
+            <SubscriptionsPanel />
             <ProjectsPanel projects={projects} loading={loading} />
-            <AccountsPanel accounts={accounts} netWorth={d.netWorth.total} loading={loading} />
-            <RecentTransactionsPanel transactions={transactions} loading={loading} />
+
+            {/* Two halves at xl so the last row has no empty cells. */}
+            <div className="xl:col-span-2 min-w-0 flex flex-col [&>*]:flex-1">
+              <AccountsPanel accounts={accounts} netWorth={d.netWorth.total} loading={loading} />
+            </div>
+            <div className="xl:col-span-2 min-w-0 flex flex-col [&>*]:flex-1">
+              <RecentTransactionsPanel transactions={transactions} loading={loading} />
+            </div>
           </div>
         </div>
       </main>
