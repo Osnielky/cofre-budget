@@ -57,7 +57,7 @@ export class AdminService {
       this.count('users', 't."lastSeenAt" >= :c', { c: d30 }),
       this.count('plaid_items', undefined, {}, distinctUsers),
       // Numerator population must match the active30d denominator: only users seen in the last 30 days.
-      this.count('transactions', 't."createdAt" >= :c AND t."userId" IN (SELECT u.id FROM users u WHERE u."lastSeenAt" >= :c)', { c: d30 }),
+      this.count('transactions', 't."createdAt" >= :c AND t."userId" IN (SELECT CAST(u.id AS VARCHAR) FROM users u WHERE u."lastSeenAt" >= :c)', { c: d30 }),
       this.count('budgets', undefined, {}, distinctUsers),
       this.count('projects', undefined, {}, distinctUsers),
       this.count('users', 't."netWorthGoalTargetDate" IS NOT NULL'),
