@@ -67,13 +67,15 @@ describe.skipIf(!hasDb)('database migrations', { timeout: 30_000 }, () => {
 
   it('adopt a database that synchronize already built, without touching its data', async () => {
     // Production today: tables made by synchronize, no migrations table.
-    const synced = source('migrations_test_synced', { synchronize: true });
+    const SYNCED = 'migrations_test_synced';
+    const synced = source(SYNCED, { synchronize: true });
     await synced.initialize();
     // Tables added by post-baseline migrations did not exist when production was synchronized.
-    await synced.query(`DROP TABLE "net_worth_snapshots"`);
+    // Schema-qualify to ensure unqualified statements cannot fall through to public if test schema is dropped.
+    await synced.query(`DROP TABLE "${SYNCED}"."net_worth_snapshots"`);
     // Columns added by post-baseline migrations likewise.
-    await synced.query(`ALTER TABLE "users" DROP COLUMN "lastSeenAt"`);
-    await synced.query(`INSERT INTO "users" ("email", "name") VALUES ('owner@cofre.dev', 'Owner')`);
+    await synced.query(`ALTER TABLE "${SYNCED}"."users" DROP COLUMN "lastSeenAt"`);
+    await synced.query(`INSERT INTO "${SYNCED}"."users" ("email", "name") VALUES ('owner@cofre.dev', 'Owner')`);
     await synced.destroy();
 
     const ds = source('migrations_test_synced');
