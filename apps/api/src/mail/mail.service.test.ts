@@ -34,3 +34,26 @@ describe('MailService with Resend', () => {
     expect(lines.find((l) => l.external)?.external).toMatchObject({ service: 'resend', ok: true });
   });
 });
+
+describe('MailService.sendBillingEmail', () => {
+  it('renders the subject, every detail row, the features and the button, escaping user text', async () => {
+    let sent: { to: string; subject: string; html: string } | null = null;
+    const mail = mailWith(async (msg: any) => { sent = msg; return { data: { id: 'email_2' }, error: null }; });
+    await mail.sendBillingEmail('owner@cofre.dev', {
+      subject: 'Welcome to Cofre Pro',
+      heading: 'Welcome to Cofre Pro',
+      intro: 'Hi <script>x</script>, your plan is active.',
+      rows: [['Plan', 'Pro · Monthly'], ['First payment', '$4.99 on October 29, 2026']],
+      featuresTitle: "What's included in Pro",
+      features: ['Ask Cofre AI assistant'],
+      cta: { label: 'Open Cofre', href: 'https://budgetcofre.com/dashboard' },
+    });
+    expect(sent!.to).toBe('owner@cofre.dev');
+    expect(sent!.subject).toBe('Welcome to Cofre Pro');
+    for (const text of ['Pro · Monthly', '$4.99 on October 29, 2026', 'Ask Cofre AI assistant', 'Open Cofre', 'https://budgetcofre.com/dashboard']) {
+      expect(sent!.html).toContain(text);
+    }
+    expect(sent!.html).not.toContain('<script>');
+    expect(sent!.html).toContain('&lt;script&gt;');
+  });
+});

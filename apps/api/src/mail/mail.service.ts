@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import { timed } from '../common/logging/timed';
+import type { BillingEmailContent } from '../billing/billing-emails';
 
 function money(n: number): string {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -84,6 +85,38 @@ export class MailService {
 
   // Resend's SDK never throws — a rejected key, unverified domain or rate limit
   // comes back as { error } — so turn that into a failure timed() and callers see.
+  /** Purchase / plan-change / cancellation / plan-ended emails (see billing/billing-emails.ts). */
+  async sendBillingEmail(to: string, c: BillingEmailContent): Promise<void> {
+    if (!this.resend) { this.logger.warn(`[dev] email not sent (no RESEND_API_KEY): "${c.subject}"`); return; }
+    await this.deliver(to, c.subject, this.templateBilling(c));
+  }
+
+  private templateBilling(c: BillingEmailContent): string {
+    const rows = c.rows.map(([label, value]) => `
+        <tr>
+          <td style="padding:10px 0;border-bottom:1px solid #26314d;font-size:13px;color:#8d95a8;width:42%;vertical-align:top">${esc(label)}</td>
+          <td style="padding:10px 0;border-bottom:1px solid #26314d;font-size:14px;color:#F2F1EA;font-weight:600;text-align:right">${esc(value)}</td>
+        </tr>`).join('');
+    const features = c.features?.length ? `
+    <div style="margin-top:24px">
+      <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#DDB877;margin-bottom:10px">${esc(c.featuresTitle ?? '')}</div>
+      ${c.features.map((f) => `<div style="font-size:14px;line-height:1.6;color:#cfd4de;padding:3px 0">&#10003;&nbsp; ${esc(f)}</div>`).join('')}
+    </div>` : '';
+    const note = c.note ? `<p style="font-size:13px;line-height:1.6;color:#aeb4c2;margin:22px 0 0">${esc(c.note)}</p>` : '';
+    return `
+<div style="background:#0B1322;padding:40px 0;font-family:Arial,Helvetica,sans-serif">
+  <div style="max-width:520px;margin:0 auto;background:#141C32;border:1px solid #26314d;border-radius:16px;padding:36px 32px;color:#E8E6DF">
+    <div style="font-size:13px;letter-spacing:0.28em;text-transform:uppercase;color:#DDB877;margin-bottom:20px">Cofre &middot; Wealth &amp; Budget</div>
+    <h1 style="font-size:22px;margin:0 0 12px;color:#F2F1EA">${esc(c.heading)}</h1>
+    <p style="font-size:14px;line-height:1.7;color:#cfd4de;margin:0 0 22px">${esc(c.intro)}</p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;border-top:1px solid #26314d">${rows}
+    </table>${features}${note}
+    <a href="${esc(c.cta.href)}" style="display:inline-block;margin-top:28px;background:linear-gradient(180deg,#DDB877,#C9A05C);color:#131C30;font-weight:600;text-decoration:none;padding:13px 26px;border-radius:999px;font-size:13px;letter-spacing:0.06em">${esc(c.cta.label)}</a>
+    <p style="font-size:11px;line-height:1.6;color:#6b7488;margin:28px 0 0">You're receiving this because of a change to your Cofre subscription. Billing is handled securely by Stripe.</p>
+  </div>
+</div>`;
+  }
+
   private async deliver(to: string, subject: string, html: string): Promise<void> {
     await timed('resend', 'emails.send', async () => {
       const result = await this.resend!.emails.send({ from: this.from, to, subject, html });

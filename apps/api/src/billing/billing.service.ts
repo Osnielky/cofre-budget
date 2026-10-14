@@ -7,6 +7,8 @@ import { User } from '../users/user.entity';
 import { Subscription } from './subscription.entity';
 import { mapStripeSubscription, PriceIdMap } from './billing.mapping';
 import { timed } from '../common/logging/timed';
+import { MailService } from '../mail/mail.service';
+import { billingEmailContent, billingEmailFor, type SubState } from './billing-emails';
 
 @Injectable()
 export class BillingService {
@@ -19,6 +21,7 @@ export class BillingService {
     @InjectRepository(User) private users: Repository<User>,
     @InjectRepository(Subscription) private subs: Repository<Subscription>,
     private config: ConfigService,
+    private mail: MailService,
   ) {
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY');
     const webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET');
@@ -94,6 +97,7 @@ export class BillingService {
     }
     const mapped = mapStripeSubscription(sub, this.priceIds);
     const plan = mapped.status === 'canceled' ? 'free' : mapped.tier;
+    const previous = await this.subs.findOneBy({ userId: user.id });
 
     await this.subs.upsert(
       {
@@ -109,6 +113,36 @@ export class BillingService {
       ['userId'],
     );
     await this.users.update(user.id, { plan });
+    await this.sendBillingEmail(user, previous, mapped, sub);
+  }
+
+  /**
+   * Emails the user when this sync started, changed, scheduled the cancellation
+   * of, or ended their plan. Decided from the saved row vs. Stripe's, so a
+   * repeated webhook sends nothing. A failed send is logged, never thrown: the
+   * subscription is already saved and Stripe must not retry the webhook for it.
+   */
+  private async sendBillingEmail(user: User, previous: Subscription | null, mapped: SubState & { trialEnd: Date | null; currentPeriodEnd: Date | null }, sub: Stripe.Subscription): Promise<void> {
+    const kind = billingEmailFor(previous, mapped);
+    if (!kind) return;
+    const price = sub.items.data[0]?.price;
+    try {
+      await this.mail.sendBillingEmail(user.email, billingEmailContent(kind, {
+        name: user.name ?? '',
+        tier: mapped.tier,
+        interval: mapped.interval,
+        status: mapped.status,
+        amount: typeof price?.unit_amount === 'number' ? price.unit_amount / 100 : null,
+        currency: price?.currency ?? 'usd',
+        trialEnd: mapped.trialEnd,
+        currentPeriodEnd: mapped.currentPeriodEnd,
+        prevTier: previous?.tier,
+        prevInterval: previous?.interval,
+        appUrl: this.frontendUrl,
+      }));
+    } catch (err) {
+      this.logger.error(`Billing email "${kind}" failed`, err as Error);
+    }
   }
 
   getSubscription(userId: string): Promise<Subscription | null> {
