@@ -29,6 +29,17 @@ export class BillingController {
     return { ok: true };
   }
 
+  @Get('overview')
+  getOverview(@Request() req: any) {
+    return this.billing.getOverview(req.user.id);
+  }
+
+  @Post('resume')
+  async resume(@Request() req: any) {
+    await this.billing.resume(req.user.id);
+    return { ok: true };
+  }
+
   @Post('portal-link')
   createPortalLink(@Request() req: any) {
     return this.billing.createPortalLink(req.user.id);

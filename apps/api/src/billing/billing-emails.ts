@@ -32,13 +32,13 @@ const PLAN_FEATURES: Record<Tier, string[]> = {
     'Everything in Basic',
     'Automatic bank sync with Plaid',
     'Up to 4 linked institutions',
-    'Ask Cofre AI assistant',
+    'Ask Cofre AI assistant (25 messages a day)',
   ],
   elite: [
     'Everything in Pro',
     'Automatic bank sync with Plaid',
     'Unlimited linked institutions',
-    'Ask Cofre AI assistant',
+    'Ask Cofre AI assistant (50 messages a day)',
   ],
 };
 

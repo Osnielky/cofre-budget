@@ -9,6 +9,7 @@ import { mapStripeSubscription, PriceIdMap } from './billing.mapping';
 import { timed } from '../common/logging/timed';
 import { MailService } from '../mail/mail.service';
 import { billingEmailContent, billingEmailFor, type SubState } from './billing-emails';
+import { mapBillingOverview, EMPTY_OVERVIEW, type BillingOverview } from './billing-overview';
 
 @Injectable()
 export class BillingService {
@@ -163,6 +164,51 @@ export class BillingService {
   async cancel(userId: string): Promise<void> {
     const existing = await this.subs.findOneByOrFail({ userId });
     await timed('stripe', 'subscriptions.update', () => this.stripe.subscriptions.update(existing.stripeSubscriptionId, { cancel_at_period_end: true }));
+  }
+
+  /** Undo a scheduled cancellation; the subscription.updated webhook persists it. */
+  async resume(userId: string): Promise<void> {
+    const existing = await this.subs.findOneByOrFail({ userId });
+    await timed('stripe', 'subscriptions.update', () => this.stripe.subscriptions.update(existing.stripeSubscriptionId, { cancel_at_period_end: false }));
+  }
+
+  /**
+   * Card, address, next charge and recent invoices for the billing page, read
+   * live from Stripe. Each lookup fails on its own: the page shows what loaded.
+   */
+  async getOverview(userId: string): Promise<BillingOverview> {
+    const user = await this.users.findOneBy({ id: userId });
+    const customerId = user?.stripeCustomerId;
+    if (!customerId) return EMPTY_OVERVIEW;
+    const sub = await this.subs.findOneBy({ userId });
+    const live = sub && sub.status !== 'canceled' ? sub : null;
+
+    const attempt = async <T>(op: string, fn: () => Promise<T>): Promise<T | null> => {
+      try {
+        return await timed('stripe', op, fn);
+      } catch (err) {
+        this.logger.warn(`Billing overview: ${op} failed — ${(err as Error).message}`);
+        return null;
+      }
+    };
+
+    const [customer, subscription, invoices, preview] = await Promise.all([
+      attempt('customers.retrieve', () => this.stripe.customers.retrieve(customerId, { expand: ['invoice_settings.default_payment_method'] })),
+      live ? attempt('subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(live.stripeSubscriptionId, { expand: ['default_payment_method'] })) : null,
+      attempt('invoices.list', () => this.stripe.invoices.list({ customer: customerId, limit: 5 })),
+      // No next charge once the plan is set to end.
+      live && !live.cancelAtPeriodEnd
+        ? attempt('invoices.createPreview', () => this.stripe.invoices.createPreview({ customer: customerId, subscription: live.stripeSubscriptionId }))
+        : null,
+    ]);
+
+    return mapBillingOverview({
+      customer: customer && !(customer as Stripe.DeletedCustomer).deleted ? (customer as Stripe.Customer) : null,
+      subscription: (subscription as Stripe.Subscription | null) ?? null,
+      preview: (preview as Stripe.Invoice | null) ?? null,
+      invoices: (invoices?.data ?? []) as Stripe.Invoice[],
+      fallbackDate: live ? (live.status === 'trialing' && live.trialEnd ? live.trialEnd : live.currentPeriodEnd) : null,
+    });
   }
 
   async createPortalLink(userId: string): Promise<{ url: string }> {

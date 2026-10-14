@@ -55,7 +55,7 @@ describe('billingEmailContent', () => {
     expect(rows.Price).toBe('$4.99 / month');
     expect(rows['Free trial ends']).toBe('October 29, 2026');
     expect(rows['First payment']).toBe('$4.99 on October 29, 2026');
-    expect(c.features).toContain('Ask Cofre AI assistant');
+    expect(c.features).toContain('Ask Cofre AI assistant (25 messages a day)');
     expect(c.cta.href).toBe('https://budgetcofre.com/dashboard');
   });
 

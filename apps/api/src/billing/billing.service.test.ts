@@ -231,3 +231,68 @@ describe('BillingService.createCheckoutSession existing-subscription guard', () 
     await expect(service.createCheckoutSession(user.id, 'pro', 'month')).rejects.not.toBeInstanceOf(ConflictException);
   });
 });
+
+describe('BillingService.getOverview and resume', () => {
+  async function setup(opts: { withSub?: boolean; cancelAtPeriodEnd?: boolean } = {}) {
+    const ds = await makeDataSource();
+    const userRepo = ds.getRepository(User);
+    const user = await userRepo.save(userRepo.create({ email: 'o@example.com', stripeCustomerId: 'cus_o', plan: 'pro' }));
+    if (opts.withSub !== false) {
+      await ds.getRepository(Subscription).save(ds.getRepository(Subscription).create({
+        userId: user.id, stripeSubscriptionId: 'sub_o', tier: 'pro', interval: 'month', status: 'active',
+        cancelAtPeriodEnd: opts.cancelAtPeriodEnd ?? false, currentPeriodEnd: new Date('2026-11-14T00:00:00Z'),
+      }));
+    }
+    const service = new BillingService(ds.getRepository(User), ds.getRepository(Subscription), fakeConfig(), asMail(new FakeMail()));
+    const calls: string[] = [];
+    const updates: unknown[] = [];
+    const stripe = {
+      customers: { retrieve: async () => { calls.push('customer'); return { address: null, invoice_settings: { default_payment_method: { type: 'card', card: { brand: 'visa', last4: '4242', exp_month: 4, exp_year: 2028 } } } }; } },
+      subscriptions: {
+        retrieve: async () => { calls.push('subscription'); return { default_payment_method: null }; },
+        update: async (_id: string, params: unknown) => { updates.push(params); return {}; },
+      },
+      invoices: {
+        list: async () => { calls.push('invoices'); return { data: [] }; },
+        createPreview: async () => { calls.push('preview'); return { subtotal: 499, total: 499, total_excluding_tax: 499, currency: 'usd', next_payment_attempt: null }; },
+      },
+    };
+    (service as any).stripe = stripe;
+    return { service, userId: user.id, calls, updates, stripe };
+  }
+
+  it('returns the card and next charge for an active subscription', async () => {
+    const { service, userId } = await setup();
+    const out = await service.getOverview(userId);
+    expect(out.paymentMethod?.last4).toBe('4242');
+    expect(out.upcoming).toMatchObject({ total: 4.99, date: '2026-11-14T00:00:00.000Z' });
+  });
+
+  it('skips the next-charge preview once the plan is set to cancel', async () => {
+    const { service, userId, calls } = await setup({ cancelAtPeriodEnd: true });
+    const out = await service.getOverview(userId);
+    expect(calls).not.toContain('preview');
+    expect(out.upcoming).toBeNull();
+  });
+
+  it('still answers with what it has when a Stripe call fails', async () => {
+    const { service, userId, stripe } = await setup();
+    stripe.invoices.list = async () => { throw new Error('stripe down'); };
+    const out = await service.getOverview(userId);
+    expect(out.invoices).toEqual([]);
+    expect(out.paymentMethod?.last4).toBe('4242');
+  });
+
+  it('returns an empty overview for a user with no Stripe customer', async () => {
+    const ds = await makeDataSource();
+    const user = await ds.getRepository(User).save(ds.getRepository(User).create({ email: 'n@example.com', plan: 'free' }));
+    const service = new BillingService(ds.getRepository(User), ds.getRepository(Subscription), fakeConfig(), asMail(new FakeMail()));
+    expect(await service.getOverview(user.id)).toEqual({ paymentMethod: null, billingAddress: null, upcoming: null, invoices: [] });
+  });
+
+  it('resume turns cancel-at-period-end back off in Stripe', async () => {
+    const { service, userId, updates } = await setup({ cancelAtPeriodEnd: true });
+    await service.resume(userId);
+    expect(updates).toEqual([{ cancel_at_period_end: false }]);
+  });
+});

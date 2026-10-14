@@ -3,29 +3,16 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import PricingCards from './PricingCards';
 import { useUser } from './UserProvider';
+import type { BillingOverview, SubscriptionInfo } from '@/lib/billing/types';
+import { CurrentPlanCard, PaymentMethodCard, BillingSummaryCard, TrialCard, type BillingActions } from './billing/TopCards';
+import { InvoicesCard, ComparePlansCard, IncludedCard, YearlyBanner, BillingHelpCard } from './billing/LowerCards';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-interface SubscriptionInfo {
-  tier: 'pro' | 'elite';
-  interval: 'month' | 'year';
-  status: 'trialing' | 'active' | 'past_due' | 'canceled';
-  currentPeriodEnd: string | null;
-  trialEnd: string | null;
-  cancelAtPeriodEnd: boolean;
-}
-
-const glass: React.CSSProperties = {
-  background: 'var(--color-surface)',
-  backdropFilter: 'var(--glass-blur)',
-  WebkitBackdropFilter: 'var(--glass-blur)',
-  border: 'var(--glass-border)',
-  boxShadow: 'var(--glass-shadow)',
-};
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+/** Card, next charge and invoices from Stripe. Best effort: null hides those details. */
+async function fetchOverview(): Promise<BillingOverview | null> {
+  const res = await fetch(`${API}/billing/overview`, { credentials: 'include' }).catch(() => null);
+  return res?.ok ? res.json() : null;
 }
 
 /**
@@ -82,6 +69,8 @@ export default function BillingTab() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [overview, setOverview] = useState<BillingOverview | null>(null);
+  const reloadOverview = useCallback(() => { fetchOverview().then(setOverview); }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,6 +86,7 @@ export default function BillingTab() {
         : await fetchSubscription();
       setSub(result);
       setLoadError(false);
+      if (result && result.status !== 'canceled') fetchOverview().then(setOverview);
       // The plan lives on the user (sidebar badge, Ask Cofre, Connect Bank), so
       // reload it too — otherwise the app still says "Basic" until a page refresh.
       if (isCheckoutSuccess && result) refetchRef.current();
@@ -144,6 +134,7 @@ export default function BillingTab() {
         );
         setSub(updated);
         await refetch();
+        reloadOverview();
       }
     } finally {
       setBusy(false);
@@ -158,6 +149,21 @@ export default function BillingTab() {
       if (res.ok) {
         const updated = await waitForSubscriptionChange(fetchSubscription, (s) => s?.cancelAtPeriodEnd === true);
         setSub(updated);
+        reloadOverview();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resumePlan() {
+    setBusy(true);
+    try {
+      const res = await fetch(`${API}/billing/resume`, { method: 'POST', credentials: 'include' });
+      if (res.ok) {
+        const updated = await waitForSubscriptionChange(fetchSubscription, (s) => s?.cancelAtPeriodEnd === false);
+        setSub(updated);
+        reloadOverview();
       }
     } finally {
       setBusy(false);
@@ -209,55 +215,30 @@ export default function BillingTab() {
     );
   }
 
+  const actions: BillingActions = { busy, switchTier, cancelPlan, resumePlan, openPortal };
   return (
-    <div className="max-w-xl">
-      <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--color-text-primary)' }}>Plan &amp; billing</h2>
-      <div className="rounded-2xl p-6 space-y-3" style={glass}>
-        <p style={{ color: 'var(--color-text-primary)' }}>
-          <span className="font-semibold capitalize">{sub.tier}</span> · {sub.interval === 'month' ? 'Monthly' : 'Yearly'}
-        </p>
-        {sub.status === 'trialing' && (
-          <p style={{ color: 'var(--color-text-muted)' }}>Trial ends {fmtDate(sub.trialEnd)}</p>
-        )}
-        {sub.status === 'past_due' && (
-          <p style={{ color: 'var(--color-card-orange)' }}>
-            Your last payment failed — update your card to keep your plan active.
-          </p>
-        )}
-        {sub.cancelAtPeriodEnd ? (
-          <p style={{ color: 'var(--color-text-muted)' }}>Cancels on {fmtDate(sub.currentPeriodEnd)}</p>
-        ) : (
-          <p style={{ color: 'var(--color-text-muted)' }}>Renews on {fmtDate(sub.currentPeriodEnd)}</p>
-        )}
+    <div className="flex flex-col gap-5">
+      <div>
+        <h2 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>Billing &amp; Subscription</h2>
+        <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>Manage your plan, payment method and billing details.</p>
+      </div>
 
-        <div className="flex flex-wrap gap-2 pt-2">
-          {sub.tier === 'pro' && (
-            <button disabled={busy} onClick={() => switchTier('elite', sub.interval)} className="btn-gold px-4 py-2 rounded-full text-sm font-semibold">
-              Upgrade to Elite
-            </button>
-          )}
-          {sub.tier === 'elite' && (
-            <button disabled={busy} onClick={() => switchTier('pro', sub.interval)} className="px-4 py-2 rounded-full text-sm font-semibold" style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
-              Downgrade to Pro
-            </button>
-          )}
-          <button
-            disabled={busy}
-            onClick={() => switchTier(sub.tier, sub.interval === 'month' ? 'year' : 'month')}
-            className="px-4 py-2 rounded-full text-sm font-semibold"
-            style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
-          >
-            Switch to {sub.interval === 'month' ? 'yearly (save 20%)' : 'monthly'}
-          </button>
-          <button disabled={busy} onClick={openPortal} className="px-4 py-2 rounded-full text-sm font-semibold" style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
-            Update payment method
-          </button>
-          {!sub.cancelAtPeriodEnd && (
-            <button disabled={busy} onClick={cancelPlan} className="px-4 py-2 rounded-full text-sm font-semibold" style={{ color: 'var(--color-card-orange)' }}>
-              Cancel plan
-            </button>
-          )}
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.9fr_1fr_1fr_1fr] gap-4">
+        <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><CurrentPlanCard sub={sub} actions={actions} /></div>
+        <PaymentMethodCard overview={overview} actions={actions} />
+        <BillingSummaryCard sub={sub} overview={overview} />
+        <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><TrialCard sub={sub} /></div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.3fr_1fr_1fr] gap-4">
+        <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><InvoicesCard overview={overview} actions={actions} /></div>
+        <ComparePlansCard sub={sub} actions={actions} />
+        <IncludedCard sub={sub} />
+      </div>
+
+      <div className={`grid grid-cols-1 gap-4 ${sub.interval === 'month' ? 'xl:grid-cols-[2.2fr_1fr]' : ''}`}>
+        {sub.interval === 'month' && <YearlyBanner sub={sub} actions={actions} />}
+        <BillingHelpCard actions={actions} />
       </div>
     </div>
   );

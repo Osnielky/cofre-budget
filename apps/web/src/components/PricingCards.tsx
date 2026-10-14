@@ -91,7 +91,7 @@ const PLANS: PlanDef[] = [
       { icon: 'bank', label: 'Everything in Free' },
       { icon: 'link', label: 'Automatic bank sync with Plaid' },
       { icon: 'bank', label: 'Up to 4 linked institutions' },
-      { icon: 'sparkle', label: 'Ask Cofre AI assistant' },
+      { icon: 'sparkle', label: 'Ask Cofre AI assistant · 25 messages/day' },
     ],
   },
   {
@@ -104,7 +104,7 @@ const PLANS: PlanDef[] = [
       { icon: 'bank', label: 'Everything in Pro' },
       { icon: 'link', label: 'Automatic bank sync with Plaid' },
       { icon: 'infinity', label: 'Unlimited linked institutions' },
-      { icon: 'sparkle', label: 'Ask Cofre AI assistant' },
+      { icon: 'sparkle', label: 'Ask Cofre AI assistant · 50 messages/day' },
     ],
   },
 ];
