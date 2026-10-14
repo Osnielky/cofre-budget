@@ -9,6 +9,7 @@ import ProposalCard from './ProposalCard';
 import SavingsTrendWidget from './SavingsTrendWidget';
 import SafeToSpendWidget from './SafeToSpendWidget';
 import FinancialSnapshotPanel from './FinancialSnapshotPanel';
+import { resetsIn } from '@/lib/ai/usage';
 
 const SUGGESTED_PROMPTS = [
   {
@@ -56,8 +57,9 @@ export default function AskCofrePage() {
   const {
     conversations, activeId, setActiveId, startNewConversation,
     messages, loading, sending, sendMessage,
-    confirmAction, rejectAction,
+    confirmAction, rejectAction, usage,
   } = useAiChat();
+  const outOfMessages = usage != null && usage.remaining <= 0;
   const { user } = useUser();
   const [input, setInput] = useState('');
   const [month, setMonth] = useState(currentMonth());
@@ -67,7 +69,7 @@ export default function AskCofrePage() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   async function handleSend(text: string) {
-    if (!text.trim() || sending) return;
+    if (!text.trim() || sending || outOfMessages) return;
     setInput('');
     await sendMessage(text.trim(), month);
   }
@@ -217,8 +219,8 @@ export default function AskCofrePage() {
               style={{ color: 'var(--color-text-muted)' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95L10.13 17.1a2 2 0 0 1-2.83-2.83l8.49-8.49"/></svg>
             </button>
-            <input value={input} onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask anything, or tell me what to change…"
+            <input value={input} onChange={(e) => setInput(e.target.value)} disabled={outOfMessages}
+              placeholder={outOfMessages ? 'Daily message limit reached' : 'Ask anything, or tell me what to change…'}
               className="flex-1 bg-transparent outline-none text-sm px-1 min-w-0" />
             <button type="button" disabled title="Voice input coming soon"
               className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40"
@@ -228,14 +230,25 @@ export default function AskCofrePage() {
             <input type="month" value={month} onChange={(e) => setMonth(e.target.value)}
               className="text-xs bg-transparent outline-none px-2 py-1 rounded-full shrink-0"
               style={{ border: '1px solid var(--color-border)' }} title={monthLabel(month)} />
-            <button type="submit" disabled={sending || !input.trim()}
+            <button type="submit" disabled={sending || !input.trim() || outOfMessages}
               className="btn-gold w-9 h-9 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-40 shrink-0">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
             </button>
           </form>
-          <p className="text-[10px] text-center" style={{ color: 'var(--color-text-muted)' }}>
-            Cofre can make mistakes. Changes always need your confirmation first.
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[10.5px] px-1">
+            {usage && usage.limit > 0 ? (
+              <span className="font-semibold" role="status"
+                style={{ color: outOfMessages ? 'var(--color-rose)' : usage.remaining <= 5 ? 'var(--color-amber)' : 'var(--color-text-secondary)' }}>
+                {outOfMessages
+                  ? `You've used all ${usage.limit} messages for today · resets in ${resetsIn(usage.resetsAt)}`
+                  : `${usage.remaining} of ${usage.limit} messages left today · resets in ${resetsIn(usage.resetsAt)}`}
+                {user?.plan === 'pro' && usage.remaining <= 5 && (
+                  <> · <Link href="/settings?tab=billing" className="underline" style={{ color: 'var(--color-primary)' }}>Elite gets 50/day</Link></>
+                )}
+              </span>
+            ) : <span />}
+            <span style={{ color: 'var(--color-text-muted)' }}>Cofre can make mistakes. Changes always need your confirmation first.</span>
+          </div>
         </div>
 
         {/* Right column: financial snapshot */}

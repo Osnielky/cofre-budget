@@ -5,6 +5,7 @@ import { PlanGuard } from '../auth/guards/plan.guard';
 import { RequiresPlan } from '../auth/decorators/require-plan.decorator';
 import { AiChatService } from './ai-chat.service';
 import { AiConversationsService } from './ai-conversations.service';
+import { messageUsage } from './ai-usage';
 
 @UseGuards(JwtAuthGuard, PlanGuard)
 @RequiresPlan('pro', 'elite')
@@ -22,10 +23,13 @@ export class AiChatController {
     @Body() body: { content: string; month?: string },
     @Res() res: Response,
   ) {
-    const DAILY_MESSAGE_CAP = 50;
-    const sentToday = await this.conversations.countUserMessagesToday(req.user.id);
-    if (sentToday >= DAILY_MESSAGE_CAP) {
-      throw new ForbiddenException(`You've reached today's limit of ${DAILY_MESSAGE_CAP} messages — it resets at midnight.`);
+    const before = messageUsage(req.user.plan, await this.conversations.countUserMessagesToday(req.user.id));
+    if (before.remaining <= 0) {
+      throw new ForbiddenException({
+        message: `You've used all ${before.limit} of today's Ask Cofre messages. They reset at midnight UTC.`,
+        code: 'AI_DAILY_LIMIT',
+        usage: before,
+      });
     }
 
     await this.conversations.appendUserMessage(id, req.user.id, body.content);
@@ -45,7 +49,8 @@ export class AiChatController {
         onTextDelta: (text) => res.write(`data: ${JSON.stringify({ type: 'text_delta', text })}\n\n`),
       });
       const message = await this.conversations.appendAssistantMessage(id, result.text, result.widget);
-      res.write(`data: ${JSON.stringify({ type: 'done', message })}\n\n`);
+      const usage = messageUsage(req.user.plan, await this.conversations.countUserMessagesToday(req.user.id));
+      res.write(`data: ${JSON.stringify({ type: 'done', message, usage })}\n\n`);
     } catch (err) {
       res.write(`data: ${JSON.stringify({ type: 'error', message: 'Something went wrong. Please try again.' })}\n\n`);
     } finally {

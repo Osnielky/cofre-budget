@@ -4,6 +4,7 @@ import { In, Repository } from 'typeorm';
 import { AiConversation } from './ai-conversation.entity';
 import { AiMessage, AiMessageWidget } from './ai-message.entity';
 import { AiPendingAction } from './ai-pending-action.entity';
+import { startOfUtcDay } from './ai-usage';
 
 const TITLE_MAX_LEN = 60;
 
@@ -80,8 +81,8 @@ export class AiConversationsService {
   }
 
   async countUserMessagesToday(userId: string): Promise<number> {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    // Limits reset at midnight UTC (see ai-usage.ts), whatever the server's zone.
+    const startOfDay = startOfUtcDay(new Date());
     return this.messages.createQueryBuilder('m')
       .innerJoin(AiConversation, 'c', 'c.id = m."conversationId"')
       .where('c."userId" = :userId', { userId })

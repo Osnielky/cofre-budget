@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import type { MessageUsage } from '@/lib/ai/usage';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -55,12 +56,18 @@ export function useAiChat() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [recentActions, setRecentActions] = useState<RecentAction[]>([]);
+  const [usage, setUsage] = useState<MessageUsage | null>(null);
 
   const reloadConversations = useCallback(async () => {
     const res = await fetch(`${API}/ai/conversations`, { credentials: 'include' });
     const data = await res.json();
     setConversations(Array.isArray(data) ? data : []);
     return Array.isArray(data) ? data : [];
+  }, []);
+
+  const reloadUsage = useCallback(async () => {
+    const res = await fetch(`${API}/ai/conversations/usage`, { credentials: 'include' }).catch(() => null);
+    if (res?.ok) setUsage(await res.json());
   }, []);
 
   const reloadRecent = useCallback(async () => {
@@ -79,7 +86,7 @@ export function useAiChat() {
     (async () => {
       setLoading(true);
       const list = await reloadConversations();
-      await reloadRecent();
+      await Promise.all([reloadRecent(), reloadUsage()]);
       if (list.length > 0) {
         setActiveId(list[0].id);
         await loadMessages(list[0].id);
@@ -119,6 +126,7 @@ export function useAiChat() {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => null);
+        if (body?.usage) setUsage(body.usage);
         setMessages((prev) => [...prev.slice(0, -1), {
           id: `err-${Date.now()}`, role: 'assistant',
           text: typeof body?.message === 'string' ? body.message : 'Something went wrong. Please try again.',
@@ -147,6 +155,7 @@ export function useAiChat() {
             });
           } else if (event.type === 'done') {
             setMessages((prev) => [...prev.slice(0, -1), event.message]);
+            if (event.usage) setUsage(event.usage);
             reloadConversations();
             if (event.message.widget?.type === 'proposal') reloadRecent();
           } else if (event.type === 'error') {
@@ -180,5 +189,6 @@ export function useAiChat() {
     messages, loading, sending, sendMessage,
     confirmAction, rejectAction, undoAction,
     recentActions, reloadRecent,
+    usage,
   };
 }
