@@ -42,6 +42,13 @@ export default function PlaidOAuthRedirectPage() {
   const onSuccess = async (publicToken: string, metadata: any) => {
     const mode = sessionStorage.getItem('plaidLinkMode');
     try {
+      if (mode === 'liabilities') {
+        const itemId = sessionStorage.getItem('plaidReconnectItemId');
+        if (itemId) await fetch(`${API}/plaid/liabilities/${itemId}/complete`, { method: 'POST', credentials: 'include' });
+        clearHandoffState();
+        router.replace('/cards');
+        return;
+      }
       if (mode === 'reconnect') {
         const itemId = sessionStorage.getItem('plaidReconnectItemId');
         if (itemId) {
@@ -101,7 +108,11 @@ export default function PlaidOAuthRedirectPage() {
     token: linkToken ?? '',
     receivedRedirectUri: linkToken ? window.location.href : undefined,
     onSuccess,
-    onExit: () => { clearHandoffState(); router.replace('/settings'); },
+    onExit: () => {
+      const back = sessionStorage.getItem('plaidLinkMode') === 'liabilities' ? '/cards' : '/settings';
+      clearHandoffState();
+      router.replace(back);
+    },
   });
 
   useEffect(() => { if (linkToken && ready) open(); }, [linkToken, ready, open]);
