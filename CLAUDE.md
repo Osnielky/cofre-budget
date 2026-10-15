@@ -72,8 +72,11 @@ ANTHROPIC_API_KEY
 PLAID_CLIENT_ID
 PLAID_SECRET
 PLAID_ENV                 # sandbox | development | production
-                            # Liabilities must be enabled for the Plaid client (dashboard → Products)
-                            # or new links skip it and existing banks show "Enable card details"
+PLAID_LIABILITIES_ENABLED  # 'true' adds Liabilities (card APRs, statements) as an optional product
+                            # on new links. Keep 'false' until Plaid approves Liabilities for the
+                            # client (dashboard → Products) — Plaid rejects link tokens naming an
+                            # unapproved product, which breaks bank linking. Set in
+                            # deploy/ci-deploy.sh (currently false); true locally for sandbox
 PLAID_WEBHOOK_URL          # e.g. https://<host>/api/plaid/webhook — enables automatic sync
 PLAID_OAUTH_REDIRECT_URI   # e.g. https://<host>/settings/plaid-oauth-redirect — must also be
                             # registered in the Plaid dashboard's Allowed redirect URIs

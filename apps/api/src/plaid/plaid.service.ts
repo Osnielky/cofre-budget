@@ -101,8 +101,12 @@ export class PlaidService {
         user_id: plaidUserId,
         client_name: 'Cofre Budget',
         products: [Products.Transactions],
-        /* Best effort: banks without Liabilities still link; cards there get manual entry. */
-        optional_products: [Products.Liabilities],
+        /* Best effort: banks without Liabilities still link; cards there get manual entry.
+           Gated because Plaid rejects link tokens that name a product the client isn't
+           approved for — set PLAID_LIABILITIES_ENABLED=true once Plaid approves it. */
+        ...(this.config.get<string>('PLAID_LIABILITIES_ENABLED') === 'true'
+          ? { optional_products: [Products.Liabilities] }
+          : {}),
         country_codes: [CountryCode.Us],
         language: 'en',
         ...(webhook ? { webhook } : {}),

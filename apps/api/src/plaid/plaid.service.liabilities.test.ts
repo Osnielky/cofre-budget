@@ -58,12 +58,12 @@ describe('PlaidService liabilities', () => {
   });
 
   // Real constructor order: (config, itemRepo, accountRepo, txRepo, userRepo, rulesService, creditCards).
-  function makeService(client: any) {
+  function makeService(client: any, env: Record<string, string> = {}) {
     const creditCards = new CreditCardsService(
       ds.getRepository(CreditCardDetail), ds.getRepository(CardProfile), ds.getRepository(BankAccount), ds.getRepository(PlaidItem),
     );
     const service = new PlaidService(
-      { get: (k: string, d?: string) => ({ PLAID_ENV: 'sandbox', JWT_SECRET: SECRET } as Record<string, string>)[k] ?? d } as any,
+      { get: (k: string, d?: string) => ({ PLAID_ENV: 'sandbox', JWT_SECRET: SECRET, ...env } as Record<string, string>)[k] ?? d } as any,
       ds.getRepository(PlaidItem), ds.getRepository(BankAccount), ds.getRepository(Transaction), ds.getRepository(User),
       { getActiveRules: async () => [], matchRule: () => null } as any,
       creditCards,
@@ -114,7 +114,18 @@ describe('PlaidService liabilities', () => {
     expect(await details()).toHaveLength(0);
   });
 
-  it('asks for Liabilities as an optional product on new links', async () => {
+  it('asks for Liabilities as an optional product on new links when enabled', async () => {
+    let req: any;
+    const service = makeService({
+      userCreate: async () => ({ data: { user_id: 'plaid-user' } }),
+      linkTokenCreate: async (r: any) => { req = r; return { data: { link_token: 'lt' } }; },
+    }, { PLAID_LIABILITIES_ENABLED: 'true' });
+    await service.createLinkToken('user-1');
+    expect(req.products).toEqual(['transactions']);
+    expect(req.optional_products).toEqual(['liabilities']);
+  });
+
+  it('leaves Liabilities out of new links until it is enabled', async () => {
     let req: any;
     const service = makeService({
       userCreate: async () => ({ data: { user_id: 'plaid-user' } }),
@@ -122,7 +133,7 @@ describe('PlaidService liabilities', () => {
     });
     await service.createLinkToken('user-1');
     expect(req.products).toEqual(['transactions']);
-    expect(req.optional_products).toEqual(['liabilities']);
+    expect(req.optional_products).toBeUndefined();
   });
 
   it('builds an update-mode token that adds Liabilities consent', async () => {
