@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
 import Sidebar from '@/components/Sidebar';
 import TotalUtilization from './components/TotalUtilization';
@@ -8,6 +8,7 @@ import CardTile from './components/CardTile';
 import CardDetailDrawer from './components/CardDetailDrawer';
 import CardProfileForm from './components/CardProfileForm';
 import type { CardView } from '@/lib/cards/types';
+import { itemsNeedingFirstSync } from '@/lib/cards/first-sync';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -19,13 +20,31 @@ export default function CardsPage() {
   const [consentItemId, setConsentItemId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  const load = useCallback(() => {
-    fetch(`${API}/cards`, { credentials: 'include' })
+  const firstSynced = useRef<Set<string>>(new Set());
+
+  const fetchCards = useCallback(
+    () => fetch(`${API}/cards`, { credentials: 'include' })
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((d) => setCards(Array.isArray(d) ? d : []))
+      .then((d): CardView[] => (Array.isArray(d) ? d : [])),
+    [],
+  );
+
+  const load = useCallback(() => {
+    fetchCards()
+      .then(async (list) => {
+        setCards(list);
+        // Items linked before card details existed never synced; do it once per visit, best effort.
+        const todo = itemsNeedingFirstSync(list).filter((id) => !firstSynced.current.has(id));
+        if (todo.length === 0) return;
+        todo.forEach((id) => firstSynced.current.add(id));
+        await Promise.all(todo.map((id) =>
+          fetch(`${API}/plaid/liabilities/${id}/complete`, { method: 'POST', credentials: 'include' }).catch(() => null)));
+        const fresh = await fetchCards().catch(() => null);
+        if (fresh) setCards(fresh);
+      })
       .catch(() => setError('Could not load your cards.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [fetchCards]);
   useEffect(() => { load(); }, [load]);
 
   const clearHandoff = () => {

@@ -135,7 +135,9 @@ function toView(account: BankAccount, d: CreditCardDetail, plaidItemStatus: stri
     bankName: account.bankName,
     accountName: account.accountName,
     last4: account.last4 ?? null,
-    balance: Math.abs(Number(account.balance)),
+    // Plaid reports amount owed as a positive `current`; negative means overpaid, not debt.
+    // Manual accounts may have owed amounts typed as negatives.
+    balance: account.provider === 'plaid' ? Math.max(0, Number(account.balance)) : Math.abs(Number(account.balance)),
     provider: account.provider === 'plaid' ? 'plaid' : 'manual',
     plaidItemId: account.plaidItemId ?? null,
     plaidItemStatus,

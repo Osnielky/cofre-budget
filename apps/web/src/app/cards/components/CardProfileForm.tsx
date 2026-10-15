@@ -18,7 +18,7 @@ export default function CardProfileForm() {
   const [profile, setProfile] = useState<CardProfileView>(EMPTY);
   const [budget, setBudget] = useState('');
   const [purchase, setPurchase] = useState('');
-  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'invalid'>('idle');
   const [open, setOpen] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -41,7 +41,7 @@ export default function CardProfileForm() {
     e.preventDefault();
     const monthlyDebtBudget = toAmount(budget);
     const plannedPurchaseAmount = toAmount(purchase);
-    if (monthlyDebtBudget === undefined || plannedPurchaseAmount === undefined) { setStatus('error'); return; }
+    if (monthlyDebtBudget === undefined || plannedPurchaseAmount === undefined) { setStatus('invalid'); return; }
     setStatus('saving');
     const res = await fetch(`${API}/cards/profile`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
@@ -110,7 +110,8 @@ export default function CardProfileForm() {
             </button>
             {loadFailed && <span style={{ color: 'var(--color-rose)' }}>Could not load your goals.</span>}
             {status === 'saved' && <span style={{ color: 'var(--color-green)' }}>Saved</span>}
-            {status === 'error' && <span style={{ color: 'var(--color-rose)' }}>Amounts must be numbers like 450 or 1200.50</span>}
+            {status === 'error' && <span style={{ color: 'var(--color-rose)' }}>Could not save your goals. Try again.</span>}
+            {status === 'invalid' && <span style={{ color: 'var(--color-rose)' }}>Amounts must be numbers like 450 or 1200.50</span>}
           </div>
         </form>
       )}

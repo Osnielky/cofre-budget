@@ -67,7 +67,7 @@ Each phase ships independently and gets its own implementation plan.
 | `id` uuid, `userId`, `bankAccountId` (unique, FK cascade) | |
 | `creditLimit` decimal | Plaid `balances.limit` or manual |
 | `officialName` | Plaid `official_name`, used for catalog matching |
-| `aprs` jsonb | `[{type: purchase\|balance_transfer\|cash_advance\|special, percentage, balanceSubjectTo, interestCharged}]` |
+| `aprs` simple-json | `[{type: purchase\|balance_transfer\|cash_advance\|special, percentage, balanceSubjectTo, interestCharged}]` |
 | `lastStatementBalance`, `lastStatementDate` | |
 | `minimumPayment`, `nextPaymentDueDate` | |
 | `lastPaymentAmount`, `lastPaymentDate`, `isOverdue` | |
@@ -75,12 +75,12 @@ Each phase ships independently and gets its own implementation plan.
 | `rewardsBalance` decimal, nullable | manual only |
 | `productId` FK → `card_products`, nullable | phase 2 |
 | `liabilitiesStatus` | `synced` \| `unsupported` \| `not_consented` \| `pending` \| `manual` |
-| `manualFields` text[] | names of fields the user edited by hand |
+| `manualFields` simple-array | names of fields the user edited by hand |
 | `manualEditedAt` timestamp | |
-| `plaidData` jsonb | last Plaid report, used by "Use bank data" |
+| `plaidData` simple-json | last Plaid report, used by "Use bank data" |
 | `liabilitiesSyncedAt` timestamp | |
 
-`aprs` and `plaidData` are `simple-json`; `manualFields` is `simple-array`.
+`aprs` and `plaidData` are `simple-json`; `manualFields` is `simple-array`. Plaid cards start as `pending`; manual credit accounts start as `manual`. Opening `/cards` runs a first Liabilities sync for Plaid items that have never synced, which moves them to `synced`, `not_consented` or `unsupported`.
 
 **Manual-override rule:** a field listed in `manualFields` is not overwritten by sync,
 except that a Plaid statement with a `lastStatementDate` later than the manual edit

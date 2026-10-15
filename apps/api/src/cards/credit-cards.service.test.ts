@@ -39,7 +39,7 @@ describe('CreditCardsService', () => {
     const accounts = ds.getRepository(BankAccount);
     card = await accounts.save(accounts.create({
       userId: 'u1', bankName: 'Citi', accountName: 'Double Cash', accountType: 'credit',
-      balance: -1234.5, provider: 'plaid', plaidAccountId: 'p-card',
+      balance: 1234.5, provider: 'plaid', plaidAccountId: 'p-card',
     }));
     await accounts.save(accounts.create({ userId: 'u1', bankName: 'Citi', accountName: 'Checking', accountType: 'checking', balance: 50 }));
     service = new CreditCardsService(
@@ -53,6 +53,12 @@ describe('CreditCardsService', () => {
     expect(list).toHaveLength(1);
     expect(list[0]).toMatchObject({ accountId: card.id, balance: 1234.5, liabilitiesStatus: 'pending', aprs: [], hasBankData: false });
     expect(await ds.getRepository(CreditCardDetail).count()).toBe(1);
+  });
+
+  it('shows an overpaid Plaid card (negative current) as zero debt, not debt', async () => {
+    await ds.getRepository(BankAccount).update({ id: card.id }, { balance: -25 });
+    const list = await service.listForUser('u1');
+    expect(list[0].balance).toBe(0);
   });
 
   it('gives manual credit accounts the manual status', async () => {

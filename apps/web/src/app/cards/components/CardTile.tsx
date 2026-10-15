@@ -77,6 +77,9 @@ export default function CardTile({ card, onOpen, onEnable }: Props) {
           {notice.kind === 'enable' && (
             <button onClick={onEnable} className="btn-gold mt-2 block w-full px-3 py-2 rounded-lg text-xs font-semibold">Enable card details</button>
           )}
+          {notice.kind === 'reconnect' && (
+            <a href="/settings" className="mt-2 block font-semibold underline" style={{ color: 'var(--color-primary)' }}>Go to Settings</a>
+          )}
           {notice.kind === 'add_details' && (
             <button onClick={onOpen} className="mt-2 block font-semibold underline" style={{ color: 'var(--color-primary)' }}>Add details</button>
           )}

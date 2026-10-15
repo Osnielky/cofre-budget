@@ -26,6 +26,13 @@ describe('cardNotice', () => {
     expect(cardNotice({ ...base, liabilitiesStatus: 'unsupported', aprs: [] })?.kind).toBe('add_details');
     expect(cardNotice({ ...base, provider: 'manual', plaidItemId: null, plaidItemStatus: null, liabilitiesStatus: 'manual', creditLimit: null })?.kind).toBe('add_details');
   });
+  it('asks for the APR or limit a synced card is missing', () => {
+    expect(cardNotice({ ...base, aprs: [] })?.kind).toBe('add_details');
+    expect(cardNotice({ ...base, creditLimit: null })?.message).toBe('Your bank didn’t send the APR or limit — add them yourself.');
+  });
+  it('keeps priority: a synced card with a broken bank still says reconnect', () => {
+    expect(cardNotice({ ...base, aprs: [], plaidItemStatus: 'error' })?.kind).toBe('reconnect');
+  });
   it('is quiet once a manual card has APR and limit', () => {
     expect(cardNotice({ ...base, provider: 'manual', plaidItemId: null, plaidItemStatus: null, liabilitiesStatus: 'manual' })).toBeNull();
   });

@@ -110,7 +110,8 @@ export class PlaidService {
       }));
       return res.data.link_token;
     } catch (err) {
-      this.logger.error('linkTokenCreate failed', (err as any)?.response?.data ?? err);
+      const code = (err as any)?.response?.data?.error_code ?? (err as Error)?.message;
+      this.logger.error(`linkTokenCreate failed: ${code}`);
       throw err;
     }
   }
@@ -571,7 +572,8 @@ export class PlaidService {
       }));
       return res.data.link_token;
     } catch (err) {
-      this.logger.error(`linkTokenCreate (${purpose}) failed`, (err as any)?.response?.data ?? err);
+      const code = (err as any)?.response?.data?.error_code ?? (err as Error)?.message;
+      this.logger.error(`linkTokenCreate (${purpose}) failed: ${code}`);
       throw err;
     }
   }

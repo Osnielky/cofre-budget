@@ -23,5 +23,8 @@ export function cardNotice(card: CardView): CardNotice | null {
         : 'Add the APR and limit so Cofre can advise on this card.',
     };
   }
+  if (card.liabilitiesStatus === 'synced' && missing) {
+    return { kind: 'add_details', message: 'Your bank didn’t send the APR or limit — add them yourself.' };
+  }
   return null;
 }
