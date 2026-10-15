@@ -10,6 +10,26 @@ plus extras: bank accounts, Plaid, CSV import, projects, debts) are not listed.
   Bottom tab bar + "More" sheet on mobile, shared `AppShell`, per-page passes.
   Spec: [docs/superpowers/specs/2026-06-17-mobile-first-responsive-design.md](superpowers/specs/2026-06-17-mobile-first-responsive-design.md)
 
+- **Credit card expert** — spec approved; phase 1 (card data: Plaid Liabilities
+  sync, manual entry, `/cards` page, card goals) shipped 2026-10-15. Remaining,
+  each with its own plan:
+  2. Card catalog — `card_products`, seed of popular US cards, admin editing,
+     account↔product linking, reward-category mapping.
+  3. Advisor — rewards / payoff / balance-transfer / offer math + Ask Cofre tools
+     (best card per category, debt payoff plan, new-card recommendations).
+  4. Offer analysis — attach a mailer (image/PDF) or paste text in Ask Cofre,
+     AI term extraction, confirm, analyze.
+  5. Affiliate links — disclosed apply links on winning cards only (ranking never
+     sees commission), click tracking, network feed import.
+
+  Phase 1 follow-ups: card edit drawer accessibility (dialog role, Escape,
+  focus, scroll lock, confirm before discarding edits); a sync landing within
+  milliseconds of a manual edit can overwrite it; editing only the promo APR
+  marks the purchase APR as hand-entered too; `useBankData` should 400 when no
+  bank snapshot exists; tests for the `LIABILITIES` webhook branch and
+  `syncLiabilitiesByExternalItemId`.
+  Spec: [docs/superpowers/specs/2026-10-15-credit-card-expert-design.md](superpowers/specs/2026-10-15-credit-card-expert-design.md)
+
 ## Not started (rough effort)
 
 - **Privacy policy** — small. Static `/privacy` page + footer link.

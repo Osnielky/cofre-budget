@@ -123,6 +123,7 @@ emails or amounts. Queries and alert commands: `docs/observability.md`.
 | `middleware.ts` | Route guard — redirects unauthenticated users to `/login`, authenticated users away from `/login`. Reads `access_token` cookie. |
 | `app/(auth)/login/` | Public login page. POSTs to API with `credentials: 'include'`. |
 | `app/dashboard/` | Protected dashboard (stat cards placeholder). |
+| `app/cards/` | Credit Cards page: total utilization, a tile per credit card (APR, limit, due date, minimum), edit drawer for hand-entered values, card-goals form. Opening it runs a first Liabilities sync for Plaid items that never synced; "Enable card details" runs Plaid update mode (`plaidLinkMode = 'liabilities'`, also handled by `settings/plaid-oauth-redirect`). Pure helpers + tests in `lib/cards/`. Design: `docs/superpowers/specs/2026-10-15-credit-card-expert-design.md`. |
 | `components/Logo.tsx` | Inline SVG vault-door logo, accepts `size` prop. |
 
 Path alias `@/*` → `src/*` is defined in `apps/web/tsconfig.json`.
