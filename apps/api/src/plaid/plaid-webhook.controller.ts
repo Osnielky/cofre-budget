@@ -42,6 +42,8 @@ export class PlaidWebhookController {
       await this.service.markItemStatus(itemId, 'error', body.error?.error_code ?? null);
     } else if (webhookType === 'ITEM' && (webhookCode === 'PENDING_EXPIRATION' || webhookCode === 'PENDING_DISCONNECT')) {
       await this.service.markItemStatus(itemId, 'error', webhookCode);
+    } else if (webhookType === 'LIABILITIES' && webhookCode === 'DEFAULT_UPDATE') {
+      await this.service.syncLiabilitiesByExternalItemId(itemId);
     } else {
       this.logger.log(`No handler for ${webhookType}/${webhookCode} — acknowledging without action`);
     }

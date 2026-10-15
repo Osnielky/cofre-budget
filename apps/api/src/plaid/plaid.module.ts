@@ -9,9 +9,10 @@ import { PlaidController } from './plaid.controller';
 import { PlaidWebhookController } from './plaid-webhook.controller';
 import { PlaidWebhookVerifierService } from './plaid-webhook-verifier.service';
 import { CategorizationRulesModule } from '../categorization-rules/categorization-rules.module';
+import { CardsModule } from '../cards/cards.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PlaidItem, BankAccount, Transaction, User]), CategorizationRulesModule],
+  imports: [TypeOrmModule.forFeature([PlaidItem, BankAccount, Transaction, User]), CategorizationRulesModule, CardsModule],
   providers: [PlaidService, PlaidWebhookVerifierService],
   controllers: [PlaidController, PlaidWebhookController],
   exports: [PlaidService],

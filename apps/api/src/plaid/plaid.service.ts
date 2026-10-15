@@ -8,6 +8,7 @@ import {
   PlaidEnvironments,
   Products,
   CountryCode,
+  AccountType,
 } from 'plaid';
 import { PlaidItem } from './plaid-item.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
@@ -16,6 +17,9 @@ import { User } from '../users/user.entity';
 import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.util';
 import { CategorizationRulesService } from '../categorization-rules/categorization-rules.service';
 import { timed } from '../common/logging/timed';
+import { CreditCardsService } from '../cards/credit-cards.service';
+import { mapPlaidCard, liabilitiesErrorStatus } from '../cards/liabilities.mapper';
+import type { LiabilitiesStatus } from '../cards/card-types';
 
 export interface PreviewAccount {
   plaidAccountId: string;
@@ -55,6 +59,7 @@ export class PlaidService {
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
     @InjectRepository(User) private userRepo: Repository<User>,
     private rulesService: CategorizationRulesService,
+    private creditCards: CreditCardsService,
   ) {
     const secret = this.config.get<string>('JWT_SECRET');
     if (!secret) throw new Error('JWT_SECRET is required for PlaidService token encryption');
@@ -96,6 +101,8 @@ export class PlaidService {
         user_id: plaidUserId,
         client_name: 'Cofre Budget',
         products: [Products.Transactions],
+        /* Best effort: banks without Liabilities still link; cards there get manual entry. */
+        optional_products: [Products.Liabilities],
         country_codes: [CountryCode.Us],
         language: 'en',
         ...(webhook ? { webhook } : {}),
@@ -238,6 +245,7 @@ export class PlaidService {
     }
 
     await this.runSync(item, accessToken, cutoverDates.size > 0 ? cutoverDates : undefined);
+    await this.syncLiabilities(item, accessToken);
     return accounts;
   }
 
@@ -261,6 +269,7 @@ export class PlaidService {
         await this.accountRepo.save(account);
       }
     }
+    await this.syncLiabilities(item, accessToken);
   }
 
   /* Looked up by Plaid's item_id (not our PlaidItem.id) — this is what webhook
@@ -282,6 +291,56 @@ export class PlaidService {
     item.status = status;
     item.errorCode = errorCode;
     await this.itemRepo.save(item);
+  }
+
+  /* Card data (limit, APRs, statement, due date) from /liabilities/get, handed to
+     CreditCardsService per credit account. Never throws: a card-data problem must not
+     fail the connect / sync / reconnect that triggered it. Expected "no data" errors
+     (no consent yet, unsupported bank, still extracting) fall back to /accounts/get so
+     limit and card name are still stored, and set that status on each card. Logs only
+     the Plaid error code — axios errors carry the request, which holds the access token. */
+  async syncLiabilities(item: PlaidItem, accessToken: string): Promise<void> {
+    try {
+      let accounts;
+      let credit: { account_id: string | null }[] = [];
+      let status: LiabilitiesStatus = 'synced';
+      try {
+        const res = await timed('plaid', 'liabilitiesGet', () => this.client.liabilitiesGet({ access_token: accessToken }));
+        accounts = res.data.accounts;
+        credit = res.data.liabilities.credit ?? [];
+      } catch (err) {
+        const code: string | undefined = (err as any)?.response?.data?.error_code;
+        const fallback = liabilitiesErrorStatus(code);
+        if (!fallback) throw err;
+        this.logger.log(`Liabilities unavailable for item ${item.itemId}: ${code}`);
+        status = fallback;
+        accounts = (await timed('plaid', 'accountsGet', () => this.client.accountsGet({ access_token: accessToken }))).data.accounts;
+      }
+
+      const creditById = new Map(credit.map((c) => [c.account_id, c]));
+      for (const pa of accounts) {
+        if (pa.type !== AccountType.Credit) continue;
+        const liability = (creditById.get(pa.account_id) ?? null) as Parameters<typeof mapPlaidCard>[1];
+        await this.creditCards.applyPlaidReport(item.userId, {
+          plaidAccountId: pa.account_id,
+          data: mapPlaidCard(pa, liability),
+          status: status === 'synced' && !liability ? 'unsupported' : status,
+        });
+      }
+    } catch (err) {
+      const code = (err as any)?.response?.data?.error_code ?? (err as Error)?.message;
+      this.logger.error(`Liabilities sync failed for item ${item.itemId}: ${code}`);
+    }
+  }
+
+  async syncLiabilitiesByExternalItemId(externalItemId: string): Promise<void> {
+    const item = await this.itemRepo
+      .createQueryBuilder('item')
+      .addSelect('item.accessToken')
+      .where('item.itemId = :externalItemId', { externalItemId })
+      .getOne();
+    if (!item) return;
+    await this.syncLiabilities(item, decryptToken(item.accessToken, this.encKey));
   }
 
   /* Cursor-based sync via /transactions/sync — pages through everything new since
@@ -462,7 +521,32 @@ export class PlaidService {
 
   /* Update-mode link token: reuses the existing Item's access token so the user
      re-authenticates the same connection instead of creating a new one. */
-  async createReconnectLinkToken(userId: string, plaidItemId: string): Promise<string> {
+  createReconnectLinkToken(userId: string, plaidItemId: string): Promise<string> {
+    return this.updateModeLinkToken(userId, plaidItemId, {}, 'reconnect');
+  }
+
+  /* Update mode that asks the user to consent to Liabilities on an Item linked before
+     Cofre requested it. Plaid bills Liabilities per Item from then on. */
+  createLiabilitiesLinkToken(userId: string, plaidItemId: string): Promise<string> {
+    return this.updateModeLinkToken(userId, plaidItemId, { additional_consented_products: [Products.Liabilities] }, 'liabilities');
+  }
+
+  async completeLiabilitiesConsent(plaidItemId: string, userId: string): Promise<void> {
+    const item = await this.itemRepo
+      .createQueryBuilder('item')
+      .addSelect('item.accessToken')
+      .where('item.id = :plaidItemId AND item.userId = :userId', { plaidItemId, userId })
+      .getOne();
+    if (!item) throw new NotFoundException('Bank connection not found');
+    await this.syncLiabilities(item, decryptToken(item.accessToken, this.encKey));
+  }
+
+  private async updateModeLinkToken(
+    userId: string,
+    plaidItemId: string,
+    extra: { additional_consented_products?: Products[] },
+    purpose: string,
+  ): Promise<string> {
     const item = await this.itemRepo
       .createQueryBuilder('item')
       .addSelect('item.accessToken')
@@ -481,12 +565,13 @@ export class PlaidService {
         access_token: accessToken,
         country_codes: [CountryCode.Us],
         language: 'en',
+        ...extra,
         ...(webhook ? { webhook } : {}),
         ...(redirectUri ? { redirect_uri: redirectUri } : {}),
       }));
       return res.data.link_token;
     } catch (err) {
-      this.logger.error('linkTokenCreate (reconnect) failed', (err as any)?.response?.data ?? err);
+      this.logger.error(`linkTokenCreate (${purpose}) failed`, (err as any)?.response?.data ?? err);
       throw err;
     }
   }
@@ -505,6 +590,7 @@ export class PlaidService {
 
     const accessToken = decryptToken(item.accessToken, this.encKey);
     await this.runSync(item, accessToken);
+    await this.syncLiabilities(item, accessToken);
 
     const refreshed = await this.itemRepo.findOneBy({ id: plaidItemId });
     return { status: refreshed?.status ?? item.status, errorCode: refreshed?.errorCode ?? null };

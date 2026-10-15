@@ -34,12 +34,14 @@ function makeService(sync: { added: unknown[]; removed?: unknown[] }) {
     ds.getRepository(Transaction),
     ds.getRepository(User),
     { getActiveRules: async () => [], matchRule: () => null } as any,
+    { applyPlaidReport: async () => undefined } as any, // CreditCardsService stub
   );
   const accounts = [
     { account_id: 'plaid-chk', name: 'TOTAL CHECKING', mask: '7682', subtype: 'checking', balances: { current: 4516.7, iso_currency_code: 'USD' } },
     { account_id: 'plaid-sav', name: 'SAVINGS', mask: '9001', subtype: 'savings', balances: { current: 800, iso_currency_code: 'USD' } },
   ];
   (service as any).client = {
+    liabilitiesGet: async () => ({ data: { accounts: [], liabilities: { credit: [], mortgage: null, student: null } } }),
     itemPublicTokenExchange: async () => ({ data: { access_token: 'access-tok', item_id: 'item-chase' } }),
     accountsBalanceGet: async () => ({ data: { accounts } }),
     transactionsSync: async () => ({ data: { added: sync.added, modified: [], removed: sync.removed ?? [], next_cursor: 'c1', has_more: false } }),

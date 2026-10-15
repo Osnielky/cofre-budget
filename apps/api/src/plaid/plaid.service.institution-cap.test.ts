@@ -40,7 +40,7 @@ describe('PlaidService institution cap', () => {
   });
 
   // Matches PlaidService's real constructor order: (config, itemRepo, accountRepo,
-  // txRepo, userRepo, rulesService) — read plaid.service.ts:50-56 before touching this.
+  // txRepo, userRepo, rulesService, creditCards) — read plaid.service.ts:50-56 before touching this.
   function makeService(fakeClient: any) {
     const service = new PlaidService(
       fakeConfig({ PLAID_ENV: 'sandbox', JWT_SECRET: 'test-secret-at-least-this-long' }),
@@ -49,6 +49,7 @@ describe('PlaidService institution cap', () => {
       ds.getRepository(Transaction),
       ds.getRepository(User),
       { matchNewTransaction: async () => null } as any, // CategorizationRulesService stub
+      { applyPlaidReport: async () => undefined } as any, // CreditCardsService stub
     );
     (service as any).client = fakeClient;
     return service;

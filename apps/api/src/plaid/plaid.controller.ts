@@ -53,4 +53,16 @@ export class PlaidController {
   completeReconnect(@Param('itemId') itemId: string, @Request() req: any) {
     return this.service.completeReconnect(itemId, req.user.id);
   }
+
+  @Post('liabilities-token/:itemId')
+  async createLiabilitiesLinkToken(@Param('itemId') itemId: string, @Request() req: any) {
+    const linkToken = await this.service.createLiabilitiesLinkToken(req.user.id, itemId);
+    return { link_token: linkToken };
+  }
+
+  @Post('liabilities/:itemId/complete')
+  async completeLiabilitiesConsent(@Param('itemId') itemId: string, @Request() req: any) {
+    await this.service.completeLiabilitiesConsent(itemId, req.user.id);
+    return { ok: true };
+  }
 }
