@@ -77,6 +77,7 @@ export default function CardsPage() {
           {loading ? (
             <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading cards…</p>
           ) : cards.length === 0 ? (
+            error ? null :
             <div className="rounded-2xl p-6 text-sm" style={{ background: 'var(--color-surface)', border: 'var(--glass-border)' }}>
               No credit cards yet. Connect your card’s bank or add a credit card account in{' '}
               <a href="/settings" className="font-semibold underline" style={{ color: 'var(--color-primary)' }}>Settings</a>.

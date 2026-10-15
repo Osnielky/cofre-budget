@@ -25,7 +25,7 @@ export default function CardProfileForm() {
 
   useEffect(() => {
     fetch(`${API}/cards/profile`, { credentials: 'include' })
-      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((r) => { if (!r.ok) throw new Error(); return r.text().then((t) => (t ? JSON.parse(t) : null)); })
       .then((p: CardProfileView | null) => {
         setLoaded(true);
         if (!p) return;
