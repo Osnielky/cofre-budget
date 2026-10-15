@@ -43,6 +43,12 @@ plus extras: bank accounts, Plaid, CSV import, projects, debts) are not listed.
 - **Bills / reminders** — medium/large. Recurring-bill model + due dates;
   in-app/email reminders are easy, but *automatic scheduled* reminders need
   Cloud Scheduler (deferred infra).
+- **Personal tax preparation** — large. Help users prepare personal taxes from
+  their Cofre data: tax-category tagging of transactions, deductible-expense
+  summaries, income totals, year-end report/export. Needs its own brainstorm +
+  spec. When built, request "Personal tax preparation" as an added use case in
+  the Plaid dashboard (approval currently filed under "Personal budgeting and
+  financial advice"); investment cost basis would need the Plaid Investments product.
 - **English / Spanish (i18n)** — large. i18n infra (e.g. next-intl) + translating
   every page. Touches everything; do deliberately.
 - **Premium plan structure** — large. `user.plan` field exists; needs free/pro
