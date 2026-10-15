@@ -99,8 +99,8 @@ export default function ProjectsPage() {
   const [projects, setProjects]     = useState<Project[]>([]);
   const [loading, setLoading]       = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Terminated projects are tucked away until the user asks to see them.
-  const [showTerminated, setShowTerminated] = useState(false);
+  // Closed projects (sold or terminated) are tucked away until the user asks to see them.
+  const [showClosed, setShowClosed] = useState(false);
   const [showForm, setShowForm]       = useState(false);
   const [editing, setEditing]         = useState<Project | null>(null);
   const [showSell, setShowSell]       = useState<Project | null>(null);
@@ -171,8 +171,8 @@ export default function ProjectsPage() {
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
       setProjects(list);
-      // Open on the first project that's visible by default (not terminated).
-      const first = list.find((p: Project) => p.status !== 'terminated') ?? list[0];
+      // Open on the first project that's visible by default (still active).
+      const first = list.find((p: Project) => !isClosed(p.status)) ?? list[0];
       if (first) {
         setSelectedId((prev) => prev ?? first.id);
         loadDetail(first.id);
@@ -504,8 +504,8 @@ export default function ProjectsPage() {
             )}
 
             {[...projects]
-              // The open project stays listed even when terminated, so it doesn't vanish mid-edit.
-              .filter((p) => showTerminated || p.status !== 'terminated' || p.id === selectedId)
+              // The open project stays listed even when closed, so it doesn't vanish mid-edit.
+              .filter((p) => showClosed || !isClosed(p.status) || p.id === selectedId)
               .sort((a, b) => Number(isClosed(a.status)) - Number(isClosed(b.status)))
               .map((p) => {
               const color      = p.color || '#9B6DFF';
@@ -561,18 +561,18 @@ export default function ProjectsPage() {
               );
             })}
             {(() => {
-              const count = projects.filter((p) => p.status === 'terminated').length;
+              const count = projects.filter((p) => isClosed(p.status)).length;
               if (count === 0) return null;
               return (
-                <button type="button" onClick={() => setShowTerminated((v) => !v)} aria-pressed={showTerminated}
+                <button type="button" onClick={() => setShowClosed((v) => !v)} aria-pressed={showClosed}
                   className="mt-1 w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,currentColor_6%,transparent)]"
                   style={{ border: '1px dashed var(--color-border)', color: 'var(--color-text-secondary)' }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    {showTerminated
+                    {showClosed
                       ? <path d="M17.94 17.94A10 10 0 0 1 12 20c-7 0-10-8-10-8a18 18 0 0 1 5.06-5.94M9.9 4.24A9 9 0 0 1 12 4c7 0 10 8 10 8a18 18 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24M1 1l22 22" />
                       : <path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8-10-8-10-8Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />}
                   </svg>
-                  {showTerminated ? 'Hide terminated' : `Show terminated (${count})`}
+                  {showClosed ? 'Hide sold & terminated' : `Show sold & terminated (${count})`}
                 </button>
               );
             })()}
