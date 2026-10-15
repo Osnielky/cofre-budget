@@ -73,6 +73,8 @@ describe.skipIf(!hasDb)('database migrations', { timeout: 30_000 }, () => {
     // Tables added by post-baseline migrations did not exist when production was synchronized.
     // Schema-qualify to ensure unqualified statements cannot fall through to public if test schema is dropped.
     await synced.query(`DROP TABLE "${SYNCED}"."net_worth_snapshots"`);
+    await synced.query(`DROP TABLE "${SYNCED}"."credit_card_details"`);
+    await synced.query(`DROP TABLE "${SYNCED}"."card_profiles"`);
     // Columns added by post-baseline migrations likewise.
     await synced.query(`ALTER TABLE "${SYNCED}"."users" DROP COLUMN "lastSeenAt"`);
     await synced.query(`INSERT INTO "${SYNCED}"."users" ("email", "name") VALUES ('owner@cofre.dev', 'Owner')`);

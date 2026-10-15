@@ -4,5 +4,6 @@ import { Baseline1790610365591 } from './1790610365591-Baseline';
 import { NetWorthSnapshots1790968124309 } from './1790968124309-NetWorthSnapshots';
 import { InvestmentsAsSavings1791301606403 } from './1791301606403-InvestmentsAsSavings';
 import { UserLastSeen1791904532417 } from './1791904532417-UserLastSeen';
+import { CreditCardDetails1792090417461 } from './1792090417461-CreditCardDetails';
 
-export const MIGRATIONS = [Baseline1790610365591, NetWorthSnapshots1790968124309, InvestmentsAsSavings1791301606403, UserLastSeen1791904532417];
+export const MIGRATIONS = [Baseline1790610365591, NetWorthSnapshots1790968124309, InvestmentsAsSavings1791301606403, UserLastSeen1791904532417, CreditCardDetails1792090417461];
