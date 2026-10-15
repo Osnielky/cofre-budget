@@ -44,7 +44,7 @@ export default function PlaidOAuthRedirectPage() {
     try {
       if (mode === 'liabilities') {
         const itemId = sessionStorage.getItem('plaidReconnectItemId');
-        if (itemId) await fetch(`${API}/plaid/liabilities/${itemId}/complete`, { method: 'POST', credentials: 'include' });
+        if (itemId) await fetch(`${API}/plaid/liabilities/${itemId}/complete`, { method: 'POST', credentials: 'include' }).catch(() => null);
         clearHandoffState();
         router.replace('/cards');
         return;

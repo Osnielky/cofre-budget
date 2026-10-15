@@ -21,7 +21,8 @@ export default function CardsPage() {
 
   const load = useCallback(() => {
     fetch(`${API}/cards`, { credentials: 'include' })
-      .then((r) => r.json()).then((d) => setCards(Array.isArray(d) ? d : []))
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((d) => setCards(Array.isArray(d) ? d : []))
       .catch(() => setError('Could not load your cards.'))
       .finally(() => setLoading(false));
   }, []);

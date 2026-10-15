@@ -20,18 +20,21 @@ export default function CardProfileForm() {
   const [purchase, setPurchase] = useState('');
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [open, setOpen] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     fetch(`${API}/cards/profile`, { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((p: CardProfileView | null) => {
+        setLoaded(true);
         if (!p) return;
         setProfile(p);
         setBudget(p.monthlyDebtBudget === null ? '' : String(p.monthlyDebtBudget));
         setPurchase(p.plannedPurchaseAmount === null ? '' : String(p.plannedPurchaseAmount));
         setOpen(!p.goal || !p.creditScoreBand);
       })
-      .catch(() => {});
+      .catch(() => setLoadFailed(true));
   }, []);
 
   async function save(e: React.FormEvent) {
@@ -102,9 +105,10 @@ export default function CardProfileForm() {
               onChange={(e) => setProfile({ ...profile, plannedPurchaseNote: e.target.value })} className="px-3 py-2 rounded-lg" style={inputStyle} />
           </label>
           <div className="md:col-span-2 flex items-center gap-3">
-            <button type="submit" disabled={status === 'saving'} className="btn-gold px-4 py-2.5 rounded-xl font-semibold">
+            <button type="submit" disabled={status === 'saving' || !loaded} className="btn-gold px-4 py-2.5 rounded-xl font-semibold">
               {status === 'saving' ? 'Saving…' : 'Save goals'}
             </button>
+            {loadFailed && <span style={{ color: 'var(--color-rose)' }}>Could not load your goals.</span>}
             {status === 'saved' && <span style={{ color: 'var(--color-green)' }}>Saved</span>}
             {status === 'error' && <span style={{ color: 'var(--color-rose)' }}>Amounts must be numbers like 450 or 1200.50</span>}
           </div>
