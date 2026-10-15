@@ -72,6 +72,8 @@ ANTHROPIC_API_KEY
 PLAID_CLIENT_ID
 PLAID_SECRET
 PLAID_ENV                 # sandbox | development | production
+                            # Liabilities must be enabled for the Plaid client (dashboard → Products)
+                            # or new links skip it and existing banks show "Enable card details"
 PLAID_WEBHOOK_URL          # e.g. https://<host>/api/plaid/webhook — enables automatic sync
 PLAID_OAUTH_REDIRECT_URI   # e.g. https://<host>/settings/plaid-oauth-redirect — must also be
                             # registered in the Plaid dashboard's Allowed redirect URIs
@@ -97,6 +99,7 @@ NestJS modules wired in `app/app.module.ts`:
 | `config/database.config.ts` | TypeORM options via `@nestjs/config`. Entity list lives in `config/entities.ts`; `config/data-source.ts` is the same connection for the TypeORM CLI. **Entities and migrations must be imported explicitly** — glob paths don't work in the webpack bundle. |
 | `users/` | `User` entity + `UsersService`. Password column has `select: false`; use `createQueryBuilder().addSelect('user.password')` to load it. |
 | `auth/` | Passport local + JWT strategies. JWT stored as `httpOnly` cookie `access_token`. Login: `POST /api/auth/login`. |
+| `cards/` | Credit card data. `credit_card_details` (one per credit account, created lazily) holds Plaid Liabilities data or hand-entered values; `manualFields` + `detail-merge.ts` decide which wins. `card_profiles` holds the user's card goals. `/api/cards` is open to every plan. |
 
 **Logging.** Everything logs as Cloud Logging JSON through `common/logging/`: `CloudLogger`
 backs every `new Logger(Name)`, `requestLoggingMiddleware` writes one line per request and

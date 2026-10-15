@@ -51,12 +51,11 @@ Each phase ships independently and gets its own implementation plan.
   institution supports it without failing where it doesn't.
 - Existing Items: `/cards` shows **"Enable card details"** on credit accounts with no
   Liabilities data. It opens Link in update mode with Liabilities as an additional
-  consented product (new `POST /api/plaid/link-token/liabilities` returning that token).
+  consented product (`POST /api/plaid/liabilities-token/:itemId` returns an update-mode token with `additional_consented_products: [liabilities]`; `POST /api/plaid/liabilities/:itemId/complete` runs the sync after Link succeeds).
 - Account sync already reads Plaid accounts; it additionally stores `balances.limit`
   and `official_name` into `credit_card_details` for credit-type accounts.
 - `syncLiabilities(item)` calls `liabilitiesGet` wrapped in
-  `timed('plaid', 'liabilitiesGet', …)`. It runs after transaction sync, on the
-  `DEFAULT_UPDATE` webhook, and right after an update-mode relink.
+  `timed('plaid', 'liabilitiesGet', …)`. It runs after the initial sync in `confirmExchange`, after a manual sync, after a reconnect or consent, and on the `LIABILITIES/DEFAULT_UPDATE` webhook.
 - `PRODUCTS_NOT_SUPPORTED` / `PRODUCT_NOT_READY` / not-consented errors are expected
   states, not failures: set `liabilitiesStatus` on the detail row (`unsupported` |
   `not_consented` | `pending`) and log at info level with the error code only.
@@ -77,16 +76,19 @@ Each phase ships independently and gets its own implementation plan.
 | `productId` FK → `card_products`, nullable | phase 2 |
 | `liabilitiesStatus` | `synced` \| `unsupported` \| `not_consented` \| `pending` \| `manual` |
 | `manualFields` text[] | names of fields the user edited by hand |
-| `liabilitiesSyncedAt`, timestamps | |
+| `manualEditedAt` timestamp | |
+| `plaidData` jsonb | last Plaid report, used by "Use bank data" |
+| `liabilitiesSyncedAt` timestamp | |
+
+`aprs` and `plaidData` are `simple-json`; `manualFields` is `simple-array`.
 
 **Manual-override rule:** a field listed in `manualFields` is not overwritten by sync,
 except that a Plaid statement with a `lastStatementDate` later than the manual edit
 replaces statement-derived fields (statement balance, minimum payment, due date) and
 removes them from `manualFields`. APRs and limit edited by hand stay until the user
-clicks "Use bank data".
+clicks "Use bank data". A null from Plaid never erases a stored value.
 
-Manual accounts of type `credit` get a detail row with `liabilitiesStatus = 'manual'`
-on creation (and a backfill in the migration for existing ones).
+Detail rows are created lazily the first time a credit account is listed or synced (no backfill).
 
 ### `/cards` page (web, responsive)
 
@@ -99,7 +101,7 @@ on creation (and a backfill in the migration for existing ones).
 - Card profile form (below the tiles, collapsible once filled).
 - Colors from theme variables only; utilization bar uses status colors, not chart
   series colors.
-- Nav entry "Cards" next to Accounts.
+- Nav entry "Cards" after Debts (accounts live in Settings, there is no Accounts nav item).
 
 ### `card_profiles` (one per user)
 
