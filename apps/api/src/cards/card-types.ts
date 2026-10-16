@@ -74,3 +74,17 @@ export interface CardProfileView {
   plannedPurchaseAmount: number | null;
   plannedPurchaseNote: string | null;
 }
+
+/* A checking account shown as a debit card on /cards. */
+export interface DebitView {
+  accountId: string;
+  bankName: string;
+  accountName: string;
+  last4: string | null;
+  balance: number;
+  /* Money out this month, excluding transfers, savings moves and debt payments
+     (same rule as net-worth cash flow). */
+  spentThisMonth: number;
+  provider: 'manual' | 'plaid';
+  plaidItemStatus: string | null;
+}

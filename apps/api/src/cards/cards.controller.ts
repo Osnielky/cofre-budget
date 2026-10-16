@@ -13,6 +13,11 @@ export class CardsController {
     return this.service.listForUser(req.user.id);
   }
 
+  @Get('debit')
+  listDebit(@Request() req: any) {
+    return this.service.listDebitForUser(req.user.id);
+  }
+
   @Get('profile')
   getProfile(@Request() req: any) {
     return this.service.getProfile(req.user.id);

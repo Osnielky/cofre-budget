@@ -63,6 +63,12 @@ export default function AskCofrePage() {
   const outOfMessages = usage != null && usage.remaining <= 0;
   const { user } = useUser();
   const [input, setInput] = useState('');
+
+  /* /ask-cofre?q=… (e.g. from the Cards page) fills the input; the user still presses send. */
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q) setInput(q.slice(0, 500));
+  }, []);
   const [month, setMonth] = useState(currentMonth());
   const [showHistory, setShowHistory] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);

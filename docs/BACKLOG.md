@@ -27,6 +27,12 @@ plus extras: bank accounts, Plaid, CSV import, projects, debts) are not listed.
   utilization and spend per card. It still can't compare rewards — that needs the
   phase 2 catalog.
 
+  Cards page redesign shipped 2026-10-16 (stat tiles, Credit/Debit/All tabs,
+  payment-strategy tips). Its "Coming soon" panels still need: a daily snapshot of
+  card balances for the utilization-trend chart, and the phase 2 catalog for
+  rewards. Debit tiles link to /transactions without an account filter — add
+  `?account=` support to the Transactions page.
+
   Phase 1 follow-ups: card edit drawer accessibility (dialog role, Escape,
   focus, scroll lock, confirm before discarding edits); a sync landing within
   milliseconds of a manual edit can overwrite it; editing only the promo APR

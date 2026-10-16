@@ -42,3 +42,15 @@ export interface CardProfileView {
   plannedPurchaseAmount: number | null;
   plannedPurchaseNote: string | null;
 }
+
+/* A checking account shown as a debit card. Mirror of DebitView in apps/api/src/cards/card-types.ts. */
+export interface DebitView {
+  accountId: string;
+  bankName: string;
+  accountName: string;
+  last4: string | null;
+  balance: number;
+  spentThisMonth: number;
+  provider: 'manual' | 'plaid';
+  plaidItemStatus: string | null;
+}

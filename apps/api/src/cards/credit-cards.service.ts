@@ -3,9 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { PlaidItem } from '../plaid/plaid-item.entity';
+import { Transaction } from '../transactions/transaction.entity';
+import { isCashFlowTx } from '../net-worth-goal/net-worth-history.math';
 import { CreditCardDetail } from './credit-card-detail.entity';
 import { CardProfile } from './card-profile.entity';
-import type { CardProfileView, CardView, LiabilitiesStatus, PlaidCardData } from './card-types';
+import type { CardProfileView, CardView, DebitView, LiabilitiesStatus, PlaidCardData } from './card-types';
 import { MANUAL_FIELDS, mergePlaidData, mergeSnapshot } from './detail-merge';
 import { validateDetailPatch, validateProfile } from './card-validation';
 
@@ -27,6 +29,7 @@ export class CreditCardsService {
     @InjectRepository(CardProfile) private profiles: Repository<CardProfile>,
     @InjectRepository(BankAccount) private accounts: Repository<BankAccount>,
     @InjectRepository(PlaidItem) private items: Repository<PlaidItem>,
+    @InjectRepository(Transaction) private transactions: Repository<Transaction>,
   ) {}
 
   async listForUser(userId: string): Promise<CardView[]> {
@@ -40,6 +43,38 @@ export class CreditCardsService {
       views.push(toView(account, detail, account.plaidItemId ? statusByItem.get(account.plaidItemId) ?? null : null));
     }
     return views;
+  }
+
+  /* Checking accounts, shown as debit cards, with this month's spending. */
+  async listDebitForUser(userId: string, now: Date = new Date()): Promise<DebitView[]> {
+    const accounts = await this.accounts.find({ where: { userId, accountType: 'checking' }, order: { createdAt: 'ASC' } });
+    if (accounts.length === 0) return [];
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const rows = await this.transactions.createQueryBuilder('tx')
+      .leftJoinAndSelect('tx.categoryRef', 'categoryRef')
+      .where('tx.userId = :userId', { userId })
+      .andWhere('tx.bankAccountId IN (:...ids)', { ids: accounts.map((a) => a.id) })
+      .andWhere('tx.isSplitParent = :split', { split: false })
+      .andWhere('tx.amount < 0')
+      .andWhere('tx.date >= :start AND tx.date <= :end', { start: `${ym}-01`, end: `${ym}-31` })
+      .getMany();
+    const spent = new Map<string, number>();
+    for (const t of rows) {
+      if (!isCashFlowTx({ date: t.date, amount: t.amount, debtId: t.debtId ?? null, categoryType: t.categoryRef?.type ?? null, accountType: 'checking' })) continue;
+      spent.set(t.bankAccountId, (spent.get(t.bankAccountId) ?? 0) + Math.abs(Number(t.amount)));
+    }
+    const items = await this.items.find({ where: { userId } });
+    const statusByItem = new Map(items.map((i) => [i.id, i.status]));
+    return accounts.map((a) => ({
+      accountId: a.id,
+      bankName: a.bankName,
+      accountName: a.accountName,
+      last4: a.last4 ?? null,
+      balance: Number(a.balance),
+      spentThisMonth: Math.round((spent.get(a.id) ?? 0) * 100) / 100,
+      provider: a.provider === 'plaid' ? 'plaid' : 'manual',
+      plaidItemStatus: a.plaidItemId ? statusByItem.get(a.plaidItemId) ?? null : null,
+    }));
   }
 
   async updateDetail(userId: string, accountId: string, body: unknown): Promise<CardView> {
