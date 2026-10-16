@@ -76,7 +76,7 @@ PLAID_LIABILITIES_ENABLED  # 'true' adds Liabilities (card APRs, statements) as 
                             # on new links. Keep 'false' until Plaid approves Liabilities for the
                             # client (dashboard → Products) — Plaid rejects link tokens naming an
                             # unapproved product, which breaks bank linking. Set in
-                            # deploy/ci-deploy.sh (currently false); true locally for sandbox
+                            # deploy/ci-deploy.sh (true since Plaid approved Liabilities 2026-10-16)
 PLAID_WEBHOOK_URL          # e.g. https://<host>/api/plaid/webhook — enables automatic sync
 PLAID_OAUTH_REDIRECT_URI   # e.g. https://<host>/settings/plaid-oauth-redirect — must also be
                             # registered in the Plaid dashboard's Allowed redirect URIs
