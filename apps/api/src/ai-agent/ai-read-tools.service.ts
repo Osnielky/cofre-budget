@@ -12,6 +12,8 @@ import { TRACKING_TYPES } from '../bank-accounts/account-types';
 import { computeSavingsTrend } from './ai-savings-trend.math';
 import { computeSafeToSpend } from './ai-safe-to-spend.math';
 import type { SavingsTrendWidgetData, SafeToSpendWidgetData } from './ai-message.entity';
+import { CreditCardsService } from '../cards/credit-cards.service';
+import { summarizeCreditCards, type AiCreditCardsSummary } from './ai-credit-cards.summary';
 
 export interface GetTransactionsArgs {
   startDate?: string;
@@ -19,6 +21,7 @@ export interface GetTransactionsArgs {
   categoryId?: string;
   uncategorizedOnly?: boolean;
   merchant?: string;
+  accountId?: string;
   limit?: number;
 }
 
@@ -37,11 +40,13 @@ export class AiReadToolsService {
     private netWorthGoal: NetWorthGoalService,
     private bankAccounts: BankAccountsService,
     private debts: DebtsService,
+    private creditCards: CreditCardsService,
   ) {}
 
   async getTransactions(userId: string, args: GetTransactionsArgs) {
     const qb = this.txRepo.createQueryBuilder('tx')
       .leftJoinAndSelect('tx.categoryRef', 'categoryRef')
+      .leftJoinAndSelect('tx.bankAccount', 'bankAccount')
       .where('tx.userId = :userId', { userId })
       .andWhere('tx.isSplitParent = false')
       .orderBy('tx.date', 'DESC')
@@ -51,12 +56,14 @@ export class AiReadToolsService {
     if (args.endDate) qb.andWhere('tx.date <= :end', { end: args.endDate });
     if (args.categoryId) qb.andWhere('tx.categoryId = :categoryId', { categoryId: args.categoryId });
     if (args.uncategorizedOnly) qb.andWhere('tx.categoryId IS NULL');
+    if (args.accountId) qb.andWhere('tx.bankAccountId = :accountId', { accountId: args.accountId });
     if (args.merchant) qb.andWhere('(tx.merchantName ILIKE :m OR tx.name ILIKE :m)', { m: `%${args.merchant}%` });
 
     const rows = await qb.getMany();
     return rows.map((t) => ({
       id: t.id, date: t.date, name: t.name, merchantName: t.merchantName ?? null,
       amount: Number(t.amount), categoryId: t.categoryId ?? null, category: t.categoryRef?.name ?? null,
+      accountId: t.bankAccountId ?? null, account: t.bankAccount?.accountName ?? null,
     }));
   }
 
@@ -80,6 +87,11 @@ export class AiReadToolsService {
   async getAccounts(userId: string) {
     const rows = await this.bankAccounts.findAllByUser(userId);
     return rows.map((a) => ({ id: a.id, name: a.accountName, type: a.accountType, balance: Number(a.balance) }));
+  }
+
+  async getCreditCards(userId: string): Promise<AiCreditCardsSummary> {
+    const [cards, profile] = await Promise.all([this.creditCards.listForUser(userId), this.creditCards.getProfile(userId)]);
+    return summarizeCreditCards(cards, profile);
   }
 
   async getDebts(userId: string) {

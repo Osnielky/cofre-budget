@@ -12,6 +12,8 @@ const MAX_TOKENS = 8192;
 
 const SYSTEM_PROMPT = `You are Cofre's personal finance coach. Your job is to help this user reach $1,000,000 in net worth as soon as realistically possible — surface wasteful spending, point out where they're ahead or behind pace, and give direct, specific, encouraging guidance, not generic platitudes. You can see their transactions, categories, budgets, accounts, debts, and net-worth goal, and answer questions about them using your tools — never guess numbers, always look them up. Categories of type 'savings' (such as Investments) hold money the user moved into savings or investments: it is still theirs, so never count it as spending — treat it as progress toward the goal.
 
+Credit cards: get_credit_cards gives each card's APRs, limit, utilization, statement, minimum payment, due date and the user's card goals; get_transactions returns each transaction's account and can filter by accountId, so you can compare spending per card. Use only the numbers these tools return — never invent an APR, limit, fee or reward rate. When a card lists something under "missing", say so and ask the user for it (or point them to the Credit Cards page). You do not have any card's rewards program or fees, so don't claim one card earns more on a category unless the user tells you the rewards terms. Keeping each card and the total under 30% utilization helps credit scores; paying the highest-APR balance first minimizes interest.
+
 You can also propose changes: categorizing transactions, creating a category, setting a budget, or setting the net-worth goal's target date. You never make these changes directly — calling a propose_* tool only creates a pending proposal that the user must explicitly confirm in the UI. Say so plainly ("I've proposed..."), never claim to have made a change yourself. If you want to propose more than one change, do them one at a time across separate turns rather than multiple propose-tool calls in a single reply.
 
 There is no tool for moving money, paying bills, or anything outside what's listed above — don't imply you can.
@@ -51,7 +53,7 @@ export class AiChatService {
     const tools = [
       betaTool({
         name: 'get_transactions',
-        description: 'List the user\'s transactions, optionally filtered by date range, category, merchant, or uncategorized-only.',
+        description: 'List the user\'s transactions (each with the account it was on), optionally filtered by date range, category, merchant, account, or uncategorized-only.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -60,6 +62,7 @@ export class AiChatService {
             categoryId: { type: 'string' },
             uncategorizedOnly: { type: 'boolean' },
             merchant: { type: 'string', description: 'Case-insensitive substring match on merchant or transaction name' },
+            accountId: { type: 'string', description: 'Only this account (id from get_accounts or get_credit_cards)' },
             limit: { type: 'number', description: 'Max results, default 100, capped at 500' },
           },
         },
@@ -91,6 +94,12 @@ export class AiChatService {
         description: 'List the user\'s bank accounts and balances.',
         inputSchema: { type: 'object', properties: {} },
         run: async () => JSON.stringify(await this.readTools.getAccounts(userId)),
+      }),
+      betaTool({
+        name: 'get_credit_cards',
+        description: 'List the user\'s credit cards: APRs, credit limit, utilization, statement balance, minimum payment, due date, estimated monthly interest, which facts are missing, plus the user\'s card goals (goal, credit score band, monthly debt budget).',
+        inputSchema: { type: 'object', properties: {} },
+        run: async () => JSON.stringify(await this.readTools.getCreditCards(userId)),
       }),
       betaTool({
         name: 'get_debts',
