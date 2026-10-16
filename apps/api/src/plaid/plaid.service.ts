@@ -229,6 +229,7 @@ export class PlaidService {
         existing.plaidItemId = item.id;
         existing.plaidAccountId = pa.account_id;
         existing.balance = pa.balances.current ?? existing.balance;
+        if (!existing.last4 && pa.mask) existing.last4 = pa.mask.slice(-4);
         accounts.push(await this.accountRepo.save(existing));
 
         if (decision.cutoverDate) cutoverDates.set(pa.account_id, decision.cutoverDate);
@@ -245,6 +246,7 @@ export class PlaidService {
         provider: 'plaid',
         plaidItemId: item.id,
         plaidAccountId: pa.account_id,
+        last4: last4FromMask(pa.mask),
       });
       accounts.push(await this.accountRepo.save(account));
     }
@@ -271,6 +273,8 @@ export class PlaidService {
       const account = await this.accountRepo.findOneBy({ plaidAccountId: pa.account_id });
       if (account) {
         account.balance = pa.balances.current ?? account.balance;
+        // Accounts connected before masks were stored get their last 4 digits here.
+        if (!account.last4 && pa.mask) account.last4 = pa.mask.slice(-4);
         await this.accountRepo.save(account);
       }
     }
@@ -601,6 +605,11 @@ export class PlaidService {
     const refreshed = await this.itemRepo.findOneBy({ id: plaidItemId });
     return { status: refreshed?.status ?? item.status, errorCode: refreshed?.errorCode ?? null };
   }
+}
+
+/* Plaid's mask is the account number's last 2–4 digits; the column holds at most 4. */
+function last4FromMask(mask: string | null | undefined): string | undefined {
+  return mask ? mask.slice(-4) : undefined;
 }
 
 function mapPlaidSubtype(subtype: string): string {

@@ -1,4 +1,5 @@
-/* A generic card graphic in a theme accent. Deliberately no issuer logos or card art —
+/* A generic card graphic in the given accent (the real card's color when known, see
+   lib/cards/card-colors.ts). Deliberately no issuer logos or card art —
    those are other companies' trademarks. Like a physical card it is always dark (the
    accent is mixed with a fixed ink, not the theme base), so its white text stays legible
    under any theme. */

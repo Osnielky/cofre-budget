@@ -102,6 +102,24 @@ describe('free → Pro: connecting a bank the user already tracked by hand', () 
     expect(all.find((a) => a.plaidAccountId === 'plaid-sav')).toMatchObject({ accountName: 'SAVINGS', provider: 'plaid' });
   });
 
+  it("stores the account's last 4 digits from Plaid's mask on a new account", async () => {
+    await connectAndMerge(makeService({ added: [] }));
+    const sav = await ds.getRepository(BankAccount).findOneByOrFail({ plaidAccountId: 'plaid-sav' });
+    expect(sav.last4).toBe('9001');
+  });
+
+  it('a sync fills in missing last 4 digits on accounts connected before masks were stored', async () => {
+    const service = makeService({ added: [] });
+    await connectAndMerge(service);
+    const accounts = ds.getRepository(BankAccount);
+    const sav = await accounts.findOneByOrFail({ plaidAccountId: 'plaid-sav' });
+    await accounts.update({ id: sav.id }, { last4: null as any });
+    await service.syncItem(sav.plaidItemId, USER);
+    expect((await accounts.findOneByOrFail({ id: sav.id })).last4).toBe('9001');
+    // A merged manual account keeps the digits the user typed.
+    expect((await accounts.findOneByOrFail({ id: checking.id })).last4).toBe('7682');
+  });
+
   it('skips Plaid history before the cutover and does not duplicate the overlap day', async () => {
     await connectAndMerge(makeService({
       added: [

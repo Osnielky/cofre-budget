@@ -14,6 +14,7 @@ import CardDetailDrawer from './components/CardDetailDrawer';
 import CardProfileForm from './components/CardProfileForm';
 import type { CardView, DebitView } from '@/lib/cards/types';
 import { itemsNeedingFirstSync } from '@/lib/cards/first-sync';
+import { cardColor } from '@/lib/cards/card-colors';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -163,11 +164,11 @@ export default function CardsPage() {
               )}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {showCredit && cards.map((c, i) => (
-                  <CardTile key={c.accountId} card={c} accent={CARD_ACCENTS[i % CARD_ACCENTS.length]}
+                  <CardTile key={c.accountId} card={c} accent={cardColor(c.bankName, c.officialName ?? c.accountName) ?? CARD_ACCENTS[i % CARD_ACCENTS.length]}
                     onOpen={() => setEditing(c)} onEnable={() => enable(c)} />
                 ))}
                 {showDebit && debit.map((d, i) => (
-                  <DebitTile key={d.accountId} account={d} accent={CARD_ACCENTS[(cards.length + i) % CARD_ACCENTS.length]} />
+                  <DebitTile key={d.accountId} account={d} accent={cardColor(d.bankName, d.accountName) ?? CARD_ACCENTS[(cards.length + i) % CARD_ACCENTS.length]} />
                 ))}
               </div>
             </>
