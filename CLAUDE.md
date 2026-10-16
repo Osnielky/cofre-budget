@@ -103,6 +103,7 @@ NestJS modules wired in `app/app.module.ts`:
 | `users/` | `User` entity + `UsersService`. Password column has `select: false`; use `createQueryBuilder().addSelect('user.password')` to load it. |
 | `auth/` | Passport local + JWT strategies. JWT stored as `httpOnly` cookie `access_token`. Login: `POST /api/auth/login`. |
 | `cards/` | Credit card data. `credit_card_details` (one per credit account, created lazily) holds Plaid Liabilities data or hand-entered values; `manualFields` + `detail-merge.ts` decide which wins. `card_profiles` holds the user's card goals. `/api/cards` is open to every plan. |
+| `ai-agent/` | Ask Cofre chat (Claude with tools). Read tools in `ai-read-tools.service.ts` — transactions (each tagged with its account, filterable by `accountId`), categories, budgets, accounts, debts, credit cards, savings trend, safe-to-spend; `propose_*` tools only create pending actions the user confirms. `get_credit_cards` returns `summarizeCreditCards()` (`ai-credit-cards.summary.ts`): per-card APRs, limit, utilization, estimated monthly interest, what's missing, plus the card profile — derived numbers are computed in tested code, never by the model. Tools and system prompt live in `ai-chat.service.ts`. |
 
 **Logging.** Everything logs as Cloud Logging JSON through `common/logging/`: `CloudLogger`
 backs every `new Logger(Name)`, `requestLoggingMiddleware` writes one line per request and
@@ -127,6 +128,7 @@ emails or amounts. Queries and alert commands: `docs/observability.md`.
 | `app/(auth)/login/` | Public login page. POSTs to API with `credentials: 'include'`. |
 | `app/dashboard/` | Protected dashboard (stat cards placeholder). |
 | `app/cards/` | Credit Cards page: total utilization, a tile per credit card (APR, limit, due date, minimum), edit drawer for hand-entered values, card-goals form. Opening it runs a first Liabilities sync for Plaid items that never synced; "Enable card details" runs Plaid update mode (`plaidLinkMode = 'liabilities'`, also handled by `settings/plaid-oauth-redirect`). Pure helpers + tests in `lib/cards/`. Design: `docs/superpowers/specs/2026-10-15-credit-card-expert-design.md`. |
+| `components/ChatMarkdown.tsx` | Renders Ask Cofre replies as Markdown (react-markdown + remark-gfm: bold, lists, tables in a horizontal-scroll wrapper, links in a new tab), styled with theme variables. Raw HTML in replies is never rendered. |
 | `components/Logo.tsx` | Inline SVG vault-door logo, accepts `size` prop. |
 
 Path alias `@/*` → `src/*` is defined in `apps/web/tsconfig.json`.

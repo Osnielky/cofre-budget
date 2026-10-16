@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import ChatMarkdown from '@/components/ChatMarkdown';
 import Sidebar from '@/components/Sidebar';
 import { useAiChat } from '@/hooks/useAiChat';
 import { useUser } from '@/components/UserProvider';
@@ -171,8 +172,8 @@ export default function AskCofrePage() {
                       {m.text}
                     </div>
                   ) : (
-                    <div className="text-sm whitespace-pre-wrap pt-1" style={{ color: 'var(--color-text-primary)' }}>
-                      {m.text || (sending && m.id === 'streaming' ? '…' : '')}
+                    <div className="text-sm pt-1 min-w-0" style={{ color: 'var(--color-text-primary)' }}>
+                      {m.text ? <ChatMarkdown text={m.text} /> : (sending && m.id === 'streaming' ? '…' : '')}
                       {m.widget && m.widget.type === 'proposal' && (() => {
                         const actionId = m.widget.actionId;
                         return (

@@ -22,6 +22,11 @@ plus extras: bank accounts, Plaid, CSV import, projects, debts) are not listed.
   5. Affiliate links — disclosed apply links on winning cards only (ranking never
      sees commission), click tracking, network feed import.
 
+  Shipped early from phase 3 (2026-10-16): Ask Cofre `get_credit_cards` tool and
+  per-account transactions, so it can compare cards on APR, interest cost,
+  utilization and spend per card. It still can't compare rewards — that needs the
+  phase 2 catalog.
+
   Phase 1 follow-ups: card edit drawer accessibility (dialog role, Escape,
   focus, scroll lock, confirm before discarding edits); a sync landing within
   milliseconds of a manual edit can overwrite it; editing only the promo APR
