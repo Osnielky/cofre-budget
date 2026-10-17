@@ -1,36 +1,39 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-function isJwtExpired(token: string): boolean {
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.exp ? payload.exp * 1000 < Date.now() : false;
-  } catch {
-    return true; // malformed token → treat as expired
-  }
-}
-
-const PUBLIC_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password', '/privacy', '/terms'];
+import { isUsableSessionToken } from './lib/session-token';
+import { proxyRequestHeaders } from './lib/proxy-headers';
+import { canonicalRedirect } from './lib/canonical-host';
+import { routeDecision } from './lib/route-access';
 
 export function middleware(req: NextRequest) {
-  const token = req.cookies.get('access_token')?.value;
   const { pathname } = req.nextUrl;
 
-  const validToken = token && !isJwtExpired(token);
-  const isPublic = PUBLIC_PATHS.includes(pathname);
+  const canonical = canonicalRedirect(req.headers.get('host'), pathname, req.nextUrl.search);
+  if (canonical) return NextResponse.redirect(canonical, 308);
 
-  if (!validToken && !isPublic) {
+  // /api/* is rewritten to the API service (next.config.js). The API authenticates
+  // on its own; this only tells it which client the request came from.
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next({
+      request: { headers: proxyRequestHeaders(req.headers, process.env.PROXY_SHARED_SECRET) },
+    });
+  }
+
+  const token = req.cookies.get('access_token')?.value;
+  const decision = routeDecision(pathname, !!token && isUsableSessionToken(token));
+
+  if (decision === 'to-login') {
     const res = NextResponse.redirect(new URL('/login', req.url));
     // Clear stale cookie
     if (token) res.cookies.delete('access_token');
     return res;
   }
-  if (validToken && pathname === '/login') {
+  if (decision === 'to-dashboard') {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/((?!_next|api|favicon.ico|.*\\..*).*)'],
+  matcher: ['/((?!_next|api|favicon.ico|.*\\..*).*)', '/api/:path*'],
 };

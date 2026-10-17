@@ -36,6 +36,18 @@ export class Receipt {
   @Column({ default: false })
   imported: boolean;
 
+  @Column({ default: false })
+  reviewed: boolean;
+
+  @Column({ default: 'gmail' })
+  source: string;
+
+  @Column({ type: 'bytea', nullable: true, select: false })
+  imageData: Buffer | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  imageMimeType: string | null;
+
   @CreateDateColumn()
   parsedAt: Date;
 }

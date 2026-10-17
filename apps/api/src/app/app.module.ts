@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ClientIpThrottlerGuard } from '../common/client-ip-throttler.guard';
 import { APP_GUARD } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import databaseConfig from '../config/database.config';
@@ -13,14 +14,21 @@ import { CategoriesModule } from '../categories/categories.module';
 import { BudgetsModule } from '../budgets/budgets.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { DebtsModule } from '../debts/debts.module';
+import { CardsModule } from '../cards/cards.module';
 import { DataResetModule } from '../data-reset/data-reset.module';
 import { GmailModule } from '../gmail/gmail.module';
 import { ReceiptsModule } from '../receipts/receipts.module';
+import { CategorizationRulesModule } from '../categorization-rules/categorization-rules.module';
+import { NetWorthGoalModule } from '../net-worth-goal/net-worth-goal.module';
+import { AiAgentModule } from '../ai-agent/ai-agent.module';
+import { BillingModule } from '../billing/billing.module';
+import { AdminModule } from '../admin/admin.module';
+import { HealthController } from '../health/health.controller';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, load: [databaseConfig] }),
-    // Global rate limiting: 100 requests per minute per IP
+    // Global rate limiting: 100 requests per minute per client IP (see ClientIpThrottlerGuard)
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
@@ -35,13 +43,20 @@ import { ReceiptsModule } from '../receipts/receipts.module';
     BudgetsModule,
     ProjectsModule,
     DebtsModule,
+    CardsModule,
     DataResetModule,
     GmailModule,
     ReceiptsModule,
+    CategorizationRulesModule,
+    NetWorthGoalModule,
+    AiAgentModule,
+    BillingModule,
+    AdminModule,
   ],
+  controllers: [HealthController],
   providers: [
-    // Apply ThrottlerGuard globally — all routes inherit the 100 req/min default
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Apply globally — all routes inherit the 100 req/min default
+    { provide: APP_GUARD, useClass: ClientIpThrottlerGuard },
   ],
 })
 export class AppModule {}

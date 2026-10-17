@@ -1,14 +1,17 @@
 'use client';
 
 import Panel, { PanelEmpty } from '../Panel';
+import type { ReactNode } from 'react';
 import { fmt } from '../chartTheme';
 import type { CategorySlice } from '@/lib/dashboard/derive';
 
-export default function CategoryRankingPanel({ slices, loading }: { slices: CategorySlice[]; loading: boolean }) {
+export default function CategoryRankingPanel({ slices, monthLabel, picker, loading }: {
+  slices: CategorySlice[]; monthLabel: string; picker?: ReactNode; loading: boolean;
+}) {
   const max = slices[0]?.value || 1;
   return (
-    <Panel title="Category Spending Ranking" subtitle="This month" loading={loading}>
-      {slices.length === 0 ? <PanelEmpty message="No spending this month yet." /> : (
+    <Panel title="Category Spending Ranking" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading}>
+      {slices.length === 0 ? <PanelEmpty message="No spending in this month yet." /> : (
         <ul className="flex flex-col gap-2.5">
           {slices.map((s) => (
             <li key={s.id} className="flex items-center gap-2 text-xs">

@@ -4,11 +4,14 @@ import { Repository } from 'typeorm';
 import { Category } from './category.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { Budget } from '../budgets/budget.entity';
-import { UpsertCategoryDto } from './dto/upsert-category.dto';
+import { UpsertCategoryDto, CATEGORY_FIELDS } from './dto/upsert-category.dto';
+import { CategorizationRule, ruleIdentityKey } from '../categorization-rules/categorization-rule.entity';
+import { pickFields } from '../common/http/pick-fields';
 
-const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'createdAt' | 'updatedAt' | 'isFixed'>[] = [
+const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'createdAt' | 'updatedAt' | 'isFixed' | 'wantNeed'>[] = [
   { name: 'Food & Dining',  icon: '🍔', color: '#F07A3E', type: 'expense',  description: 'Restaurants, groceries, coffee & snacks' },
   { name: 'Groceries',      icon: '🛒', color: '#4FBF7F', type: 'expense',  description: 'Supermarket & grocery store purchases' },
+  { name: 'Candy & Sweets', icon: '🍬', color: '#F07A3E', type: 'expense',  description: 'Candy, sweets & sugary treats' },
   { name: 'Transport',      icon: '🚗', color: '#4BA8D8', type: 'expense',  description: 'Gas, rideshare, parking & transit' },
   { name: 'Shopping',       icon: '🛍️', color: '#9B6DFF', type: 'expense',  description: 'Clothing, electronics & retail purchases' },
   { name: 'Clothes',        icon: '👗', color: '#E879A0', type: 'expense',  description: 'Clothing, shoes & accessories' },
@@ -30,7 +33,7 @@ const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'created
   { name: 'Cash-reward',    icon: '🎁', color: '#F5C842', type: 'income',   description: 'Credit card cash back, bank rewards & bonuses' },
   { name: 'Salary',         icon: '💼', color: '#4FBF7F', type: 'income',   description: 'Regular employment income' },
   { name: 'Freelance',      icon: '💻', color: '#9B6DFF', type: 'income',   description: 'Contract & self-employment earnings' },
-  { name: 'Investments',    icon: '📈', color: '#F5C842', type: 'income',   description: 'Dividends, returns & capital gains' },
+  { name: 'Investments',    icon: '📈', color: '#F5C842', type: 'savings',  description: 'Money you invest or save — brokerage, retirement & savings contributions' },
   { name: 'Other',               icon: '📦', color: '#5C5C78', type: 'both',     description: 'Anything that doesn\'t fit another category' },
   { name: 'Credit Card Payment', icon: '💳', color: '#6B6B8A', type: 'transfer', description: 'Paying off your credit card balance' },
   { name: 'Internal Transfer',   icon: '🔄', color: '#6B6B8A', type: 'transfer', description: 'Moving money between your own accounts' },
@@ -42,6 +45,7 @@ export class CategoriesService {
     @InjectRepository(Category) private repo: Repository<Category>,
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
     @InjectRepository(Budget) private budgetRepo: Repository<Budget>,
+    @InjectRepository(CategorizationRule) private rulesRepo: Repository<CategorizationRule>,
   ) {}
 
   async findAllByUser(userId: string): Promise<Category[]> {
@@ -70,14 +74,14 @@ export class CategoriesService {
   }
 
   create(userId: string, dto: UpsertCategoryDto): Promise<Category> {
-    return this.repo.save(this.repo.create({ ...dto, userId, isDefault: false }));
+    return this.repo.save(this.repo.create({ ...pickFields(dto, CATEGORY_FIELDS), userId, isDefault: false }));
   }
 
   async update(id: string, userId: string, dto: UpsertCategoryDto): Promise<Category> {
     const cat = await this.repo.findOneBy({ id });
     if (!cat) throw new NotFoundException();
     if (cat.userId !== userId) throw new ForbiddenException();
-    Object.assign(cat, dto);
+    Object.assign(cat, pickFields(dto, CATEGORY_FIELDS));
     return this.repo.save(cat);
   }
 
@@ -96,10 +100,44 @@ export class CategoriesService {
     if (reassignTo) {
       await this.txRepo.update({ categoryId: id }, { categoryId: reassignTo });
     }
-    // Budgets reference this category. Don't rely on a DB-level cascade (it isn't
-    // guaranteed across environments) — clean them up explicitly so the delete
-    // never leaves an orphaned budget that renders as a phantom "Unknown" row.
+    // Budgets reference this category. Don't rely on a DB-level cascade (it
+    // isn't guaranteed across environments) — clean it up explicitly so the
+    // delete never leaves an orphaned budget behind.
     await this.budgetRepo.delete({ categoryId: id });
+
+    if (reassignTo) {
+      // Retarget rather than delete: a rule that used to fire for this category
+      // should keep firing, just pointed at the category transactions were
+      // reassigned to. Guard against the unique(userId, matchType, matchValue,
+      // matchStrategy) constraint — if the user already has a separate rule with
+      // the same match pointing at reassignTo, drop the now-redundant rule(s) on
+      // the deleted category before retargeting the rest.
+      const [deletedRules, targetRules] = await Promise.all([
+        this.rulesRepo.find({ where: { categoryId: id } }),
+        this.rulesRepo.find({ where: { categoryId: reassignTo } }),
+      ]);
+      const targetKeys = new Set(targetRules.map(ruleIdentityKey));
+      const colliding = deletedRules.filter((r) => targetKeys.has(ruleIdentityKey(r)));
+      if (colliding.length > 0) {
+        await this.rulesRepo.delete(colliding.map((r) => r.id));
+      }
+      try {
+        await this.rulesRepo.update({ categoryId: id }, { categoryId: reassignTo });
+      } catch (err) {
+        // Fallback for any collision the pre-check above didn't catch (e.g. a
+        // race, or case-variant match values) — don't let the whole category
+        // delete fail because of a rule conflict.
+        if ((err as { code?: string })?.code === '23505') {
+          await this.rulesRepo.delete({ categoryId: id });
+        } else {
+          throw err;
+        }
+      }
+    } else {
+      // No sensible category left for the rule to point at — remove it, as before.
+      await this.rulesRepo.delete({ categoryId: id });
+    }
+
     await this.repo.remove(cat);
   }
 

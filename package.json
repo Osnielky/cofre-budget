@@ -9,7 +9,11 @@
     "build:api": "nx build api",
     "seed": "node -r dotenv/config dist/seed.js",
     "test:api": "vitest run --root apps/api",
-    "test:dashboard": "vitest run --root apps/web"
+    "test:dashboard": "vitest run --root apps/web",
+    "migration:generate": "sh -c 'SWC_NODE_PROJECT=apps/api/tsconfig.app.json node -r @swc-node/register node_modules/typeorm/cli.js migration:generate -d apps/api/src/config/data-source.ts apps/api/src/migrations/$0'",
+    "migration:run": "SWC_NODE_PROJECT=apps/api/tsconfig.app.json node -r @swc-node/register node_modules/typeorm/cli.js migration:run -d apps/api/src/config/data-source.ts",
+    "migration:show": "SWC_NODE_PROJECT=apps/api/tsconfig.app.json node -r @swc-node/register node_modules/typeorm/cli.js migration:show -d apps/api/src/config/data-source.ts",
+    "migration:check": "SWC_NODE_PROJECT=apps/api/tsconfig.app.json node -r @swc-node/register node_modules/typeorm/cli.js migration:generate -d apps/api/src/config/data-source.ts --check apps/api/src/migrations/Check"
   },
   "devDependencies": {
     "@eslint/js": "^9.8.0",
@@ -33,6 +37,8 @@
     "@swc/helpers": "~0.5.18",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.10",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.2.0",
     "@types/node": "20.19.9",
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/passport-jwt": "^4.0.1",
@@ -40,6 +46,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "better-sqlite3": "^12.11.1",
     "eslint": "^9.8.0",
     "eslint-config-next": "^16.1.6",
     "eslint-config-prettier": "^10.0.0",
@@ -58,6 +65,10 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/modifiers": "^9.0.0",
+    "@dnd-kit/sortable": "^10.0.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.0",
@@ -72,6 +83,7 @@
     "cheerio": "^1.2.0",
     "cookie-parser": "^1.4.7",
     "googleapis": "^173.0.0",
+    "jsonwebtoken": "^9.0.3",
     "next": "~16.1.6",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
@@ -81,11 +93,14 @@
     "plaid": "^42.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
     "react-plaid-link": "^4.1.1",
     "recharts": "^3.8.1",
     "reflect-metadata": "^0.1.13",
+    "remark-gfm": "^4.0.1",
     "resend": "^6.12.4",
     "rxjs": "^7.8.0",
+    "stripe": "^22.6.0",
     "tailwindcss": "^4.3.0",
     "typeorm": "^0.3.29"
   }

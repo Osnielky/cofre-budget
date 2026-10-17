@@ -6,10 +6,16 @@ export interface BankAccount {
   id: string; bankName: string; accountName: string; accountType: string;
   color: string; balance: number; last4?: string;
 }
+/** A per-project category ("Tires", "Trade Profits"). Has no `type`. */
+export interface ProjectCategory { id: string; name: string; icon: string; color: string }
+
 export interface Transaction {
   id: string; name: string; amount: number; date: string; source: string;
   categoryRef: Category | null; bankAccount: BankAccount | null;
   projectId: string | null; debtId?: string | null;
+  /** Set instead of categoryRef when the row belongs to a project. */
+  projectCategoryRef?: ProjectCategory | null;
+  projectCategoryId?: string | null;
 }
 export interface Budget {
   id: string; amount: number; spent: number; category: Category | null;
@@ -20,4 +26,4 @@ export interface Project {
   expenses: number; income: number; costBasis: number; netGain: number | null;
   roi: number | null; purchasePrice: number;
 }
-export interface Debt { remaining: number; status: 'open' | 'paid' }
+export interface Debt { remaining: number; status: 'open' | 'paid'; direction: 'lent' | 'owed' }

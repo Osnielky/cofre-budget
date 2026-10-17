@@ -32,6 +32,19 @@ export class PlaidItem {
   @Column({ nullable: true })
   lastSync: Date;
 
+  /* Plaid's /transactions/sync pagination cursor. Null until the first sync completes. */
+  @Column({ type: 'text', nullable: true })
+  cursor: string | null;
+
+  /* 'active' | 'error' — set to 'error' by the webhook handler when Plaid reports the
+     item needs attention (e.g. ITEM_LOGIN_REQUIRED); cleared back to 'active' by the
+     next successful sync. */
+  @Column({ default: 'active' })
+  status: string;
+
+  @Column({ type: 'varchar', nullable: true })
+  errorCode: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

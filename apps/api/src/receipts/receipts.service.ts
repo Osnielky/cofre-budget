@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not, IsNull, In } from 'typeorm';
+import * as crypto from 'crypto';
 import { Receipt } from './receipt.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
@@ -11,6 +12,38 @@ export interface ImportSplit {
   itemIndices: number[];
   categoryId: string | null;
   bankAccountId?: string | null;
+}
+
+export interface CreateManualReceiptInput {
+  merchant: string;
+  total: number;
+  currency: string;
+  orderDate: string | null;
+  orderNumber: string | null;
+  items: { name: string; quantity: number; unitPrice: number; total: number }[];
+}
+
+export type MatchStatus = 'matched' | 'pending';
+
+export interface MatchedTransaction {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  category: { id: string; name: string; icon: string; color: string } | null;
+}
+
+export interface MerchantSuggestion {
+  categoryId: string;
+  categoryName: string;
+  icon: string;
+  color: string;
+  receiptsConsidered: number;
+}
+
+export interface ReceiptListItem extends Receipt {
+  matchStatus: MatchStatus;
+  matchedTransaction: MatchedTransaction | null;
 }
 
 @Injectable()
@@ -25,7 +58,7 @@ export class ReceiptsService {
     private gmail: GmailService,
   ) {}
 
-  async syncAndFind(userId: string): Promise<Receipt[]> {
+  async syncAndFind(userId: string): Promise<{ receipts: ReceiptListItem[]; syncError: string | null }> {
     const existing = await this.receiptRepo.find({ where: { userId } });
     const existingIds = new Set(existing.map((r) => r.gmailMessageId));
 
@@ -33,9 +66,10 @@ export class ReceiptsService {
     try {
       raw = await this.gmail.fetchAndParseReceipts(userId);
     } catch (err) {
-      // Gmail not connected or fetch failed — return cached only
-      this.logger.error(`fetchAndParseReceipts failed for user ${userId}: ${(err as Error)?.message}`, (err as Error)?.stack);
-      return existing;
+      // Gmail not connected or fetch failed — return cached results plus the reason, so the UI can surface it
+      const message = (err as Error)?.message ?? 'Unknown error';
+      this.logger.error(`fetchAndParseReceipts failed for user ${userId}: ${message}`, (err as Error)?.stack);
+      return { receipts: await this.withMatchStatus(userId, existing), syncError: message };
     }
 
     const newReceipts = raw.filter((r) => !existingIds.has(r.gmailMessageId));
@@ -66,7 +100,49 @@ export class ReceiptsService {
       );
     }
 
-    return this.receiptRepo.find({ where: { userId }, order: { parsedAt: 'DESC' } });
+    const receipts = await this.receiptRepo.find({ where: { userId }, order: { parsedAt: 'DESC' } });
+    return { receipts: await this.withMatchStatus(userId, receipts), syncError: null };
+  }
+
+  /** Annotates receipts with match status by loading every linked transaction for this
+      user once and grouping by receiptId — avoids one query per receipt. When a receipt
+      has more than one linked transaction (e.g. a multi-category "Create Transactions"
+      import), the highest-amount one represents it for display. */
+  private async withMatchStatus(userId: string, receipts: Receipt[]): Promise<ReceiptListItem[]> {
+    const linkedTxs = await this.txRepo.find({
+      where: { userId, receiptId: Not(IsNull()) },
+      relations: ['categoryRef'],
+      order: { amount: 'DESC' },
+    });
+
+    const byReceiptId = new Map<string, Transaction[]>();
+    for (const tx of linkedTxs) {
+      if (!tx.receiptId) continue;
+      const list = byReceiptId.get(tx.receiptId) ?? [];
+      list.push(tx);
+      byReceiptId.set(tx.receiptId, list);
+    }
+
+    return receipts.map((receipt) => {
+      const linked = byReceiptId.get(receipt.id) ?? [];
+      const top = linked[0] ?? null;
+      const matchedTransaction: MatchedTransaction | null = top
+        ? {
+            id: top.id,
+            name: top.name,
+            amount: Number(top.amount),
+            date: top.date,
+            category: top.categoryRef
+              ? { id: top.categoryRef.id, name: top.categoryRef.name, icon: top.categoryRef.icon, color: top.categoryRef.color }
+              : null,
+          }
+        : null;
+      return {
+        ...receipt,
+        matchStatus: (linked.length > 0 ? 'matched' : 'pending') as MatchStatus,
+        matchedTransaction,
+      };
+    });
   }
 
   async importToTransactions(receiptId: string, userId: string, splits: ImportSplit[]): Promise<Transaction[]> {
@@ -121,5 +197,89 @@ export class ReceiptsService {
     }
 
     return created;
+  }
+
+  async createManual(
+    userId: string, input: CreateManualReceiptInput, file: Express.Multer.File | undefined,
+  ): Promise<Receipt> {
+    const items = input.items.length > 0
+      ? input.items
+      : [{ name: `${input.merchant} purchase`, quantity: 1, unitPrice: input.total, total: input.total }];
+
+    return this.receiptRepo.save(
+      this.receiptRepo.create({
+        userId,
+        gmailMessageId: `manual:${crypto.randomUUID()}`,
+        merchant: input.merchant,
+        orderNumber: input.orderNumber ?? undefined,
+        orderDate: input.orderDate ?? undefined,
+        total: input.total,
+        currency: input.currency || 'USD',
+        items,
+        rawSubject: input.merchant,
+        imported: false,
+        source: 'manual',
+        imageData: file ? file.buffer : null,
+        imageMimeType: file ? file.mimetype : null,
+      }),
+    );
+  }
+
+  async approve(userId: string, receiptId: string): Promise<Receipt> {
+    const receipt = await this.receiptRepo.findOneBy({ id: receiptId, userId });
+    if (!receipt) throw new NotFoundException('Receipt not found');
+    receipt.reviewed = true;
+    return this.receiptRepo.save(receipt);
+  }
+
+  /** Suggests a category for a receipt based on how the user has categorized
+      their own past transactions from the same merchant (via Transaction.receiptId
+      -> Receipt.merchant). Returns null when there's no prior categorized history. */
+  async getMerchantSuggestion(userId: string, receiptId: string): Promise<MerchantSuggestion | null> {
+    const receipt = await this.receiptRepo.findOneBy({ id: receiptId, userId });
+    if (!receipt) throw new NotFoundException('Receipt not found');
+
+    const pastReceipts = await this.receiptRepo.find({
+      where: { userId, merchant: receipt.merchant },
+      select: ['id'],
+    });
+    const pastReceiptIds = pastReceipts.map((r) => r.id).filter((id) => id !== receiptId);
+    if (pastReceiptIds.length === 0) return null;
+
+    const pastTxs = await this.txRepo.find({
+      where: { receiptId: In(pastReceiptIds), categoryId: Not(IsNull()) },
+      relations: ['categoryRef'],
+    });
+    if (pastTxs.length === 0) return null;
+
+    const byCategoryId = new Map<string, { receiptIds: Set<string>; category: Category }>();
+    for (const tx of pastTxs) {
+      if (!tx.categoryRef || !tx.receiptId) continue;
+      const entry = byCategoryId.get(tx.categoryId) ?? { receiptIds: new Set<string>(), category: tx.categoryRef };
+      entry.receiptIds.add(tx.receiptId);
+      byCategoryId.set(tx.categoryId, entry);
+    }
+    if (byCategoryId.size === 0) return null;
+
+    const [topCategoryId, top] = [...byCategoryId.entries()]
+      .sort((a, b) => b[1].receiptIds.size - a[1].receiptIds.size)[0];
+
+    return {
+      categoryId: topCategoryId,
+      categoryName: top.category.name,
+      icon: top.category.icon,
+      color: top.category.color,
+      receiptsConsidered: top.receiptIds.size,
+    };
+  }
+
+  async getImage(userId: string, receiptId: string): Promise<{ data: Buffer; mimeType: string } | null> {
+    const receipt = await this.receiptRepo
+      .createQueryBuilder('r')
+      .where('r.id = :receiptId AND r.userId = :userId', { receiptId, userId })
+      .addSelect('r.imageData')
+      .getOne();
+    if (!receipt?.imageData || !receipt.imageMimeType) return null;
+    return { data: receipt.imageData, mimeType: receipt.imageMimeType };
   }
 }

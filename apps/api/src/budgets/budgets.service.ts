@@ -15,6 +15,15 @@ export interface BudgetWithSpent extends Budget {
   remaining: number;
 }
 
+/** Per-budget settings that ride along with create/update. All optional: an
+    omitted field leaves the stored value untouched. */
+export interface BudgetSettings {
+  notifyEnabled?: boolean;
+  notifyThreshold?: number;
+  rollover?: boolean;
+  isRecurring?: boolean;
+}
+
 @Injectable()
 export class BudgetsService {
   constructor(
@@ -25,23 +34,36 @@ export class BudgetsService {
     @InjectRepository(ProjectCategory) private projectCategoryRepo: Repository<ProjectCategory>,
   ) {}
 
-  /** Average monthly spend per category over the trailing `months` months,
-      to suggest budget amounts. Expenses only; tracking accounts excluded. */
-  async categoryAverages(userId: string, months = 3): Promise<Record<string, number>> {
+  /** Average monthly spend per category over the `months` FULL months before
+      `month` (defaulting to the current month), to suggest budget amounts.
+      Expenses only; transfers, debt repayments and tracking accounts excluded.
+
+      The window is closed at both ends and anchored on `month`, so the divisor
+      always matches the number of months actually summed — an open-ended window
+      would fold the partial current month into an n-month average. */
+  async categoryAverages(userId: string, months = 3, month?: string): Promise<Record<string, number>> {
     const n = Math.min(Math.max(months, 1), 12);
     const now = new Date();
-    const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - n, 1));
+    const anchor = /^\d{4}-\d{2}$/.test(month ?? '')
+      ? new Date(Date.UTC(Number(month!.slice(0, 4)), Number(month!.slice(5, 7)) - 1, 1))
+      : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const start = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - n, 1));
     const startDate = start.toISOString().slice(0, 10);
+    const endDate = anchor.toISOString().slice(0, 10);
 
     const rows = await this.txRepo
       .createQueryBuilder('tx')
       .leftJoin('tx.bankAccount', 'ba')
+      .leftJoin('tx.categoryRef', 'cat')
       .select('tx.categoryId', 'categoryId')
       .addSelect('COALESCE(SUM(ABS(tx.amount)), 0)', 'total')
       .where('tx.userId = :userId', { userId })
       .andWhere('tx.amount < 0')
       .andWhere('tx.categoryId IS NOT NULL')
       .andWhere('tx.date >= :startDate', { startDate })
+      .andWhere('tx.date < :endDate', { endDate })
+      .andWhere('tx.debtId IS NULL')
+      .andWhere("(cat.type IS NULL OR cat.type != 'transfer')")
       .andWhere('(ba."accountType" IS NULL OR ba."accountType" NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] })
       .groupBy('tx.categoryId')
       .getRawMany<{ categoryId: string; total: string }>();
@@ -141,6 +163,26 @@ export class BudgetsService {
     );
   }
 
+  /** Spending-budget totals vs. actual spend for each of the last N calendar months
+      (ending at the current month), for the plan-history sparkline. */
+  async history(userId: string, months = 6): Promise<{ month: string; budget: number; spent: number }[]> {
+    const n = Math.min(Math.max(months, 1), 24);
+    const now = new Date();
+    const keys = Array.from({ length: n }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - (n - 1 - i), 1);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    });
+    return Promise.all(keys.map(async (month) => {
+      const rows = await this.findWithSpent(userId, month);
+      const spending = rows.filter((b) => (b.category ? b.category.type !== 'income' : true) && !b.projectCategoryId);
+      return {
+        month,
+        budget: +spending.reduce((s, b) => s + Number(b.amount), 0).toFixed(2),
+        spent: +spending.reduce((s, b) => s + Number(b.spent), 0).toFixed(2),
+      };
+    }));
+  }
+
   async getMonthSummaries(userId: string): Promise<{ month: string; total: number; count: number }[]> {
     // Count only spending budgets (exclude income targets) so the total matches
     // the "Total Budget" shown on the page.
@@ -173,6 +215,14 @@ export class BudgetsService {
     return rows.map(r => r.month);
   }
 
+  /** Optional per-budget settings that travel with the amount. */
+  private applySettings(target: Budget, dto: BudgetSettings): void {
+    if (dto.notifyEnabled !== undefined) target.notifyEnabled = dto.notifyEnabled;
+    if (dto.notifyThreshold !== undefined) target.notifyThreshold = dto.notifyThreshold;
+    if (dto.rollover !== undefined) target.rollover = dto.rollover;
+    if (dto.isRecurring !== undefined) target.isRecurring = dto.isRecurring;
+  }
+
   /** Propagate a regular category budget amount to all future months that already exist. */
   private async propagateForward(userId: string, categoryId: string, amount: number, fromMonth: string, projectId?: string | null, repo: Repository<Budget> = this.repo): Promise<void> {
     for (const month of await this.futureMonths(userId, fromMonth, repo)) {
@@ -202,7 +252,7 @@ export class BudgetsService {
     }
   }
 
-  async create(userId: string, dto: { categoryId?: string | null; amount: number; month: string; projectId?: string | null; projectCategoryId?: string | null }): Promise<Budget> {
+  async create(userId: string, dto: { categoryId?: string | null; amount: number; month: string; projectId?: string | null; projectCategoryId?: string | null } & BudgetSettings): Promise<Budget> {
     // Normalize empty strings to null so callers can't sneak in a budget with
     // neither a real category nor a project category (which would render as "Unknown").
     if (!dto.categoryId) dto = { ...dto, categoryId: null };
@@ -235,9 +285,12 @@ export class BudgetsService {
       if (existing) {
         existing.amount = dto.amount;
         existing.sourceMonth = dto.month;
+        this.applySettings(existing, dto);
         await this.repo.save(existing);
       } else {
-        await this.repo.save(this.repo.create({ userId, categoryId: null, projectCategoryId: dto.projectCategoryId, amount: dto.amount, month: dto.month, sourceMonth: dto.month, projectId: dto.projectId ?? null }));
+        const row = this.repo.create({ userId, categoryId: null, projectCategoryId: dto.projectCategoryId, amount: dto.amount, month: dto.month, sourceMonth: dto.month, projectId: dto.projectId ?? null });
+        this.applySettings(row, dto);
+        await this.repo.save(row);
       }
       await this.propagateProjectCategoryForward(userId, dto.projectCategoryId, dto.projectId ?? null, dto.amount, dto.month);
       return this.repo.findOne({ where: { userId, projectCategoryId: dto.projectCategoryId, projectId: dto.projectId ?? null, month: dto.month } }) as Promise<Budget>;
@@ -249,15 +302,18 @@ export class BudgetsService {
       existing.amount = dto.amount;
       existing.sourceMonth = dto.month;
       if (dto.projectId !== undefined) existing.projectId = dto.projectId ?? null;
+      this.applySettings(existing, dto);
       await this.repo.save(existing);
     } else {
-      await this.repo.save(this.repo.create({ ...dto, userId, sourceMonth: dto.month }));
+      const row = this.repo.create({ userId, categoryId: dto.categoryId, amount: dto.amount, month: dto.month, sourceMonth: dto.month, projectId: dto.projectId ?? null });
+      this.applySettings(row, dto);
+      await this.repo.save(row);
     }
     await this.propagateForward(userId, dto.categoryId!, dto.amount, dto.month, dto.projectId);
     return this.repo.findOne({ where: { userId, categoryId: dto.categoryId, month: dto.month } }) as Promise<Budget>;
   }
 
-  async update(id: string, userId: string, dto: { amount: number; projectId?: string | null }): Promise<Budget> {
+  async update(id: string, userId: string, dto: { amount: number; projectId?: string | null } & BudgetSettings): Promise<Budget> {
     const budget = await this.repo.findOneBy({ id });
     if (!budget) throw new NotFoundException();
     if (budget.userId !== userId) throw new ForbiddenException();
@@ -268,6 +324,7 @@ export class BudgetsService {
     budget.amount = dto.amount;
     budget.sourceMonth = budget.month;
     if (dto.projectId !== undefined) budget.projectId = dto.projectId ?? null;
+    this.applySettings(budget, dto);
     await this.repo.save(budget);
     if (budget.projectCategoryId) {
       await this.propagateProjectCategoryForward(userId, budget.projectCategoryId, budget.projectId ?? null, dto.amount, budget.month);

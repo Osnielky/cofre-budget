@@ -2,6 +2,7 @@
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { composePlugins, withNx } = require('@nx/next');
+const { securityHeaders } = require('./security-headers');
 
 /**
  * @type {import('@nx/next/plugins/with-nx').WithNxOptions}
@@ -9,6 +10,12 @@ const { composePlugins, withNx } = require('@nx/next');
 const nextConfig = {
   nx: {},
   output: 'standalone',
+  poweredByHeader: false,
+  // Pages only: /api/* responses come from the API with its own, stricter set,
+  // and doubling X-Frame-Options would make browsers ignore it.
+  async headers() {
+    return [{ source: '/((?!api/).*)', headers: securityHeaders(process.env.NODE_ENV === 'production') }];
+  },
   // Single-origin proxy: the browser only ever talks to the web domain.
   // Requests to /api/* are forwarded server-side to the API service, so the
   // auth cookie is scoped to the web domain (which the route-guard middleware

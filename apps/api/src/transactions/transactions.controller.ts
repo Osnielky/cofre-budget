@@ -1,7 +1,8 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { TransactionsService, CsvRow } from './transactions.service';
+import { TransactionsService, CsvRow, SplitPiece } from './transactions.service';
 import { ReceiptFinderService } from './receipt-finder.service';
+import { RecurringService, CreateRuleDto } from './recurring.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('transactions')
@@ -9,6 +10,7 @@ export class TransactionsController {
   constructor(
     private service: TransactionsService,
     private receiptFinder: ReceiptFinderService,
+    private recurring: RecurringService,
   ) {}
 
   @Get('category-hints')
@@ -31,19 +33,57 @@ export class TransactionsController {
     return this.service.findTransferMatches(req.user.id, parseFloat(amount), date, excludeAccountId);
   }
 
+  @Get('receipt-matches')
+  receiptMatches(@Request() req: any) {
+    return this.receiptFinder.findCachedMatchIds(req.user.id);
+  }
+
   @Get()
-  list(
+  async list(
     @Request() req: any,
     @Query('accountId') accountId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('limit') limit?: string,
   ) {
+    // No scheduler in this deployment, so recurring occurrences are written
+    // when they are next asked for. Never let that fail the read.
+    await this.recurring.materialiseDue(req.user.id).catch(() => undefined);
     return this.service.findByUser(req.user.id, accountId, from, to, limit ? parseInt(limit) : 500);
   }
 
+  @Get('recurring')
+  listRules(@Request() req: any) {
+    return this.recurring.list(req.user.id);
+  }
+
+  @Post('recurring')
+  createRule(@Request() req: any, @Body() body: CreateRuleDto) {
+    return this.recurring.create(req.user.id, body);
+  }
+
+  @Patch('recurring/:id/stop')
+  stopRule(@Param('id') id: string, @Request() req: any) {
+    return this.recurring.stop(id, req.user.id);
+  }
+
+  @Patch('recurring/:id/resume')
+  resumeRule(@Param('id') id: string, @Request() req: any) {
+    return this.recurring.resume(id, req.user.id);
+  }
+
+  @Get('recurring/:id/history')
+  ruleHistory(@Param('id') id: string, @Request() req: any) {
+    return this.recurring.history(id, req.user.id);
+  }
+
+  @Delete('recurring/:id')
+  removeRule(@Param('id') id: string, @Request() req: any, @Query('deleteFuture') deleteFuture?: string) {
+    return this.recurring.remove(id, req.user.id, deleteFuture === 'true');
+  }
+
   @Post()
-  create(@Request() req: any, @Body() body: { name: string; amount: number; date: string; bankAccountId?: string | null; categoryId?: string | null; debtId?: string | null; note?: string | null }) {
+  create(@Request() req: any, @Body() body: { name: string; amount: number; date: string; bankAccountId?: string | null; categoryId?: string | null; debtId?: string | null; note?: string | null; projectId?: string | null; projectCategoryId?: string | null }) {
     return this.service.createManual(req.user.id, body);
   }
 
@@ -67,7 +107,7 @@ export class TransactionsController {
   split(
     @Param('id') id: string,
     @Request() req: any,
-    @Body() body: { splits: { categoryId: string | null; amount: number }[] },
+    @Body() body: { splits: SplitPiece[] },
   ) {
     return this.service.split(id, req.user.id, body.splits);
   }

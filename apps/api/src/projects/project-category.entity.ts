@@ -19,6 +19,10 @@ export class ProjectCategory {
   @Column()
   name: string;
 
+  /* Optional note explaining what belongs in this category. */
+  @Column({ type: 'varchar', nullable: true })
+  description: string | null;
+
   @Column({ default: '📦' })
   icon: string;
 

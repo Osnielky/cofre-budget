@@ -5,13 +5,13 @@ import Panel, { PanelEmpty } from '../Panel';
 import { fmt } from '../chartTheme';
 import type { ExpenseChange } from '@/lib/dashboard/derive';
 
-export default function ExpenseChangePanel({ changes, unchanged, loading }: {
-  changes: ExpenseChange[]; unchanged: number; loading: boolean;
+export default function ExpenseChangePanel({ changes, unchanged, monthLabel, prevMonthLabel, loading }: {
+  changes: ExpenseChange[]; unchanged: number; monthLabel: string; prevMonthLabel: string; loading: boolean;
 }) {
   const tc = useThemeColors();
   const max = Math.max(1, ...changes.map((c) => Math.abs(c.delta)));
   return (
-    <Panel title="Expense Change" subtitle="vs last month" loading={loading}>
+    <Panel title="Expense Change" subtitle={`${monthLabel} vs ${prevMonthLabel}`} loading={loading}>
       {changes.length === 0 ? <PanelEmpty message="Spending is steady — no meaningful category changes vs last month." /> : (
         <ul className="flex flex-col gap-2 text-xs">
           {changes.slice(0, 7).map((c) => {

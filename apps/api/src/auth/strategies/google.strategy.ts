@@ -23,10 +23,19 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     profile: any,
     done: VerifyCallback,
   ) {
-    const email     = profile.emails?.[0]?.value;
-    const name      = profile.displayName || profile.name?.givenName || email;
-    const avatarUrl = profile.photos?.[0]?.value;
-    const user  = await this.usersService.findOrCreateByGoogle({ id: profile.id, email, name, avatarUrl });
-    done(null, user);
+    const primary = profile.emails?.[0];
+    const email: string | undefined = primary?.value;
+    // Accounts are matched by email, so only an address Google has verified may
+    // sign in or link to an existing account. A refusal (false) sends the user
+    // back to /login?error=google via GoogleCallbackGuard.
+    if (!email || primary?.verified === false) return done(null, false);
+    try {
+      const name      = profile.displayName || profile.name?.givenName || email;
+      const avatarUrl = profile.photos?.[0]?.value;
+      const user  = await this.usersService.findOrCreateByGoogle({ id: profile.id, email, name, avatarUrl });
+      done(null, user);
+    } catch (err) {
+      done(err as Error, false);
+    }
   }
 }

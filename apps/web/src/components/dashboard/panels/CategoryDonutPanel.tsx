@@ -1,16 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { useThemeColors } from '@/components/ThemeProvider';
 import Panel, { PanelEmpty } from '../Panel';
 import { makeChartTheme, fmt } from '../chartTheme';
 import type { CategorySlice } from '@/lib/dashboard/derive';
+import { distinctColors } from '@/lib/dashboard/distinctColors';
+import PeriodSelect, { type PeriodOption } from '../PeriodSelect';
+
 
 interface Props {
   title: string; subtitle: string;
   slices: CategorySlice[]; total: number; loading: boolean;
   colSpan?: 1 | 2;
+  /** Optional period filter. 'ytd' plus one entry per month with data. */
+  period?: string;
+  periodOptions?: PeriodOption[];
+  onPeriodChange?: (value: string) => void;
 }
 
 function IconChip({ slice }: { slice: CategorySlice }) {
@@ -24,9 +31,15 @@ function IconChip({ slice }: { slice: CategorySlice }) {
   );
 }
 
-export default function CategoryDonutPanel({ title, subtitle, slices, total, loading, colSpan = 1 }: Props) {
+export default function CategoryDonutPanel({ title, subtitle, slices: rawSlices, total, loading, colSpan = 1, period, periodOptions, onPeriodChange }: Props) {
   const tc = useThemeColors();
   const th = makeChartTheme(tc);
+  /* Categories often share a colour (several greens for income); recolour clashes
+     from the chart palette so every slice in this donut is its own colour. */
+  const slices = useMemo(() => {
+    const colors = distinctColors(rawSlices.map((s) => s.color), [tc.green, tc.sky, tc.amber, tc.orange, tc.violet, tc.rose].filter(Boolean));
+    return rawSlices.map((s, i) => (colors[i] === s.color ? s : { ...s, color: colors[i] }));
+  }, [rawSlices, tc]);
   const [mode, setMode] = useState<'amount' | 'percent'>('amount');
   const max = slices.reduce((m, s) => Math.max(m, s.value), 0) || 1;
   const top = slices[0];
@@ -44,9 +57,14 @@ export default function CategoryDonutPanel({ title, subtitle, slices, total, loa
 
   return (
     <Panel title={title} subtitle={subtitle} loading={loading} colSpan={colSpan}
-      legend={slices.length > 0 ? (
-        <div className="flex items-center gap-1.5">{toggleBtn('amount', '$ Amount')}{toggleBtn('percent', '% Percent')}</div>
-      ) : undefined}>
+      legend={(
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          {periodOptions && periodOptions.length > 0 && onPeriodChange && (
+            <PeriodSelect value={period ?? ''} options={periodOptions} onChange={onPeriodChange} ariaLabel={`${title} period`} />
+          )}
+          {slices.length > 0 && <>{toggleBtn('amount', '$ Amount')}{toggleBtn('percent', '% Percent')}</>}
+        </div>
+      )}>
       {slices.length === 0 ? <PanelEmpty message="Nothing categorized here yet." /> : (
         <div className="flex flex-col gap-4 flex-1">
           <div className="flex items-center gap-5 flex-wrap sm:flex-nowrap flex-1">
@@ -95,10 +113,33 @@ export default function CategoryDonutPanel({ title, subtitle, slices, total, loa
             </div>
           </div>
 
-          {/* Footer stats — only the ones derivable from this panel's data */}
-          {top && smallest && (
-            <div className="grid grid-cols-2 gap-2.5 pt-3 mt-auto" style={{ borderTop: '1px solid var(--color-border)' }}>
-              {[{ label: 'Top category', s: top }, { label: 'Smallest category', s: smallest }].map(({ label, s }) => (
+          {/* Footer stats — only the ones derivable from this panel's data.
+              The total always shows; top/smallest need at least two categories
+              to mean anything, so they come and go independently. */}
+          {top && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-3 mt-auto" style={{ borderTop: '1px solid var(--color-border)' }}>
+
+              {/* Deliberately uncoloured: the other two cards borrow their slice's
+                  colour because that colour is that category's identity in the
+                  donut. A total is not a slice, so tinting it would imply one. */}
+              <div className="flex items-center gap-2.5 rounded-xl py-2 px-3 min-w-0"
+                style={{ border: 'var(--glass-border)', background: 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)' }}>
+                <span className="w-7 h-7 rounded-lg flex items-center justify-center text-[13px] font-bold shrink-0"
+                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+                  aria-hidden="true">Σ</span>
+                <div className="min-w-0">
+                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>Total</p>
+                  <p className="text-xs font-bold truncate">{subtitle}</p>
+                </div>
+                <div className="ml-auto text-right shrink-0">
+                  <p className="text-xs font-bold tabular-nums">${fmt(total)}</p>
+                  <p className="text-[9.5px]" style={{ color: 'var(--color-text-muted)' }}>
+                    {slices.length} {slices.length === 1 ? 'category' : 'categories'}
+                  </p>
+                </div>
+              </div>
+
+              {([{ label: 'Top category', s: top }, ...(smallest ? [{ label: 'Smallest category', s: smallest }] : [])]).map(({ label, s }) => (
                 <div key={label} className="flex items-center gap-2.5 rounded-xl py-2 px-3 min-w-0"
                   style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${s.color} 4%, transparent)` }}>
                   <IconChip slice={s} />

@@ -29,6 +29,8 @@ interface Props extends RowHandlers {
   revealKey: string | null;
   onSelectMany: (keys: string[], on: boolean) => void;
   emptyAction: React.ReactNode;
+  /** Expanded-row content; falls back to this month's transaction list. */
+  renderDetail?: (row: DerivedRow) => React.ReactNode;
 }
 
 function CategoryTransactions({ txs, categoryId, name }: { txs: Transaction[]; categoryId: string | null; name: string }) {
@@ -58,7 +60,7 @@ function CategoryTransactions({ txs, categoryId, name }: { txs: Transaction[]; c
 }
 
 export default function CategoryBudgetEditor(props: Props) {
-  const { rows, health, monthTxs, trendLabels, selected, expanded, flashKey, deletingKey, revealKey, onSelectMany, emptyAction, ...handlers } = props;
+  const { rows, health, monthTxs, trendLabels, selected, expanded, flashKey, deletingKey, revealKey, onSelectMany, emptyAction, renderDetail, ...handlers } = props;
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<RowFilter>('all');
   const [sort, setSort] = useState<RowSort>('risk');
@@ -161,7 +163,7 @@ export default function CategoryBudgetEditor(props: Props) {
                     flash={flashKey === r.key} deleting={deletingKey === r.key} {...handlers} />
                   {expanded.has(r.key) && (
                     <div className="mx-3 mb-2 rounded-xl overflow-hidden" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                      <CategoryTransactions txs={monthTxs} categoryId={r.categoryId} name={r.name} />
+                      {renderDetail?.(r) ?? <CategoryTransactions txs={monthTxs} categoryId={r.categoryId} name={r.name} />}
                     </div>
                   )}
                 </div>

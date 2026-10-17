@@ -4,7 +4,16 @@
 # Lives as a real script so shell variables ($API_URL, $WEB_URL) are never
 # mistaken for Cloud Build substitutions. Inputs arrive as env vars set by the
 # `env:` block of the deploy step:
-#   PROJECT_ID SHA REGION REPO SQL_CONN DB_NAME DB_USER GOOGLE_CLIENT_ID MAIL_FROM
+#   PROJECT_ID SHA REGION REPO SQL_CONN DB_NAME DB_USER GOOGLE_CLIENT_ID
+#   PLAID_CLIENT_ID MAIL_FROM STRIPE_PRICE_PRO_MONTHLY STRIPE_PRICE_PRO_YEARLY
+#   STRIPE_PRICE_ELITE_MONTHLY STRIPE_PRICE_ELITE_YEARLY PUBLIC_URL (optional; defaults to the cofre-web run.app URL)
+#
+# Secrets required in Secret Manager (this script references them; it does not
+# create them): DB_PASS JWT_SECRET GOOGLE_CLIENT_SECRET RESEND_API_KEY
+# PLAID_SECRET STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET ANTHROPIC_API_KEY
+# PROXY_SHARED_SECRET (both services: web forwards the client IP to the API
+# with it, the API trusts that IP for rate limiting only when it matches)
+# ADMIN_EMAILS (API: comma-separated admin login emails)
 #
 set -euo pipefail
 
@@ -16,8 +25,8 @@ gcloud run deploy cofre-api \
   --image "${API_IMAGE}" --region "${REGION}" --allow-unauthenticated \
   --min-instances=0 --max-instances=2 --memory=512Mi \
   --add-cloudsql-instances "${SQL_CONN}" \
-  --set-env-vars "NODE_ENV=production,DB_HOST=/cloudsql/${SQL_CONN},DB_PORT=5432,DB_USER=${DB_USER},DB_NAME=${DB_NAME},JWT_EXPIRES_IN=7d,GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},MAIL_FROM=${MAIL_FROM}" \
-  --set-secrets "DB_PASS=DB_PASS:latest,JWT_SECRET=JWT_SECRET:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,RESEND_API_KEY=RESEND_API_KEY:latest"
+  --set-env-vars "NODE_ENV=production,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DB_HOST=/cloudsql/${SQL_CONN},DB_PORT=5432,DB_USER=${DB_USER},DB_NAME=${DB_NAME},JWT_EXPIRES_IN=7d,GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},MAIL_FROM=${MAIL_FROM},PLAID_CLIENT_ID=${PLAID_CLIENT_ID},PLAID_ENV=production,PLAID_LIABILITIES_ENABLED=true,STRIPE_PRICE_PRO_MONTHLY=${STRIPE_PRICE_PRO_MONTHLY},STRIPE_PRICE_PRO_YEARLY=${STRIPE_PRICE_PRO_YEARLY},STRIPE_PRICE_ELITE_MONTHLY=${STRIPE_PRICE_ELITE_MONTHLY},STRIPE_PRICE_ELITE_YEARLY=${STRIPE_PRICE_ELITE_YEARLY}" \
+  --set-secrets "DB_PASS=DB_PASS:latest,JWT_SECRET=JWT_SECRET:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,RESEND_API_KEY=RESEND_API_KEY:latest,PLAID_SECRET=PLAID_SECRET:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,PROXY_SHARED_SECRET=PROXY_SHARED_SECRET:latest,ADMIN_EMAILS=ADMIN_EMAILS:latest"
 
 API_URL="$(gcloud run services describe cofre-api --region "${REGION}" --format='value(status.url)')"
 echo "  API at ${API_URL}"
@@ -26,16 +35,20 @@ echo "▶ Deploying web (proxies /api → ${API_URL})…"
 gcloud run deploy cofre-web \
   --image "${WEB_IMAGE}" --region "${REGION}" --allow-unauthenticated \
   --min-instances=0 --max-instances=2 --memory=512Mi \
-  --set-env-vars "API_PROXY_URL=${API_URL}"
+  --set-env-vars "API_PROXY_URL=${API_URL}" \
+  --set-secrets "PROXY_SHARED_SECRET=PROXY_SHARED_SECRET:latest"
 
 WEB_URL="$(gcloud run services describe cofre-web --region "${REGION}" --format='value(status.url)')"
 echo "  Web at ${WEB_URL}"
+# The address users actually visit — the custom domain when one is mapped.
+PUBLIC_URL="${PUBLIC_URL:-${WEB_URL}}"
+echo "  Public at ${PUBLIC_URL}"
 
-echo "▶ Syncing API FRONTEND_URL + Google callback + Gmail redirect → ${WEB_URL}…"
+echo "▶ Syncing API FRONTEND_URL + Google callback + Gmail redirect + Plaid redirect → ${PUBLIC_URL}…"
 gcloud run services update cofre-api --region "${REGION}" \
-  --update-env-vars "FRONTEND_URL=${WEB_URL},GOOGLE_CALLBACK_URL=${WEB_URL}/api/auth/google/callback,GOOGLE_GMAIL_REDIRECT_URI=${WEB_URL}/api/gmail/callback"
+  --update-env-vars "FRONTEND_URL=${PUBLIC_URL},GOOGLE_CALLBACK_URL=${PUBLIC_URL}/api/auth/google/callback,GOOGLE_GMAIL_REDIRECT_URI=${PUBLIC_URL}/api/gmail/callback,PLAID_WEBHOOK_URL=${API_URL}/api/plaid/webhook,PLAID_OAUTH_REDIRECT_URI=${PUBLIC_URL}/settings/plaid-oauth-redirect"
 
 echo ""
 echo "✅ Deployed."
-echo "   Web: ${WEB_URL}"
+echo "   Web: ${PUBLIC_URL} (Cloud Run: ${WEB_URL})"
 echo "   API: ${API_URL}/api"

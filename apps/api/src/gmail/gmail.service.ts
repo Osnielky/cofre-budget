@@ -7,6 +7,7 @@ import { google } from 'googleapis';
 import { ConnectedApp } from '../connected-apps/connected-app.entity';
 import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.util';
 import { parseReceiptEmail } from './receipt-parser';
+import { timed } from '../common/logging/timed';
 
 export interface RawReceiptItem {
   name: string;
@@ -41,6 +42,12 @@ export class GmailService {
     this.encKey = deriveKey(secret);
   }
 
+  // The state travels through Google's redirect URL, so it must not be signed
+  // with the session key — otherwise it could be replayed as a login token.
+  private get stateSecret(): string {
+    return `${this.config.get<string>('JWT_SECRET')}:gmail-oauth-state`;
+  }
+
   private makeOAuth2Client() {
     return new google.auth.OAuth2(
       this.config.get<string>('GOOGLE_CLIENT_ID'),
@@ -50,7 +57,10 @@ export class GmailService {
   }
 
   buildAuthUrl(userId: string, nonce: string): string {
-    const state = this.jwtService.sign({ userId, nonce }, { expiresIn: '5m' });
+    const state = this.jwtService.sign(
+      { userId, nonce, purpose: 'gmail-oauth-state' },
+      { secret: this.stateSecret, expiresIn: '5m' },
+    );
     const client = this.makeOAuth2Client();
     return client.generateAuthUrl({
       access_type: 'offline',
@@ -64,7 +74,10 @@ export class GmailService {
     let userId: string;
     let stateNonce: string;
     try {
-      const payload = this.jwtService.verify(state) as { userId: string; nonce: string };
+      const payload = this.jwtService.verify(state, { secret: this.stateSecret }) as {
+        userId: string; nonce: string; purpose: string;
+      };
+      if (payload.purpose !== 'gmail-oauth-state') throw new Error('bad purpose');
       userId = payload.userId;
       stateNonce = payload.nonce;
     } catch {
@@ -75,7 +88,7 @@ export class GmailService {
     }
 
     const client = this.makeOAuth2Client();
-    const { tokens } = await client.getToken(code);
+    const { tokens } = await timed('gmail', 'getToken', () => client.getToken(code));
     client.setCredentials(tokens);
 
     const oauth2 = google.oauth2({ version: 'v2', auth: client });
@@ -121,7 +134,7 @@ export class GmailService {
     // Only refresh if the token is expired or about to expire (within 60 seconds)
     const isExpired = !conn.tokenExpiry || Date.now() >= Number(conn.tokenExpiry) - 60_000;
     if (isExpired) {
-      const { credentials } = await client.refreshAccessToken();
+      const { credentials } = await timed('gmail', 'refreshAccessToken', () => client.refreshAccessToken());
       client.setCredentials(credentials);
       if (credentials.access_token && credentials.access_token !== decryptToken(conn.accessToken, this.encKey)) {
         conn.accessToken = encryptToken(credentials.access_token, this.encKey);
@@ -143,37 +156,37 @@ export class GmailService {
     const client = await this.getAuthorizedClient(userId);
     const gmail = google.gmail({ version: 'v1', auth: client });
 
-    const listRes = await gmail.users.messages.list({
+    const listRes = await timed('gmail', 'users.messages.list', () => gmail.users.messages.list({
       userId: 'me',
       q: query,
       maxResults,
-    });
+    }));
 
     const messages = listRes.data.messages ?? [];
     const results: RawReceipt[] = [];
-    this.logger.log(`Gmail search "${query}" matched ${messages.length} message(s) for user ${userId}`);
+    this.logger.log(`Gmail receipt search matched ${messages.length} message(s)`);
 
     for (const msg of messages) {
       if (!msg.id) continue;
-      const full = await gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' });
+      const full = await timed('gmail', 'users.messages.get', () => gmail.users.messages.get({ userId: 'me', id: msg.id, format: 'full' }));
       const headers = full.data.payload?.headers ?? [];
       const subject = this.extractHeader(headers, 'Subject');
       const from = this.extractHeader(headers, 'From');
       const dateHeader = this.extractHeader(headers, 'Date') || null;
       const body = this.extractBody(full.data.payload);
       if (!body) {
-        this.logger.warn(`No text/html body extracted for message ${msg.id} ("${subject}"), mimeType=${full.data.payload?.mimeType}, skipping`);
+        this.logger.warn(`No text/html body extracted for message ${msg.id}, mimeType=${full.data.payload?.mimeType}, skipping`);
         continue;
       }
       let parsed: ReturnType<typeof parseReceiptEmail>;
       try {
         parsed = parseReceiptEmail({ html: body, subject, from, dateHeader });
       } catch (err) {
-        this.logger.warn(`Failed to parse message ${msg.id} ("${subject}"): ${(err as Error)?.message}, skipping`);
+        this.logger.warn(`Failed to parse message ${msg.id}: ${(err as Error)?.message}, skipping`);
         continue;
       }
       if (!parsed) {
-        this.logger.warn(`No total found in message ${msg.id} ("${subject}"), skipping — likely not a receipt`);
+        this.logger.warn(`No total found in message ${msg.id}, skipping — likely not a receipt`);
         continue;
       }
       results.push({ gmailMessageId: msg.id, subject, ...parsed });

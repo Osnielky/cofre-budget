@@ -1,25 +1,31 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Fragment, FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment, FormEvent, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { usePlaidLink } from 'react-plaid-link';
 import Sidebar from '@/components/Sidebar';
 import CsvImportModal from '@/components/CsvImportModal';
 import CategoryManager from '@/components/CategoryManager';
+import RulesManager from '@/components/RulesManager';
+import RecurringManager from '@/components/RecurringManager';
 import ProjectCategoryManager from '@/components/ProjectCategoryManager';
 import AccountSettings from '@/components/AccountSettings';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import DataResetModal from '@/components/DataResetModal';
+import PlaidMergeReviewModal, { PreviewExchangeResult } from '@/components/PlaidMergeReviewModal';
 import IntegrationsTab from '@/components/IntegrationsTab';
+import BillingTab from '@/components/BillingTab';
 import { useTheme } from '@/components/ThemeProvider';
 import { THEMES } from '@/lib/theme';
 import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
+import { connectBankError } from '@/lib/connect-bank-error';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 type AccountType = string;
-type Tab = 'account' | 'banks' | 'categories' | 'projects' | 'appearance' | 'integrations' | 'data';
+type Tab = 'account' | 'banks' | 'categories' | 'recurring' | 'rules' | 'projects' | 'appearance' | 'integrations' | 'billing' | 'data';
 
 interface BankAccount {
   id: string;
@@ -31,6 +37,7 @@ interface BankAccount {
   color: string;
   provider: string;
   plaidItemId: string | null;
+  plaidStatus?: string | null;
   last4?: string | null;
   txCount?: number;
 }
@@ -146,6 +153,25 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    id: 'recurring',
+    label: 'Recurring Payments',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/>
+        <path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'rules',
+    label: 'Categorization Rules',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a3 3 0 0 0-6 0Z"/>
+      </svg>
+    ),
+  },
+  {
     id: 'projects',
     label: 'Project Categories',
     icon: (
@@ -160,6 +186,15 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     icon: (
       <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+      </svg>
+    ),
+  },
+  {
+    id: 'billing',
+    label: 'Billing',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
       </svg>
     ),
   },
@@ -184,7 +219,8 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   },
 ];
 
-export default function SettingsPage() {
+function SettingsPageInner() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<Tab>('banks');
   const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string; connectedAt?: string } | null>(null);
   const [gmailLoading, setGmailLoading] = useState(false);
@@ -202,7 +238,11 @@ export default function SettingsPage() {
   const [importAccount, setImportAccount] = useState<BankAccount | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [linkMode, setLinkMode] = useState<'connect' | 'reconnect'>('connect');
+  const [reconnectItemId, setReconnectItemId] = useState<string | null>(null);
+  const [mergeReview, setMergeReview] = useState<PreviewExchangeResult | null>(null);
   const [error, setError] = useState('');
+  const [upgradeNotice, setUpgradeNotice] = useState('');
   const [typeOpen, setTypeOpen] = useState(false);
   const typeDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -217,10 +257,37 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tab = params.get('tab') as Tab | null;
-    if (tab && ['account', 'banks', 'categories', 'projects', 'appearance', 'integrations'].includes(tab)) {
+    if (searchParams.get('checkout') === 'success') {
+      // Stripe Checkout's success_url lands here — always show the new plan,
+      // regardless of any ?tab= param also present.
+      setActiveTab('billing');
+      return;
+    }
+    const tab = searchParams.get('tab') as Tab | null;
+    if (tab && ['account', 'banks', 'categories', 'rules', 'projects', 'appearance', 'integrations', 'billing'].includes(tab)) {
       setActiveTab(tab);
+    }
+    // Re-run whenever the query string actually changes (e.g. clicking "Upgrade" while
+    // already on /settings only changes the URL — Next.js's App Router does not remount
+    // this client component for a query-only navigation, so a mount-only effect here
+    // would never see the new ?tab= value).
+  }, [searchParams]);
+
+  /* Pick up state handed off by /settings/plaid-oauth-redirect — that page is a
+     lightweight Link landing page for banks requiring Plaid's OAuth redirect
+     (e.g. Charles Schwab) and doesn't carry the manual-account list this page
+     needs to render PlaidMergeReviewModal, so it stashes the preview (or a
+     failure message) in sessionStorage instead of showing it directly. */
+  useEffect(() => {
+    const pendingError = sessionStorage.getItem('plaidPendingError');
+    if (pendingError) {
+      setError(pendingError);
+      sessionStorage.removeItem('plaidPendingError');
+    }
+    const pendingMerge = sessionStorage.getItem('plaidPendingMergeReview');
+    if (pendingMerge) {
+      try { setMergeReview(JSON.parse(pendingMerge)); } catch { /* malformed — ignore */ }
+      sessionStorage.removeItem('plaidPendingMergeReview');
     }
   }, []);
 
@@ -250,12 +317,42 @@ export default function SettingsPage() {
 
   const openPlaidLink = async () => {
     setConnecting(true);
+    setLinkMode('connect');
+    setUpgradeNotice('');
     try {
       const res = await fetch(`${API}/plaid/link-token`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) {
+        const failure = connectBankError(res.status, await res.json().catch(() => null));
+        if (failure.upgrade) setUpgradeNotice(failure.message);
+        else setError(failure.message);
+        setConnecting(false);
+        return;
+      }
       const { link_token } = await res.json();
+      sessionStorage.setItem('plaidLinkToken', link_token);
+      sessionStorage.setItem('plaidLinkMode', 'connect');
       setLinkToken(link_token);
     } catch {
-      setError('Could not open bank connection. Check your Plaid credentials.');
+      setError(connectBankError(0, null).message);
+      setConnecting(false);
+    }
+  };
+
+  const openReconnect = async (account: BankAccount) => {
+    if (!account.plaidItemId) return;
+    setConnecting(true);
+    setLinkMode('reconnect');
+    setReconnectItemId(account.plaidItemId);
+    try {
+      const res = await fetch(`${API}/plaid/reconnect-token/${account.plaidItemId}`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) throw new Error();
+      const { link_token } = await res.json();
+      sessionStorage.setItem('plaidLinkToken', link_token);
+      sessionStorage.setItem('plaidLinkMode', 'reconnect');
+      sessionStorage.setItem('plaidReconnectItemId', account.plaidItemId);
+      setLinkToken(link_token);
+    } catch {
+      setError('Could not open bank reconnection.');
       setConnecting(false);
     }
   };
@@ -263,28 +360,74 @@ export default function SettingsPage() {
   const onPlaidSuccess = useCallback(async (publicToken: string, metadata: any) => {
     setConnecting(true);
     try {
-      const res = await fetch(`${API}/plaid/exchange`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({
-          public_token: publicToken,
-          institution_id: metadata.institution?.institution_id ?? '',
-          institution_name: metadata.institution?.name ?? 'Unknown Bank',
-        }),
-      });
-      if (!res.ok) throw new Error();
-      const newAccounts: BankAccount[] = await res.json();
-      setAccounts((prev) => {
-        const ids = new Set(newAccounts.map((a) => a.id));
-        return [...prev.filter((a) => !ids.has(a.id)), ...newAccounts];
-      });
-    } catch {
-      setError('Bank connected but account import failed. Try syncing manually.');
-    } finally { setLinkToken(null); setConnecting(false); }
-  }, []);
+      if (linkMode === 'reconnect' && reconnectItemId) {
+        const completeRes = await fetch(`${API}/plaid/reconnect/${reconnectItemId}/complete`, { method: 'POST', credentials: 'include' });
+        if (!completeRes.ok) throw new Error();
+        const { status } = await completeRes.json();
+        if (status !== 'active') throw new Error();
+        const res = await fetch(`${API}/bank-accounts`, { credentials: 'include' });
+        const data = await res.json();
+        setAccounts(Array.isArray(data) ? data : []);
+      } else {
+        const res = await fetch(`${API}/plaid/exchange/preview`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({
+            public_token: publicToken,
+            institution_id: metadata.institution?.institution_id ?? '',
+            institution_name: metadata.institution?.name ?? 'Unknown Bank',
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          if (body?.code === 'INSTITUTION_LIMIT_REACHED') {
+            throw new Error('INSTITUTION_LIMIT_REACHED');
+          }
+          throw new Error();
+        }
+        const preview: PreviewExchangeResult = await res.json();
+
+        if (preview.hasManualAccounts) {
+          /* Let the user match to an existing manual account before creating anything —
+             handled by the modal itself, which calls /plaid/exchange/confirm on submit. */
+          setMergeReview(preview);
+        } else {
+          const confirmRes = await fetch(`${API}/plaid/exchange/confirm`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+            body: JSON.stringify({
+              plaid_item_id: preview.plaidItemId,
+              decisions: preview.accounts.map((a) => ({ plaidAccountId: a.plaidAccountId, action: 'new' })),
+            }),
+          });
+          if (!confirmRes.ok) throw new Error();
+          const newAccounts: BankAccount[] = await confirmRes.json();
+          setAccounts((prev) => {
+            const ids = new Set(newAccounts.map((a) => a.id));
+            return [...prev.filter((a) => !ids.has(a.id)), ...newAccounts];
+          });
+        }
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message === 'INSTITUTION_LIMIT_REACHED') {
+        setError('Pro is limited to 4 linked institutions — upgrade to Elite in Settings → Billing for unlimited.');
+      } else {
+        setError(linkMode === 'reconnect' ? 'Reconnected, but refresh failed. Try syncing manually.' : 'Bank connected but account import failed. Try syncing manually.');
+      }
+    } finally {
+      setLinkToken(null); setConnecting(false); setReconnectItemId(null);
+      sessionStorage.removeItem('plaidLinkToken');
+      sessionStorage.removeItem('plaidLinkMode');
+      sessionStorage.removeItem('plaidReconnectItemId');
+    }
+  }, [linkMode, reconnectItemId]);
 
   const { open: openLink, ready: linkReady } = usePlaidLink({
     token: linkToken ?? '', onSuccess: onPlaidSuccess,
-    onExit: () => { setLinkToken(null); setConnecting(false); },
+    onExit: () => {
+      setLinkToken(null); setConnecting(false); setReconnectItemId(null);
+      sessionStorage.removeItem('plaidLinkToken');
+      sessionStorage.removeItem('plaidLinkMode');
+      sessionStorage.removeItem('plaidReconnectItemId');
+    },
   });
 
   useEffect(() => { if (linkToken && linkReady) openLink(); }, [linkToken, linkReady, openLink]);
@@ -439,6 +582,37 @@ export default function SettingsPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Connect/reconnect error — shown here so it's visible regardless of which
+                  flow set it (popup Link, OAuth-redirect hand-off, or reconnect) */}
+              {error && !showManualForm && (
+                <div className="px-4 py-3 rounded-xl flex items-start gap-3 text-sm"
+                  style={{ background: 'color-mix(in srgb, var(--color-rose) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-rose) 25%, transparent)' }}>
+                  <span className="mt-0.5">⚠️</span>
+                  <p className="flex-1" style={{ color: 'var(--color-rose)' }}>{error}</p>
+                  <button onClick={() => setError('')}
+                    className="text-xs font-semibold shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {/* Plan gate (free plan, or Pro's institution limit): point at Billing, not at Plaid */}
+              {upgradeNotice && (
+                <div className="px-4 py-3 rounded-xl flex flex-wrap items-center gap-3 text-sm"
+                  style={{ background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>
+                  <span>✨</span>
+                  <p className="flex-1 min-w-[200px]" style={{ color: 'var(--color-text-primary)' }}>{upgradeNotice}</p>
+                  <button onClick={() => { setUpgradeNotice(''); setActiveTab('billing'); }}
+                    className="btn-gold py-2 px-4 text-xs font-semibold shrink-0 cursor-pointer" style={{ borderRadius: 12 }}>
+                    See plans
+                  </button>
+                  <button onClick={() => setUpgradeNotice('')} aria-label="Dismiss"
+                    className="text-xs font-semibold shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                    ✕
+                  </button>
+                </div>
+              )}
 
               {/* Plaid info banner */}
               <div className="px-4 py-3 rounded-xl flex items-start gap-3 text-sm"
@@ -773,11 +947,24 @@ export default function SettingsPage() {
                               style={{ background: `${meta.accent}18`, color: meta.accent }}>
                               {meta.label}
                             </span>
-                            {isConnected && (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1"
-                                style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)' }}>
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-green)' }} />
-                                Synced
+                            {isConnected ? (
+                              account.plaidStatus === 'error' ? (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1"
+                                  style={{ background: 'color-mix(in srgb, var(--color-rose) 12%, transparent)', color: 'var(--color-rose)' }}>
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-rose)' }} />
+                                  Needs reconnect
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1"
+                                  style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)' }}>
+                                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-green)' }} />
+                                  Synced
+                                </span>
+                              )
+                            ) : (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                style={{ background: 'color-mix(in srgb, var(--color-text-muted) 14%, transparent)', color: 'var(--color-text-muted)' }}>
+                                Manual
                               </span>
                             )}
                           </div>
@@ -809,12 +996,21 @@ export default function SettingsPage() {
                             <UploadIcon />
                           </button>
                           {isConnected && (
-                            <button onClick={() => handleSync(account)} disabled={syncingId === account.id}
-                              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40"
-                              style={{ color: syncingId === account.id ? 'var(--color-text-muted)' : 'var(--color-green)' }}
-                              title="Sync now">
-                              <SyncIcon spinning={syncingId === account.id} />
-                            </button>
+                            account.plaidStatus === 'error' ? (
+                              <button onClick={() => openReconnect(account)} disabled={connecting}
+                                className="px-2.5 h-8 rounded-lg flex items-center justify-center text-[11px] font-semibold transition-colors disabled:opacity-40"
+                                style={{ color: 'var(--color-rose)' }}
+                                title="Reconnect bank">
+                                Reconnect
+                              </button>
+                            ) : (
+                              <button onClick={() => handleSync(account)} disabled={syncingId === account.id}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40"
+                                style={{ color: syncingId === account.id ? 'var(--color-text-muted)' : 'var(--color-green)' }}
+                                title="Sync now">
+                                <SyncIcon spinning={syncingId === account.id} />
+                              </button>
+                            )
                           )}
                           <button onClick={() => openDeleteConfirm(account)} disabled={deletingId === account.id}
                             className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 disabled:opacity-40"
@@ -835,6 +1031,8 @@ export default function SettingsPage() {
 
           {/* ── CATEGORIES TAB ── */}
           {activeTab === 'categories' && <CategoryManager />}
+          {activeTab === 'recurring' && <RecurringManager />}
+          {activeTab === 'rules' && <RulesManager />}
 
           {/* ── PROJECT CATEGORIES TAB ── */}
           {activeTab === 'projects' && <ProjectCategoryManager />}
@@ -848,6 +1046,9 @@ export default function SettingsPage() {
               onManageData={() => setShowResetModal(true)}
             />
           )}
+
+          {/* ── BILLING TAB ── */}
+          {activeTab === 'billing' && <BillingTab />}
 
           {/* ── APPEARANCE TAB ── */}
           {activeTab === 'appearance' && (
@@ -968,6 +1169,21 @@ export default function SettingsPage() {
         document.body,
       )}
 
+      {mergeReview && (
+        <PlaidMergeReviewModal
+          plaidItemId={mergeReview.plaidItemId}
+          institutionName={mergeReview.institutionName}
+          plaidAccounts={mergeReview.accounts}
+          manualAccounts={accounts.filter((a) => a.provider === 'manual')}
+          onClose={() => setMergeReview(null)}
+          onDone={(newAccounts: BankAccount[]) => {
+            setMergeReview(null);
+            const ids = new Set(newAccounts.map((a) => a.id));
+            setAccounts((prev) => [...prev.filter((a) => !ids.has(a.id)), ...newAccounts]);
+          }}
+        />
+      )}
+
       {showResetModal && (
         <DataResetModal
           accounts={accounts}
@@ -981,6 +1197,14 @@ export default function SettingsPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <SettingsPageInner />
+    </Suspense>
   );
 }
 

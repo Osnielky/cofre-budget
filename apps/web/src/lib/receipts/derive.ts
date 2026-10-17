@@ -5,6 +5,17 @@
 
 export interface ReceiptItem { name: string; quantity: number; unitPrice: number; total: number }
 
+export type ReceiptSource = 'gmail' | 'manual';
+export type MatchStatus = 'matched' | 'pending';
+
+export interface MatchedTransaction {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  category: { id: string; name: string; icon: string; color: string } | null;
+}
+
 export interface Receipt {
   id: string;
   merchant: string;
@@ -15,7 +26,13 @@ export interface Receipt {
   items: ReceiptItem[];
   rawSubject: string;
   imported: boolean;
+  reviewed: boolean;
   parsedAt: string;
+  source: ReceiptSource;
+  matchStatus: MatchStatus;
+  matchedTransaction: MatchedTransaction | null;
+  imageMimeType: string | null;
+  gmailMessageId: string | null;
 }
 
 /** Subset of Receipt needed by stat/filter logic — any Receipt satisfies this structurally. */
@@ -26,44 +43,43 @@ export interface ReceiptLite {
   total: number;
   imported: boolean;
   orderDate: string | null;
+  matchStatus: MatchStatus;
+  source?: ReceiptSource;
 }
 
-export type ReceiptStatus = 'all' | 'imported' | 'pending';
+export type ReceiptStatus = 'all' | 'imported' | 'matched' | 'pending';
 
 export interface ReceiptFilters {
   search: string;
-  merchant: string;  // '' = all
+  merchant: string;
   dateFrom: string;   // '' = no lower bound, else 'YYYY-MM-DD'
   dateTo: string;     // '' = no upper bound
   status: ReceiptStatus;
+  source: '' | ReceiptSource; // '' = all
 }
 
 export const DEFAULT_FILTERS: ReceiptFilters = {
-  search: '', merchant: '', dateFrom: '', dateTo: '', status: 'all',
+  search: '', merchant: '', dateFrom: '', dateTo: '', status: 'all', source: '',
 };
-
-export function currentMonthPrefix(now = new Date()): string {
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
 
 export interface StatTotals {
   total: number;
   imported: number;
   pending: number;
-  thisMonthTotal: number;
+  matchedCount: number; // imported OR matched — either way it has a linked transaction
+  matchRate: number;    // 0-100, rounded, matchedCount / total
 }
 
-export function statTotals(receipts: ReceiptLite[], now = new Date()): StatTotals {
-  const monthPrefix = currentMonthPrefix(now);
+export function statTotals(receipts: ReceiptLite[]): StatTotals {
   const imported = receipts.filter((r) => r.imported).length;
-  const thisMonthTotal = receipts
-    .filter((r) => r.orderDate?.startsWith(monthPrefix))
-    .reduce((sum, r) => sum + Number(r.total), 0);
+  const pending = receipts.filter((r) => statusLabel(r) === 'Pending').length;
+  const matchedCount = receipts.filter((r) => r.imported || r.matchStatus === 'matched').length;
   return {
     total: receipts.length,
     imported,
-    pending: receipts.length - imported,
-    thisMonthTotal,
+    pending,
+    matchedCount,
+    matchRate: receipts.length ? Math.round((matchedCount / receipts.length) * 100) : 0,
   };
 }
 
@@ -71,13 +87,22 @@ export function distinctMerchants(receipts: ReceiptLite[]): string[] {
   return [...new Set(receipts.map((r) => r.merchant))].sort((a, b) => a.localeCompare(b));
 }
 
+/** Imported takes priority (it's already a real transaction), then Matched, then Pending. */
+export function statusLabel(r: { imported: boolean; matchStatus: MatchStatus }): 'Imported' | 'Matched' | 'Pending' {
+  if (r.imported) return 'Imported';
+  return r.matchStatus === 'matched' ? 'Matched' : 'Pending';
+}
+
 export function filterReceipts<T extends ReceiptLite>(receipts: T[], filters: ReceiptFilters): T[] {
   const search = filters.search.trim().toLowerCase();
   return receipts.filter((r) => {
     if (search && !r.merchant.toLowerCase().includes(search) && !r.rawSubject.toLowerCase().includes(search)) return false;
     if (filters.merchant && r.merchant !== filters.merchant) return false;
-    if (filters.status === 'imported' && !r.imported) return false;
-    if (filters.status === 'pending' && r.imported) return false;
+    if (filters.source && r.source !== filters.source) return false;
+    const label = statusLabel(r);
+    if (filters.status === 'imported' && label !== 'Imported') return false;
+    if (filters.status === 'matched' && label !== 'Matched') return false;
+    if (filters.status === 'pending' && label !== 'Pending') return false;
     if (filters.dateFrom && (!r.orderDate || r.orderDate < filters.dateFrom)) return false;
     if (filters.dateTo && (!r.orderDate || r.orderDate > filters.dateTo)) return false;
     return true;
@@ -101,4 +126,62 @@ export function countGroups(itemCount: number, itemCategories: Record<number, st
     else hasUncategorized = true;
   }
   return assigned.size + (hasUncategorized ? 1 : 0) || 1;
+}
+
+export interface CategoryLite { id: string; name: string; icon: string; color: string }
+
+export interface MerchantSuggestion {
+  categoryId: string;
+  categoryName: string;
+  icon: string;
+  color: string;
+  receiptsConsidered: number;
+}
+
+export interface CategoryGroup {
+  categoryId: string | null; // null = uncategorized
+  categoryName: string;
+  icon: string;
+  color: string;
+  itemIndices: number[];
+  total: number;
+}
+
+/** Groups a receipt's line items by their currently-assigned category (client-side
+    itemCategories state, not persisted). Uncategorized items always form one trailing
+    group. Categorized groups sort by total descending — used both for the "group by
+    category" list view and the "this will create" transaction preview. */
+export function groupItemsByCategory(
+  items: ReceiptItem[],
+  itemCategories: Record<number, string>,
+  categories: CategoryLite[],
+): CategoryGroup[] {
+  const byId = new Map(categories.map((c) => [c.id, c]));
+  const groups = new Map<string, CategoryGroup>();
+
+  items.forEach((item, idx) => {
+    const catId = itemCategories[idx] || null;
+    const key = catId ?? '__uncategorized__';
+    const cat = catId ? byId.get(catId) : undefined;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.itemIndices.push(idx);
+      existing.total += item.total;
+    } else {
+      groups.set(key, {
+        categoryId: catId,
+        categoryName: cat?.name ?? 'Uncategorized',
+        icon: cat?.icon ?? '❔',
+        color: cat?.color ?? 'var(--color-text-muted)',
+        itemIndices: [idx],
+        total: item.total,
+      });
+    }
+  });
+
+  return [...groups.values()].sort((a, b) => {
+    if (a.categoryId === null) return 1;
+    if (b.categoryId === null) return -1;
+    return b.total - a.total;
+  });
 }

@@ -1,12 +1,21 @@
 import { describe, it, expect } from 'vitest';
-import { isTransfer, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, savingsSeries, netWorthBreakdown, dailyCumulative } from './derive';
-import type { Transaction, Category, BankAccount } from './types';
+import { makeBucketer, isTransfer, isSavings, savedTotal, inCashFlow, txInMonth, monthKeyOf, monthlyCashFlow, trendSeries, categoryTotals, categoryMonthly, categoryTrendGroups, foldOther, topMerchants, expenseChanges, calendarDays, spendingPace, fixedVariable, netWorthBreakdown, dailyCumulative, assetMix, netWorthTrend } from './derive';
+import type { Transaction, Category, BankAccount, Debt, Project } from './types';
 
 export function cat(p: Partial<Category> = {}): Category {
   return { id: 'c1', name: 'Food', icon: '🍔', color: '#fff', type: 'expense', ...p };
 }
 export function acct(p: Partial<BankAccount> = {}): BankAccount {
   return { id: 'a1', bankName: 'B', accountName: 'A', accountType: 'checking', color: '#fff', balance: 0, ...p };
+}
+export function proj(p: Partial<Project> = {}): Project {
+  return {
+    id: 'p1', name: 'Project', icon: '📁', color: '#9B6DFF', type: 'other', status: 'active',
+    expenses: 0, income: 0, costBasis: 0, netGain: null, roi: null, purchasePrice: 0, ...p,
+  };
+}
+export function debt(p: Partial<Debt> = {}): Debt {
+  return { remaining: 0, status: 'open', direction: 'lent', ...p };
 }
 export function tx(p: Partial<Transaction> = {}): Transaction {
   return {
@@ -39,6 +48,31 @@ describe('inCashFlow', () => {
   });
   it('tolerates null bankAccount', () => {
     expect(inCashFlow(tx({ bankAccount: null }))).toBe(true);
+  });
+  it('excludes savings-type categories (money still yours)', () => {
+    expect(inCashFlow(tx({ categoryRef: cat({ type: 'savings' }) }))).toBe(false);
+  });
+});
+
+describe('isSavings / savedTotal', () => {
+  const inv = cat({ id: 'inv', name: 'Investments', type: 'savings' });
+  it('flags savings-type categories only', () => {
+    expect(isSavings(tx({ categoryRef: inv }))).toBe(true);
+    expect(isSavings(tx())).toBe(false);
+    expect(isSavings(tx({ categoryRef: null }))).toBe(false);
+  });
+  it('nets contributions against withdrawals and ignores other categories', () => {
+    expect(savedTotal([
+      tx({ amount: -2000, categoryRef: inv }),
+      tx({ amount: 300, categoryRef: inv }),
+      tx({ amount: -50 }),
+    ])).toBe(1700);
+  });
+  it('ignores the receiving side on a tracking account', () => {
+    expect(savedTotal([
+      tx({ amount: -2000, categoryRef: inv }),
+      tx({ amount: 2000, categoryRef: inv, bankAccount: acct({ accountType: 'investment' }) }),
+    ])).toBe(2000);
   });
 });
 
@@ -88,6 +122,73 @@ describe('trendSeries', () => {
   });
 });
 
+describe('income trends', () => {
+  it('categoryMonthly sums income for a category when dir is income', () => {
+    const salary = cat({ id: 's', name: 'Salary', type: 'income' });
+    const out = categoryMonthly([
+      tx({ date: '2026-07-01', amount: 2000, categoryRef: salary }),
+      tx({ date: '2026-07-02', amount: -40, categoryRef: salary }), // a refund-like outflow is not income
+    ], 's', NOW, [], 'income');
+    expect(out[6].value).toBe(2000);
+  });
+  it('categoryTrendGroups lists income buckets when dir is income', () => {
+    const out = categoryTrendGroups([
+      tx({ amount: 900, categoryRef: cat({ id: 's', name: 'Salary', type: 'income' }) }),
+      tx({ amount: -50, categoryRef: cat({ id: 'f', name: 'Food' }) }),
+    ], [], 'income');
+    expect(out.flatMap((g) => g.options.map((o) => o.id))).toEqual(['s']);
+  });
+});
+
+describe('categoryTrendGroups', () => {
+  const house = proj({ id: 'p1', name: 'Rental House', icon: '🏠', color: '#F07A3E' });
+  const shop = proj({ id: 'p2', name: 'Shop', icon: '🛠', color: '#4BA8D8' });
+  const repairs = { id: 'pc1', name: 'Repairs', icon: '🔧', color: '#999' };
+
+  it('puts personal categories first, then one group per project ordered by spend', () => {
+    const out = categoryTrendGroups([
+      tx({ amount: -50, categoryRef: cat({ id: 'f', name: 'Food' }) }),
+      tx({ amount: -30, categoryRef: null, projectId: 'p1', projectCategoryRef: repairs }),
+      tx({ amount: -90, categoryRef: null, projectId: 'p2' }),
+    ], [house, shop]);
+    expect(out.map((g) => g.label)).toEqual(['Personal', 'Shop', 'Rental House']);
+    expect(out[0]).toMatchObject({ project: null });
+    expect(out[0].options.map((o) => o.id)).toEqual(['f']);
+    expect(out[2]).toMatchObject({ project: { id: 'p1', name: 'Rental House', icon: '🏠', color: '#F07A3E' } });
+    expect(out[2].options.map((o) => [o.id, o.name])).toEqual([['proj:pc1', 'Repairs']]);
+  });
+
+  it('names a project\'s uncategorised spending "All of <project>"', () => {
+    const out = categoryTrendGroups([tx({ amount: -90, categoryRef: null, projectId: 'p2' })], [shop]);
+    expect(out[0].options[0]).toMatchObject({ id: 'project:p2', name: 'All of Shop' });
+  });
+
+  it('ignores income and returns no groups when nothing was spent', () => {
+    expect(categoryTrendGroups([tx({ amount: 500 })], [])).toEqual([]);
+  });
+});
+
+describe('categoryMonthly', () => {
+  it('sums one category per month, Jan..current, ignoring other buckets and income', () => {
+    const food = cat({ id: 'f' });
+    const out = categoryMonthly([
+      tx({ date: '2026-05-03', amount: -40, categoryRef: food }),
+      tx({ date: '2026-05-20', amount: -10.5, categoryRef: food }),
+      tx({ date: '2026-07-01', amount: -25, categoryRef: food }),
+      tx({ date: '2026-07-02', amount: -99, categoryRef: cat({ id: 'g' }) }),
+      tx({ date: '2026-07-02', amount: 15, categoryRef: food }), // refund, not spend
+    ], 'f', NOW);
+    expect(out).toHaveLength(7);
+    expect(out[4]).toEqual({ month: 'May', key: '2026-05', value: 50.5 });
+    expect(out[5].value).toBe(0);
+    expect(out[6].value).toBe(25);
+  });
+  it('matches project buckets by their namespaced id', () => {
+    const out = categoryMonthly([tx({ categoryRef: null, projectId: 'p1' })], 'project:p1', NOW, [proj()]);
+    expect(out[6].value).toBe(10);
+  });
+});
+
 describe('categoryTotals', () => {
   it('groups expenses by category with pct', () => {
     const food = cat({ id: 'f', name: 'Food' });
@@ -95,12 +196,94 @@ describe('categoryTotals', () => {
     const out = categoryTotals([
       tx({ amount: -75, categoryRef: food }), tx({ amount: -25, categoryRef: gas }),
       tx({ amount: 500, categoryRef: cat({ id: 'i', type: 'income' }) }), // ignored for dir=expense
+      tx({ amount: -2000, categoryRef: cat({ id: 's', type: 'savings' }) }), // savings is not spending
     ], 'expense');
     expect(out.map((s) => [s.id, s.value, s.pct])).toEqual([['f', 75, 75], ['g', 25, 25]]);
   });
   it('folds uncategorized', () => {
     const out = categoryTotals([tx({ amount: -10, categoryRef: null })], 'expense');
     expect(out[0].id).toBe('uncat');
+  });
+
+  // A project-linked row has categoryId = null by design, so keying on the
+  // budget category alone reported all project activity as "Uncategorized".
+  it('attributes project-categorized income to its project category', () => {
+    const out = categoryTotals([
+      tx({ amount: 3488.87, categoryRef: null, projectCategoryRef: { id: 'pc1', name: 'Trade Profits', icon: '📈', color: '#22C55E' } }),
+    ] as never, 'income');
+    expect(out).toHaveLength(1);
+    expect(out[0].name).toBe('Trade Profits');
+    expect(out[0].id).toBe('proj:pc1');
+    expect(out[0].value).toBe(3488.87);
+  });
+
+  it('keeps project and budget categories in separate buckets even on an id clash', () => {
+    const out = categoryTotals([
+      tx({ amount: -40, categoryRef: cat({ id: 'x', name: 'Budget X' }) }),
+      tx({ amount: -60, categoryRef: null, projectCategoryRef: { id: 'x', name: 'Project X', icon: '📁', color: '#9B6DFF' } }),
+    ] as never, 'expense');
+    expect(out.map((s) => [s.id, s.value])).toEqual([['proj:x', 60], ['x', 40]]);
+  });
+
+  it('still reports a row with neither kind of category as uncategorized', () => {
+    const out = categoryTotals([tx({ amount: -10, categoryRef: null, projectCategoryRef: null })] as never, 'expense');
+    expect(out[0].id).toBe('uncat');
+  });
+
+  // Linking a transaction to a project without picking a project category is a
+  // first-class state — the picker offers "No specific category", and
+  // markAsPurchase() always links that way. Those rows count as categorised on
+  // the transactions page, so the donut must not file them under Uncategorized.
+  it('attributes a project-linked row with no project category to the project', () => {
+    const out = categoryTotals(
+      [tx({ amount: -2330, categoryRef: null, projectCategoryRef: null, projectId: 'p1' })] as never,
+      'expense',
+      [proj({ id: 'p1', name: 'Founding Venture', icon: '🏗️', color: '#9B6DFF' })],
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ id: 'project:p1', name: 'Founding Venture', icon: '🏗️', color: '#9B6DFF', value: 2330 });
+  });
+
+  it('keeps the project bucket separate from its own project categories', () => {
+    const out = categoryTotals(
+      [
+        tx({ amount: -2330, categoryRef: null, projectCategoryRef: null, projectId: 'p1' }),
+        tx({ amount: -21700, categoryRef: null, projectId: 'p1', projectCategoryRef: { id: 'pc1', name: 'Founding Capital', icon: '💰', color: '#F5C842' } }),
+      ] as never,
+      'expense',
+      [proj({ id: 'p1', name: 'Founding Venture' })],
+    );
+    expect(out.map((s) => [s.id, s.value])).toEqual([['proj:pc1', 21700], ['project:p1', 2330]]);
+  });
+
+  it('falls back to uncategorized when the project cannot be resolved', () => {
+    const out = categoryTotals(
+      [tx({ amount: -10, categoryRef: null, projectCategoryRef: null, projectId: 'gone' })] as never,
+      'expense',
+      [],
+    );
+    expect(out[0].id).toBe('uncat');
+  });
+});
+
+describe('makeBucketer', () => {
+  // The transactions-page insights donut reuses this with its own row shape —
+  // a bare Bucketable, not a full dashboard Transaction.
+  const bucket = makeBucketer([proj({ id: 'p1', name: 'Founding Venture', icon: '🏗️', color: '#9B6DFF' })]);
+
+  it('prefers the budget category', () => {
+    expect(bucket({ categoryRef: cat({ id: 'f', name: 'Food' }), projectId: 'p1' }).id).toBe('f');
+  });
+  it('falls back to the project category', () => {
+    expect(bucket({ categoryRef: null, projectCategoryRef: { id: 'pc1', name: 'Founding Capital', icon: '💰', color: '#F5C842' }, projectId: 'p1' }))
+      .toMatchObject({ id: 'proj:pc1', name: 'Founding Capital' });
+  });
+  it('falls back to the project when it has no project category', () => {
+    expect(bucket({ categoryRef: null, projectCategoryRef: null, projectId: 'p1' }))
+      .toMatchObject({ id: 'project:p1', name: 'Founding Venture' });
+  });
+  it('reports a row with no project at all as uncategorized', () => {
+    expect(bucket({ categoryRef: null, projectId: null }).id).toBe('uncat');
   });
 });
 
@@ -181,6 +364,21 @@ describe('spendingPace', () => {
     expect(out.projected).toBeCloseTo(1240, 0);
     expect(out.overBy).toBeCloseTo(240, 0);
   });
+  it('only counts spending in budgeted categories', () => {
+    // A $100 Food budget must not be measured against unbudgeted rent.
+    const food = { id: 'b1', amount: 100, spent: 0, category: cat({ id: 'food' }) };
+    const out = spendingPace([food], [
+      tx({ date: '2026-07-05', amount: -80, categoryRef: cat({ id: 'food' }) }),
+      tx({ date: '2026-07-01', amount: -1300, categoryRef: cat({ id: 'rent', name: 'Rent' }) }),
+      tx({ date: '2026-07-02', amount: -40, categoryRef: null }),
+    ], '2026-07', new Date(2026, 6, 31));
+    expect(out.budgetPct).toBe(80);
+    expect(out.overBy).toBe(-20);
+  });
+  it('ignores project-category budgets (income targets)', () => {
+    const target = { id: 'b2', amount: 5000, spent: 0, category: null, projectCategoryId: 'pc1' };
+    expect(spendingPace([target], [], '2026-07', new Date(2026, 6, 15)).hasBudgets).toBe(false);
+  });
   it('flags missing budgets', () => {
     expect(spendingPace([], [], '2026-07', new Date(2026, 6, 15)).hasBudgets).toBe(false);
   });
@@ -205,40 +403,29 @@ describe('fixedVariable', () => {
   });
 });
 
-describe('savingsSeries', () => {
-  const NOW = new Date(2026, 6, 3);
-  it('accumulates net and ramps the goal linearly', () => {
-    const out = savingsSeries([
-      tx({ date: '2026-01-05', amount: 2000 }), tx({ date: '2026-01-06', amount: -500 }),
-      tx({ date: '2026-02-05', amount: 1000 }),
-    ], NOW, 12000);
-    expect(out.points).toHaveLength(7);
-    expect(out.points[0].actual).toBe(1500);
-    expect(out.points[1].actual).toBe(2500);
-    expect(out.points[0].goal).toBe(1000);   // 12000 × 1/12
-    expect(out.points[6].goal).toBe(7000);   // 12000 × 7/12
-    expect(out.current).toBe(2500);
-    expect(out.onTrackPct).toBeCloseTo(35.7, 1); // 2500 / 7000
-  });
-  it('handles no goal', () => {
-    const out = savingsSeries([], NOW, null);
-    expect(out.goal).toBeNull();
-    expect(out.onTrackPct).toBeNull();
-    expect(out.points[0].goal).toBeNull();
-  });
-});
-
 describe('netWorthBreakdown', () => {
   it('sums assets minus liabilities with receivables', () => {
     const out = netWorthBreakdown(
       [acct({ id: 'a1', accountName: 'Chk', accountType: 'checking', balance: 5000 }),
        acct({ id: 'a2', accountName: 'CC', accountType: 'credit', balance: 1200 })],
-      [{ remaining: 300, status: 'open' }],
+      [debt({ remaining: 300, status: 'open' })],
       [], '2026-07',
     );
     expect(out.assets).toBe(5300);       // 5000 + 300 receivable
     expect(out.liabilities).toBe(1200);
     expect(out.total).toBe(4100);
+  });
+  it('treats open "owed" debts as a liability, not a receivable', () => {
+    const out = netWorthBreakdown(
+      [acct({ balance: 5000 })],
+      [debt({ remaining: 300, status: 'open', direction: 'lent' }),
+       debt({ remaining: 800, status: 'open', direction: 'owed' })],
+      [], '2026-07',
+    );
+    expect(out.assets).toBe(5300);         // 5000 + 300 receivable ('lent')
+    expect(out.liabilities).toBe(800);     // 800 payable ('owed')
+    expect(out.total).toBe(4500);
+    expect(out.liabilityItems).toContainEqual({ label: 'Debts you owe', value: 800, color: '#6B6B8A' });
   });
   it('approximates month delta from this month cash flow', () => {
     const out = netWorthBreakdown(
@@ -257,6 +444,67 @@ describe('netWorthBreakdown', () => {
     );
     expect(out.liabilities).toBe(1200);
     expect(out.total).toBe(3800);
+  });
+  it('exposes this month cash flow as a dollar amount', () => {
+    const out = netWorthBreakdown(
+      [acct({ balance: 5000 })], [],
+      [tx({ date: '2026-07-01', amount: 1000 })], '2026-07',
+    );
+    expect(out.monthNet).toBe(1000);
+  });
+});
+
+describe('assetMix', () => {
+  it('groups accounts by type and computes percentages', () => {
+    const out = assetMix(
+      [acct({ id: 'a1', accountName: 'Chase Checking', accountType: 'checking', balance: 3000 }),
+       acct({ id: 'a2', accountName: 'Ally Savings', accountType: 'savings', balance: 1000 }),
+       acct({ id: 'a3', accountName: 'Vanguard', accountType: 'investment', balance: 6000 })],
+      [],
+    );
+    expect(out).toHaveLength(3);
+    expect(out[0]).toMatchObject({ label: 'Investment Account', value: 6000, pct: 60 });
+    expect(out[0].accounts).toEqual([{ id: 'a3', label: 'Vanguard', value: 6000 }]);
+  });
+  it('merges multiple accounts of the same type into one group', () => {
+    const out = assetMix(
+      [acct({ id: 'a1', accountName: 'Chk 1', accountType: 'checking', balance: 1000 }),
+       acct({ id: 'a2', accountName: 'Chk 2', accountType: 'checking', balance: 500 })],
+      [],
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].value).toBe(1500);
+    expect(out[0].accounts).toHaveLength(2);
+  });
+  it('adds a receivables group for open lent debts, excludes paid ones', () => {
+    const out = assetMix([], [debt({ remaining: 300, status: 'open' }), debt({ remaining: 200, status: 'paid' })]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ label: 'Money owed to you', value: 300 });
+  });
+  it('excludes open "owed" debts from the receivables group', () => {
+    const out = assetMix([], [debt({ remaining: 300, status: 'open', direction: 'lent' }),
+      debt({ remaining: 900, status: 'open', direction: 'owed' })]);
+    expect(out).toHaveLength(1);
+    expect(out[0].value).toBe(300);
+  });
+  it('excludes liability accounts', () => {
+    const out = assetMix([acct({ accountType: 'credit', balance: 500 })], []);
+    expect(out).toHaveLength(0);
+  });
+});
+
+describe('netWorthTrend', () => {
+  const NOW = new Date(2026, 6, 15); // Jul 15 2026
+  it('walks backward from current using each month net cash flow, capped to start of year', () => {
+    const yearTx = [
+      tx({ date: '2026-06-01', amount: 500 }),
+      tx({ date: '2026-07-01', amount: 200 }),
+    ];
+    const out = netWorthTrend(10000, yearTx, NOW, 3);
+    expect(out.map((p) => p.month)).toEqual(['May', 'Jun', 'Jul']);
+    expect(out[2].value).toBe(10000);   // Jul (current)
+    expect(out[1].value).toBe(9800);    // before Jul's +200
+    expect(out[0].value).toBe(9300);    // before Jun's +500
   });
 });
 

@@ -1,7 +1,7 @@
 import LegalPageShell from '@/components/LegalPageShell';
 
 export const metadata = {
-  title: 'Privacy Policy — Cofre',
+  title: 'Privacy Policy',
   description: 'How Cofre collects, uses, and protects your data, including Gmail and bank account data.',
 };
 
@@ -11,13 +11,7 @@ function H2({ children }: { children: React.ReactNode }) {
 
 export default function PrivacyPolicyPage() {
   return (
-    <LegalPageShell title="Privacy Policy" updated="July 23, 2026">
-      <p>
-        <strong style={{ color: 'var(--color-text-primary)' }}>Draft notice:</strong> this is a first-draft privacy
-        policy describing what Cofre actually collects and does with your data today. It has not yet been reviewed
-        by a lawyer — treat it as accurate but not final.
-      </p>
-
+    <LegalPageShell title="Privacy Policy" updated="October 5, 2026">
       <p>
         Cofre (&ldquo;Cofre&rdquo;, &ldquo;we&rdquo;, &ldquo;us&rdquo;) is a personal budget tracker operated by
         Osmio Services. This policy explains what information we collect when you use the Cofre web app, why we
@@ -34,6 +28,14 @@ export default function PrivacyPolicyPage() {
         bank account, we receive your account name, type, balance, currency, and up to 90 days of transaction
         history from Plaid. The access token Plaid issues us is encrypted at rest (AES-256-GCM) and is never shown
         to us in readable form.</p>
+      <p><strong style={{ color: 'var(--color-text-primary)' }}>Ask Cofre (AI assistant)</strong> — when you use
+        Ask Cofre, your question and the data it looks up to answer it (transactions, categories, budgets, accounts,
+        debts and your net-worth goal) are sent to Anthropic, which provides the Claude model that writes the reply.
+        Your conversations are saved in your Cofre account so you can return to them. Ask Cofre can only propose
+        changes, which you must confirm; it cannot move money.</p>
+      <p><strong style={{ color: 'var(--color-text-primary)' }}>Payments (Stripe)</strong> — if you subscribe to a
+        paid plan, Stripe processes the payment. Your card details go directly to Stripe; Cofre never sees or stores
+        your card number. We keep your Stripe customer id and subscription status.</p>
       <p><strong style={{ color: 'var(--color-text-primary)' }}>Gmail data</strong> — if you connect Gmail, Cofre
         requests read-only access (<code>gmail.readonly</code>) to search for receipt, order-confirmation, and
         invoice emails whose subject line looks like a receipt, order confirmation, or invoice — regardless of
@@ -65,6 +67,10 @@ export default function PrivacyPolicyPage() {
       <ul className="list-disc pl-5 flex flex-col gap-1.5">
         <li><strong style={{ color: 'var(--color-text-primary)' }}>Plaid</strong> — bank account linking and
           transaction data.</li>
+        <li><strong style={{ color: 'var(--color-text-primary)' }}>Anthropic</strong> — provides the AI model behind
+          Ask Cofre, as described above.</li>
+        <li><strong style={{ color: 'var(--color-text-primary)' }}>Stripe</strong> — subscription payments and
+          billing.</li>
         <li><strong style={{ color: 'var(--color-text-primary)' }}>Google</strong> — Gmail and Google Sign-In, as
           described above.</li>
         <li><strong style={{ color: 'var(--color-text-primary)' }}>Resend</strong> — delivers transactional email
@@ -77,21 +83,35 @@ export default function PrivacyPolicyPage() {
       <p>You can disconnect Gmail or a bank account at any time from Settings → Integrations — this revokes our
         access token immediately. To delete your account and all associated data, contact us at the email below.</p>
 
-      <H2>6. Security</H2>
+      <H2>6. Cookies and local storage</H2>
+      <p>Cofre uses one essential cookie, <code>access_token</code>, to keep you signed in. It is
+        <code> httpOnly</code>, so scripts on the page can&rsquo;t read it. Your browser&rsquo;s local storage keeps
+        display preferences such as your chosen theme. We don&rsquo;t use advertising cookies or third-party ad
+        trackers.</p>
+
+      <H2>7. Data retention and deletion</H2>
+      <p>We keep your data for as long as your account is open. You can erase your financial data at any time from
+        Settings → Data &amp; Privacy. When you ask us to delete your account, we delete your account and its data from our
+        production database within 30 days. Copies in encrypted backups expire on their normal schedule. Payment
+        records held by Stripe are kept as required by tax and accounting law. Disconnecting Gmail or a bank revokes
+        our access token immediately.</p>
+
+      <H2>8. Security</H2>
       <p>Passwords are hashed with bcrypt and never stored in plain text. OAuth tokens for Gmail and bank
         connections are encrypted at rest with AES-256-GCM. All traffic to Cofre is encrypted in transit (HTTPS).
         No security measure is perfect, and we cannot guarantee absolute security.</p>
 
-      <H2>7. Children&rsquo;s privacy</H2>
-      <p>Cofre is not directed to children under 13, and we do not knowingly collect data from them.</p>
+      <H2>9. Children&rsquo;s privacy</H2>
+      <p>Cofre is for adults (18+) and is not directed to children. We do not knowingly collect data from
+        children under 13.</p>
 
-      <H2>8. Changes to this policy</H2>
+      <H2>10. Changes to this policy</H2>
       <p>We may update this policy as Cofre changes. We&rsquo;ll update the &ldquo;Last updated&rdquo; date above
         when we do.</p>
 
-      <H2>9. Contact</H2>
+      <H2>11. Contact</H2>
       <p>Questions about this policy or your data? Email{' '}
-        <a href="mailto:support@cofre.app" style={{ color: 'var(--color-primary)' }}>support@cofre.app</a>.</p>
+        <a href="mailto:support@budgetcofre.com" style={{ color: 'var(--color-primary)' }}>support@budgetcofre.com</a>.</p>
     </LegalPageShell>
   );
 }

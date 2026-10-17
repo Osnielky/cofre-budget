@@ -1,17 +1,39 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User)
     private repo: Repository<User>,
   ) {}
 
   findById(id: string): Promise<User | null> {
+    // findOneBy drops undefined keys from the WHERE, which would return the first user.
+    if (!id) return Promise.resolve(null);
     return this.repo.findOneBy({ id });
+  }
+
+  /**
+   * Records activity for admin "active users" counts. At most one write per user
+   * per hour (the WHERE skips fresh rows), never bumps updatedAt, and never
+   * rejects: callers fire and forget it.
+   */
+  async touchLastSeen(id: string, now: Date = new Date()): Promise<void> {
+    try {
+      await this.repo.createQueryBuilder()
+        .update(User)
+        .set({ lastSeenAt: now, updatedAt: () => '"updatedAt"' })
+        .where('id = :id', { id })
+        .andWhere('("lastSeenAt" IS NULL OR "lastSeenAt" < :stale)', { stale: new Date(now.getTime() - 60 * 60 * 1000) })
+        .execute();
+    } catch (err) {
+      this.logger.warn(`touchLastSeen failed: ${(err as Error).message}`);
+    }
   }
 
   findByEmail(email: string): Promise<User | null> {
@@ -65,6 +87,14 @@ export class UsersService {
 
     user = await this.repo.findOneBy({ email: profile.email });
     if (user) {
+      // An unverified account's password and name were set by whoever
+      // registered the address — possibly not its owner. Google has just
+      // proven ownership, so that password must not keep working; the owner
+      // can set one with "forgot password".
+      if (!user.emailVerified) {
+        await this.repo.update(user.id, { password: null as unknown as string });
+        user.name = profile.name;
+      }
       user.googleId = profile.id;
       if (!user.name) user.name = profile.name;
       if (!user.avatarUrl && profile.avatarUrl) user.avatarUrl = profile.avatarUrl;
@@ -81,18 +111,9 @@ export class UsersService {
     }));
   }
 
-  async updateProfile(id: string, data: { name?: string; savingsGoal?: number | null }): Promise<User> {
+  async updateProfile(id: string, data: { name?: string }): Promise<User> {
     const patch: Partial<User> = {};
     if (typeof data.name === 'string') patch.name = data.name.trim();
-    if (data.savingsGoal !== undefined) {
-      if (data.savingsGoal === null) {
-        patch.savingsGoal = null;
-      } else {
-        const n = Number(data.savingsGoal);
-        if (!Number.isFinite(n) || n < 0) throw new BadRequestException('savingsGoal must be a non-negative number');
-        patch.savingsGoal = n.toFixed(2);
-      }
-    }
     if (Object.keys(patch).length) await this.repo.update(id, patch);
     return this.repo.findOneByOrFail({ id });
   }

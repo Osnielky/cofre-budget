@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { parseMoneyInput, formatMoney, applyPercent, toCents } from './money';
-import { computePlan, deriveRow, statusOf, usagePercent, sliderScale, filterRows, sortRows, projectExpenses, type BudgetSource } from './calculations';
+import { computePlan, projectMonthExpenses, deriveRow, statusOf, usagePercent, sliderScale, filterRows, sortRows, projectExpenses, type BudgetSource } from './calculations';
 import { draftReducer, emptyDraft, previewAdjust, canUndo, type DraftState } from './draft';
 import { buildBatchPayload, saveBudgetBatch } from './persist';
 import { assemble, dailySeries, monthFraction, type ServerBudget } from './assemble';
@@ -83,6 +83,13 @@ describe('calculations', () => {
     const many = Array.from({ length: 10 }, (_, i) => src(`k${i}`, `K${i}`, 0.1, 0));
     const p = computePlan({ ...BASE, sources: many, drafts: {} });
     expect(p.totalBudgetCents).toBe(100); // 0.1 × 10 is exactly $1.00
+  });
+  it('projects fixed categories at actual and flexible ones at the run-rate', () => {
+    const rows = [deriveRow(src('f', 'Rent', 1000, 1000, { isFixed: true }), {}), deriveRow(src('v', 'Food', 300, 100), {})];
+    // half the month gone: rent stays $1000, food doubles to $200, $50 uncategorized stays $50
+    expect(projectMonthExpenses(rows, 115000, 0.5)).toBe(100000 + 20000 + 5000);
+    // future month: the plan is the projection
+    expect(projectMonthExpenses([deriveRow(src('v', 'Food', 300, 0), {})], 0, 0)).toBe(30000);
   });
   it('projects with the run-rate method, using the plan for future months', () => {
     expect(projectExpenses(1000, 0.5, 9999)).toBe(2000);

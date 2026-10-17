@@ -18,6 +18,10 @@ export class AuthService {
   private get jwtSecret(): string {
     return this.config.get<string>('JWT_SECRET') as string;
   }
+  // Separate key so a verification link can never pass as any other token.
+  private get verifySecret(): string {
+    return `${this.jwtSecret}:verify-email`;
+  }
   private get frontendUrl(): string {
     return this.config.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }
@@ -32,7 +36,7 @@ export class AuthService {
   login(user: User) {
     const { password: _p, ...safeUser } = user as any;
     return {
-      access_token: this.jwtService.sign({ sub: user.id, email: user.email }),
+      access_token: this.jwtService.sign({ sub: user.id, email: user.email, typ: 'access' }),
       user: safeUser,
     };
   }
@@ -54,7 +58,7 @@ export class AuthService {
   private async sendVerificationLink(user: User): Promise<void> {
     const token = this.jwtService.sign(
       { sub: user.id, purpose: 'verify' },
-      { secret: this.jwtSecret, expiresIn: '24h' },
+      { secret: this.verifySecret, expiresIn: '24h' },
     );
     const link = `${this.frontendUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
     await this.mail.sendVerification(user.email, user.name, link);
@@ -68,7 +72,7 @@ export class AuthService {
   // Returns the FRONTEND_URL the controller should redirect to.
   async verifyEmail(token: string): Promise<string> {
     try {
-      const payload = this.jwtService.verify<{ sub: string; purpose: string }>(token, { secret: this.jwtSecret });
+      const payload = this.jwtService.verify<{ sub: string; purpose: string }>(token, { secret: this.verifySecret });
       if (payload.purpose !== 'verify') throw new Error('bad purpose');
       await this.usersService.markEmailVerified(payload.sub);
       return `${this.frontendUrl}/login?verified=1`;
@@ -79,10 +83,11 @@ export class AuthService {
 
   async requestPasswordReset(email: string): Promise<void> {
     const user = await this.usersService.findByEmailWithPassword(email);
-    if (!user?.password) return; // no account, or Google-only: silent (enumeration-safe)
+    if (!user) return; // no account with that email: silent (enumeration-safe)
+    // Google-only accounts have no password yet — reuse this flow to let them set one.
     const token = this.jwtService.sign(
       { sub: user.id, purpose: 'reset' },
-      { secret: this.jwtSecret + user.password, expiresIn: '1h' },
+      { secret: this.jwtSecret + (user.password ?? user.id), expiresIn: '1h' },
     );
     const link = `${this.frontendUrl}/reset-password?token=${encodeURIComponent(token)}`;
     await this.mail.sendPasswordReset(user.email, user.name, link);
@@ -93,9 +98,11 @@ export class AuthService {
     const decoded = this.jwtService.decode(token) as { sub?: string } | null;
     if (!decoded?.sub) throw new BadRequestException('Invalid or expired link.');
     const user = await this.usersService.findByIdWithPassword(decoded.sub);
-    if (!user?.password) throw new BadRequestException('Invalid or expired link.');
+    if (!user) throw new BadRequestException('Invalid or expired link.');
     try {
-      const payload = this.jwtService.verify<{ purpose: string }>(token, { secret: this.jwtSecret + user.password });
+      const payload = this.jwtService.verify<{ purpose: string }>(token, {
+        secret: this.jwtSecret + (user.password ?? user.id),
+      });
       if (payload.purpose !== 'reset') throw new Error('bad purpose');
     } catch {
       throw new BadRequestException('Invalid or expired link.');

@@ -24,14 +24,39 @@ export class User {
   avatarUrl: string;
 
   @Column({ default: 'free' })
-  plan: 'free' | 'pro';
+  plan: 'free' | 'pro' | 'elite';
 
-  /* Yearly savings goal in dollars; null = not set */
+  /* Set the first time this user ever starts Stripe Checkout — lets checkout/webhook
+     code reuse one Stripe Customer across repeat attempts and upgrades/downgrades. */
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  stripeCustomerId: string | null;
+
+  /* User-set date for reaching the $1,000,000 net-worth mission; null = not set */
+  @Column({ type: 'date', nullable: true, default: null })
+  netWorthGoalTargetDate: string | null;
+
+  /* Net worth snapshot captured the moment netWorthGoalTargetDate was first set */
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true, default: null })
-  savingsGoal: string | null;
+  netWorthGoalBaselineValue: string | null;
+
+  /* Date netWorthGoalBaselineValue was captured */
+  @Column({ type: 'date', nullable: true, default: null })
+  netWorthGoalBaselineDate: string | null;
 
   @Column({ default: false })
   emailVerified: boolean;
+
+  /* Plaid's persistent user identifier (from /user/create) — required by
+     linkTokenCreate's `user_id` field for integrations approved after Dec 10, 2025
+     (see PlaidService.getOrCreatePlaidUserId). Null until the user's first Plaid
+     connection attempt. */
+  @Column({ type: 'varchar', nullable: true, default: null })
+  plaidUserId: string | null;
+
+  /* Last authenticated request, refreshed at most hourly (UsersService.touchLastSeen).
+     Null until the user's first request after this column shipped. */
+  @Column({ type: Date, nullable: true, default: null })
+  lastSeenAt: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;

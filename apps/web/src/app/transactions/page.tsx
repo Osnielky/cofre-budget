@@ -2,28 +2,85 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import dynamic from 'next/dynamic';
+import RecurringPanel, { emptyRecurring, occurrenceDates, type RecurringState } from '@/components/RecurringPanel';
+import DatePicker from '@/components/DatePicker';
 import Sidebar from '@/components/Sidebar';
+import Avatar from '@/components/Avatar';
+import { useUser } from '@/components/UserProvider';
 import CsvImportModal from '@/components/CsvImportModal';
 import ImportReconcileModal from '@/components/ImportReconcileModal';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
+import LinkIcon from '@/components/LinkIcon';
+import InfoIcon from '@/components/InfoIcon';
 import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiability } from '@/lib/accountTypes';
-import SplitTransactionModal from '@/components/SplitTransactionModal';
-import FindReceiptModal from '@/components/FindReceiptModal';
+// Lazy: pulls in @dnd-kit (~19 KB gz) only when someone opens the split modal.
+const SplitTransactionModal = dynamic(() => import('@/components/SplitTransactionModal'), { ssr: false });
 import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
 import { buildRecurringMap, normalize } from './recurring';
+import { pickProjectSuggestion } from '@/lib/transactions/suggestions';
+import { isClosed, closureKind, selectableProjects } from '@/lib/projects/closure';
+import LinkTransferModal from '@/components/LinkTransferModal';
 import StatStrip from './StatStrip';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
+/* Mirrors DELETABLE_SOURCES in the API's TransactionsService. Plaid rows are
+   owned by the bank feed — the next sync would bring a deleted one back — so
+   they get no delete control rather than one that fails. */
+const DELETABLE_SOURCES = new Set(['manual', 'recurring', 'csv']);
+
+interface PickerPos { top: number; left: number; width: number; maxHeight: number; origin: string }
+
+/** Where to put the category picker for a given trigger.
+ *
+ *  It scales with the viewport rather than using a fixed 220x360 box, and when
+ *  neither side of the trigger has room for a usable list it centres the panel
+ *  instead of squeezing it into a sliver. Always clamped inside the viewport.
+ */
+function placePicker(rect: DOMRect): PickerPos {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const GAP = 8;
+  const MARGIN = 16;
+  /** Below this the list is too short to scan; centre instead of anchoring. */
+  const COMFORTABLE = 340;
+
+  const width = Math.round(Math.min(460, Math.max(280, vw - MARGIN * 2)));
+  const cap = Math.round(Math.min(620, vh - MARGIN * 2));
+
+  const spaceBelow = vh - rect.bottom - GAP - MARGIN;
+  const spaceAbove = rect.top - GAP - MARGIN;
+
+  // Right-align to the trigger, then keep the whole panel on screen.
+  const left = Math.round(Math.min(Math.max(MARGIN, rect.right - width), vw - width - MARGIN));
+
+  /** Keep the panel fully on screen — the trigger itself may be scrolled out of view. */
+  const clampTop = (top: number, h: number) =>
+    Math.round(Math.min(Math.max(MARGIN, top), Math.max(MARGIN, vh - h - MARGIN)));
+
+  if (spaceBelow >= Math.min(cap, COMFORTABLE)) {
+    const maxHeight = Math.min(cap, spaceBelow);
+    return { top: clampTop(rect.bottom + GAP, maxHeight), left, width, maxHeight, origin: 'top right' };
+  }
+  if (spaceAbove >= Math.min(cap, COMFORTABLE)) {
+    const maxHeight = Math.min(cap, spaceAbove);
+    return { top: clampTop(rect.top - GAP - maxHeight, maxHeight), left, width, maxHeight, origin: 'bottom right' };
+  }
+  // Neither side fits: centre it vertically so the full list is usable.
+  const maxHeight = Math.min(cap, vh - MARGIN * 2);
+  return { top: clampTop((vh - maxHeight) / 2, maxHeight), left, width, maxHeight, origin: 'center' };
+}
+
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null; last4?: string | null }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
-interface Project { id: string; name: string; icon: string; color: string; status: string; type?: string; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[] }
+interface Project { id: string; name: string; icon: string; color: string; status: string; type?: string; imageUrl?: string | null; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[] }
 interface TransferMatch { id: string; name: string; amount: number; date: string; bankAccount: BankAccount | null }
 interface Transaction {
-  id: string; name: string; amount: number; date: string; source: string; pending: boolean;
+  id: string; name: string; merchantName: string | null; amount: number; date: string; source: string; pending: boolean;
   categoryId: string | null; categoryRef: Category | null;
   bankAccountId: string; bankAccount: BankAccount | null;
   projectId: string | null;
@@ -36,11 +93,19 @@ interface Transaction {
   isSplitParent: boolean;
   note: string | null;
   receiptId: string | null;
+  categorizedByRuleId: string | null;
+  categorizedByRule: { id: string; matchValue: string } | null;
 }
 interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid'; direction: 'lent' | 'owed' }
 
 type Filter    = 'all' | 'uncategorized' | 'expense' | 'income' | 'recurring';
 type RangeMode = 'month' | 'custom';
+
+type RuleToast =
+  | { kind: 'created'; matchLabel: string; matchStrategy?: 'exact' | 'prefix' }
+  | { kind: 'duplicate'; matchLabel: string }
+  | { kind: 'error'; matchLabel: string; reason?: string }
+  | { kind: 'categorized'; tx: Transaction; categoryId: string; categoryLabel: string; categoryIcon?: string };
 
 const glass: React.CSSProperties = {
   background: 'var(--color-surface)',
@@ -83,6 +148,7 @@ const TYPE_META: Record<string, string> = { savings: '🏦', investment: '📈',
 
 /* ═══════════════════════════════════════════════════════════════ */
 export default function TransactionsPage() {
+  const { user } = useUser();
   const [month, setMonth]           = useState(currentMonth);
   const [rangeMode, setRangeMode]   = useState<RangeMode>('month');
   const [customFrom, setCustomFrom] = useState('');
@@ -92,6 +158,7 @@ export default function TransactionsPage() {
   const [prevTransactions, setPrevTransactions] = useState<Transaction[]>([]);
   const [sortMode, setSortMode] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
   const [accountFilter, setAccountFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [categories, setCategories]     = useState<Category[]>([]);
   const [accounts, setAccounts]         = useState<BankAccount[]>([]);
   const [projects, setProjects]         = useState<Project[]>([]);
@@ -100,7 +167,7 @@ export default function TransactionsPage() {
   const [filter, setFilter]             = useState<Filter>('all');
   const [search, setSearch]             = useState('');
   const [openPickerId, setOpenPickerId] = useState<string | null>(null);
-  const [pickerPos, setPickerPos]       = useState<{ top: number; left: number; maxHeight: number } | null>(null);
+  const [pickerPos, setPickerPos]       = useState<PickerPos | null>(null);
   const [updatingId, setUpdatingId]     = useState<string | null>(null);
   const [importAccount, setImportAccount]       = useState<BankAccount | null>(null);
   const [showImportPicker, setShowImportPicker] = useState(false);
@@ -117,6 +184,12 @@ export default function TransactionsPage() {
   const [pickerShowPurchasePrompt, setPickerShowPurchasePrompt] = useState(false);
   const [pickerTransferStep, setPickerTransferStep]   = useState(false);
   const [pickerSearch, setPickerSearch]               = useState('');
+  const [rowMenuTxId, setRowMenuTxId] = useState<string | null>(null);
+  const [rowMenuPos, setRowMenuPos]   = useState<{ top: number; left: number } | null>(null);
+  const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
+  const rowMenuRef = useRef<HTMLDivElement>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
   const [transferMatches, setTransferMatches]         = useState<TransferMatch[]>([]);
   const [transferMatchesLoading, setTransferMatchesLoading] = useState(false);
   const [linkingProj, setLinkingProj]                 = useState(false);
@@ -125,7 +198,6 @@ export default function TransactionsPage() {
   const [transferModal, setTransferModal]             = useState<{ tx: Transaction; categoryId: string } | null>(null);
   const [transferModalMatches, setTransferModalMatches] = useState<Transaction[]>([]);
   const [transferModalLoading, setTransferModalLoading] = useState(false);
-  const [transferModalSelected, setTransferModalSelected] = useState<string | null>(null); // tx id
   const [markAsSaleConfirm, setMarkAsSaleConfirm]     = useState<string | null>(null); // projectId
   const [markAsSaleSaving, setMarkAsSaleSaving]       = useState(false);
 
@@ -136,17 +208,26 @@ export default function TransactionsPage() {
   const [manualTxError, setManualTxError] = useState('');
   const [manualAccOpen, setManualAccOpen] = useState(false);
   const [manualCatOpen, setManualCatOpen] = useState(false);
+  const [manualCatSearch, setManualCatSearch] = useState('');
   const today = new Date().toISOString().slice(0, 10);
-  const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
+  const EMPTY_MANUAL_TX = { name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '', projectId: '', projectCategoryId: '' };
+  const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '', projectId: '', projectCategoryId: '' });
+  const [recurring, setRecurring] = useState<RecurringState>(() => emptyRecurring(new Date().toISOString().slice(0, 10)));
   const [debts, setDebts] = useState<DebtLite[]>([]);
   const [splitTx, setSplitTx] = useState<Transaction | null>(null);
-  const [receiptTx, setReceiptTx] = useState<Transaction | null>(null);
-  const [splitInitialLines, setSplitInitialLines] = useState<{ categoryId: string; amount: string }[] | null>(null);
   const [selectedTx, setSelectedTx]       = useState<Transaction | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionStore>({});
 
   const [importToast, setImportToast] = useState<{ imported: number; skipped: number; account: { bankName: string; accountName: string; accountType: string; color: string } } | null>(null);
   const importToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [ruleToast, setRuleToast] = useState<RuleToast | null>(null);
+  const ruleToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* Only open projects can be picked. `projects` stays complete on purpose —
+     every row pill and the detail panel look a project up by id, so a closed
+     project must still resolve or historical transactions lose their label. */
+  const openProjects = useMemo(() => selectableProjects(projects), [projects]);
 
   /* name → most-recently-used category (cross-period, loaded once) */
   const [categoryHints, setCategoryHints] = useState<Record<string, { id: string; name: string; icon: string; color: string }>>({});
@@ -187,6 +268,21 @@ export default function TransactionsPage() {
 
   const from = rangeMode === 'month' ? monthFrom(month) : customFrom;
   const to   = rangeMode === 'month' ? monthTo(month)   : customTo;
+
+  /* A bulk import (e.g. six months of brokerage history) often lands entirely
+     outside the currently-viewed month — switch to a custom range covering it
+     and scope the account filter to what was just imported, so the list isn't
+     left showing "No transactions found" right after a successful import. */
+  function jumpToImportedRange(result: { account: { id: string }; dateRange: { from: string; to: string } | null }) {
+    if (!result.dateRange) return;
+    const alreadyVisible = result.dateRange.from >= from && result.dateRange.to <= to;
+    if (!alreadyVisible) {
+      setRangeMode('custom');
+      setCustomFrom(result.dateRange.from);
+      setCustomTo(result.dateRange.to);
+    }
+    setAccountFilter(result.account.id);
+  }
 
   /* Previous window (for stat deltas + insight card): previous month, or the
      same-length span immediately before a custom range. */
@@ -246,6 +342,46 @@ export default function TransactionsPage() {
 
   useEffect(() => { loadTransactions(); }, [loadTransactions]);
 
+  /* Escape closes the category picker — it can be a large centred panel now,
+     so leaving the keyboard with no way out would be a trap. */
+  useEffect(() => {
+    if (!openPickerId) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setOpenPickerId(null);
+      setPickerProjectDrill(null);
+      setPickerTransferStep(false);
+      setPickerSearch('');
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [openPickerId]);
+
+  /* The picker is position:fixed against a rect captured at open time, so an
+     outside scroll or a resize detaches it from its row. Close on both.
+     Scrolling the picker's OWN list must not close it. */
+  useEffect(() => {
+    if (!openPickerId) return;
+    const close = () => {
+      setOpenPickerId(null);
+      setPickerProjectDrill(null);
+      setPickerTransferStep(false);
+      setPickerSearch('');
+    };
+    const onScroll = (e: Event) => {
+      const t = e.target as Node;
+      if (pickerRef.current && (pickerRef.current === t || pickerRef.current.contains(t))) return;
+      close();
+    };
+    window.addEventListener('resize', close);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      window.removeEventListener('resize', close);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [openPickerId]);
+
   /* close pickers on outside click */
   useEffect(() => {
     function onDown(e: MouseEvent) {
@@ -270,8 +406,32 @@ export default function TransactionsPage() {
     return () => document.removeEventListener('mousedown', onDown);
   }, [openPickerId, showImportPicker]);
 
-  /* ── category assign ── */
-  async function assignCategory(txId: string, categoryId: string | null, keepOpen = false) {
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (rowMenuTxId && rowMenuRef.current && !rowMenuRef.current.contains(e.target as Node)) {
+        setRowMenuTxId(null);
+        setDeleteConfirmId(null);
+      }
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [rowMenuTxId]);
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (notifOpen && notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [notifOpen]);
+
+  /* ── category assign ──
+     Returns true if the assignment request succeeded, false otherwise, so
+     callers can decide whether it's safe to proceed with a dependent action
+     like creating a categorization rule. */
+  async function assignCategory(txId: string, categoryId: string | null, keepOpen = false): Promise<boolean> {
     setUpdatingId(txId);
     if (!keepOpen) setOpenPickerId(null);
 
@@ -293,6 +453,10 @@ export default function TransactionsPage() {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       credentials: 'include', body: JSON.stringify({ categoryId }),
     });
+    if (!res.ok) {
+      setUpdatingId(null);
+      return false;
+    }
     const updated: Transaction = await res.json();
     const counterpartId = !categoryId ? txBefore?.counterpartTxId : null;
     setTransactions((prev) => prev.map((t) => {
@@ -301,6 +465,8 @@ export default function TransactionsPage() {
         categoryId: updated.categoryId,
         categoryRef: updated.categoryRef,
         debtId: updated.debtId ?? null,
+        categorizedByRuleId: updated.categorizedByRuleId ?? null,
+        categorizedByRule: updated.categorizedByRule ?? null,
         ...(!categoryId && { transferAccountId: null, transferAccount: null, counterpartTxId: null }),
       };
       if (counterpartId && t.id === counterpartId) return {
@@ -317,6 +483,63 @@ export default function TransactionsPage() {
       }
     }
     setUpdatingId(null);
+    if (categoryId && updated.categoryRef && updated.categoryRef.type !== 'transfer') {
+      if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current);
+      const mergedTx: Transaction = { ...(txBefore as Transaction), ...updated };
+      setRuleToast({ kind: 'categorized', tx: mergedTx, categoryId, categoryLabel: updated.categoryRef.name, categoryIcon: updated.categoryRef.icon });
+      ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+    } else {
+      setRuleToast((prev) => (prev?.kind === 'categorized' && prev.tx.id === txId ? null : prev));
+    }
+    return true;
+  }
+
+  async function createRule(tx: Transaction, categoryId: string) {
+    const matchLabel = tx.merchantName || tx.name;
+    const res = await fetch(`${API}/categorization-rules`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      credentials: 'include', body: JSON.stringify({ transactionId: tx.id, categoryId }),
+    });
+    if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current);
+    if (res.status === 409) {
+      setRuleToast({ kind: 'duplicate', matchLabel });
+      ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+      return;
+    }
+    if (!res.ok) {
+      setRuleToast({ kind: 'error', matchLabel });
+      ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+      return;
+    }
+    const rule = await res.json();
+    setRuleToast({
+      kind: 'created',
+      matchLabel: rule?.matchValue || matchLabel,
+      matchStrategy: rule?.matchStrategy,
+    });
+    ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+    // No refetch: the rule changes nothing that is already on screen.
+  }
+
+  async function uncategorizeOne(tx: Transaction) {
+    setRowMenuTxId(null);
+    await assignCategory(tx.id, null);
+  }
+
+  async function deleteRuleFromRow(tx: Transaction) {
+    if (!tx.categorizedByRuleId) return;
+    const matchLabel = tx.categorizedByRule?.matchValue || tx.merchantName || tx.name;
+    setDeletingRuleId(tx.categorizedByRuleId);
+    setRowMenuTxId(null);
+    const res = await fetch(`${API}/categorization-rules/${tx.categorizedByRuleId}`, { method: 'DELETE', credentials: 'include' });
+    setDeletingRuleId(null);
+    if (!res.ok) {
+      if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current);
+      setRuleToast({ kind: 'error', matchLabel, reason: `Couldn't delete the rule for "${matchLabel}".` });
+      ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+      return;
+    }
+    loadTransactions();
   }
 
   async function assignDebt(txId: string, debtId: string | null) {
@@ -360,9 +583,40 @@ export default function TransactionsPage() {
         setTransactions((prev) => prev.map((t) => t.id === editingTxId ? { ...t, ...updated } : t));
         setShowManualTx(false);
         setEditingTxId(null);
-        setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
+        setManualTx(EMPTY_MANUAL_TX);
         return;
       }
+      // A recurring transaction is a rule, not a row: the server materialises
+      // occurrences as their dates arrive. Reload afterwards so any already-due
+      // ones show up.
+      if (recurring.enabled) {
+        const res = await fetch(`${API}/transactions/recurring`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            name: manualTx.name,
+            amount: finalAmount,
+            categoryId: manualTx.debtId ? null : (manualTx.categoryId || null),
+            bankAccountId: manualTx.bankAccountId,
+            note: manualTx.note || null,
+            interval: recurring.interval,
+            unit: recurring.unit,
+            dayOfMonth: recurring.unit === 'month' || recurring.unit === 'year' ? recurring.dayOfMonth : null,
+            startDate: recurring.startDate,
+            endDate: recurring.endMode === 'on' ? (recurring.endDate || null) : null,
+            occurrenceCount: recurring.endMode === 'after' ? recurring.count : null,
+            recordFirstNow: recurring.recordFirst,
+          }),
+        });
+        if (!res.ok) { setManualTxError('Could not save the recurring transaction.'); return; }
+        await loadTransactions();
+        setShowManualTx(false);
+        setManualTx(EMPTY_MANUAL_TX);
+        setRecurring(emptyRecurring(today));
+        return;
+      }
+
       const res = await fetch(`${API}/transactions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -372,24 +626,66 @@ export default function TransactionsPage() {
           amount: finalAmount,
           date: manualTx.date,
           bankAccountId: manualTx.bankAccountId,
-          categoryId: manualTx.debtId ? null : (manualTx.categoryId || null),
+          categoryId: manualTx.debtId || manualTx.projectCategoryId ? null : (manualTx.categoryId || null),
           debtId: manualTx.debtId || null,
           note: manualTx.note || null,
+          projectId: manualTx.projectId || null,
+          projectCategoryId: manualTx.projectCategoryId || null,
         }),
       });
       if (!res.ok) return;
       const created: Transaction = await res.json();
       setTransactions((prev) => [created, ...prev]);
       setShowManualTx(false);
-      setManualTx({ name: '', amountStr: '', sign: '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '' });
+      setManualTx(EMPTY_MANUAL_TX);
     } finally {
       setManualTxSaving(false);
     }
   }
 
+  /** Write the transfer note onto both legs so it reads the same from either side. */
+  async function saveTransferNote(ids: (string | null)[], note: string) {
+    await Promise.all(ids.filter(Boolean).map((id) =>
+      fetch(`${API}/transactions/${id}/note`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify({ note }),
+      }).catch(() => undefined),
+    ));
+    loadTransactions();
+  }
+
+  /** Load a transaction back into the manual modal for editing. */
+  function openEditModal(tx: Transaction) {
+    setEditingTxId(tx.id);
+    setManualTx({
+      name: tx.name,
+      amountStr: String(Math.abs(Number(tx.amount))),
+      sign: Number(tx.amount) >= 0 ? '+' : '-',
+      date: tx.date,
+      bankAccountId: tx.bankAccountId ?? '',
+      categoryId: tx.categoryId ?? '',
+      debtId: tx.debtId ?? '',
+      note: tx.note ?? '',
+      projectId: tx.projectId ?? '',
+      projectCategoryId: tx.projectCategoryId ?? '',
+    });
+    setManualTxError('');
+    setShowManualTx(true);
+  }
+
   async function deleteManualTx(id: string) {
     const tx = transactions.find((t) => t.id === id);
-    await fetch(`${API}/transactions/${id}`, { method: 'DELETE', credentials: 'include' });
+    const res = await fetch(`${API}/transactions/${id}`, { method: 'DELETE', credentials: 'include' });
+    if (!res.ok) {
+      // The row stays put rather than vanishing from a delete that never landed.
+      const reason = await res.json().then((b) => b?.message).catch(() => null);
+      if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current);
+      setRuleToast({ kind: 'error', matchLabel: tx?.name ?? '', reason: reason || "Couldn't delete this transaction." });
+      ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
+      setDeleteConfirmId(null);
+      setRowMenuTxId(null);
+      return;
+    }
     setTransactions((prev) => prev
       .filter((t) => t.id !== id)
       .map((t) => t.id === tx?.counterpartTxId
@@ -581,6 +877,8 @@ export default function TransactionsPage() {
   /* ── derived data ── */
   // Excluded from income/expense totals: transfers between own accounts, and debt repayments
   const isTransfer = (t: Transaction) => t.categoryRef?.type === 'transfer' || !!t.debtId;
+  /** Neither income nor spending: transfers plus money moved into savings. */
+  const isNonSpending = (t: Transaction) => isTransfer(t) || t.categoryRef?.type === 'savings';
   const openDebts = debts.filter((d) => d.status === 'open');
   const uncategorizedCount = transactions.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
   /* Current + previous window: gives buildRecurringMap the ≥2 months it needs
@@ -602,10 +900,11 @@ export default function TransactionsPage() {
   const isRecurringTx = (t: Transaction) => Number(t.amount) < 0 && recurringMap.has(normalize(t.name));
   const visible = transactions.filter((t) => {
     if (filter === 'uncategorized' && (t.categoryId || t.projectId || isTransfer(t))) return false;
-    if (filter === 'expense'       && (Number(t.amount) >= 0 || isTransfer(t))) return false;
-    if (filter === 'income'        && (Number(t.amount) < 0  || isTransfer(t))) return false;
+    if (filter === 'expense'       && (Number(t.amount) >= 0 || isNonSpending(t))) return false;
+    if (filter === 'income'        && (Number(t.amount) < 0  || isNonSpending(t))) return false;
     if (filter === 'recurring'     && !isRecurringTx(t)) return false;
     if (accountFilter !== 'all'    && t.bankAccountId !== accountFilter) return false;
+    if (categoryFilter !== 'all'   && t.categoryId !== categoryFilter) return false;
     if (search && !t.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -661,14 +960,39 @@ export default function TransactionsPage() {
 
       <main className="flex-1 overflow-y-auto min-w-0 pt-14 md:pt-0">
 
-        {/* ── Sticky header ── */}
-        <div className="sticky top-14 md:top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-4"
+        {/* ── Sticky header (desktop only — too tall to pin on narrow viewports) ── */}
+        <div className="md:sticky md:top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-4"
           style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
 
           {/* Title + actions */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Track, review and organize your money</p>
+            </div>
             <div className="flex items-center gap-2">
+              {/* Notifications */}
+              <div className="relative" ref={notifRef}>
+                <button onClick={() => setNotifOpen((v) => !v)}
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
+                  style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+                  title="Notifications">
+                  <BellIcon />
+                </button>
+                {notifOpen && (
+                  <div className="absolute right-0 top-full mt-2 z-30 rounded-2xl overflow-hidden"
+                    style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', width: '260px' }}>
+                    <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                      <p className="text-sm font-semibold">Notifications</p>
+                    </div>
+                    <div className="px-4 py-6 text-center">
+                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No notifications yet</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Avatar */}
+              <Avatar name={user?.name} email={user?.email} src={user?.avatarUrl} size={32} rounded={12} />
               {/* New manual transaction */}
               <button onClick={() => { setManualTxError(''); setShowManualTx(true); }}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
@@ -955,34 +1279,13 @@ export default function TransactionsPage() {
             loading={loading}
           />
 
-          {/* ── Uncategorized alert ── */}
-          {!loading && uncategorizedCount > 0 && (
-            <button onClick={() => setFilter('uncategorized')}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-left w-full transition-opacity hover:opacity-80"
-              style={{ background: 'color-mix(in srgb, var(--color-amber) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 25%, transparent)' }}>
-              <span className="text-lg">🏷️</span>
-              <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: 'var(--color-amber)' }}>
-                  {uncategorizedCount} transaction{uncategorizedCount !== 1 ? 's' : ''} without a category
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                  Assign categories so your budgets track spending correctly.
-                </p>
-              </div>
-              <span className="text-xs font-bold px-2 py-1 rounded-lg shrink-0"
-                style={{ background: 'color-mix(in srgb, var(--color-amber) 16%, transparent)', color: 'var(--color-amber)' }}>
-                Review →
-              </span>
-            </button>
-          )}
-
-          {/* ── Search + filter tabs ── */}
+          {/* ── Search + filters ── */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="relative flex-1 min-w-44">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
                 style={{ color: 'var(--color-text-muted)' }}><SearchIcon /></span>
               <input value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name…"
+                placeholder="Search merchants or notes"
                 className="w-full pl-9 pr-3 py-2 text-sm outline-none rounded-xl"
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
             </div>
@@ -1004,25 +1307,62 @@ export default function TransactionsPage() {
                 <option key={a.id} value={a.id}>{a.bankName} · {a.accountName}</option>
               ))}
             </select>
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+              aria-label="Filter by category"
+              className="px-3 py-2 text-xs font-semibold rounded-xl outline-none cursor-pointer max-w-48 truncate"
+              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+              <option value="all">Category: All</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+              ))}
+            </select>
+            {(search || accountFilter !== 'all' || categoryFilter !== 'all' || sortMode !== 'date-desc') && (
+              <button
+                onClick={() => { setSearch(''); setAccountFilter('all'); setCategoryFilter('all'); setSortMode('date-desc'); }}
+                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
+                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+                title="Clear search, sort and filters">
+                <SlidersIcon />
+              </button>
+            )}
+          </div>
+
+          {/* ── Status tabs ── */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex gap-1 p-1 rounded-xl"
               style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               {([
-                { id: 'all',          label: 'All',           count: transactions.length },
-                { id: 'expense',      label: 'Expenses',      count: transactions.filter((t) => Number(t.amount) < 0).length },
-                { id: 'income',       label: 'Income',        count: transactions.filter((t) => Number(t.amount) >= 0).length },
-                { id: 'uncategorized',label: 'Uncategorized', count: uncategorizedCount, dot: true },
-                { id: 'recurring',    label: 'Recurring',     count: transactions.filter(isRecurringTx).length },
-              ] as { id: Filter; label: string; count: number; dot?: boolean }[]).map((f) => (
+                { id: 'all',       label: 'All',       count: transactions.length },
+                { id: 'expense',   label: 'Expenses',  count: transactions.filter((t) => Number(t.amount) < 0).length },
+                { id: 'income',    label: 'Income',    count: transactions.filter((t) => Number(t.amount) >= 0).length },
+                { id: 'recurring', label: 'Recurring', count: transactions.filter(isRecurringTx).length },
+              ] as { id: Filter; label: string; count: number }[]).map((f) => (
                 <button key={f.id} onClick={() => setFilter(f.id)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
                   style={filter === f.id
                     ? { background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
                     : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
-                  {f.dot && f.count > 0 && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--color-amber)' }} />}
                   {f.label}
                   <span className="opacity-50">{f.count}</span>
                 </button>
               ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setFilter('uncategorized')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:brightness-110"
+                style={{
+                  ...(uncategorizedCount > 0
+                    ? { background: 'color-mix(in srgb, var(--color-amber) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 30%, transparent)', color: 'var(--color-amber)' }
+                    : { background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 30%, transparent)', color: 'var(--color-green)' }),
+                  ...(filter === 'uncategorized' ? { boxShadow: `0 0 0 1px ${uncategorizedCount > 0 ? 'var(--color-amber)' : 'var(--color-green)'}` } : {}),
+                }}>
+                {uncategorizedCount > 0 ? '● ' : '✓ '}{uncategorizedCount} uncategorized
+              </button>
+              <button onClick={() => setFilter('all')}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold"
+                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
+                {transactions.length} total
+              </button>
             </div>
           </div>
         </div>
@@ -1066,8 +1406,8 @@ export default function TransactionsPage() {
             accountGroups.map(([accountId, txList]) => {
               const acc        = txList[0]?.bankAccount;
               const isCollapsed = collapsed.has(accountId);
-              const accIncome       = txList.filter((t) => Number(t.amount) >= 0 && !isTransfer(t)).reduce((s, t) => s + Number(t.amount), 0);
-              const accExpense      = txList.filter((t) => Number(t.amount) < 0  && !isTransfer(t)).reduce((s, t) => s + Number(t.amount), 0);
+              const accIncome       = txList.filter((t) => Number(t.amount) >= 0 && !isNonSpending(t)).reduce((s, t) => s + Number(t.amount), 0);
+              const accExpense      = txList.filter((t) => Number(t.amount) < 0  && !isNonSpending(t)).reduce((s, t) => s + Number(t.amount), 0);
               const accUncategorized = txList.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
               const accColor        = acc?.color || '#9B6DFF';
 
@@ -1239,9 +1579,22 @@ export default function TransactionsPage() {
                         const primaryType   = isIncome ? 'income' : 'expense';
                         const secondaryType = isIncome ? 'expense' : 'income';
                         const searchQ       = pickerSearch.toLowerCase();
-                        const pickerCats    = categories.filter((c) => (c.type === primaryType || c.type === 'transfer') && (!searchQ || c.name.toLowerCase().includes(searchQ)));
+                        const pickerCats    = categories.filter((c) => (c.type === primaryType || c.type === 'transfer' || c.type === 'savings') && (!searchQ || c.name.toLowerCase().includes(searchQ)));
                         const pickerCatsAlt = categories.filter((c) => c.type === secondaryType && (!searchQ || c.name.toLowerCase().includes(searchQ)));
                         const needsCategory = !tx.categoryId && !tx.projectId && !tx.debtId && !txIsTransfer;
+
+                        /* What the row's action cluster is allowed to offer. A split
+                           parent must be recombined before it can be deleted, and
+                           editing stays manual-only: a materialised recurring
+                           occurrence would silently drift from the rule behind it. */
+                        const canDelete  = DELETABLE_SOURCES.has(tx.source) && !tx.isSplitParent;
+                        const canEdit    = tx.source === 'manual';
+                        const canSplit   = !tx.debtId && !txIsTransfer && !tx.parentId;
+                        const canUnsplit = !tx.debtId && !txIsTransfer && !!tx.parentId;
+                        /* Everything else moved into the cluster, so the ⋮ now has
+                           content only for a rule-categorized row. Without this it
+                           would open an empty popover on most rows. */
+                        const hasRowMenu = !!tx.categorizedByRuleId;
 
                         return (
                           <div key={tx.id} className="relative group cursor-pointer"
@@ -1300,6 +1653,13 @@ export default function TransactionsPage() {
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
                                       style={{ background: 'color-mix(in srgb, var(--color-amber) 12%, transparent)', color: 'var(--color-amber)' }}>
                                       Pending
+                                    </span>
+                                  )}
+                                  {tx.categorizedByRuleId && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                      title={tx.categorizedByRule ? `Categorized by rule: ${tx.categorizedByRule.matchValue}` : 'Categorized by a rule'}
+                                      style={{ background: 'color-mix(in srgb, var(--color-card-violet) 12%, transparent)', color: 'var(--color-card-violet)' }}>
+                                      📌 Rule
                                     </span>
                                   )}
                                   {tx.projectId ? (() => {
@@ -1376,11 +1736,11 @@ export default function TransactionsPage() {
 
                           {/* ── Project category suggestion ── */}
                           {(() => {
-                            if (tx.projectId || tx.categoryId || tx.debtId || txIsTransfer) return null;
-                            const normName = tx.name.replace(/\s+(?:conf#\S+|[A-Z0-9]{6,})$/i, '').trim();
-                            const ph = projectHints[tx.name] ?? projectHints[normName] ?? null;
+                            const ph = pickProjectSuggestion(tx, projectHints, txIsTransfer);
                             if (!ph) return null;
-                            const proj = projects.find((p) => p.id === ph.projectId);
+                            /* openProjects, not projects: a closed project must not be
+                               offered as a one-click suggestion either. */
+                            const proj = openProjects.find((p) => p.id === ph.projectId);
                             if (!proj) return null;
                             return (
                               <button
@@ -1404,15 +1764,7 @@ export default function TransactionsPage() {
                               onMouseDown={(e) => { if (isOpen) e.stopPropagation(); }}
                               onClick={(e) => {
                                 if (isOpen) { setOpenPickerId(null); setPickerProjectDrill(null); setPickerTransferStep(false); setPickerShowPurchasePrompt(false); return; }
-                                const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
-                                const w = 220;
-                                const left = Math.max(4, rect.right - w);
-                                const spaceBelow = window.innerHeight - rect.bottom - 8;
-                                const spaceAbove = rect.top - 8;
-                                const openAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
-                                const maxHeight = Math.min(360, openAbove ? spaceAbove : spaceBelow);
-                                const top = openAbove ? rect.top - maxHeight - 4 : rect.bottom + 4;
-                                setPickerPos({ top, left, maxHeight });
+                                setPickerPos(placePicker((e.currentTarget as HTMLButtonElement).getBoundingClientRect()));
                                 setOpenPickerId(tx.id);
                                 setPickerProjectDrill(null);
                                 setPickerTransferStep(false);
@@ -1469,8 +1821,8 @@ export default function TransactionsPage() {
                             </button>
 
                             {isOpen && pickerPos && createPortal(
-                              <div ref={pickerRef} className="py-1 rounded-xl overflow-y-auto"
-                                style={{ ...glass, position: 'fixed', top: pickerPos.top, left: pickerPos.left, width: '220px', maxHeight: pickerPos.maxHeight, zIndex: 9999 }}>
+                              <div ref={pickerRef} className="py-1 rounded-xl overflow-y-auto cat-picker"
+                                style={{ ...glass, position: 'fixed', top: pickerPos.top, left: pickerPos.left, width: pickerPos.width, maxHeight: pickerPos.maxHeight, zIndex: 9999, transformOrigin: pickerPos.origin }}>
                                 {cat && (
                                   <>
                                     <button onClick={() => assignCategory(tx.id, null)}
@@ -1681,13 +2033,12 @@ export default function TransactionsPage() {
                                         if (isTransfer) {
                                           setOpenPickerId(null);
                                           setTransferModal({ tx, categoryId: c.id });
-                                          setTransferModalSelected(null);
                                           setTransferModalMatches([]);
                                           setTransferModalLoading(true);
                                           fetch(`${API}/transactions/matches?amount=${tx.amount}&date=${tx.date}&excludeAccountId=${tx.bankAccountId}`, { credentials: 'include' })
                                             .then((r) => r.json())
-                                            .then((m) => { if (Array.isArray(m)) { setTransferModalMatches(m); if (m.length > 0) setTransferModalSelected(m[0].id); } })
-                                            .catch(() => {})
+                                            .then((m) => { if (Array.isArray(m)) setTransferModalMatches(m); })
+                                            .catch(() => undefined)
                                             .finally(() => setTransferModalLoading(false));
                                         } else {
                                           assignCategory(tx.id, c.id);
@@ -1734,12 +2085,12 @@ export default function TransactionsPage() {
                                     )}
 
                                     {/* Projects section */}
-                                    {projects.length > 0 && (
+                                    {openProjects.length > 0 && (
                                       <>
                                         <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
                                         <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
                                           style={{ color: 'var(--color-text-muted)' }}>Projects</p>
-                                        {projects.map((proj) => {
+                                        {openProjects.map((proj) => {
                                           const c = proj.color || '#9B6DFF';
                                           const linked = tx.projectId === proj.id;
                                           return (
@@ -1747,8 +2098,7 @@ export default function TransactionsPage() {
                                               onClick={() => setPickerProjectDrill(proj.id)}
                                               className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-[var(--color-elevated)]"
                                               style={linked ? { background: `${c}12` } : {}}>
-                                              <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                                style={{ background: `${c}20` }}>{proj.icon}</span>
+                                              <ProjectAvatar project={proj} size={24} />
                                               <span className="flex-1 font-medium text-left truncate"
                                                 style={{ color: linked ? c : 'var(--color-text-primary)' }}>
                                                 {proj.name}
@@ -1784,7 +2134,7 @@ export default function TransactionsPage() {
                                           <button onClick={() => { setPickerProjectDrill(null); setMarkAsSaleConfirm(null); setPickerShowPurchasePrompt(false); }}
                                             className="text-sm hover:opacity-70 shrink-0"
                                             style={{ color: 'var(--color-text-muted)' }}>←</button>
-                                          <span className="text-base shrink-0">{proj?.icon}</span>
+                                          {proj && <ProjectAvatar project={proj} size={28} />}
                                           <span className="text-xs font-bold flex-1 truncate" style={{ color: c }}>{proj?.name}</span>
                                           {tx.projectId === pickerProjectDrill && (
                                             <button
@@ -1877,8 +2227,12 @@ export default function TransactionsPage() {
                                           </>
                                         )}
 
-                                        {/* Mark as SOLD — only for income txs on active projects */}
-                                        {Number(tx.amount) > 0 && proj?.status !== 'sold' && (
+                                        {/* Mark as SOLD — income txs on active projects, and only
+                                            for types that are actually sold. A service or trading
+                                            project ends by being terminated from the Projects page;
+                                            offering "sold" here would just earn a 400 from the API. */}
+                                        {Number(tx.amount) > 0 && proj && !isClosed(proj.status)
+                                          && closureKind(proj.type ?? '') === 'sale' && (
                                           <>
                                             <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
                                             {markAsSaleConfirm === proj?.id ? (
@@ -1923,97 +2277,130 @@ export default function TransactionsPage() {
                             )}
                           </div>
 
-                          {/* Find receipt in email */}
-                          {!tx.isSplitParent && (
-                            <button
-                              onClick={() => setReceiptTx(tx)}
-                              className={`${tx.receiptId ? '' : 'opacity-0 group-hover:opacity-100'} flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110 shrink-0`}
-                              style={{ background: 'color-mix(in srgb, var(--color-violet) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-violet) 25%, transparent)', color: 'var(--color-violet)' }}
-                              title={tx.receiptId ? 'View linked receipt' : 'Find receipt in email'}
-                            >
-                              ✉ {tx.receiptId ? 'Receipt ✓' : 'Receipt'}
-                            </button>
-                          )}
+                          {/* Row actions — a delimited cluster of the things you reach
+                              for most, with the ⋮ keeping the long tail. Hidden until
+                              the row is hovered or something inside it takes focus, so
+                              a dense ledger stays quiet; `row-actions` makes it
+                              permanently visible on touch, where nothing hovers.
+                              It always occupies its space, so rows never reflow. */}
+                          <div className={`relative shrink-0 items-center gap-0.5 p-0.5 rounded-lg row-actions opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ${
+                              canSplit || canUnsplit || canEdit || canDelete || hasRowMenu ? 'flex' : 'hidden'
+                            }`}
+                            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
 
-                          {/* Split / Unsplit */}
-                          {!tx.debtId && !txIsTransfer && (
-                            tx.parentId ? (
-                              <button
-                                onClick={() => unsplitTransaction(tx)}
-                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110 shrink-0"
-                                style={{ background: 'color-mix(in srgb, var(--color-text-muted) 10%, transparent)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}
-                                title="Unsplit — recombine into one transaction"
-                              >
-                                ↩ Unsplit
+                            {canSplit && (
+                              <button onClick={() => { setSplitTx(tx); setRowMenuTxId(null); }}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                                style={{ color: 'var(--color-text-muted)' }}
+                                title="Split into multiple categories" aria-label="Split into multiple categories">
+                                <ScissorsIcon />
                               </button>
-                            ) : (
-                              <button
-                                onClick={() => setSplitTx(tx)}
-                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all hover:brightness-110 shrink-0"
-                                style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 25%, transparent)', color: 'var(--color-primary)' }}
-                                title="Split into multiple categories"
-                              >
-                                ✂ Split
-                              </button>
-                            )
-                          )}
+                            )}
 
-                          {/* Delete — manual only */}
-                          {tx.source === 'manual' && deleteConfirmId !== tx.id && (
-                            <button
-                              onClick={() => {
-                                const absAmt = Math.abs(Number(tx.amount));
-                                setEditingTxId(tx.id);
-                                setManualTx({
-                                  name: tx.name,
-                                  amountStr: String(absAmt),
-                                  sign: Number(tx.amount) >= 0 ? '+' : '-',
-                                  date: tx.date,
-                                  bankAccountId: tx.bankAccountId ?? '',
-                                  categoryId: tx.categoryId ?? '',
-                                  debtId: tx.debtId ?? '',
-                                  note: tx.note ?? '',
-                                });
-                                setManualTxError('');
-                                setShowManualTx(true);
-                              }}
-                              className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] shrink-0"
-                              style={{ color: 'var(--color-text-muted)' }}
-                              title="Edit transaction">
-                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                              </svg>
-                            </button>
-                          )}
-                          {tx.source === 'manual' && (
-                            deleteConfirmId === tx.id ? (
-                              <div className="flex items-center gap-1 shrink-0">
-                                {tx.transferAccountId && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded-md mr-1"
-                                    style={{ background: 'color-mix(in srgb, var(--color-rose) 12%, transparent)', color: 'var(--color-rose)' }}>
-                                    ⚠ linked transfer
-                                  </span>
-                                )}
-                                <button onClick={() => deleteManualTx(tx.id)}
-                                  className="text-[10px] font-semibold px-2 py-1 rounded-lg"
-                                  style={{ background: 'color-mix(in srgb, var(--color-rose) 20%, transparent)', color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>
-                                  Delete
-                                </button>
-                                <button onClick={() => setDeleteConfirmId(null)}
-                                  className="text-[10px] px-2 py-1 rounded-lg hover:bg-[var(--color-elevated)]"
-                                  style={{ color: 'var(--color-text-muted)' }}>
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <button onClick={() => setDeleteConfirmId(tx.id)}
-                                className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 shrink-0"
-                                title="Delete transaction">
+                            {canUnsplit && (
+                              <button onClick={() => { unsplitTransaction(tx); setRowMenuTxId(null); }}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                                style={{ color: 'var(--color-text-muted)' }}
+                                title="Unsplit — recombine into one transaction" aria-label="Unsplit — recombine into one transaction">
+                                <UnsplitIcon />
+                              </button>
+                            )}
+
+                            {canEdit && (
+                              <button onClick={() => { openEditModal(tx); setRowMenuTxId(null); }}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                                style={{ color: 'var(--color-text-muted)' }}
+                                title="Edit transaction" aria-label="Edit transaction">
+                                <PencilIcon />
+                              </button>
+                            )}
+
+                            {canDelete && (
+                              <button
+                                onClick={(e) => {
+                                  if (deleteConfirmId === tx.id) { setRowMenuTxId(null); setDeleteConfirmId(null); return; }
+                                  const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                  setRowMenuPos({ top: rect.bottom + 6, left: Math.max(4, rect.right - 210) });
+                                  setRowMenuTxId(tx.id);
+                                  setDeleteConfirmId(tx.id);
+                                }}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[color-mix(in_srgb,var(--color-rose)_18%,transparent)]"
+                                style={{ color: 'var(--color-rose)' }}
+                                title="Delete transaction" aria-label="Delete transaction">
                                 <TrashIcon />
                               </button>
-                            )
-                          )}
+                            )}
+
+                            {hasRowMenu && (
+                              <button
+                                onClick={(e) => {
+                                  if (rowMenuTxId === tx.id) { setRowMenuTxId(null); setDeleteConfirmId(null); return; }
+                                  const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                                  setRowMenuPos({ top: rect.bottom + 6, left: Math.max(4, rect.right - 210) });
+                                  setRowMenuTxId(tx.id);
+                                  setDeleteConfirmId(null);
+                                }}
+                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                                style={{ color: 'var(--color-text-muted)' }}
+                                title="More actions" aria-label="More actions">
+                                <KebabIcon />
+                              </button>
+                            )}
+
+                            {rowMenuTxId === tx.id && rowMenuPos && createPortal(
+                              <div ref={rowMenuRef} className="py-1 rounded-xl overflow-hidden"
+                                style={{ ...glass, position: 'fixed', top: rowMenuPos.top, left: rowMenuPos.left, width: '210px', zIndex: 9999 }}>
+                                {deleteConfirmId === tx.id ? (
+                                  <div className="px-3 py-2.5">
+                                    <p className="text-xs font-semibold mb-1.5">
+                                      {tx.source === 'recurring' ? 'Delete this occurrence?' : 'Delete this transaction?'}
+                                    </p>
+                                    {tx.source === 'recurring' && (
+                                      <p className="text-[10px] mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                                        Removes this month only — the schedule keeps running. Stop the
+                                        whole series from Settings → Recurring.
+                                      </p>
+                                    )}
+                                    {tx.transferAccountId && (
+                                      <p className="text-[10px] mb-2" style={{ color: 'var(--color-rose)' }}>⚠ linked transfer will be unlinked</p>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                      <button onClick={() => deleteManualTx(tx.id)}
+                                        className="flex-1 text-xs font-semibold px-2 py-1.5 rounded-lg"
+                                        style={{ background: 'color-mix(in srgb, var(--color-rose) 20%, transparent)', color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>
+                                        Delete
+                                      </button>
+                                      <button onClick={() => setDeleteConfirmId(null)}
+                                        className="flex-1 text-xs px-2 py-1.5 rounded-lg hover:bg-[var(--color-elevated)]"
+                                        style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {/* Split, unsplit, edit and delete live in the row's
+                                        icon cluster; what stays here is the long tail. */}
+                                    {tx.categorizedByRuleId && (
+                                      <>
+                                        <button onClick={() => uncategorizeOne(tx)}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
+                                          style={{ color: 'var(--color-text-secondary)' }}>
+                                          📌 Uncategorize this one
+                                        </button>
+                                        <button onClick={() => deleteRuleFromRow(tx)} disabled={deletingRuleId === tx.categorizedByRuleId}
+                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-red-500/20 disabled:opacity-40"
+                                          style={{ color: 'var(--color-rose)' }}>
+                                          {deletingRuleId === tx.categorizedByRuleId ? 'Deleting rule…' : 'Delete the rule'}
+                                        </button>
+                                      </>
+                                    )}
+                                  </>
+                                )}
+                              </div>,
+                              document.body
+                            )}
+                          </div>
 
                           {/* Amount */}
                           <p className="text-sm font-bold tabular-nums w-24 text-right shrink-0"
@@ -2080,32 +2467,17 @@ export default function TransactionsPage() {
           )}
         </div>
 
-        {/* Split transaction modal */}
+        {/* Split transaction modal (manual — no receipt involved) */}
         {splitTx && (
           <SplitTransactionModal
             tx={splitTx}
             categories={categories}
-            initialLines={splitInitialLines ?? undefined}
+            projects={projects}
             onSave={() => {
               loadTransactions();
               setSplitTx(null);
-              setSplitInitialLines(null);
             }}
-            onClose={() => { setSplitTx(null); setSplitInitialLines(null); }}
-          />
-        )}
-
-        {/* Find receipt modal */}
-        {receiptTx && (
-          <FindReceiptModal
-            tx={receiptTx}
-            onLinked={() => { loadTransactions(); setReceiptTx(null); }}
-            onSplitFromItems={(lines) => {
-              setSplitInitialLines(lines);
-              setSplitTx(receiptTx);
-              setReceiptTx(null);
-            }}
-            onClose={() => setReceiptTx(null)}
+            onClose={() => setSplitTx(null)}
           />
         )}
 
@@ -2120,24 +2492,52 @@ export default function TransactionsPage() {
               const selAcc     = accounts.find((a) => a.id === manualTx.bankAccountId);
               const selCat     = categories.find((c) => c.id === manualTx.categoryId);
               const selDebt    = debts.find((d) => d.id === manualTx.debtId);
+              const mq = manualCatSearch.trim().toLowerCase();
+              const matches = (n: string) => !mq || n.toLowerCase().includes(mq);
               const catOptions = isExpense
-                ? categories.filter((c) => c.type === 'expense' || c.type === 'both')
+                ? categories.filter((c) => (c.type === 'expense' || c.type === 'both' || c.type === 'savings') && matches(c.name))
                 : null;
+              // Project categories, flattened so one search covers every project.
+              const selProjCat = manualTx.projectCategoryId
+                ? projects.flatMap((p) => (p.categories ?? []).map((pc) => ({ project: p, cat: pc })))
+                    .find((x) => x.cat.id === manualTx.projectCategoryId)
+                : null;
+              const manualProjOptions = projects.flatMap((p) =>
+                (p.categories ?? [])
+                  .filter((pc) => matches(pc.name) || matches(p.name))
+                  .map((pc) => ({ project: p, cat: pc })));
               const incomePrimary = !isExpense
                 ? categories.filter((c) => c.type === 'income' || c.type === 'both')
                 : null;
               const incomeSecondary = !isExpense
-                ? categories.filter((c) => c.type === 'expense')
+                ? categories.filter((c) => c.type === 'expense' || c.type === 'savings')
                 : null;
               const amt        = parseFloat(manualTx.amountStr) || 0;
               return (
                 <form onSubmit={saveManualTx}
-                  className="w-full max-w-md flex flex-col rounded-2xl"
-                  style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
+                  className="w-full max-w-lg flex flex-col rounded-2xl"
+                  style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '92dvh', overflow: 'hidden' }}>
 
                   {/* Hero header */}
-                  <div className="flex flex-col items-center gap-3 px-6 pt-6 pb-5 rounded-t-2xl"
+                  <div className="flex flex-col items-center gap-3 px-6 pt-5 pb-5 rounded-t-2xl shrink-0"
                     style={{ background: `linear-gradient(160deg, ${accent}14 0%, transparent 60%)`, borderBottom: '1px solid var(--color-border)' }}>
+                    <div className="flex items-start gap-3 w-full">
+                      <span className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background: `color-mix(in srgb, ${accent} 16%, transparent)`, color: accent }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 7a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                          <path d="M16 12h3" /><path d="M3 9h18" />
+                        </svg>
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-lg font-bold leading-tight">{editingTxId ? 'Edit transaction' : 'Add transaction'}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                          {isExpense
+                            ? 'Record a cash payment or a transaction missing from your accounts.'
+                            : 'Record money you received that is missing from your accounts.'}
+                        </p>
+                      </div>
+                    </div>
                     <div className="flex items-center justify-between w-full">
                       {/* Type toggle */}
                       <div className="flex gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
@@ -2175,19 +2575,31 @@ export default function TransactionsPage() {
                       style={{ color: manualTx.name ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }} />
                   </div>
 
-                  <div className="flex flex-col gap-3 px-5 py-4">
+                  <div className="flex flex-col gap-3 px-5 py-4 overflow-y-auto flex-1">
 
                     {/* Date + Account */}
                     <div className="flex gap-3">
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Date</span>
-                        <input required type="date" value={manualTx.date}
-                          onChange={(e) => setManualTx((f) => ({ ...f, date: e.target.value }))}
-                          className="px-3 py-2.5 text-sm outline-none rounded-xl w-full"
-                          style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', colorScheme: 'dark' }} />
+                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Transaction date</span>
+                        <DatePicker value={manualTx.date} ariaLabel="Transaction date"
+                          onChange={(date) => {
+                            setManualTx((f) => ({ ...f, date }));
+                            // The series starts on the transaction being recorded. Without
+                            // this the start stayed at today, so picking Aug 1 silently
+                            // produced a series starting today and no August entry at all.
+                            if (date) {
+                              setRecurring((r) => (r.startDateTouched
+                                ? r
+                                : { ...r, startDate: date, dayOfMonth: Number(date.slice(8, 10)) || r.dayOfMonth }));
+                            }
+                          }} />
                       </div>
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0" style={{ position: 'relative' }}>
-                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Account</span>
+                        {/* Money leaves an account on an expense and arrives on income —
+                            one fixed label would be wrong half the time. */}
+                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                          {isExpense ? 'Paid from' : 'Deposited to'}
+                        </span>
                         <button type="button" onClick={() => { setManualAccOpen((o) => !o); setManualCatOpen(false); }}
                           className="px-3 py-2.5 text-sm flex items-center gap-2 rounded-xl outline-none text-left w-full"
                           style={{ background: 'var(--color-elevated)', border: `1px solid ${selAcc ? (selAcc.color || accent) + '55' : 'var(--color-elevated)'}`, color: selAcc ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
@@ -2228,7 +2640,7 @@ export default function TransactionsPage() {
                       <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                         Category <span style={{ opacity: 0.5, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                       </span>
-                      <button type="button" onClick={() => { setManualCatOpen((o) => !o); setManualAccOpen(false); }}
+                      <button type="button" onClick={() => { setManualCatOpen((o) => !o); setManualAccOpen(false); setManualCatSearch(''); }}
                         className="px-3 py-2.5 text-sm flex items-center gap-2.5 rounded-xl outline-none text-left w-full"
                         style={{ background: 'var(--color-elevated)', border: `1px solid ${selCat ? selCat.color + '44' : 'var(--color-elevated)'}`, color: selCat ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                         {selDebt ? (
@@ -2236,6 +2648,14 @@ export default function TransactionsPage() {
                             <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
                             <span className="flex-1 font-medium" style={{ color: 'var(--color-card-violet)' }}>
                               {selDebt.direction === 'owed' ? 'Debt payment · ' : 'Debt repayment · '}{selDebt.borrowerName}
+                            </span>
+                          </>
+                        ) : selProjCat ? (
+                          <>
+                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${selProjCat.cat.color}20` }}>{selProjCat.cat.icon}</span>
+                            <span className="flex-1 min-w-0">
+                              <span className="block font-medium truncate" style={{ color: selProjCat.cat.color }}>{selProjCat.cat.name}</span>
+                              <span className="block text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{selProjCat.project.icon} {selProjCat.project.name}</span>
                             </span>
                           </>
                         ) : selCat ? (
@@ -2249,9 +2669,19 @@ export default function TransactionsPage() {
                         </svg>
                       </button>
                       {manualCatOpen && (
-                        <div className="absolute top-full left-0 right-0 mt-1 rounded-xl overflow-hidden overflow-y-auto"
-                          style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', zIndex: 60, maxHeight: 220 }}>
-                          <button type="button" onClick={() => { setManualTx((f) => ({ ...f, categoryId: '' })); setManualCatOpen(false); }}
+                        <div className="absolute top-full left-0 right-0 mt-1 rounded-xl flex flex-col"
+                          style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', zIndex: 60, maxHeight: 340, overflow: 'hidden' }}>
+                          <div className="p-2 shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                            <input autoFocus value={manualCatSearch}
+                              onChange={(e) => setManualCatSearch(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Search categories or projects…"
+                              aria-label="Search categories"
+                              className="w-full px-2.5 py-2 text-xs outline-none rounded-lg"
+                              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
+                          </div>
+                          <div className="overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
+                          <button type="button" onClick={() => { setManualTx((f) => ({ ...f, categoryId: '', projectId: '', projectCategoryId: '' })); setManualCatOpen(false); }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
                             style={{ color: 'var(--color-text-muted)' }}
                             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-elevated)')}
@@ -2325,6 +2755,41 @@ export default function TransactionsPage() {
                               )}
                             </>
                           )}
+
+                          {manualProjOptions.length > 0 && (
+                            <>
+                              <div className="h-px my-1" style={{ background: 'var(--color-border)' }} />
+                              <p className="px-3 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Projects</p>
+                              {manualProjOptions.map(({ project, cat: pc }) => {
+                                const on = manualTx.projectCategoryId === pc.id && manualTx.projectId === project.id;
+                                return (
+                                  <button key={`${project.id}:${pc.id}`} type="button"
+                                    onClick={() => {
+                                      // Project- and budget-categorised are mutually exclusive.
+                                      setManualTx((f) => ({ ...f, projectId: project.id, projectCategoryId: pc.id, categoryId: '', debtId: '' }));
+                                      setManualCatOpen(false);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
+                                    style={{ background: on ? `${pc.color}18` : 'transparent' }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.background = `${pc.color}12`)}
+                                    onMouseLeave={(e) => (e.currentTarget.style.background = on ? `${pc.color}18` : 'transparent')}>
+                                    <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${pc.color}20` }}>{pc.icon}</span>
+                                    <span className="flex-1 min-w-0 text-left">
+                                      <span className="block font-medium truncate" style={{ color: on ? pc.color : 'var(--color-text-primary)' }}>{pc.name}</span>
+                                      <span className="block text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{project.icon} {project.name}</span>
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </>
+                          )}
+
+                          {catOptions?.length === 0 && manualProjOptions.length === 0 && manualCatSearch.trim() && (
+                            <p className="px-3 py-4 text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>
+                              Nothing matches “{manualCatSearch}”.
+                            </p>
+                          )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2345,6 +2810,15 @@ export default function TransactionsPage() {
                     />
                   </div>
 
+                  {/* Recurring — editing an existing row is not a series */}
+                  {!editingTxId && (
+                    <RecurringPanel
+                      value={recurring}
+                      onChange={setRecurring}
+                      amount={parseFloat(manualTx.amountStr) || 0}
+                      accent={accent} isExpense={isExpense} />
+                  )}
+
                   </div>
 
                   {/* Footer */}
@@ -2355,11 +2829,26 @@ export default function TransactionsPage() {
                     <button type="button" onClick={() => { setShowManualTx(false); setManualTxError(''); }}
                       className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
                       style={{ color: 'var(--color-text-secondary)' }}>Cancel</button>
-                    <button type="submit" disabled={manualTxSaving}
-                      className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
-                      style={{ background: accent }}>
-                      {manualTxSaving ? 'Saving…' : editingTxId ? 'Save Changes' : 'Add Transaction'}
-                    </button>
+                    <div className="flex flex-col items-end gap-1">
+                      <button type="submit" disabled={manualTxSaving}
+                        className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60 transition-all"
+                        style={{ background: accent }}>
+                        {manualTxSaving ? 'Saving…' : editingTxId ? 'Save Changes' : recurring.enabled ? 'Save & schedule' : 'Add Transaction'}
+                      </button>
+                      {!editingTxId && recurring.enabled && (() => {
+                        const all = occurrenceDates(recurring);
+                        const todayIso = new Date().toISOString().slice(0, 10);
+                        const recorded = all.filter((d) => d <= todayIso || recurring.recordFirst).length
+                          ? Math.max(all.filter((d) => d <= todayIso).length, recurring.recordFirst ? 1 : 0)
+                          : 0;
+                        const scheduled = Math.max(all.length - recorded, 0);
+                        return (
+                          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                            {recorded} recorded transaction{recorded === 1 ? '' : 's'} · {recurring.endMode === 'never' ? 'rest' : scheduled} scheduled
+                          </p>
+                        );
+                      })()}
+                    </div>
                   </div>
                 </form>
               );
@@ -2369,207 +2858,23 @@ export default function TransactionsPage() {
         )}
 
         {/* ── Link Transfer modal ── */}
-        {transferModal && createPortal(
-          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
-            onMouseDown={(e) => { if (e.target === e.currentTarget) setTransferModal(null); }}>
-            {(() => {
-              const srcTx      = transferModal.tx;
-              const srcAmt     = Number(srcTx.amount);
-              const isOutgoing = srcAmt < 0;
-              const absAmt     = Math.abs(srcAmt);
-              const isTxSel    = transferModalSelected && !transferModalSelected.startsWith('acc:');
-              const isAccSel   = transferModalSelected?.startsWith('acc:');
-              const selMatch   = isTxSel ? transferModalMatches.find((m) => m.id === transferModalSelected) : null;
-              const selAccId   = isAccSel ? transferModalSelected!.replace('acc:', '') : null;
-              const selAcc     = selAccId ? accounts.find((a) => a.id === selAccId) : null;
-              const confirmColor = selMatch ? (selMatch.bankAccount?.color || '#9B6DFF') : selAcc ? (selAcc.color || '#9B6DFF') : '#6B6B8A';
-
-              return (
-                <div className="w-full max-w-md flex flex-col rounded-2xl overflow-hidden"
-                  style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
-
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-5 py-4"
-                    style={{ borderBottom: '1px solid var(--color-border)' }}>
-                    <div>
-                      <p className="font-bold text-sm" style={{ color: 'var(--color-text-primary)' }}>Link Transfer</p>
-                      <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-                        {isOutgoing ? 'Where did this money go?' : 'Where did this money come from?'}
-                      </p>
-                    </div>
-                    <button onClick={() => setTransferModal(null)}
-                      className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)]"
-                      style={{ color: 'var(--color-text-muted)' }}>✕</button>
-                  </div>
-
-                  <div className="flex flex-col px-5 py-4 gap-3">
-
-                    {/* FROM card */}
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
-                        style={{ color: 'var(--color-text-muted)' }}>{isOutgoing ? 'Money leaving' : 'Money arriving at'}</p>
-                      <div className="flex items-center gap-3 p-3 rounded-xl"
-                        style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ background: isOutgoing ? 'color-mix(in srgb, var(--color-rose) 15%, transparent)' : 'color-mix(in srgb, var(--color-green) 15%, transparent)' }}>
-                          <AccountTypeIcon type={srcTx.bankAccount?.accountType ?? ''} size={18} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{srcTx.name}</p>
-                          <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
-                            {srcTx.bankAccount?.accountName} · {srcTx.date}
-                          </p>
-                        </div>
-                        <p className="text-base font-black tabular-nums shrink-0"
-                          style={{ color: isOutgoing ? 'var(--color-rose)' : 'var(--color-green)' }}>
-                          {isOutgoing ? '−' : '+'}${absAmt.toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Flow arrow */}
-                    <div className="flex flex-col items-center gap-0.5">
-                      <div className="w-px h-3" style={{ background: 'var(--color-border)' }} />
-                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full"
-                        style={{ background: 'rgba(107,107,138,0.15)', border: '1px solid rgba(107,107,138,0.25)' }}>
-                        <span style={{ color: '#9B9BB8', fontSize: 11 }}>{isOutgoing ? '↓' : '↑'}</span>
-                        <span className="text-xs font-bold tabular-nums" style={{ color: '#9B9BB8' }}>${absAmt.toFixed(2)}</span>
-                        <span style={{ color: '#9B9BB8', fontSize: 11 }}>{isOutgoing ? '↓' : '↑'}</span>
-                      </div>
-                      <div className="w-px h-3" style={{ background: 'var(--color-border)' }} />
-                    </div>
-
-                    {/* TO section */}
-                    <div>
-                      <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
-                        style={{ color: 'var(--color-text-muted)' }}>{isOutgoing ? 'Money arriving at' : 'Money coming from'}</p>
-
-                      {/* Selected preview */}
-                      {(selMatch || selAcc) && (
-                        <div className="flex items-center gap-3 p-3 rounded-xl mb-2"
-                          style={{ background: `${confirmColor}15`, border: `1px solid ${confirmColor}44` }}>
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                            style={{ background: `${confirmColor}25` }}>
-                            <AccountTypeIcon type={selMatch?.bankAccount?.accountType ?? selAcc?.accountType ?? ''} size={18} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs font-semibold truncate" style={{ color: confirmColor }}>
-                              {selMatch ? selMatch.name : selAcc?.accountName}
-                            </p>
-                            <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
-                              {selMatch ? `${selMatch.bankAccount?.accountName} · ${selMatch.date}` : selAcc?.bankName}
-                            </p>
-                          </div>
-                          {selMatch && (
-                            <p className="text-sm font-black tabular-nums shrink-0"
-                              style={{ color: Number(selMatch.amount) >= 0 ? 'var(--color-green)' : 'var(--color-rose)' }}>
-                              {Number(selMatch.amount) >= 0 ? '+' : '−'}${Math.abs(Number(selMatch.amount)).toFixed(2)}
-                            </p>
-                          )}
-                          <span className="text-xs shrink-0" style={{ color: confirmColor }}>✓</span>
-                        </div>
-                      )}
-
-                      {/* Matches / picker */}
-                      {transferModalLoading ? (
-                        <p className="text-xs py-3 text-center" style={{ color: 'var(--color-text-muted)' }}>Searching for matches…</p>
-                      ) : (
-                        <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto overflow-x-hidden">
-                          {/* Auto matches */}
-                          {transferModalMatches.length > 0 && (
-                            <>
-                              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-green)' }}>✦ Suggested matches</p>
-                              {transferModalMatches.map((m) => {
-                                const acc = m.bankAccount;
-                                const c   = acc?.color || '#9B6DFF';
-                                const sel = transferModalSelected === m.id;
-                                return (
-                                  <button key={m.id} type="button" onClick={() => setTransferModalSelected(sel ? null : m.id)}
-                                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
-                                    style={{ background: sel ? `${c}18` : 'color-mix(in srgb, var(--color-green) 5%, transparent)', border: `1px solid ${sel ? c + '55' : 'color-mix(in srgb, var(--color-green) 20%, transparent)'}` }}>
-                                    <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                                      style={{ background: `${c}20` }}>
-                                      <AccountTypeIcon type={acc?.accountType ?? ''} size={14} />
-                                    </span>
-                                    <div className="flex-1 min-w-0">
-                                      <p className="text-xs font-semibold truncate" style={{ color: sel ? c : 'var(--color-text-primary)' }}>{m.name}</p>
-                                      <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{acc?.accountName} · {m.date}</p>
-                                    </div>
-                                    <p className="text-xs font-bold tabular-nums shrink-0"
-                                      style={{ color: Number(m.amount) >= 0 ? 'var(--color-green)' : 'var(--color-rose)' }}>
-                                      {Number(m.amount) >= 0 ? '+' : '−'}${Math.abs(Number(m.amount)).toFixed(2)}
-                                    </p>
-                                  </button>
-                                );
-                              })}
-                              <div className="my-1" style={{ borderTop: '1px solid var(--color-border)' }} />
-                            </>
-                          )}
-                          {/* Account picker */}
-                          <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                            {transferModalMatches.length > 0 ? 'Or pick account only' : 'Select destination account'}
-                          </p>
-                          {accounts.filter((a) => a.id !== srcTx.bankAccountId)
-                            .sort((a, b) => {
-                              const aCredit = isLiability(a.accountType) ? 0 : 1;
-                              const bCredit = isLiability(b.accountType) ? 0 : 1;
-                              return aCredit - bCredit;
-                            })
-                            .map((a) => {
-                              const c   = a.color || '#9B6DFF';
-                              const sel = transferModalSelected === `acc:${a.id}`;
-                              return (
-                                <button key={a.id} type="button" onClick={() => setTransferModalSelected(sel ? null : `acc:${a.id}`)}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all"
-                                  style={{ background: sel ? `${c}18` : 'var(--color-elevated)', border: `1px solid ${sel ? c + '55' : 'var(--color-elevated)'}` }}>
-                                  <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                                    style={{ background: `${c}20` }}>
-                                    <AccountTypeIcon type={a.accountType} size={14} />
-                                  </span>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-semibold truncate" style={{ color: sel ? c : 'var(--color-text-primary)' }}>{a.accountName}</p>
-                                    <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.bankName}</p>
-                                  </div>
-                                  {(() => { const tc = accountTypeMeta(a.accountType).accent; return (
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded capitalize shrink-0"
-                                    style={{ background: `color-mix(in srgb, ${tc} 16%, transparent)`, color: tc }}>{a.accountType}</span>
-                                  ); })()}
-                                </button>
-                              );
-                            })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between px-5 py-4"
-                    style={{ borderTop: '1px solid var(--color-border)' }}>
-                    <button onClick={() => setTransferModal(null)}
-                      className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
-                      style={{ color: 'var(--color-text-secondary)' }}>Skip</button>
-                    <button disabled={!transferModalSelected}
-                      onClick={async () => {
-                        if (!transferModalSelected) return;
-                        const isTxMatch = !transferModalSelected.startsWith('acc:');
-                        const matchTx   = isTxMatch ? transferModalMatches.find((m) => m.id === transferModalSelected) : null;
-                        const accId     = isTxMatch ? (matchTx?.bankAccountId ?? null) : transferModalSelected.replace('acc:', '');
-                        await assignCategory(srcTx.id, transferModal!.categoryId, true);
-                        await setTransferAccount(srcTx.id, accId, matchTx?.id);
-                        setTransferModal(null);
-                        setTransferModalSelected(null);
-                      }}
-                      className="px-5 py-2 text-sm font-bold text-white rounded-xl hover:brightness-110 disabled:opacity-40 transition-all"
-                      style={{ background: transferModalSelected ? confirmColor : '#6B6B8A' }}>
-                      {transferModalSelected ? 'Confirm Link ⇄' : 'Select destination'}
-                    </button>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>,
-          document.body
+        {transferModal && (
+          <LinkTransferModal
+            tx={transferModal.tx}
+            matches={transferModalMatches}
+            matchesLoading={transferModalLoading}
+            accounts={accounts}
+            onClose={() => { setTransferModal(null); setTransferModalMatches([]); }}
+            onLink={async (accountId, matchTxId, note) => {
+              const srcTx = transferModal.tx;
+              await assignCategory(srcTx.id, transferModal.categoryId, true);
+              await setTransferAccount(srcTx.id, accountId, matchTxId ?? undefined);
+              // The link is what was asked for, so a failed note must not undo it.
+              if (note) await saveTransferNote([srcTx.id, matchTxId], note);
+              setTransferModal(null);
+              setTransferModalMatches([]);
+            }}
+          />
         )}
 
         {/* New category from picker */}
@@ -2639,6 +2944,83 @@ export default function TransactionsPage() {
           document.body
         )}
 
+        {/* ── Categorization rule toast ── */}
+        {ruleToast && createPortal(
+          <div
+            className="fixed bottom-6 right-6 z-50 flex items-start gap-3 px-4 py-3.5 rounded-2xl"
+            style={{
+              background: 'var(--color-surface)',
+              border: 'var(--glass-border)',
+              boxShadow: 'var(--glass-shadow)',
+              backdropFilter: 'var(--glass-blur)',
+              minWidth: '260px',
+              maxWidth: '360px',
+              animation: 'slideUp 0.25s ease-out',
+            }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
+              style={{
+                background: ruleToast.kind === 'error'
+                  ? 'color-mix(in srgb, var(--color-card-orange) 20%, transparent)'
+                  : ruleToast.kind === 'categorized'
+                  ? 'color-mix(in srgb, var(--color-card-green) 20%, transparent)'
+                  : 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)',
+              }}>
+              {ruleToast.kind === 'error' ? '⚠️' : ruleToast.kind === 'categorized' ? (ruleToast.categoryIcon || '✓') : '📌'}
+            </div>
+            <div className="flex-1 min-w-0">
+              {ruleToast.kind === 'categorized' ? (
+                <>
+                  <p className="text-sm font-semibold">Categorized as {ruleToast.categoryLabel}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {filter === 'uncategorized' ? "It's left the Uncategorized list. " : ''}
+                    Pin it to auto-categorize transactions like this from now on.
+                  </p>
+                  <button
+                    onClick={() => createRule(ruleToast.tx, ruleToast.categoryId)}
+                    className="mt-2 text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors hover:brightness-110"
+                    style={{
+                      background: 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)',
+                      border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)',
+                      color: 'var(--color-card-violet)',
+                    }}>
+                    📌 Pin as rule
+                  </button>
+                </>
+              ) : ruleToast.kind === 'created' ? (
+                <>
+                  <p className="text-sm font-semibold">Rule created</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {ruleToast.matchStrategy === 'prefix'
+                      ? `Any transaction starting with "${ruleToast.matchLabel}" will auto-categorize from now on.`
+                      : `"${ruleToast.matchLabel}" will auto-categorize from now on.`}
+                  </p>
+                </>
+              ) : ruleToast.kind === 'duplicate' ? (
+                <>
+                  <p className="text-sm font-semibold">Rule already exists</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    A rule for "{ruleToast.matchLabel}" already exists.{' '}
+                    <a href="/settings?tab=rules" className="underline" style={{ color: 'var(--color-sky)' }}>Edit it in Settings</a>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold">Something went wrong</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                    {ruleToast.reason || `Something went wrong creating a rule for "${ruleToast.matchLabel}".`}
+                  </p>
+                </>
+              )}
+            </div>
+            <button onClick={() => { setRuleToast(null); if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current); }}
+              className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] shrink-0 mt-0.5"
+              style={{ color: 'var(--color-text-muted)' }}>
+              <CloseIcon />
+            </button>
+          </div>,
+          document.body
+        )}
+
         {/* CSV Import modal */}
         {importAccount && (
           <CsvImportModal
@@ -2646,6 +3028,7 @@ export default function TransactionsPage() {
             onClose={() => setImportAccount(null)}
             onImported={(result) => {
               setImportAccount(null);
+              jumpToImportedRange(result);
               loadTransactions();
               setImportToast(result);
               if (importToastTimer.current) clearTimeout(importToastTimer.current);
@@ -2662,6 +3045,7 @@ export default function TransactionsPage() {
             onAccountCreated={(a) => setAccounts((prev) => prev.some((x) => x.id === a.id) ? prev : [...prev, a as BankAccount])}
             onImported={(result) => {
               setShowFileImport(false);
+              jumpToImportedRange(result);
               loadTransactions();
               setImportToast(result);
               if (importToastTimer.current) clearTimeout(importToastTimer.current);
@@ -2690,6 +3074,7 @@ export default function TransactionsPage() {
           transactions={transactions}
           recurringMap={recurringMap}
           prevTransactions={prevTransactions}
+          projects={projects}
           subscriptions={subscriptions}
           onSubscriptionChange={handleSubscriptionChange}
           onNoteUpdate={handleNoteUpdate}
@@ -2711,6 +3096,7 @@ export default function TransactionsPage() {
               transactions={transactions}
               recurringMap={recurringMap}
               prevTransactions={prevTransactions}
+              projects={projects}
               subscriptions={subscriptions}
               onSubscriptionChange={handleSubscriptionChange}
               onNoteUpdate={handleNoteUpdate}
@@ -2721,6 +3107,26 @@ export default function TransactionsPage() {
         document.body
       )}
     </div>
+  );
+}
+
+/**
+ * A project's photo, falling back to its emoji on a wash of its own color.
+ *
+ * A car or a house is far quicker to recognise by its picture than by a generic
+ * 🚗, which is the whole point of showing it in the picker. `alt` is empty on
+ * purpose: the project's name always sits directly beside this, so labelling
+ * the image would just make a screen reader announce it twice.
+ */
+function ProjectAvatar({ project, size }: { project: Project; size: number }) {
+  const color = project.color || '#9B6DFF';
+  return (
+    <span className="rounded-lg flex items-center justify-center shrink-0 overflow-hidden"
+      style={{ width: size, height: size, background: `${color}20`, fontSize: size * 0.58 }}>
+      {project.imageUrl
+        ? <img src={project.imageUrl} alt="" className="w-full h-full object-cover" />
+        : project.icon}
+    </span>
   );
 }
 
@@ -2747,5 +3153,23 @@ function CloseIcon() {
   return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 }
 function TrashIcon() {
-  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FF6B6B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>;
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>;
+}
+function ScissorsIcon() {
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>;
+}
+function UnsplitIcon() {
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>;
+}
+function PencilIcon() {
+  return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>;
+}
+function KebabIcon() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>;
+}
+function BellIcon() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
+}
+function SlidersIcon() {
+  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>;
 }

@@ -5,7 +5,7 @@
 
 export interface CsvRow { date: string; referenceNumber?: string; name: string; amount: number; }
 
-export type CsvType = 'bank' | 'credit' | 'unknown';
+export type CsvType = 'bank' | 'credit' | 'investment' | 'unknown';
 
 export interface CsvFingerprint { bank: string | null; type: CsvType; }
 
@@ -13,7 +13,7 @@ export interface CsvFingerprint { bank: string | null; type: CsvType; }
 
 interface BankFingerprint {
   bank: string;       // normalized bank name for matching
-  type: 'bank' | 'credit';
+  type: 'bank' | 'credit' | 'investment';
   headerIncludes: string[];   // ALL must be present in header row
   headerExcludes?: string[];  // NONE must be present
 }
@@ -33,6 +33,8 @@ const BANK_FINGERPRINTS: BankFingerprint[] = [
   { bank: 'citi',        type: 'credit', headerIncludes: ['status', 'debit', 'credit', 'description'], headerExcludes: ['balance'] },
   // Capital One: Transaction Date, Posted Date, Card No., Description, Category, Debit, Credit
   { bank: 'capital one', type: 'credit', headerIncludes: ['transaction date', 'posted date', 'card no'] },
+  // Charles Schwab brokerage: Date, Action, Symbol, Description, Quantity, Price, Fees & Comm, Amount
+  { bank: 'schwab', type: 'investment', headerIncludes: ['action', 'symbol', 'quantity', 'fees & comm'] },
 ];
 
 const DATE_COL_HINTS = ['date','posting date','transaction date','trans date','post date','activity date','value date'];
@@ -62,6 +64,9 @@ export function detectCsvFingerprint(rawText: string): CsvFingerprint {
   }
   if (headerLine.includes('reference number') || headerLine.includes('ref no')) {
     return { bank: null, type: 'credit' };
+  }
+  if (headerLine.includes('symbol') && headerLine.includes('quantity')) {
+    return { bank: null, type: 'investment' };
   }
   return { bank: null, type: 'unknown' };
 }
@@ -124,6 +129,11 @@ export function parseCsv(text: string): { rows: CsvRow[]; finalBalance: number |
   const splitMode = amountIdx < 0 && debitIdx >= 0 && creditIdx >= 0;
   const refIdx = col(['reference number','reference no','reference','ref no','check no','check number','transaction id']);
   const typeIdx = col(['type','transaction type','trans type']);
+  // Brokerage-style exports (Schwab, etc.) carry an Action + Symbol instead of a
+  // self-explanatory description ("APPLE INC" alone doesn't say buy vs. sell).
+  // Only present on investment CSVs — -1 everywhere else, so other banks are unaffected.
+  const actionIdx = col(['action']);
+  const symbolIdx = col(['symbol']);
 
   if (dateIdx < 0) throw new Error('Could not find a Date column. Please share your CSV format so we can add support for it.');
   if (descIdx < 0) throw new Error('Could not find a Description/Payee column.');
@@ -167,7 +177,13 @@ export function parseCsv(text: string): { rows: CsvRow[]; finalBalance: number |
 
     const rawDate = cols[dateIdx]?.trim() ?? '';
     const date    = normalizeDate(rawDate);
-    const name    = rawDesc;
+
+    const action = actionIdx >= 0 ? cols[actionIdx]?.trim() ?? '' : '';
+    let name = rawDesc;
+    if (action) {
+      const label = symbolIdx >= 0 && cols[symbolIdx]?.trim() ? `${action} - ${cols[symbolIdx].trim()}` : action;
+      name = rawDesc && rawDesc.toLowerCase() !== action.toLowerCase() ? `${label} (${rawDesc})` : label;
+    }
     if (!date || !name) continue;
 
     const refRaw = refIdx >= 0 ? cols[refIdx]?.trim().replace(/\s+/g, ' ') : '';
@@ -191,8 +207,11 @@ export function parseCsv(text: string): { rows: CsvRow[]; finalBalance: number |
   return { rows, finalBalance };
 }
 
-/* MM/DD/YYYY → YYYY-MM-DD; already ISO dates pass through unchanged */
-function normalizeDate(raw: string): string {
+/* MM/DD/YYYY → YYYY-MM-DD; already ISO dates pass through unchanged.
+   Schwab-style "07/30/2026 as of 07/29/2026" (settlement "as of" trade date) —
+   take the settlement date, the first one, and drop the rest. */
+function normalizeDate(rawIn: string): string {
+  const raw = rawIn.split(/\s+as of\s+/i)[0].trim();
   const mdyMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (mdyMatch) return `${mdyMatch[3]}-${mdyMatch[1].padStart(2,'0')}-${mdyMatch[2].padStart(2,'0')}`;
   const dmyMatch = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);

@@ -1,17 +1,16 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import type { Category, Transaction } from '@/lib/dashboard/types';
+import type { Transaction } from '@/lib/dashboard/types';
+import type { BudgetWithSpent, Category, HistoryPoint, Project } from '@/lib/budgets/types';
 import { monthKeyOf } from '@/lib/dashboard/derive';
-import { assemble, daysIn, monthFraction, shiftMonth, TREND_MONTHS, type ServerBudget } from '@/lib/budgets/assemble';
+import { assemble, daysIn, monthFraction, shiftMonth, TREND_MONTHS } from '@/lib/budgets/assemble';
 import { computePlan } from '@/lib/budgets/calculations';
 import { canUndo, draftReducer, emptyDraft } from '@/lib/budgets/draft';
 import { buildBatchPayload, saveBudgetBatch } from '@/lib/budgets/persist';
 
 export const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-export interface ProjectCategory { id: string; name: string; icon: string; color: string }
-export interface ProjectLite { id: string; name: string; icon: string; color?: string | null; type: string; status: string; categories?: ProjectCategory[] }
 
 export type Notice = { tone: 'success' | 'error'; text: string } | null;
 
@@ -24,9 +23,11 @@ const json = (r: Response) => (r.ok ? r.json() : Promise.reject(new Error(String
  */
 export function useBudgetScenario() {
   const [month, setMonthState] = useState(() => monthKeyOf(new Date()));
-  const [budgets, setBudgets] = useState<ServerBudget[]>([]);
+  const [budgets, setBudgets] = useState<BudgetWithSpent[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [projects, setProjects] = useState<ProjectLite[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [categoryAverages, setCategoryAverages] = useState<Record<string, number>>({});
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -38,6 +39,9 @@ export function useBudgetScenario() {
   const fetchBudgets = useCallback(async (m: string) => {
     const b = await fetch(`${API}/budgets?month=${m}`, { credentials: 'include' }).then(json);
     setBudgets(Array.isArray(b) ? b : []);
+    // Plan history includes this month's totals; refresh it too, best-effort.
+    fetch(`${API}/budgets/history?months=6`, { credentials: 'include' }).then(json)
+      .then((h) => { if (Array.isArray(h)) setHistory(h); }).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -57,13 +61,18 @@ export function useBudgetScenario() {
         fetch(`${API}/categories`, { credentials: 'include' }).then(json),
         fetch(`${API}/projects`, { credentials: 'include' }).then(json),
         fetch(`${API}/transactions?from=${from}&to=${to}&limit=5000`, { credentials: 'include' }).then(json),
+        // Secondary panels: a failure here shouldn't block the editor.
+        fetch(`${API}/budgets/history?months=6`, { credentials: 'include' }).then(json).catch(() => []),
+        fetch(`${API}/budgets/category-averages?months=3&month=${month}`, { credentials: 'include' }).then(json).catch(() => ({})),
       ]))
-      .then(([b, c, p, t]) => {
+      .then(([b, c, p, t, h, avgs]) => {
         if (cancelled) return;
         setBudgets(Array.isArray(b) ? b : []);
         setCategories(Array.isArray(c) ? c : []);
         setProjects(Array.isArray(p) ? p : []);
         setTxs(Array.isArray(t) ? t : []);
+        setHistory(Array.isArray(h) ? h : []);
+        setCategoryAverages(avgs && typeof avgs === 'object' && !Array.isArray(avgs) ? avgs : {});
       })
       .catch(() => { if (!cancelled) setLoadError(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -143,7 +152,7 @@ export function useBudgetScenario() {
 
   return {
     month, setMonth, isCurrentMonth: month === monthKeyOf(now), now,
-    budgets, categories, projects, txs,
+    budgets, categories, projects, txs, history, categoryAverages,
     loading, loadError, saving, notice, setNotice,
     assembled, plan, draft, dispatch, dirty, canUndo: canUndo(draft),
     save, refresh,

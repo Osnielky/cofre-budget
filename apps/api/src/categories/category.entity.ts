@@ -29,7 +29,8 @@ export class Category {
   @Column()
   color: string;
 
-  /* 'expense' | 'income' | 'both' */
+  /* 'expense' | 'income' | 'both' | 'savings' | 'transfer'
+     savings and transfer are neither income nor spending. */
   @Column({ default: 'expense' })
   type: string;
 
@@ -40,6 +41,10 @@ export class Category {
   /* true = fixed expense (rent, insurance…), false = variable */
   @Column({ default: false })
   isFixed: boolean;
+
+  /* Only meaningful for expense/both categories; null until the user classifies it. */
+  @Column({ type: 'varchar', nullable: true, default: null })
+  wantNeed: 'want' | 'need' | null;
 
   @CreateDateColumn()
   createdAt: Date;

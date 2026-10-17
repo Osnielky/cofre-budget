@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Project } from './project.entity';
 import { ProjectCategory } from './project-category.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { isValidClosure, closedStatusFor } from './closure';
+import { pickFields } from '../common/http/pick-fields';
 
 export interface ProjectDto {
   name: string;
@@ -24,7 +26,15 @@ export interface ProjectCategoryDto {
   icon?: string;
   color?: string;
   order?: number;
+  /* 'expense' | 'income' — the client already sends this on edit; declaring it
+     keeps updateCategoryById's Object.assign honest. */
+  type?: string;
+  description?: string | null;
 }
+
+/** Fields a client may set on a project / project category; id, userId, projectType are server-owned. */
+const PROJECT_FIELDS = ['name', 'type', 'icon', 'color', 'description', 'imageUrl', 'purchasePrice', 'purchaseDate', 'status', 'salePrice', 'saleDate'] as const satisfies readonly (keyof ProjectDto)[];
+const PROJECT_CATEGORY_FIELDS = ['name', 'icon', 'color', 'order', 'type', 'description'] as const satisfies readonly (keyof ProjectCategoryDto)[];
 
 export interface CategoryBreakdown {
   id: string;
@@ -196,7 +206,7 @@ export class ProjectsService {
   }
 
   async create(userId: string, dto: ProjectDto): Promise<ProjectWithStats> {
-    const project = await this.repo.save(this.repo.create({ ...dto, userId }));
+    const project = await this.repo.save(this.repo.create({ ...pickFields(dto, PROJECT_FIELDS), userId }));
     const type    = dto.type ?? 'other';
 
     /* Only seed defaults if this type has no categories yet for this user */
@@ -215,7 +225,26 @@ export class ProjectsService {
     const project = await this.repo.findOneBy({ id });
     if (!project) throw new NotFoundException();
     if (project.userId !== userId) throw new ForbiddenException();
-    Object.assign(project, dto);
+
+    if (dto.status !== undefined) {
+      // A service isn't "sold" and a car isn't "terminated". The UI already
+      // offers only the right verb, but the rule has to hold here too or it
+      // only exists in one client.
+      const type = dto.type ?? project.type;
+      if (!isValidClosure(type, dto.status)) {
+        throw new BadRequestException(
+          `A ${type} project cannot be marked "${dto.status}" — use "${closedStatusFor(type)}" instead.`,
+        );
+      }
+      // Reactivating clears the closure, so a revived project never carries a
+      // stale sale price into its P&L.
+      if (dto.status === 'active') {
+        project.salePrice = null;
+        project.saleDate = null;
+      }
+    }
+
+    Object.assign(project, pickFields(dto, PROJECT_FIELDS));
     await this.repo.save(project);
     return this.withStats(project);
   }
@@ -261,7 +290,7 @@ export class ProjectsService {
     if (project.userId !== userId) throw new ForbiddenException();
     const count = await this.catRepo.countBy({ userId, projectType: project.type });
     return this.catRepo.save(
-      this.catRepo.create({ ...dto, userId, projectType: project.type ?? 'other', order: dto.order ?? count }),
+      this.catRepo.create({ ...pickFields(dto, PROJECT_CATEGORY_FIELDS), userId, projectType: project.type ?? 'other', order: dto.order ?? count }),
     );
   }
 
@@ -271,7 +300,7 @@ export class ProjectsService {
     if (project.userId !== userId) throw new ForbiddenException();
     const cat = await this.catRepo.findOneBy({ id: catId, userId });
     if (!cat) throw new NotFoundException();
-    Object.assign(cat, dto);
+    Object.assign(cat, pickFields(dto, PROJECT_CATEGORY_FIELDS));
     return this.catRepo.save(cat);
   }
 
@@ -302,14 +331,14 @@ export class ProjectsService {
   async createCategoryForType(type: string, userId: string, dto: ProjectCategoryDto): Promise<ProjectCategory> {
     const count = await this.catRepo.countBy({ userId, projectType: type });
     return this.catRepo.save(
-      this.catRepo.create({ ...dto, userId, projectType: type, order: dto.order ?? count }),
+      this.catRepo.create({ ...pickFields(dto, PROJECT_CATEGORY_FIELDS), userId, projectType: type, order: dto.order ?? count }),
     );
   }
 
   async updateCategoryById(catId: string, userId: string, dto: Partial<ProjectCategoryDto>): Promise<ProjectCategory> {
     const cat = await this.catRepo.findOneBy({ id: catId, userId });
     if (!cat) throw new NotFoundException();
-    Object.assign(cat, dto);
+    Object.assign(cat, pickFields(dto, PROJECT_CATEGORY_FIELDS));
     return this.catRepo.save(cat);
   }
 

@@ -3,6 +3,7 @@ import { Response } from 'express';
 import * as crypto from 'crypto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GmailService } from './gmail.service';
+import { cookieOptions } from '../common/http/cookies';
 
 @Controller('gmail')
 export class GmailController {
@@ -13,14 +14,7 @@ export class GmailController {
   connect(@Request() req: any, @Res() res: Response) {
     const nonce = crypto.randomBytes(16).toString('hex');
     const url = this.gmail.buildAuthUrl(req.user.id, nonce);
-    const isProd = process.env.NODE_ENV === 'production';
-    res.cookie('gmail_oauth_nonce', nonce, {
-      httpOnly: true,
-      sameSite: isProd ? 'none' : 'lax',
-      secure: isProd,
-      maxAge: 5 * 60 * 1000,
-      path: '/',
-    });
+    res.cookie('gmail_oauth_nonce', nonce, cookieOptions(undefined, 5 * 60 * 1000));
     return res.redirect(url);
   }
 

@@ -34,15 +34,26 @@ export class Project {
   @Column({ type: 'date', nullable: true })
   purchaseDate: string;
 
-  /* active | sold */
+  /* active | sold | terminated.
+
+     Held assets (vehicle/property/other) close as 'sold' and realise a gain
+     against cost basis. Ongoing operations (business/service/trading) close as
+     'terminated' and have no sale price, only a lifetime P&L. See closure.ts —
+     the transition is validated on update.
+
+     A terminated project reuses `saleDate` below as the date it closed and
+     leaves `salePrice` null. That is safe because every net-gain calculation
+     guards on `status === 'sold' && salePrice != null`, so a termination date
+     can never be read as a sale. */
   @Column({ default: 'active' })
   status: string;
 
+  /* Null until closed. Nullable in TS too, so reactivating can clear them. */
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
-  salePrice: number;
+  salePrice: number | null;
 
   @Column({ type: 'date', nullable: true })
-  saleDate: string;
+  saleDate: string | null;
 
   @Column({ type: 'uuid', nullable: true })
   purchaseTxId: string | null;

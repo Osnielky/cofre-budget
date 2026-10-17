@@ -102,14 +102,31 @@ export interface Plan {
 }
 
 /**
- * Projected month-end expenses using the app's existing run-rate method
- * (`spendingPace` on the dashboard): spent ÷ share-of-month-elapsed. A future
+ * Run-rate projection for one amount: spent ÷ share-of-month-elapsed. A future
  * month has no spending to extrapolate, so the plan itself is the projection.
  */
 export function projectExpenses(spent: Cents, monthFraction: number, totalBudget: Cents): Cents {
   if (monthFraction <= 0) return totalBudget;
   if (monthFraction >= 1) return spent;
   return Math.round(spent / monthFraction);
+}
+
+/**
+ * Month-end expense projection, matching the budgets page's established method
+ * (lib/budgets/derive `deriveBudget`): fixed categories end at what's already
+ * been paid, flexible ones extrapolate at the run-rate, and unbudgeted or
+ * uncategorized spending counts as-is.
+ */
+export function projectMonthExpenses(rows: DerivedRow[], totalSpent: Cents, monthFraction: number): Cents {
+  let projected = 0, rowSpent = 0;
+  for (const r of rows) {
+    rowSpent += r.spentCents;
+    const unbudgeted = r.budgetId === null && r.originalCents === 0;
+    projected += unbudgeted || (r.isFixed && monthFraction > 0)
+      ? r.spentCents
+      : projectExpenses(r.spentCents, monthFraction, r.budgetCents);
+  }
+  return projected + Math.max(0, totalSpent - rowSpent);
 }
 
 const RISK_ORDER: Record<HealthStatus, number> = { over: 0, unbudgeted: 1, near: 2, ok: 3, idle: 4 };
@@ -131,7 +148,7 @@ export function computePlan(input: PlanInputs): Plan {
   const plannedSavingsCents = input.expectedIncomeCents - totalBudgetCents;
   const originalPlannedSavingsCents = input.expectedIncomeCents - originalTotalBudgetCents;
   const savingsImpactCents = originalTotalBudgetCents - totalBudgetCents;
-  const projectedExpensesCents = projectExpenses(input.totalSpentCents, input.monthFraction, totalBudgetCents);
+  const projectedExpensesCents = projectMonthExpenses(rows, input.totalSpentCents, input.monthFraction);
 
   const health: HealthCounts = { over: 0, near: 0, ok: 0, unbudgeted: 0, idle: 0 };
   for (const r of rows) health[r.status]++;

@@ -1,14 +1,27 @@
-import { isTrackingAccount, isLiability } from '@/lib/accountTypes';
-import type { Transaction, Budget, BankAccount, Debt } from './types';
+import { isTrackingAccount, isLiability, accountTypeMeta } from '@/lib/accountTypes';
+import type { Transaction, Budget, BankAccount, Debt, Project, Category, ProjectCategory } from './types';
 
 /** Transfers between own accounts + debt repayments — excluded everywhere. */
 export function isTransfer(t: Transaction): boolean {
   return t.categoryRef?.type === 'transfer' || !!t.debtId;
 }
 
-/** Cash-flow eligible: not a transfer, not on a net-worth-only tracking account. */
+/** Money moved into savings/investments — still yours, so neither income nor spending. */
+export function isSavings(t: Transaction): boolean {
+  return t.categoryRef?.type === 'savings';
+}
+
+/** Cash-flow eligible: not a transfer or savings, not on a net-worth-only tracking account. */
 export function inCashFlow(t: Transaction): boolean {
-  return !isTransfer(t) && !isTrackingAccount(t.bankAccount?.accountType ?? '');
+  return !isTransfer(t) && !isSavings(t) && !isTrackingAccount(t.bankAccount?.accountType ?? '');
+}
+
+/** Net amount put into savings-type categories (outflows minus withdrawals). */
+export function savedTotal(txs: Transaction[]): number {
+  const sum = txs
+    .filter((t) => isSavings(t) && !t.debtId && !isTrackingAccount(t.bankAccount?.accountType ?? ''))
+    .reduce((s, t) => s - Number(t.amount), 0);
+  return +sum.toFixed(2);
 }
 
 export function txInMonth(txs: Transaction[], monthKey: string): Transaction[] {
@@ -63,13 +76,58 @@ export interface CategorySlice { id: string; name: string; icon: string; color: 
 const UNCAT = { id: 'uncat', name: 'Uncategorized', icon: '❓', color: '#6B6B8A' };
 const OTHER = { id: 'other', name: 'Other', icon: '·', color: '#6B6B8A' };
 
-export function categoryTotals(txs: Transaction[], dir: 'income' | 'expense'): CategorySlice[] {
+/**
+ * The bucket a transaction belongs to.
+ *
+ * A row linked to a project carries `projectCategoryRef` and, by the app's own
+ * convention, `categoryId = null`. Keying on the budget category alone would
+ * therefore file all project activity under "Uncategorized" — which is what it
+ * used to do.
+ *
+ * Picking a project category is optional: the project picker offers "No
+ * specific category" and `markAsPurchase()` always links that way, so
+ * `projectId` set with `projectCategoryId` null is a first-class state that the
+ * transactions page counts as categorised. Those rows fall back to a bucket for
+ * the project itself rather than to "Uncategorized", so the two views agree.
+ *
+ * Both project buckets are namespaced (`proj:` for a project category,
+ * `project:` for a whole project) so they can never collide with each other or
+ * with a budget category that happens to share an id.
+ */
+function bucketOf(t: Bucketable, projects: Map<string, BucketProject>): Bucket {
+  if (t.categoryRef) return t.categoryRef;
+  const pc = t.projectCategoryRef;
+  if (pc) return { id: `proj:${pc.id}`, name: pc.name, icon: pc.icon || '📁', color: pc.color };
+  const p = t.projectId ? projects.get(t.projectId) : null;
+  if (p) return { id: `project:${p.id}`, name: p.name, icon: p.icon || '📁', color: p.color };
+  return UNCAT;
+}
+
+export interface Bucket { id: string; name: string; icon: string; color: string }
+/* Deliberately narrower than Transaction/Project so screens with their own row
+   types (the transactions-page insights donut) can reuse the same bucketing
+   instead of growing a second, divergent copy of it. */
+export type Bucketable = {
+  categoryRef: Category | null;
+  projectCategoryRef?: ProjectCategory | null;
+  projectId: string | null;
+};
+export type BucketProject = Pick<Project, 'id' | 'name' | 'icon' | 'color'>;
+
+/** Build the project lookup once, then apply it per row. */
+export function makeBucketer(projects: BucketProject[] = []): (t: Bucketable) => Bucket {
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  return (t) => bucketOf(t, byId);
+}
+
+export function categoryTotals(txs: Transaction[], dir: 'income' | 'expense', projects: BucketProject[] = []): CategorySlice[] {
   const sign = dir === 'income' ? 1 : -1;
+  const bucket = makeBucketer(projects);
   const map = new Map<string, CategorySlice>();
   for (const t of txs) {
     if (!inCashFlow(t) || Math.sign(Number(t.amount)) !== sign) continue;
-    const c = t.categoryRef ?? UNCAT as never;
-    const key = t.categoryRef ? t.categoryRef.id : 'uncat';
+    const c = bucket(t);
+    const key = c.id;
     const cur = map.get(key) ?? { id: key, name: c.name, icon: c.icon, color: c.color, value: 0, pct: 0 };
     cur.value = +(cur.value + Math.abs(Number(t.amount))).toFixed(2);
     map.set(key, cur);
@@ -78,6 +136,60 @@ export function categoryTotals(txs: Transaction[], dir: 'income' | 'expense'): C
   const total = slices.reduce((s, x) => s + x.value, 0);
   for (const s of slices) s.pct = total > 0 ? +((s.value / total) * 100).toFixed(1) : 0;
   return slices;
+}
+
+export interface CategoryMonth { month: string; key: string; value: number }
+
+/** One bucket's monthly spend (or income), Jan..current month (yearTx starts Jan 1). */
+export function categoryMonthly(yearTx: Transaction[], bucketId: string, now: Date, projects: BucketProject[] = [], dir: 'income' | 'expense' = 'expense'): CategoryMonth[] {
+  const sign = dir === 'income' ? 1 : -1;
+  const year = now.getFullYear();
+  const bucket = makeBucketer(projects);
+  return Array.from({ length: now.getMonth() + 1 }, (_, i) => {
+    const key = `${year}-${String(i + 1).padStart(2, '0')}`;
+    const value = txInMonth(yearTx, key)
+      .filter((t) => inCashFlow(t) && Math.sign(Number(t.amount)) === sign && bucket(t).id === bucketId)
+      .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
+    return { month: MONTHS_SHORT[i], key, value: +value.toFixed(2) };
+  });
+}
+
+export interface TrendGroup {
+  label: string;
+  /** null for personal categories; the owning project otherwise. */
+  project: BucketProject | null;
+  options: CategorySlice[];
+}
+
+/**
+ * Expense (or income) buckets for the category-trend picker: personal categories first, then
+ * one group per project (ordered by spend) holding its project categories and
+ * an "All of <project>" bucket for its uncategorised spending.
+ */
+export function categoryTrendGroups(yearTx: Transaction[], projects: BucketProject[] = [], dir: 'income' | 'expense' = 'expense'): TrendGroup[] {
+  const slices = categoryTotals(yearTx, dir, projects);
+  // proj:<projectCategoryId> buckets don't carry their project; the transactions do.
+  const ownerOf = new Map<string, string>();
+  for (const t of yearTx) {
+    if (!t.categoryRef && t.projectCategoryRef && t.projectId) ownerOf.set(`proj:${t.projectCategoryRef.id}`, t.projectId);
+  }
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  const personal: CategorySlice[] = [];
+  const perProject = new Map<string, { project: BucketProject; options: CategorySlice[]; total: number }>();
+  for (const s of slices) {
+    const projectId = s.id.startsWith('project:') ? s.id.slice('project:'.length) : ownerOf.get(s.id);
+    const project = projectId ? byId.get(projectId) : undefined;
+    if (!project) { personal.push(s); continue; }
+    const group = perProject.get(project.id) ?? { project, options: [], total: 0 };
+    group.options.push(s.id.startsWith('project:') ? { ...s, name: `All of ${project.name}` } : s);
+    group.total += s.value;
+    perProject.set(project.id, group);
+  }
+  const groups: TrendGroup[] = personal.length ? [{ label: 'Personal', project: null, options: personal }] : [];
+  for (const g of [...perProject.values()].sort((a, b) => b.total - a.total)) {
+    groups.push({ label: g.project.name, project: g.project, options: g.options });
+  }
+  return groups;
 }
 
 export function foldOther(slices: CategorySlice[], max: number): CategorySlice[] {
@@ -109,12 +221,12 @@ export interface ExpenseChange {
   current: number; previous: number; delta: number; pct: number | null;
 }
 
-export function expenseChanges(yearTx: Transaction[], monthKey: string): { changes: ExpenseChange[]; unchanged: number } {
+export function expenseChanges(yearTx: Transaction[], monthKey: string, projects: BucketProject[] = []): { changes: ExpenseChange[]; unchanged: number } {
   const [y, m] = monthKey.split('-').map(Number);
   const prev = new Date(y, m - 2); // previous month
   const prevKey = monthKeyOf(prev);
-  const cur = categoryTotals(txInMonth(yearTx, monthKey), 'expense');
-  const before = new Map(categoryTotals(txInMonth(yearTx, prevKey), 'expense').map((s) => [s.id, s]));
+  const cur = categoryTotals(txInMonth(yearTx, monthKey), 'expense', projects);
+  const before = new Map(categoryTotals(txInMonth(yearTx, prevKey), 'expense', projects).map((s) => [s.id, s]));
   const all: ExpenseChange[] = [];
   const seen = new Set<string>();
   for (const s of cur) {
@@ -165,10 +277,13 @@ export function calendarDays(yearTx: Transaction[], monthKey: string): CalendarC
 export interface PaceStats { monthPct: number; budgetPct: number; projected: number; overBy: number; hasBudgets: boolean }
 
 export function spendingPace(budgets: Budget[], yearTx: Transaction[], monthKey: string, now: Date): PaceStats {
-  const spendingBudgets = budgets.filter((b) => b.category ? b.category.type !== 'income' : true);
+  const spendingBudgets = budgets.filter((b) => !b.projectCategoryId && b.category?.type !== 'income');
   const totalBudget = spendingBudgets.reduce((s, b) => s + Number(b.amount), 0);
+  // Measure only what the budgets cover — unbudgeted rent against a $100 food
+  // budget would read as thousands of percent over.
+  const budgeted = new Set(spendingBudgets.map((b) => b.category?.id).filter(Boolean));
   const spent = txInMonth(yearTx, monthKey)
-    .filter((t) => inCashFlow(t) && Number(t.amount) < 0)
+    .filter((t) => inCashFlow(t) && Number(t.amount) < 0 && !!t.categoryRef && budgeted.has(t.categoryRef.id))
     .reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
   const [y, m] = monthKey.split('-').map(Number);
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -190,10 +305,10 @@ export interface FixedVariableSplit {
   fixed: CategorySlice[]; variable: CategorySlice[];
 }
 
-export function fixedVariable(yearTx: Transaction[], monthKey: string): FixedVariableSplit {
+export function fixedVariable(yearTx: Transaction[], monthKey: string, projects: BucketProject[] = []): FixedVariableSplit {
   const txs = txInMonth(yearTx, monthKey).filter((t) => inCashFlow(t) && Number(t.amount) < 0);
-  const fixed = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed === true), 'expense');
-  const variable = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed !== true), 'expense');
+  const fixed = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed === true), 'expense', projects);
+  const variable = categoryTotals(txs.filter((t) => t.categoryRef?.isFixed !== true), 'expense', projects);
   const fixedTotal = +fixed.reduce((s, x) => s + x.value, 0).toFixed(2);
   const variableTotal = +variable.reduce((s, x) => s + x.value, 0).toFixed(2);
   const all = fixedTotal + variableTotal;
@@ -204,35 +319,19 @@ export function fixedVariable(yearTx: Transaction[], monthKey: string): FixedVar
   };
 }
 
-export interface SavingsPoint { month: string; actual: number; goal: number | null }
-export interface SavingsStats { points: SavingsPoint[]; current: number; goal: number | null; onTrackPct: number | null }
-
-export function savingsSeries(yearTx: Transaction[], now: Date, goal: number | null): SavingsStats {
-  const flow = monthlyCashFlow(yearTx, now);
-  let cum = 0;
-  const points: SavingsPoint[] = flow.map((m, i) => {
-    cum = +(cum + m.net).toFixed(2);
-    return { month: m.month, actual: cum, goal: goal != null ? +((goal * (i + 1)) / 12).toFixed(2) : null };
-  });
-  const current = points.length ? points[points.length - 1].actual : 0;
-  const goalNow = points.length && goal != null ? points[points.length - 1].goal! : null;
-  return {
-    points, current, goal,
-    onTrackPct: goalNow && goalNow > 0 ? +((current / goalNow) * 100).toFixed(1) : null,
-  };
-}
-
 export interface NetWorthItem { label: string; value: number; color: string }
 export interface NetWorthBreakdown {
   total: number; assets: number; liabilities: number;
   assetItems: NetWorthItem[]; liabilityItems: NetWorthItem[]; deltaPct: number | null;
+  monthNet: number;
 }
 
 /**
  * Reproduces the net-worth math from `apps/web/src/app/dashboard/page.tsx`:
  *   totalBalance = Σ(asset balances) − Σ|liability balances|
- *   receivables  = Σ(open debts' remaining)
- *   netWorth     = totalBalance + receivables  ≡  totalAssets − totalDebt
+ *   receivables  = Σ(open 'lent' debts' remaining)      — an asset
+ *   payables     = Σ(open 'owed' debts' remaining)      — a liability
+ *   netWorth     = totalBalance + receivables − payables
  * Liability balances are taken by magnitude (Math.abs), matching the page's
  * `isDebtAcc(a) ? -Math.abs(balance) : balance` — sign convention in the DB
  * must not change the reported debt.
@@ -242,9 +341,11 @@ export function netWorthBreakdown(
 ): NetWorthBreakdown {
   const assetAccts = accounts.filter((a) => !isLiability(a.accountType));
   const liabAccts  = accounts.filter((a) => isLiability(a.accountType));
-  const receivables = debts.filter((d) => d.status === 'open').reduce((s, d) => s + Number(d.remaining), 0);
+  const openDebts = debts.filter((d) => d.status === 'open');
+  const receivables = openDebts.filter((d) => d.direction === 'lent').reduce((s, d) => s + Number(d.remaining), 0);
+  const payables = openDebts.filter((d) => d.direction === 'owed').reduce((s, d) => s + Number(d.remaining), 0);
   const assets = +(assetAccts.reduce((s, a) => s + Number(a.balance), 0) + receivables).toFixed(2);
-  const liabilities = +liabAccts.reduce((s, a) => s + Math.abs(Number(a.balance)), 0).toFixed(2);
+  const liabilities = +(liabAccts.reduce((s, a) => s + Math.abs(Number(a.balance)), 0) + payables).toFixed(2);
   const total = +(assets - liabilities).toFixed(2);
   const monthNet = txInMonth(yearTx, monthKey).filter(inCashFlow)
     .reduce((s, t) => s + Number(t.amount), 0);
@@ -253,12 +354,86 @@ export function netWorthBreakdown(
     ...assetAccts.map((a) => ({ label: a.accountName, value: Number(a.balance), color: a.color })),
     ...(receivables > 0 ? [{ label: 'Owed to you', value: receivables, color: '#6B6B8A' }] : []),
   ];
+  const liabilityItems: NetWorthItem[] = [
+    ...liabAccts.map((a) => ({ label: a.accountName, value: Math.abs(Number(a.balance)), color: a.color })),
+    ...(payables > 0 ? [{ label: 'Debts you owe', value: payables, color: '#6B6B8A' }] : []),
+  ];
   return {
     total, assets, liabilities,
-    assetItems,
-    liabilityItems: liabAccts.map((a) => ({ label: a.accountName, value: Math.abs(Number(a.balance)), color: a.color })),
+    assetItems, liabilityItems,
     deltaPct: base > 0 ? +((monthNet / base) * 100).toFixed(1) : null,
+    monthNet: +monthNet.toFixed(2),
   };
+}
+
+export interface AssetMixAccount { id: string; label: string; value: number }
+export interface AssetMixGroup {
+  key: string; label: string; icon: string; value: number; pct: number; accounts: AssetMixAccount[];
+}
+
+const RECEIVABLES_GROUP_KEY = 'receivables';
+
+/**
+ * Groups asset accounts by their account type (Checking, Savings, Investment
+ * Account, …) plus a synthetic "Money owed to you" group for open debts
+ * receivable — the finest breakdown the data model supports, since accounts
+ * are the only real "asset" records in this app (no separate asset entity).
+ */
+export function assetMix(accounts: BankAccount[], debts: Debt[]): AssetMixGroup[] {
+  const assetAccts = accounts.filter((a) => !isLiability(a.accountType));
+  const groups = new Map<string, AssetMixGroup>();
+  for (const a of assetAccts) {
+    const meta = accountTypeMeta(a.accountType);
+    const key = meta.value;
+    const group = groups.get(key) ?? { key, label: meta.label, icon: meta.icon, value: 0, pct: 0, accounts: [] };
+    group.value = +(group.value + Number(a.balance)).toFixed(2);
+    group.accounts.push({ id: a.id, label: a.accountName, value: Number(a.balance) });
+    groups.set(key, group);
+  }
+  const openReceivables = debts.filter((d) => d.status === 'open' && d.direction === 'lent');
+  const receivables = openReceivables.reduce((s, d) => s + Number(d.remaining), 0);
+  if (receivables > 0) {
+    groups.set(RECEIVABLES_GROUP_KEY, {
+      key: RECEIVABLES_GROUP_KEY, label: 'Money owed to you', icon: '🤝',
+      value: +receivables.toFixed(2), pct: 0,
+      accounts: openReceivables.map((d, i) => ({ id: `debt-${i}`, label: 'Owed to you', value: Number(d.remaining) })),
+    });
+  }
+  const list = [...groups.values()].sort((a, b) => b.value - a.value);
+  const total = list.reduce((s, g) => s + g.value, 0);
+  for (const g of list) {
+    g.pct = total > 0 ? +((g.value / total) * 100).toFixed(1) : 0;
+    g.accounts.sort((a, b) => b.value - a.value);
+  }
+  return list;
+}
+
+const TREND_MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+export interface NetWorthTrendPoint { month: string; value: number }
+
+/**
+ * Approximate net-worth-over-time sparkline: walks backward from `current`
+ * by each month's net cash flow (the same approximation the net-worth-goal
+ * pace math already relies on). Capped to the current calendar year, since
+ * `yearTx` only covers Jan 1 → today.
+ */
+export function netWorthTrend(current: number, yearTx: Transaction[], now: Date, months = 6): NetWorthTrendPoint[] {
+  const year = now.getFullYear();
+  const end = now.getMonth();
+  const start = Math.max(0, end - months + 1);
+  const netByMonth: number[] = [];
+  for (let i = start; i <= end; i++) {
+    const mk = `${year}-${String(i + 1).padStart(2, '0')}`;
+    netByMonth.push(txInMonth(yearTx, mk).filter(inCashFlow).reduce((s, t) => s + Number(t.amount), 0));
+  }
+  const points: NetWorthTrendPoint[] = [];
+  let value = current;
+  for (let k = netByMonth.length - 1; k >= 0; k--) {
+    points.unshift({ month: TREND_MONTHS_SHORT[start + k], value: +value.toFixed(2) });
+    value -= netByMonth[k];
+  }
+  return points;
 }
 
 export interface DailyPoint { day: number; income: number; expenses: number; net: number }

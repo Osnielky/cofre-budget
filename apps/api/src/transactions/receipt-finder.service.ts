@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Receipt } from '../receipts/receipt.entity';
 import { Transaction } from './transaction.entity';
 import { GmailService } from '../gmail/gmail.service';
@@ -17,6 +17,15 @@ export interface ReceiptCandidate {
   rawSubject: string | null;
   amountDelta: number;
   source: 'cache' | 'gmail';
+  linked: boolean;
+}
+
+export interface TransactionCandidate {
+  id: string;
+  name: string;
+  date: string;
+  amount: number;
+  amountDelta: number;
   linked: boolean;
 }
 
@@ -59,10 +68,19 @@ export class ReceiptFinderService {
     const to = shiftDate(tx.date, windowDays);
 
     // 1) Local cache first — instant when the receipt was parsed before.
+    //    Must also be plausibly this merchant or amount: without that, any
+    //    unrelated receipt cached by the broad background sync (e.g. a
+    //    recurring toll charge) landing in the same date window would
+    //    short-circuit this and the Gmail search below would never run.
+    const merchantKey = merchantTerm(tx.name).replace(/\.com$/, '').toLowerCase();
     const cached = await this.receiptRepo
       .createQueryBuilder('r')
       .where('r.userId = :userId', { userId })
       .andWhere('(r.orderDate BETWEEN :from AND :to OR r.orderDate IS NULL)', { from, to })
+      .andWhere('(LOWER(r.merchant) LIKE :merchantLike OR ABS(r.total - :absAmount) < 0.01)', {
+        merchantLike: `%${merchantKey}%`,
+        absAmount,
+      })
       .getMany();
 
     if (cached.length > 0) {
@@ -108,6 +126,59 @@ export class ReceiptFinderService {
     return this.rank(fresh, tx, absAmount, 'gmail');
   }
 
+  /** Row-indicator support: which of the user's unlinked transactions have at least one
+      cached receipt that's both in their date window AND an exact amount match —
+      local-cache-only, no Gmail calls, so it's cheap enough to run for every row at once
+      instead of per-transaction on demand.
+
+      Date proximity alone isn't enough here: findCandidates' own cache lookup is
+      deliberately loose (date-only) because it feeds a browsable list the user visually
+      sanity-checks before linking. This feeds a bare "Receipt found" claim on every row,
+      so a same-week receipt from a completely different merchant would otherwise read as
+      a false positive on every transaction near it — amount must match too (the same
+      amountDelta === 0 bar the UI already uses to show its own ✓). */
+  async findCachedMatchIds(userId: string, windowDays = 4): Promise<string[]> {
+    const txs = await this.txRepo.find({ where: { userId, isSplitParent: false, receiptId: IsNull() } });
+    if (txs.length === 0) return [];
+
+    const receipts = await this.receiptRepo.find({ where: { userId } });
+    if (receipts.length === 0) return [];
+
+    const matched: string[] = [];
+    for (const tx of txs) {
+      const from = shiftDate(tx.date, -windowDays);
+      const to = shiftDate(tx.date, windowDays);
+      const absAmount = Math.abs(Number(tx.amount));
+      const hasCandidate = receipts.some((r) => {
+        const inWindow = !r.orderDate || (r.orderDate >= from && r.orderDate <= to);
+        return inWindow && Math.abs(Number(r.total) - absAmount) < 0.01;
+      });
+      if (hasCandidate) matched.push(tx.id);
+    }
+    return matched;
+  }
+
+  async findTransactionCandidates(
+    userId: string, receiptId: string, windowDays = 4,
+  ): Promise<TransactionCandidate[]> {
+    const receipt = await this.receiptRepo.findOneBy({ id: receiptId, userId });
+    if (!receipt) throw new NotFoundException('Receipt not found');
+
+    const absTotal = Math.abs(Number(receipt.total));
+    const from = receipt.orderDate ? shiftDate(receipt.orderDate, -windowDays) : null;
+    const to = receipt.orderDate ? shiftDate(receipt.orderDate, windowDays) : null;
+
+    const qb = this.txRepo.createQueryBuilder('t').where('t.userId = :userId', { userId });
+    if (from && to) {
+      qb.andWhere('(t.date BETWEEN :from AND :to OR t.receiptId = :receiptId)', { from, to, receiptId });
+    }
+    // Exclude transactions already linked to a *different* receipt.
+    qb.andWhere('(t.receiptId IS NULL OR t.receiptId = :receiptId)', { receiptId });
+    const candidates = await qb.getMany();
+
+    return this.rankTransactions(candidates, receipt, absTotal);
+  }
+
   /* The already-linked receipt is always surfaced (prepended even when outside the window). */
   private async rank(
     receipts: Receipt[], tx: Transaction, absAmount: number, source: 'cache' | 'gmail',
@@ -137,6 +208,29 @@ export class ReceiptFinderService {
         amountDelta: +Math.abs(Number(r.total) - absAmount).toFixed(2),
         source,
         linked: r.id === tx.receiptId,
+      }))
+      .sort((a, b) =>
+        Number(b.linked) - Number(a.linked) ||
+        a.amountDelta - b.amountDelta ||
+        (dateDist.get(a.id) ?? 0) - (dateDist.get(b.id) ?? 0),
+      );
+  }
+
+  private rankTransactions(txs: Transaction[], receipt: Receipt, absTotal: number): TransactionCandidate[] {
+    const receiptTime = receipt.orderDate ? new Date(`${receipt.orderDate}T00:00:00Z`).getTime() : null;
+    const dateDist = new Map(txs.map((t) => [
+      t.id,
+      receiptTime !== null ? Math.abs(new Date(`${t.date}T00:00:00Z`).getTime() - receiptTime) : Number.MAX_SAFE_INTEGER,
+    ]));
+
+    return txs
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        date: t.date,
+        amount: Number(t.amount),
+        amountDelta: +Math.abs(Math.abs(Number(t.amount)) - absTotal).toFixed(2),
+        linked: t.receiptId === receipt.id,
       }))
       .sort((a, b) =>
         Number(b.linked) - Number(a.linked) ||

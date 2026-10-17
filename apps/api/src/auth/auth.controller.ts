@@ -2,38 +2,25 @@ import { Controller, Post, Get, Patch, Body, Query, UseGuards, Request, Res, Htt
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { GoogleCallbackGuard } from './guards/google-callback.guard';
+import { isAdminEmail } from '../admin/admin-emails';
+import { cookieOptions } from '../common/http/cookies';
 
-const isProd = process.env.NODE_ENV === 'production';
-
-// In production the web and API are served from different Cloud Run domains,
-// which the browser treats as cross-site. SameSite=None (+Secure) is required
-// for the auth cookie to ride along on credentialed cross-origin requests.
-// Locally we stay on Lax so the cookie works over plain http on localhost.
-const COOKIE_OPTS = {
-  httpOnly: true,
-  sameSite: isProd ? ('none' as const) : ('lax' as const),
-  secure: isProd,
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-  path: '/',
-};
-
+const COOKIE_OPTS = cookieOptions(undefined, 7 * 24 * 60 * 60 * 1000);
 // clearCookie must match the same attributes or the browser won't remove it.
-const COOKIE_CLEAR_OPTS = {
-  httpOnly: true,
-  sameSite: isProd ? ('none' as const) : ('lax' as const),
-  secure: isProd,
-  path: '/',
-};
+const COOKIE_CLEAR_OPTS = cookieOptions();
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private authService: AuthService,
     private usersService: UsersService,
+    private config: ConfigService,
   ) {}
 
   // 5 attempts per 15 minutes — brute-force protection
@@ -99,14 +86,14 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@Request() req: any) {
-    return req.user;
+    return { ...req.user, isAdmin: isAdminEmail(req.user?.email, this.config.get<string>('ADMIN_EMAILS')) };
   }
 
   @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @Patch('profile')
-  updateProfile(@Request() req: any, @Body() body: { name?: string; savingsGoal?: number | null }) {
-    return this.usersService.updateProfile(req.user.id, { name: body.name, savingsGoal: body.savingsGoal });
+  updateProfile(@Request() req: any, @Body() body: { name?: string }) {
+    return this.usersService.updateProfile(req.user.id, { name: body.name });
   }
 
   @Throttle({ default: { ttl: 900_000, limit: 10 } })
@@ -122,12 +109,13 @@ export class AuthController {
   @Get('google')
   googleLogin() { /* passport redirects */ }
 
-  @UseGuards(AuthGuard('google'))
+  @UseGuards(GoogleCallbackGuard)
   @Get('google/callback')
   googleCallback(@Request() req: any, @Res() res: Response) {
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    if (!req.user) return res.redirect(`${frontendUrl}/login?error=google`);
     const result = this.authService.login(req.user);
     res.cookie('access_token', result.access_token, COOKIE_OPTS);
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
     return res.redirect(`${frontendUrl}/dashboard`);
   }
 }

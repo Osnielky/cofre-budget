@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useBudgetScenario, API } from '@/hooks/useBudgetScenario';
 import { dailySeries, isIncomeBudget, monthsBack, shiftMonth, TREND_MONTHS } from '@/lib/budgets/assemble';
-import { categoryTotals, foldOther, txInMonth } from '@/lib/dashboard/derive';
+import { categoryTotals, foldOther, inCashFlow, txInMonth } from '@/lib/dashboard/derive';
+import { dayOfMonth, daysInMonth, elapsedPct, roundUp50, unbudgetedSpending } from '@/lib/budgets/derive';
+import type { BudgetWithSpent } from '@/lib/budgets/types';
+import type { DerivedRow } from '@/lib/budgets/calculations';
+import { toCents } from '@/lib/budgets/money';
 import BudgetSummaryCards from '@/components/budgets/BudgetSummaryCards';
 import BudgetVsActualChart from '@/components/budgets/BudgetVsActualChart';
 import SpendingDistributionChart from '@/components/budgets/SpendingDistributionChart';
@@ -15,12 +19,19 @@ import { BudgetScenarioToolbar, ConfirmDialog, NoticeToast } from '@/components/
 import BudgetFormModal, { type BudgetFormRequest } from '@/components/budgets/BudgetFormModal';
 import ImportPlanModal from '@/components/budgets/ImportPlanModal';
 import SetAllModal from '@/components/budgets/SetAllModal';
-import IncomeTargets from '@/components/budgets/IncomeTargets';
-import { Icon, SectionCard } from '@/components/budgets/ui';
+import ActionsPanel from '@/components/budgets/ActionsPanel';
+import TargetsPanel from '@/components/budgets/TargetsPanel';
+import PlanHistory from '@/components/budgets/PlanHistory';
+import BudgetRowDetail from '@/components/budgets/BudgetRowDetail';
+import { Icon } from '@/components/budgets/ui';
 
 function monthLabel(m: string) {
   const [y, mo] = m.split('-').map(Number);
   return new Date(y, mo - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+}
+function lastDayLabel(m: string) {
+  const [y, mo] = m.split('-').map(Number);
+  return new Date(y, mo - 1, daysInMonth(m)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 const headerBtn = 'px-3 py-2 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 hover:bg-[var(--color-surface)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
@@ -58,6 +69,25 @@ export default function BudgetsPage() {
   const todayDay = s.isCurrentMonth ? s.now.getDate() : null;
   const targets = useMemo(() => s.budgets.filter(isIncomeBudget).sort((a, b) => b.percentage - a.percentage), [s.budgets]);
   const budgetCount = plan.rows.filter((r) => r.budgetId).length;
+
+  // The existing panels (actions, row detail) read server-shaped budgets; feed
+  // them the draft amounts so their advice always matches what's on screen.
+  const draftedSpending = useMemo<BudgetWithSpent[]>(() => {
+    const byId = new Map(plan.rows.filter((r) => r.budgetId).map((r) => [r.budgetId as string, r]));
+    return s.budgets.filter((b) => !isIncomeBudget(b)).flatMap((b) => {
+      const r = byId.get(b.id);
+      if (!r) return [];
+      return [{
+        ...b, amount: r.budgetCents / 100, spent: r.spentCents / 100, remaining: r.remainingCents / 100,
+        percentage: r.usagePct == null ? 0 : Math.round(r.usagePct),
+      }];
+    });
+  }, [s.budgets, plan.rows]);
+  const unbudgeted = useMemo(() => unbudgetedSpending(monthTxs.filter(inCashFlow), s.budgets), [monthTxs, s.budgets]);
+  const dLeft = daysInMonth(month) - dayOfMonth(month, s.now);
+  const remaining = plan.underBudgetCents / 100;
+  const totalTarget = plan.expectedIncomeCents / 100;
+  const totalEarned = plan.incomeTargetReceivedCents / 100;
 
   /* ── Row handlers (stable, so memoized rows don't re-render) ── */
   const onToggleSelect = useCallback((key: string) => setSelected((prev) => {
@@ -105,6 +135,29 @@ export default function BudgetsPage() {
     }, 80);
     window.setTimeout(() => setFlashKey((k) => (k === key ? null : k)), 1900);
   }, []);
+
+  /* ── Panel actions edit the draft instead of saving immediately ── */
+  const onRaise = useCallback((b: BudgetWithSpent, newAmount: number) => {
+    dispatch({ type: 'checkpoint' });
+    dispatch({ type: 'set', key: b.id, cents: toCents(newAmount) });
+    onReveal(b.id);
+  }, [dispatch, onReveal]);
+  const rowKeys = useMemo(() => new Set(plan.rows.map((r) => r.key)), [plan.rows]);
+  const onSetUnbudgeted = useCallback((categoryId: string) => {
+    const key = `new:${categoryId}`;
+    if (rowKeys.has(key)) onReveal(key);
+    else setFormReq({ kind: 'expense', editing: null, presetCategoryId: categoryId });
+  }, [rowKeys, onReveal]);
+  const renderDetail = useCallback((r: DerivedRow) => {
+    const b = r.budgetId ? draftedSpending.find((x) => x.id === r.budgetId) : undefined;
+    if (!b) return null;
+    const raiseTo = roundUp50(Math.max(r.spentCents, r.budgetCents) / 100);
+    return (
+      <BudgetRowDetail budget={b} txs={monthTxs.filter((t) => t.categoryRef?.id === r.categoryId && inCashFlow(t))}
+        avg3mo={r.categoryId ? s.categoryAverages[r.categoryId] : undefined} raiseTo={raiseTo}
+        onRaise={() => onRaise(b, raiseTo)} onDelete={() => onDelete(b.id)} deleting={deletingKey === b.id} />
+    );
+  }, [draftedSpending, monthTxs, s.categoryAverages, onRaise, onDelete, deletingKey]);
 
   /* ── Unsaved-changes guards ── */
   const changeMonth = (m: string) => {
@@ -195,6 +248,9 @@ export default function BudgetsPage() {
               <Icon name="list" size={13} /> Set all
             </button>
             {addBudgetBtn}
+            <span className="text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
+              Day {dayOfMonth(month, s.now)} of {daysInMonth(month)}
+            </span>
           </div>
         </header>
 
@@ -229,28 +285,32 @@ export default function BudgetsPage() {
                 <div className="min-w-0 order-2 desk:order-1">
                   <CategoryBudgetEditor rows={plan.rows} health={plan.health} monthTxs={monthTxs} trendLabels={trendLabels}
                     selected={selected} expanded={expanded} flashKey={flashKey} deletingKey={deletingKey} revealKey={revealKey}
-                    onSelectMany={onSelectMany} emptyAction={addBudgetBtn}
+                    onSelectMany={onSelectMany} emptyAction={addBudgetBtn} renderDetail={renderDetail}
                     dispatch={dispatch} onToggleSelect={onToggleSelect} onToggleExpand={onToggleExpand}
                     onEditDetails={onEditDetails} onDelete={onDelete} />
                 </div>
                 <aside aria-label="Budget tools"
-                  className="order-1 desk:order-2 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 desk:grid-cols-1 gap-4 desk:sticky desk:top-24">
+                  className="order-1 desk:order-2 grid grid-cols-1 md:grid-cols-2 desk:grid-cols-1 gap-4">
                   <BudgetQuickAdjust rows={plan.rows} draft={s.draft} dispatch={dispatch} selected={selected}
                     canUndo={s.canUndo} modifiedCount={plan.modifiedCount} />
                   <BudgetSavingsImpact plan={plan} />
-                  <div className="md:col-span-2 xl:col-span-1 desk:col-span-1">
-                    <BudgetHealth plan={plan} uncategorizedCents={s.assembled.uncategorizedCents} onReveal={onReveal} />
-                  </div>
+                  <BudgetHealth plan={plan} uncategorizedCents={s.assembled.uncategorizedCents} onReveal={onReveal} />
+                  <ActionsPanel spending={draftedSpending} unbudgeted={unbudgeted} month={month} now={s.now}
+                    daysLeft={dLeft} totalRemaining={remaining} budgetPerDay={dLeft > 0 ? +(remaining / dLeft).toFixed(2) : 0}
+                    onRaise={onRaise} onSetUnbudgeted={onSetUnbudgeted} />
                 </aside>
               </div>
 
-              {/* Income targets (feed Expected Income) */}
-              <SectionCard>
-                <IncomeTargets targets={targets} projects={s.projects} deletingId={deletingKey}
+              {/* Income targets (feed Expected Income) + plan history */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-start">
+                <TargetsPanel targets={targets} projects={s.projects} totalTarget={totalTarget} totalEarned={totalEarned}
+                  earnPct={totalTarget > 0 ? Math.round((totalEarned / totalTarget) * 100) : 0} lastDayLabel={lastDayLabel(month)}
                   onAdd={() => setFormReq({ kind: 'income', editing: null })}
                   onEdit={(t) => setFormReq({ kind: 'income', editing: t })}
-                  handleDelete={onDelete} />
-              </SectionCard>
+                  onDelete={onDelete} deletingId={deletingKey} />
+                <PlanHistory history={s.history} currentMonth={month} elapsedPct={elapsedPct(month, s.now)}
+                  onImport={() => { if (!s.dirty) setImportOpen(true); }} onSetAll={() => setSetAllOpen(true)} />
+              </div>
             </>
           )}
         </div>
@@ -265,7 +325,7 @@ export default function BudgetsPage() {
         confirmLabel="Discard changes" onConfirm={confirmPending} onCancel={cancelPending} />
 
       {formReq && (
-        <BudgetFormModal request={formReq} month={month} categories={s.categories} projects={s.projects} budgets={s.budgets}
+        <BudgetFormModal request={formReq} month={month} categories={s.categories} projects={s.projects} budgets={s.budgets} wideTxs={s.txs}
           onClose={() => setFormReq(null)} onSaved={refresh} />
       )}
       {importOpen && <ImportPlanModal month={month} onClose={() => setImportOpen(false)} onImported={refresh} />}
