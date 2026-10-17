@@ -78,6 +78,8 @@ NestJS modules wired in `app/app.module.ts`:
 
 Path alias `@/*` → `src/*` is defined in `apps/web/tsconfig.json`.
 
+**Budgets page** (`app/budgets/`, `components/budgets/`, `hooks/useBudgetScenario.ts`). All budget math lives in `lib/budgets/` (integer cents; `calculations.ts` is the one model every card/chart/row reads, `draft.ts` is the unsaved-scenario reducer). Edits are in-memory drafts until "Save changes", which calls the atomic `PUT /api/budgets/batch` (`apps/api/src/budgets/budget-batch.ts` validates; same carry-forward semantics as `PATCH`). Actual spending is computed client-side from transactions with the dashboard's `inCashFlow` rule, not from the API's per-budget `spent`. Tests: `npm run test:dashboard` (web libs) and `npm run test:api`.
+
 ### Styling & theming
 
 Tailwind v4 via `@tailwindcss/postcss`. Shape/font tokens live in `apps/web/src/app/globals.css` inside `@theme {}` — no `tailwind.config` file.

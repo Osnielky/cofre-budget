@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Request, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Param, Body, Query, UseGuards, Request, HttpCode } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BudgetsService } from './budgets.service';
+import { parseBatchBody } from './budget-batch';
 
 @UseGuards(JwtAuthGuard)
 @Controller('budgets')
@@ -38,6 +39,12 @@ export class BudgetsController {
   @Post()
   create(@Request() req: any, @Body() body: { categoryId?: string | null; amount: number; month?: string; projectId?: string | null; projectCategoryId?: string | null }) {
     return this.service.create(req.user.id, { ...body, month: body.month ?? currentMonth() });
+  }
+
+  /** Atomically save several budget amounts for one month (draft scenario save). */
+  @Put('batch')
+  batch(@Request() req: any, @Body() body: unknown) {
+    return this.service.batchSave(req.user.id, parseBatchBody(body));
   }
 
   @Patch(':id')

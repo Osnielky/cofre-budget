@@ -1,12 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Budget } from './budget.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { Project } from '../projects/project.entity';
 import { Category } from '../categories/category.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
 import { TRACKING_TYPES } from '../bank-accounts/account-types';
+import type { BatchItem, BatchRequest } from './budget-batch';
 
 export interface BudgetWithSpent extends Budget {
   spent: number;
@@ -162,8 +163,8 @@ export class BudgetsService {
     return this.repo.count({ where: { userId } });
   }
 
-  private async futureMonths(userId: string, fromMonth: string): Promise<string[]> {
-    const rows = await this.repo
+  private async futureMonths(userId: string, fromMonth: string, repo: Repository<Budget> = this.repo): Promise<string[]> {
+    const rows = await repo
       .createQueryBuilder('b')
       .select('DISTINCT b.month', 'month')
       .where('b.userId = :userId', { userId })
@@ -173,30 +174,30 @@ export class BudgetsService {
   }
 
   /** Propagate a regular category budget amount to all future months that already exist. */
-  private async propagateForward(userId: string, categoryId: string, amount: number, fromMonth: string, projectId?: string | null): Promise<void> {
-    for (const month of await this.futureMonths(userId, fromMonth)) {
-      const existing = await this.repo.findOne({ where: { userId, categoryId, month } });
+  private async propagateForward(userId: string, categoryId: string, amount: number, fromMonth: string, projectId?: string | null, repo: Repository<Budget> = this.repo): Promise<void> {
+    for (const month of await this.futureMonths(userId, fromMonth, repo)) {
+      const existing = await repo.findOne({ where: { userId, categoryId, month } });
       if (existing) {
         existing.amount = amount;
         existing.sourceMonth = fromMonth;
         if (projectId !== undefined) existing.projectId = projectId ?? null;
-        await this.repo.save(existing);
+        await repo.save(existing);
       } else {
-        await this.repo.save(this.repo.create({ userId, categoryId, amount, month, sourceMonth: fromMonth, projectId: projectId ?? null }));
+        await repo.save(repo.create({ userId, categoryId, amount, month, sourceMonth: fromMonth, projectId: projectId ?? null }));
       }
     }
   }
 
   /** Propagate a project-category income target to all future months that already exist. */
-  private async propagateProjectCategoryForward(userId: string, projectCategoryId: string, projectId: string | null, amount: number, fromMonth: string): Promise<void> {
-    for (const month of await this.futureMonths(userId, fromMonth)) {
-      const existing = await this.repo.findOne({ where: { userId, projectCategoryId, projectId: projectId ?? null, month } });
+  private async propagateProjectCategoryForward(userId: string, projectCategoryId: string, projectId: string | null, amount: number, fromMonth: string, repo: Repository<Budget> = this.repo): Promise<void> {
+    for (const month of await this.futureMonths(userId, fromMonth, repo)) {
+      const existing = await repo.findOne({ where: { userId, projectCategoryId, projectId: projectId ?? null, month } });
       if (existing) {
         existing.amount = amount;
         existing.sourceMonth = fromMonth;
-        await this.repo.save(existing);
+        await repo.save(existing);
       } else {
-        await this.repo.save(this.repo.create({ userId, categoryId: null, projectCategoryId, amount, month, sourceMonth: fromMonth, projectId: projectId ?? null }));
+        await repo.save(repo.create({ userId, categoryId: null, projectCategoryId, amount, month, sourceMonth: fromMonth, projectId: projectId ?? null }));
       }
     }
   }
@@ -274,6 +275,66 @@ export class BudgetsService {
       await this.propagateForward(userId, budget.categoryId, dto.amount, budget.month, dto.projectId);
     }
     return this.repo.findOneBy({ id }) as Promise<Budget>;
+  }
+
+  /** Save several budget amounts for one month atomically: either every item is
+      written (with the same carry-forward semantics as `update`/`create`) or
+      none is. Ownership and month are verified for every item before writing. */
+  async batchSave(userId: string, req: BatchRequest): Promise<{ saved: number }> {
+    const updates = req.items.filter((i): i is Extract<BatchItem, { kind: 'update' }> => i.kind === 'update');
+    const creates = req.items.filter((i): i is Extract<BatchItem, { kind: 'create' }> => i.kind === 'create');
+
+    await this.repo.manager.transaction(async (em) => {
+      const repo = em.getRepository(Budget);
+
+      const existing = updates.length
+        ? await repo.find({ where: { id: In(updates.map(u => u.id)) } })
+        : [];
+      const byId = new Map(existing.map(b => [b.id, b]));
+      for (const u of updates) {
+        const b = byId.get(u.id);
+        if (!b) throw new NotFoundException(`Budget ${u.id} not found`);
+        if (b.userId !== userId) throw new ForbiddenException();
+        if (b.month !== req.month) throw new BadRequestException(`Budget ${u.id} belongs to ${b.month}, not ${req.month}`);
+      }
+
+      if (creates.length) {
+        const cats = await em.getRepository(Category).find({ where: { id: In(creates.map(c => c.categoryId)) } });
+        const catById = new Map(cats.map(c => [c.id, c]));
+        for (const c of creates) {
+          const cat = catById.get(c.categoryId);
+          if (!cat || cat.userId !== userId) throw new NotFoundException(`Category ${c.categoryId} not found`);
+          if (cat.type === 'income' || cat.type === 'transfer') throw new BadRequestException(`Category ${cat.name} cannot have a spending budget`);
+        }
+      }
+
+      for (const u of updates) {
+        const b = byId.get(u.id)!;
+        b.amount = u.amount;
+        b.sourceMonth = b.month;
+        await repo.save(b);
+        if (b.projectCategoryId) {
+          await this.propagateProjectCategoryForward(userId, b.projectCategoryId, b.projectId ?? null, u.amount, b.month, repo);
+        } else if (b.categoryId) {
+          await this.propagateForward(userId, b.categoryId, u.amount, b.month, undefined, repo);
+        }
+      }
+
+      for (const c of creates) {
+        // A budget may already exist (e.g. created in another tab) — upsert.
+        const prior = await repo.findOne({ where: { userId, categoryId: c.categoryId, month: req.month } });
+        if (prior) {
+          prior.amount = c.amount;
+          prior.sourceMonth = req.month;
+          await repo.save(prior);
+        } else {
+          await repo.save(repo.create({ userId, categoryId: c.categoryId, amount: c.amount, month: req.month, sourceMonth: req.month, projectId: null }));
+        }
+        await this.propagateForward(userId, c.categoryId, c.amount, req.month, undefined, repo);
+      }
+    });
+
+    return { saved: req.items.length };
   }
 
   async remove(id: string, userId: string): Promise<void> {
