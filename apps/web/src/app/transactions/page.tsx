@@ -1345,23 +1345,43 @@ export default function TransactionsPage() {
 
           {/* ── Status tabs ── */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex gap-1 p-1 rounded-xl"
-              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-              {([
-                { id: 'all',       label: 'All',       count: transactions.length },
-                { id: 'expense',   label: 'Expenses',  count: transactions.filter((t) => Number(t.amount) < 0).length },
-                { id: 'income',    label: 'Income',    count: transactions.filter((t) => Number(t.amount) >= 0).length },
-                { id: 'recurring', label: 'Recurring', count: transactions.filter(isRecurringTx).length },
-              ] as { id: Filter; label: string; count: number }[]).map((f) => (
-                <button key={f.id} onClick={() => setFilter(f.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
-                  style={filter === f.id
-                    ? { background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
-                    : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
-                  {f.label}
-                  <span className="opacity-50">{f.count}</span>
-                </button>
-              ))}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex gap-1 p-1 rounded-xl"
+                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+                {([
+                  { id: 'all',       label: 'All',       count: transactions.length },
+                  { id: 'expense',   label: 'Expenses',  count: transactions.filter((t) => Number(t.amount) < 0).length },
+                  { id: 'income',    label: 'Income',    count: transactions.filter((t) => Number(t.amount) >= 0).length },
+                  { id: 'recurring', label: 'Recurring', count: transactions.filter(isRecurringTx).length },
+                ] as { id: Filter; label: string; count: number }[]).map((f) => (
+                  <button key={f.id} onClick={() => setFilter(f.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                    style={filter === f.id
+                      ? { background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
+                      : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
+                    {f.label}
+                    <span className="opacity-50">{f.count}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>Group by</span>
+                <div role="radiogroup" aria-label="Group transactions by" className="flex gap-1 p-1 rounded-xl"
+                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+                  {GROUP_BY_OPTIONS.map((o) => {
+                    const on = groupBy === o.value;
+                    return (
+                      <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => setGroupBy(o.value)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                        style={on
+                          ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
+                          : { color: 'var(--color-text-muted)', border: '1px solid transparent' }}>
+                        {o.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => setFilter('uncategorized')}
@@ -1379,42 +1399,20 @@ export default function TransactionsPage() {
                 style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
                 {transactions.length} total
               </button>
+              {groups.length > 1 && (
+                <button
+                  onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(groups.map((g) => g.id)))}
+                  className="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)]"
+                  style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                  {allCollapsed ? '↓ Expand all' : '↑ Collapse all'}
+                </button>
+              )}
             </div>
           </div>
         </div>
 
         {/* ── Transaction list ── */}
         <div className="px-6 py-5 flex flex-col gap-4">
-
-          {/* Group by + Expand / Collapse all */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>Group by</span>
-              <div role="radiogroup" aria-label="Group transactions by" className="flex gap-1 p-1 rounded-xl"
-                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                {GROUP_BY_OPTIONS.map((o) => {
-                  const on = groupBy === o.value;
-                  return (
-                    <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => setGroupBy(o.value)}
-                      className="px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                      style={on
-                        ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
-                        : { color: 'var(--color-text-muted)', border: '1px solid transparent' }}>
-                      {o.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            {groups.length > 1 && (
-              <button
-                onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(groups.map((g) => g.id)))}
-                className="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)]"
-                style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
-                {allCollapsed ? '↓ Expand all' : '↑ Collapse all'}
-              </button>
-            )}
-          </div>
 
           {loading ? (
             <p className="py-16 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading transactions…</p>
