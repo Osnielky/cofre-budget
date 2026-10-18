@@ -21,6 +21,7 @@ const SplitTransactionModal = dynamic(() => import('@/components/SplitTransactio
 import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
 import { buildRecurringMap, normalize } from './recurring';
 import { pickProjectSuggestion } from '@/lib/transactions/suggestions';
+import { groupTransactions, GROUP_BY_OPTIONS, type GroupBy, type GroupKind } from '@/lib/transactions/grouping';
 import { isClosed, closureKind, selectableProjects } from '@/lib/projects/closure';
 import LinkTransferModal from '@/components/LinkTransferModal';
 import StatStrip from './StatStrip';
@@ -101,6 +102,19 @@ interface DebtLite { id: string; borrowerName: string; remaining: number; status
 type Filter    = 'all' | 'uncategorized' | 'expense' | 'income' | 'recurring';
 type RangeMode = 'month' | 'custom';
 
+/* Non-bank group accents. Hex (not CSS vars) because the group header appends
+   alpha suffixes to the colour, exactly as it does with a bank account's colour. */
+const GROUP_COLORS: Record<Exclude<GroupKind, 'bank'>, string> = {
+  income: '#22C55E', expense: '#F97316', other: '#38BDF8', recurring: '#A855F7', 'one-time': '#64748B',
+};
+const GROUP_ICONS: Record<Exclude<GroupKind, 'bank'>, string> = {
+  income: 'M12 19V5 M5 12l7-7 7 7',
+  expense: 'M12 5v14 M19 12l-7 7-7-7',
+  other: 'M7 7h13l-3-3 M17 17H4l3 3',
+  recurring: 'M21 12a9 9 0 1 1-3-6.7L21 8 M21 3v5h-5',
+  'one-time': 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z M12 6v6l4 2',
+};
+
 type RuleToast =
   | { kind: 'created'; matchLabel: string; matchStrategy?: 'exact' | 'prefix' }
   | { kind: 'duplicate'; matchLabel: string }
@@ -165,6 +179,17 @@ export default function TransactionsPage() {
   const [loading, setLoading]           = useState(true);
   const [syncing, setSyncing]           = useState(false);
   const [filter, setFilter]             = useState<Filter>('all');
+  const [groupBy, setGroupByState]      = useState<GroupBy>('bank');
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('cofre:txGroupBy');
+      if (saved === 'bank' || saved === 'flow' || saved === 'recurring') setGroupByState(saved);
+    } catch { /* storage unavailable — keep the default */ }
+  }, []);
+  function setGroupBy(g: GroupBy) {
+    setGroupByState(g);
+    try { localStorage.setItem('cofre:txGroupBy', g); } catch { /* ignore */ }
+  }
   const [search, setSearch]             = useState('');
   const [openPickerId, setOpenPickerId] = useState<string | null>(null);
   const [pickerPos, setPickerPos]       = useState<PickerPos | null>(null);
@@ -914,17 +939,8 @@ export default function TransactionsPage() {
   else if (sortMode === 'amount-desc') visible.sort((a, b) => b.date.localeCompare(a.date) || Math.abs(Number(b.amount)) - Math.abs(Number(a.amount)));
   else if (sortMode === 'amount-asc')  visible.sort((a, b) => b.date.localeCompare(a.date) || Math.abs(Number(a.amount)) - Math.abs(Number(b.amount)));
 
-  /* Group by account first, then by date within each account */
-  const byAccount = visible.reduce<Map<string, Transaction[]>>((map, tx) => {
-    const key = tx.bankAccountId ?? 'unknown';
-    if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(tx);
-    return map;
-  }, new Map());
-
-  const accountGroups = [...byAccount.entries()].sort(([, a], [, b]) =>
-    (a[0]?.bankAccount?.bankName ?? '').localeCompare(b[0]?.bankAccount?.bankName ?? ''),
-  );
+  /* Top-level groups (bank, income/expense or recurring), then by date within each */
+  const groups = groupTransactions(visible, groupBy, { isNonSpending, isRecurring: isRecurringTx });
 
   const hasPlaid = accounts.some((a) => a.provider === 'plaid');
 
@@ -933,7 +949,7 @@ export default function TransactionsPage() {
   function toggleCollapse(id: string) {
     setCollapsed((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
-  const allCollapsed = accountGroups.length > 0 && accountGroups.every(([id]) => collapsed.has(id));
+  const allCollapsed = groups.length > 0 && groups.every((g) => collapsed.has(g.id));
 
   /* Collapse state — date groups (key = accountId::date) */
   const [collapsedDates, setCollapsedDates] = useState<Set<string>>(new Set());
@@ -1370,21 +1386,39 @@ export default function TransactionsPage() {
         {/* ── Transaction list ── */}
         <div className="px-6 py-5 flex flex-col gap-4">
 
-          {/* Expand / Collapse all */}
-          {accountGroups.length > 1 && (
-            <div className="flex justify-end">
+          {/* Group by + Expand / Collapse all */}
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>Group by</span>
+              <div role="radiogroup" aria-label="Group transactions by" className="flex gap-1 p-1 rounded-xl"
+                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+                {GROUP_BY_OPTIONS.map((o) => {
+                  const on = groupBy === o.value;
+                  return (
+                    <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => setGroupBy(o.value)}
+                      className="px-3 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                      style={on
+                        ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
+                        : { color: 'var(--color-text-muted)', border: '1px solid transparent' }}>
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {groups.length > 1 && (
               <button
-                onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(accountGroups.map(([id]) => id)))}
+                onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(groups.map((g) => g.id)))}
                 className="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)]"
                 style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
                 {allCollapsed ? '↓ Expand all' : '↑ Collapse all'}
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
           {loading ? (
             <p className="py-16 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading transactions…</p>
-          ) : accountGroups.length === 0 ? (
+          ) : groups.length === 0 ? (
             <div className="py-16 flex flex-col items-center gap-3 text-center"
               style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
               <span className="text-4xl">💸</span>
@@ -1403,13 +1437,15 @@ export default function TransactionsPage() {
               )}
             </div>
           ) : (
-            accountGroups.map(([accountId, txList]) => {
-              const acc        = txList[0]?.bankAccount;
+            groups.map((g) => {
+              const accountId  = g.id;
+              const txList     = g.txs;
+              const acc        = g.kind === 'bank' ? txList[0]?.bankAccount : undefined;
               const isCollapsed = collapsed.has(accountId);
               const accIncome       = txList.filter((t) => Number(t.amount) >= 0 && !isNonSpending(t)).reduce((s, t) => s + Number(t.amount), 0);
               const accExpense      = txList.filter((t) => Number(t.amount) < 0  && !isNonSpending(t)).reduce((s, t) => s + Number(t.amount), 0);
               const accUncategorized = txList.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
-              const accColor        = acc?.color || '#9B6DFF';
+              const accColor        = g.kind === 'bank' ? (acc?.color || '#9B6DFF') : GROUP_COLORS[g.kind];
 
               const dateMap = txList.reduce<Record<string, Transaction[]>>((m, tx) => {
                 (m[tx.date] ??= []).push(tx); return m;
@@ -1431,7 +1467,15 @@ export default function TransactionsPage() {
                     }}>
 
                     {/* Composite icon: bank logo + type badge */}
-                    {(() => {
+                    {g.kind !== 'bank' ? (
+                      <div className="shrink-0 rounded-xl flex items-center justify-center"
+                        style={{ width: 38, height: 38, background: `${accColor}22`, border: `1px solid ${accColor}40`, color: accColor }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                          strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d={GROUP_ICONS[g.kind]} />
+                        </svg>
+                      </div>
+                    ) : (() => {
                       const bankMeta = BANKS.find((b) => b.name === acc?.bankName);
                       const isCash   = acc?.accountType === 'cash';
                       return (
@@ -1468,10 +1512,10 @@ export default function TransactionsPage() {
                     })()}
 
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold truncate">{acc?.bankName ?? 'Unknown Bank'}</p>
+                      <p className="text-sm font-bold truncate">{g.kind === 'bank' ? (acc?.bankName ?? 'Unknown Bank') : g.label}</p>
                       <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
                         <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>
-                          {acc?.accountName}
+                          {g.kind === 'bank' ? acc?.accountName : g.hint}
                         </p>
                         {acc?.accountType && (() => { const tc = accountTypeMeta(acc.accountType).accent; return (
                           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 capitalize"
@@ -1647,6 +1691,14 @@ export default function TransactionsPage() {
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase"
                                       style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
                                       {tx.source}
+                                    </span>
+                                  )}
+                                  {/* Bank context, which the group header supplies only in Bank grouping */}
+                                  {groupBy !== 'bank' && tx.bankAccount && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md truncate max-w-48"
+                                      title={`${tx.bankAccount.bankName} · ${tx.bankAccount.accountName}`}
+                                      style={{ background: `color-mix(in srgb, ${tx.bankAccount.color || 'var(--color-primary)'} 14%, transparent)`, color: 'var(--color-text-secondary)' }}>
+                                      {tx.bankAccount.bankName} · {tx.bankAccount.accountName}
                                     </span>
                                   )}
                                   {tx.pending && (
