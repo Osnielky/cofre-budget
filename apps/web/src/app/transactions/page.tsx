@@ -982,9 +982,42 @@ export default function TransactionsPage() {
 
           {/* Title + actions */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
-              <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Track, review and organize your money</p>
+            <div className="flex items-center gap-x-6 gap-y-3 flex-wrap">
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
+                <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Track, review and organize your money</p>
+              </div>
+              {/* ── Date range selector ── */}
+              <div className="flex items-center gap-3 flex-wrap">
+                {rangeMode === 'month' ? (
+                  <div className="flex items-center gap-1 p-1 rounded-xl"
+                    style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+                    <button onClick={() => setMonth(prevMonth(month))}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] text-lg leading-none"
+                      style={{ color: 'var(--color-text-secondary)' }}>‹</button>
+                    <span className="px-3 text-sm font-semibold min-w-36 text-center">{monthLabel(month)}</span>
+                    <button onClick={() => setMonth(nextMonth(month))}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] text-lg leading-none"
+                      style={{ color: 'var(--color-text-secondary)' }}>›</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
+                      className="px-3 py-1.5 text-sm rounded-xl outline-none"
+                      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
+                    <span style={{ color: 'var(--color-text-muted)' }}>→</span>
+                    <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
+                      className="px-3 py-1.5 text-sm rounded-xl outline-none"
+                      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
+                  </div>
+                )}
+                <button onClick={() => setRangeMode((m) => m === 'month' ? 'custom' : 'month')}
+                  className="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)]"
+                  style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
+                  {rangeMode === 'month' ? '📅 Custom range' : '← Month view'}
+                </button>
+
+              </div>
             </div>
             <div className="flex items-center gap-2">
               {/* Notifications */}
@@ -1251,38 +1284,6 @@ export default function TransactionsPage() {
                 </button>
               )}
             </div>
-          </div>
-
-          {/* ── Date range selector ── */}
-          <div className="flex items-center gap-3 flex-wrap">
-            {rangeMode === 'month' ? (
-              <div className="flex items-center gap-1 p-1 rounded-xl"
-                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                <button onClick={() => setMonth(prevMonth(month))}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] text-lg leading-none"
-                  style={{ color: 'var(--color-text-secondary)' }}>‹</button>
-                <span className="px-3 text-sm font-semibold min-w-36 text-center">{monthLabel(month)}</span>
-                <button onClick={() => setMonth(nextMonth(month))}
-                  className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] text-lg leading-none"
-                  style={{ color: 'var(--color-text-secondary)' }}>›</button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
-                  className="px-3 py-1.5 text-sm rounded-xl outline-none"
-                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
-                <span style={{ color: 'var(--color-text-muted)' }}>→</span>
-                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
-                  className="px-3 py-1.5 text-sm rounded-xl outline-none"
-                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
-              </div>
-            )}
-            <button onClick={() => setRangeMode((m) => m === 'month' ? 'custom' : 'month')}
-              className="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)]"
-              style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
-              {rangeMode === 'month' ? '📅 Custom range' : '← Month view'}
-            </button>
-
           </div>
 
           {/* ── Stat strip ── */}
