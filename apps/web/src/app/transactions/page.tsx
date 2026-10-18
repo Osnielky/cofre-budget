@@ -25,6 +25,7 @@ import { groupTransactions, GROUP_BY_OPTIONS, type GroupBy, type GroupKind } fro
 import { isClosed, closureKind, selectableProjects } from '@/lib/projects/closure';
 import LinkTransferModal from '@/components/LinkTransferModal';
 import StatStrip from './StatStrip';
+import CategoryChooser from '@/components/transactions/CategoryChooser';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -232,8 +233,6 @@ export default function TransactionsPage() {
   const [manualTxSaving, setManualTxSaving] = useState(false);
   const [manualTxError, setManualTxError] = useState('');
   const [manualAccOpen, setManualAccOpen] = useState(false);
-  const [manualCatOpen, setManualCatOpen] = useState(false);
-  const [manualCatSearch, setManualCatSearch] = useState('');
   const today = new Date().toISOString().slice(0, 10);
   const EMPTY_MANUAL_TX = { name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '', projectId: '', projectCategoryId: '' };
   const [manualTx, setManualTx] = useState({ name: '', amountStr: '', sign: '-' as '+' | '-', date: today, bankAccountId: '', categoryId: '', debtId: '', note: '', projectId: '', projectCategoryId: '' });
@@ -2536,37 +2535,26 @@ export default function TransactionsPage() {
         {showManualTx && createPortal(
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
             style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowManualTx(false); setManualAccOpen(false); setManualCatOpen(false); setEditingTxId(null); } }}>
+            onMouseDown={(e) => { if (e.target === e.currentTarget) { setShowManualTx(false); setManualAccOpen(false); setEditingTxId(null); } }}>
             {(() => {
               const isExpense  = manualTx.sign === '-';
               const accent     = isExpense ? 'var(--color-orange)' : 'var(--color-green)';
               const selAcc     = accounts.find((a) => a.id === manualTx.bankAccountId);
               const selCat     = categories.find((c) => c.id === manualTx.categoryId);
               const selDebt    = debts.find((d) => d.id === manualTx.debtId);
-              const mq = manualCatSearch.trim().toLowerCase();
-              const matches = (n: string) => !mq || n.toLowerCase().includes(mq);
-              const catOptions = isExpense
-                ? categories.filter((c) => (c.type === 'expense' || c.type === 'both' || c.type === 'savings') && matches(c.name))
-                : null;
-              // Project categories, flattened so one search covers every project.
+              const expenseCats = categories.filter((c) => c.type === 'expense' || c.type === 'both' || c.type === 'savings');
+              const incomePrimary = categories.filter((c) => c.type === 'income' || c.type === 'both');
+              const incomeSecondary = categories.filter((c) => c.type === 'expense' || c.type === 'savings');
+              // Closed projects aren't offered — unless this row already uses one.
+              const chooserProjects = projects.filter((p) => openProjects.includes(p) || p.id === manualTx.projectId);
               const selProjCat = manualTx.projectCategoryId
                 ? projects.flatMap((p) => (p.categories ?? []).map((pc) => ({ project: p, cat: pc })))
                     .find((x) => x.cat.id === manualTx.projectCategoryId)
                 : null;
-              const manualProjOptions = projects.flatMap((p) =>
-                (p.categories ?? [])
-                  .filter((pc) => matches(pc.name) || matches(p.name))
-                  .map((pc) => ({ project: p, cat: pc })));
-              const incomePrimary = !isExpense
-                ? categories.filter((c) => c.type === 'income' || c.type === 'both')
-                : null;
-              const incomeSecondary = !isExpense
-                ? categories.filter((c) => c.type === 'expense' || c.type === 'savings')
-                : null;
               const amt        = parseFloat(manualTx.amountStr) || 0;
               return (
                 <form onSubmit={saveManualTx}
-                  className="w-full max-w-lg flex flex-col rounded-2xl"
+                  className="w-full max-w-lg md:max-w-4xl md:h-[min(780px,92dvh)] flex flex-col rounded-2xl"
                   style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '92dvh', overflow: 'hidden' }}>
 
                   {/* Hero header */}
@@ -2626,7 +2614,8 @@ export default function TransactionsPage() {
                       style={{ color: manualTx.name ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }} />
                   </div>
 
-                  <div className="flex flex-col gap-3 px-5 py-4 overflow-y-auto flex-1">
+                  <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
+                  <div className="flex flex-col gap-3 px-5 py-4 md:overflow-y-auto md:min-h-0">
 
                     {/* Date + Account */}
                     <div className="flex gap-3">
@@ -2651,7 +2640,7 @@ export default function TransactionsPage() {
                         <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                           {isExpense ? 'Paid from' : 'Deposited to'}
                         </span>
-                        <button type="button" onClick={() => { setManualAccOpen((o) => !o); setManualCatOpen(false); }}
+                        <button type="button" onClick={() => { setManualAccOpen((o) => !o); }}
                           className="px-3 py-2.5 text-sm flex items-center gap-2 rounded-xl outline-none text-left w-full"
                           style={{ background: 'var(--color-elevated)', border: `1px solid ${selAcc ? (selAcc.color || accent) + '55' : 'var(--color-elevated)'}`, color: selAcc ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                           {selAcc ? (
@@ -2686,165 +2675,6 @@ export default function TransactionsPage() {
                       </div>
                     </div>
 
-                    {/* Category */}
-                    <div className="flex flex-col gap-1.5" style={{ position: 'relative' }}>
-                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                        Category <span style={{ opacity: 0.5, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
-                      </span>
-                      <button type="button" onClick={() => { setManualCatOpen((o) => !o); setManualAccOpen(false); setManualCatSearch(''); }}
-                        className="px-3 py-2.5 text-sm flex items-center gap-2.5 rounded-xl outline-none text-left w-full"
-                        style={{ background: 'var(--color-elevated)', border: `1px solid ${selCat ? selCat.color + '44' : 'var(--color-elevated)'}`, color: selCat ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                        {selDebt ? (
-                          <>
-                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
-                            <span className="flex-1 font-medium" style={{ color: 'var(--color-card-violet)' }}>
-                              {selDebt.direction === 'owed' ? 'Debt payment · ' : 'Debt repayment · '}{selDebt.borrowerName}
-                            </span>
-                          </>
-                        ) : selProjCat ? (
-                          <>
-                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${selProjCat.cat.color}20` }}>{selProjCat.cat.icon}</span>
-                            <span className="flex-1 min-w-0">
-                              <span className="block font-medium truncate" style={{ color: selProjCat.cat.color }}>{selProjCat.cat.name}</span>
-                              <span className="block text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{selProjCat.project.icon} {selProjCat.project.name}</span>
-                            </span>
-                          </>
-                        ) : selCat ? (
-                          <>
-                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${selCat.color}20` }}>{selCat.icon}</span>
-                            <span className="flex-1 font-medium" style={{ color: selCat.color }}>{selCat.name}</span>
-                          </>
-                        ) : <span className="flex-1">Uncategorized</span>}
-                        <svg width="10" height="10" viewBox="0 0 12 12" fill="none" style={{ opacity: 0.4, flexShrink: 0 }}>
-                          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
-                      {manualCatOpen && (
-                        <div className="absolute top-full left-0 right-0 mt-1 rounded-xl flex flex-col"
-                          style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', zIndex: 60, maxHeight: 340, overflow: 'hidden' }}>
-                          <div className="p-2 shrink-0" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                            <input autoFocus value={manualCatSearch}
-                              onChange={(e) => setManualCatSearch(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder="Search categories or projects…"
-                              aria-label="Search categories"
-                              className="w-full px-2.5 py-2 text-xs outline-none rounded-lg"
-                              style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
-                          </div>
-                          <div className="overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
-                          <button type="button" onClick={() => { setManualTx((f) => ({ ...f, categoryId: '', projectId: '', projectCategoryId: '' })); setManualCatOpen(false); }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors"
-                            style={{ color: 'var(--color-text-muted)' }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-elevated)')}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-                            <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'var(--color-elevated)' }}>—</span>
-                            Uncategorized
-                          </button>
-                          {openDebts.length > 0 && (
-                            <>
-                              <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Debt repayment</p>
-                              {openDebts.map((d) => (
-                                <button key={d.id} type="button"
-                                  onClick={() => {
-                                    setManualTx((f) => ({ ...f, debtId: d.id, categoryId: '', sign: d.direction === 'owed' ? '-' : '+' }));
-                                    setManualCatOpen(false);
-                                  }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
-                                  style={{ background: manualTx.debtId === d.id ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)' : 'transparent', color: manualTx.debtId === d.id ? 'var(--color-card-violet)' : 'var(--color-text-primary)' }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.background = 'color-mix(in srgb, var(--color-card-violet) 12%, transparent)')}
-                                  onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.debtId === d.id ? 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)' : 'transparent')}>
-                                  <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
-                                  <span className="font-medium flex-1 text-left">
-                                    {d.direction === 'owed' ? '↓ ' : '↑ '}{d.borrowerName}
-                                  </span>
-                                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>${Number(d.remaining).toLocaleString('en-US', { minimumFractionDigits: 2 })} left</span>
-                                </button>
-                              ))}
-                              <div className="h-px my-1" style={{ background: 'var(--color-border)' }} />
-                            </>
-                          )}
-                          {isExpense ? (
-                            catOptions!.map((c) => (
-                              <button key={c.id} type="button"
-                                onClick={() => { setManualTx((f) => ({ ...f, categoryId: c.id })); setManualCatOpen(false); }}
-                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
-                                style={{ background: manualTx.categoryId === c.id ? `${c.color}18` : 'transparent', color: manualTx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}
-                                onMouseEnter={(e) => (e.currentTarget.style.background = `${c.color}12`)}
-                                onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.categoryId === c.id ? `${c.color}18` : 'transparent')}>
-                                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${c.color}20` }}>{c.icon}</span>
-                                <span className="font-medium">{c.name}</span>
-                              </button>
-                            ))
-                          ) : (
-                            <>
-                              {incomePrimary!.map((c) => (
-                                <button key={c.id} type="button"
-                                  onClick={() => { setManualTx((f) => ({ ...f, categoryId: c.id })); setManualCatOpen(false); }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
-                                  style={{ background: manualTx.categoryId === c.id ? `${c.color}18` : 'transparent', color: manualTx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}
-                                  onMouseEnter={(e) => (e.currentTarget.style.background = `${c.color}12`)}
-                                  onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.categoryId === c.id ? `${c.color}18` : 'transparent')}>
-                                  <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${c.color}20` }}>{c.icon}</span>
-                                  <span className="font-medium">{c.name}</span>
-                                </button>
-                              ))}
-                              {incomeSecondary!.length > 0 && (
-                                <>
-                                  <p className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Expense categories</p>
-                                  {incomeSecondary!.map((c) => (
-                                    <button key={c.id} type="button"
-                                      onClick={() => { setManualTx((f) => ({ ...f, categoryId: c.id })); setManualCatOpen(false); }}
-                                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
-                                      style={{ background: manualTx.categoryId === c.id ? `${c.color}18` : 'transparent', color: manualTx.categoryId === c.id ? c.color : 'var(--color-text-primary)' }}
-                                      onMouseEnter={(e) => (e.currentTarget.style.background = `${c.color}12`)}
-                                      onMouseLeave={(e) => (e.currentTarget.style.background = manualTx.categoryId === c.id ? `${c.color}18` : 'transparent')}>
-                                      <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${c.color}20` }}>{c.icon}</span>
-                                      <span className="font-medium">{c.name}</span>
-                                    </button>
-                                  ))}
-                                </>
-                              )}
-                            </>
-                          )}
-
-                          {manualProjOptions.length > 0 && (
-                            <>
-                              <div className="h-px my-1" style={{ background: 'var(--color-border)' }} />
-                              <p className="px-3 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Projects</p>
-                              {manualProjOptions.map(({ project, cat: pc }) => {
-                                const on = manualTx.projectCategoryId === pc.id && manualTx.projectId === project.id;
-                                return (
-                                  <button key={`${project.id}:${pc.id}`} type="button"
-                                    onClick={() => {
-                                      // Project- and budget-categorised are mutually exclusive.
-                                      setManualTx((f) => ({ ...f, projectId: project.id, projectCategoryId: pc.id, categoryId: '', debtId: '' }));
-                                      setManualCatOpen(false);
-                                    }}
-                                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors"
-                                    style={{ background: on ? `${pc.color}18` : 'transparent' }}
-                                    onMouseEnter={(e) => (e.currentTarget.style.background = `${pc.color}12`)}
-                                    onMouseLeave={(e) => (e.currentTarget.style.background = on ? `${pc.color}18` : 'transparent')}>
-                                    <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0" style={{ background: `${pc.color}20` }}>{pc.icon}</span>
-                                    <span className="flex-1 min-w-0 text-left">
-                                      <span className="block font-medium truncate" style={{ color: on ? pc.color : 'var(--color-text-primary)' }}>{pc.name}</span>
-                                      <span className="block text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{project.icon} {project.name}</span>
-                                    </span>
-                                  </button>
-                                );
-                              })}
-                            </>
-                          )}
-
-                          {catOptions?.length === 0 && manualProjOptions.length === 0 && manualCatSearch.trim() && (
-                            <p className="px-3 py-4 text-xs text-center" style={{ color: 'var(--color-text-muted)' }}>
-                              Nothing matches “{manualCatSearch}”.
-                            </p>
-                          )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
                   {/* Note */}
                   <div className="flex flex-col gap-1.5">
                     <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
@@ -2870,6 +2700,44 @@ export default function TransactionsPage() {
                       accent={accent} isExpense={isExpense} />
                   )}
 
+                  </div>
+
+                  {/* Category — inline picker, always visible */}
+                  <div className="flex flex-col gap-2.5 px-5 py-4 min-h-0 md:border-l" style={{ borderColor: 'var(--color-border)' }}>
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                        Category <span style={{ opacity: 0.5, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
+                      </span>
+                      {(selDebt || selProjCat || selCat) && (
+                        <span className="flex items-center gap-1.5 min-w-0 text-xs font-semibold px-2 py-1 rounded-lg"
+                          style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                          <span className="truncate">
+                            {selDebt
+                              ? `🤝 ${selDebt.direction === 'owed' ? 'Debt payment' : 'Debt repayment'} · ${selDebt.borrowerName}`
+                              : selProjCat
+                                ? `${selProjCat.cat.icon} ${selProjCat.cat.name} · ${selProjCat.project.name}`
+                                : `${selCat!.icon} ${selCat!.name}`}
+                          </span>
+                          <button type="button" aria-label="Clear category" className="shrink-0 cursor-pointer" style={{ color: 'var(--color-text-muted)' }}
+                            onClick={() => setManualTx((f) => ({ ...f, categoryId: '', projectId: '', projectCategoryId: '', debtId: '' }))}>✕</button>
+                        </span>
+                      )}
+                    </div>
+                    <div className="h-[22rem] md:h-auto md:flex-1 min-h-0 flex flex-col">
+                      <CategoryChooser
+                        key={manualTx.sign}
+                        accent={accent}
+                        categories={isExpense ? expenseCats : incomePrimary}
+                        secondary={isExpense ? undefined : { label: 'Expense categories', items: incomeSecondary }}
+                        projects={chooserProjects}
+                        debts={openDebts}
+                        value={{ categoryId: manualTx.categoryId, projectId: manualTx.projectId, projectCategoryId: manualTx.projectCategoryId, debtId: manualTx.debtId }}
+                        onPickCategory={(id) => setManualTx((f) => ({ ...f, categoryId: id, projectId: '', projectCategoryId: '', debtId: '' }))}
+                        // Project- and budget-categorised are mutually exclusive.
+                        onPickProjectCategory={(project, id) => setManualTx((f) => ({ ...f, projectId: project.id, projectCategoryId: id, categoryId: '', debtId: '' }))}
+                        onPickDebt={(d) => setManualTx((f) => ({ ...f, debtId: d.id, categoryId: '', projectId: '', projectCategoryId: '', sign: d.direction === 'owed' ? '-' : '+' }))} />
+                    </div>
+                  </div>
                   </div>
 
                   {/* Footer */}
