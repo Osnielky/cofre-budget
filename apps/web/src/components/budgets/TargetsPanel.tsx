@@ -62,7 +62,10 @@ export default function TargetsPanel({
           <div className="flex flex-col gap-2 mt-1">
             {targets.map((t) => {
               const earned = Number(t.spent), goal = Number(t.amount), pct = t.percentage, reached = pct >= 100;
-              const projCat = t.projectCategoryId ? t.project?.categories?.find((c) => c.id === t.projectCategoryId) : null;
+              // The budget's embedded project comes without its categories; the projects
+              // list (loaded with categories) is the reliable source for the name.
+              const projCats = t.project?.categories ?? projects.find((p) => p.id === t.projectId)?.categories;
+              const projCat = t.projectCategoryId ? projCats?.find((c) => c.id === t.projectCategoryId) : null;
               const displayCat = projCat ?? t.category;
               const tColor = displayCat?.color ?? 'var(--color-green)';
               return (

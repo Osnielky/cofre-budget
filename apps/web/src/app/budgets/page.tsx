@@ -282,12 +282,22 @@ export default function BudgetsPage() {
 
               {/* C — Editor + tools */}
               <div className="grid grid-cols-1 desk:grid-cols-[minmax(0,1fr)_300px] gap-4 sm:gap-5 items-start">
-                <div className="min-w-0 order-2 desk:order-1">
+                <div className="min-w-0 order-2 desk:order-1 flex flex-col gap-4 sm:gap-5">
                   <CategoryBudgetEditor rows={plan.rows} health={plan.health} monthTxs={monthTxs} trendLabels={trendLabels}
                     selected={selected} expanded={expanded} flashKey={flashKey} deletingKey={deletingKey} revealKey={revealKey}
                     onSelectMany={onSelectMany} emptyAction={addBudgetBtn} renderDetail={renderDetail}
                     dispatch={dispatch} onToggleSelect={onToggleSelect} onToggleExpand={onToggleExpand}
                     onEditDetails={onEditDetails} onDelete={onDelete} />
+                  {/* Income targets (feed Expected Income) + plan history */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-start">
+                    <TargetsPanel targets={targets} projects={s.projects} totalTarget={totalTarget} totalEarned={totalEarned}
+                      earnPct={totalTarget > 0 ? Math.round((totalEarned / totalTarget) * 100) : 0} lastDayLabel={lastDayLabel(month)}
+                      onAdd={() => setFormReq({ kind: 'income', editing: null })}
+                      onEdit={(t) => setFormReq({ kind: 'income', editing: t })}
+                      onDelete={onDelete} deletingId={deletingKey} />
+                    <PlanHistory history={s.history} currentMonth={month} elapsedPct={elapsedPct(month, s.now)}
+                      onImport={() => { if (!s.dirty) setImportOpen(true); }} onSetAll={() => setSetAllOpen(true)} />
+                  </div>
                 </div>
                 <aside aria-label="Budget tools"
                   className="order-1 desk:order-2 grid grid-cols-1 md:grid-cols-2 desk:grid-cols-1 gap-4">
@@ -301,16 +311,6 @@ export default function BudgetsPage() {
                 </aside>
               </div>
 
-              {/* Income targets (feed Expected Income) + plan history */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 items-start">
-                <TargetsPanel targets={targets} projects={s.projects} totalTarget={totalTarget} totalEarned={totalEarned}
-                  earnPct={totalTarget > 0 ? Math.round((totalEarned / totalTarget) * 100) : 0} lastDayLabel={lastDayLabel(month)}
-                  onAdd={() => setFormReq({ kind: 'income', editing: null })}
-                  onEdit={(t) => setFormReq({ kind: 'income', editing: t })}
-                  onDelete={onDelete} deletingId={deletingKey} />
-                <PlanHistory history={s.history} currentMonth={month} elapsedPct={elapsedPct(month, s.now)}
-                  onImport={() => { if (!s.dirty) setImportOpen(true); }} onSetAll={() => setSetAllOpen(true)} />
-              </div>
             </>
           )}
         </div>
