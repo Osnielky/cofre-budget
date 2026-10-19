@@ -1,7 +1,6 @@
 'use client';
 
 import { useThemeColors } from '@/components/ThemeProvider';
-import { fmt } from './chartTheme';
 
 /* ── Icons (stroke paths, 24×24 viewBox) ── */
 function StatIcon({ d }: { d: string }) {
@@ -44,6 +43,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
 
 export interface StatCardDef {
   label: string;
+  short?: string;                // phone-width label; falls back to label
   value: string;
   delta: number | null;          // % vs last month; null hides the badge
   inverseDelta?: boolean;        // true = a drop is good (expenses)
@@ -61,13 +61,13 @@ const ICONS: Record<StatCardDef['icon'], string> = {
 export default function StatCardsRow({ cards, loading }: { cards: StatCardDef[]; loading: boolean }) {
   const tc = useThemeColors();
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-5">
+    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-5">
       {cards.map((c) => {
         const good = c.delta == null ? true : (c.inverseDelta ? c.delta < 0 : c.delta > 0);
         const deltaTone = good ? tc.green : tc.rose;
         return (
           <div key={c.label}
-            className="card-lift p-5 flex flex-col gap-2.5 rounded-2xl min-w-0 cursor-default select-none overflow-hidden"
+            className="card-lift p-3.5 sm:p-5 flex flex-col gap-2 sm:gap-2.5 rounded-2xl min-w-0 cursor-default select-none overflow-hidden"
             style={{
               background: `linear-gradient(140deg, color-mix(in srgb, ${c.accent} 9%, transparent), var(--color-surface) 60%)`,
               backdropFilter: 'var(--glass-blur)',
@@ -75,14 +75,17 @@ export default function StatCardsRow({ cards, loading }: { cards: StatCardDef[];
               border: 'var(--glass-border)',
               boxShadow: 'var(--glass-shadow)',
             }}>
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+              <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0"
                 style={{ background: `color-mix(in srgb, ${c.accent} 18%, transparent)`, color: c.accent }}>
                 <StatIcon d={ICONS[c.icon]} />
               </span>
-              <span className="text-xs font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>{c.label}</span>
+              <span className="text-xs font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                <span className="sm:hidden">{c.short ?? c.label}</span>
+                <span className="hidden sm:inline">{c.label}</span>
+              </span>
             </div>
-            <p className="text-[22px] leading-7 font-bold tabular-nums truncate">
+            <p className="text-[19px] sm:text-[22px] leading-7 font-bold tabular-nums truncate">
               {loading ? <span className="opacity-30">—</span> : c.value}
             </p>
             <p className="flex items-center gap-1.5 text-[11px] min-w-0">

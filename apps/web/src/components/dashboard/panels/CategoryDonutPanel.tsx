@@ -67,9 +67,10 @@ export default function CategoryDonutPanel({ title, subtitle, slices: rawSlices,
       )}>
       {slices.length === 0 ? <PanelEmpty message="Nothing categorized here yet." /> : (
         <div className="flex flex-col gap-4 flex-1">
-          <div className="flex items-center gap-5 flex-wrap sm:flex-nowrap flex-1">
+          {/* Donut above the table on phones; side by side from sm up. */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-5 flex-1 min-w-0">
             {/* Donut */}
-            <div className="relative shrink-0 mx-auto sm:mx-0" style={{ width: 190, height: 190 }}>
+            <div className="relative shrink-0" style={{ width: 190, height: 190 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie data={slices} dataKey="value" nameKey="name" innerRadius={62} outerRadius={92}
@@ -86,23 +87,23 @@ export default function CategoryDonutPanel({ title, subtitle, slices: rawSlices,
             </div>
 
             {/* Category table */}
-            <div className="flex-1 min-w-0 flex flex-col gap-1 justify-evenly self-stretch">
+            <div className="flex-1 min-w-0 w-full flex flex-col gap-1 justify-evenly self-stretch">
               <div className="flex items-center gap-2.5 text-[10px] pb-1" style={{ color: 'var(--color-text-muted)' }}>
                 <span className="flex-1">Category</span>
-                <span className="w-20 text-right">{mode === 'amount' ? 'Amount' : 'Percent'}</span>
-                <span className="w-12 text-right">{mode === 'amount' ? '% of total' : 'Amount'}</span>
+                <span className="w-16 sm:w-20 text-right">{mode === 'amount' ? 'Amount' : 'Percent'}</span>
+                <span className="w-10 sm:w-12 text-right truncate">{mode === 'amount' ? '% of total' : 'Amount'}</span>
               </div>
               {slices.map((s) => (
                 <div key={s.id} className="flex items-center gap-2.5 min-w-0">
                   <IconChip slice={s} />
-                  <span className="text-xs truncate w-24 sm:w-28" style={{ color: 'var(--color-text-secondary)' }}>{s.name}</span>
-                  <div className="flex-1 h-1.5 rounded-full min-w-6" style={{ background: 'color-mix(in srgb, var(--color-text-muted) 14%, transparent)' }}>
+                  <span className="text-xs truncate w-20 sm:w-28" style={{ color: 'var(--color-text-secondary)' }}>{s.name}</span>
+                  <div className="flex-1 h-1.5 rounded-full min-w-4" style={{ background: 'color-mix(in srgb, var(--color-text-muted) 14%, transparent)' }}>
                     <div className="h-full rounded-full" style={{ width: `${(s.value / max) * 100}%`, background: s.color }} />
                   </div>
-                  <span className="w-20 text-right text-xs font-bold tabular-nums">
+                  <span className="w-16 sm:w-20 text-right text-xs font-bold tabular-nums shrink-0">
                     {mode === 'amount' ? `$${fmt(s.value)}` : `${s.pct}%`}
                   </span>
-                  <span className="w-12 text-right">
+                  <span className="w-10 sm:w-12 text-right shrink-0">
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded tabular-nums"
                       style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
                       {mode === 'amount' ? `${Math.round(s.pct)}%` : `$${fmt(s.value)}`}

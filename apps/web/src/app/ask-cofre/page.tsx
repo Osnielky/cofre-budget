@@ -85,7 +85,7 @@ export default function AskCofrePage() {
     return (
       <div className="flex h-dvh overflow-hidden">
         <Sidebar />
-        <main className="flex-1 flex items-center justify-center p-6">
+        <main className="flex-1 flex items-center justify-center p-6 pt-20 md:pt-6">
           <div className="max-w-md text-center rounded-2xl p-8 flex flex-col items-center gap-4"
             style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
             {/* eslint-disable-next-line @next/next/no-img-element -- fixed-color brand asset, not a themed vector icon */}
@@ -107,7 +107,7 @@ export default function AskCofrePage() {
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-hidden pt-14 md:pt-0 flex">
-        <div className="flex-1 flex flex-col min-w-0 px-6 md:px-8 py-6 gap-4">
+        <div className="flex-1 flex flex-col min-w-0 px-4 sm:px-6 md:px-8 py-4 sm:py-6 gap-4">
           {/* Header */}
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
@@ -115,7 +115,7 @@ export default function AskCofrePage() {
                 {/* eslint-disable-next-line @next/next/no-img-element -- fixed-color brand asset, not a themed vector icon */}
                 <img src="/ask-cofre-logo.png" alt="" className="w-10 h-10" style={{ objectFit: 'contain' }} />
                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
-                  style={{ background: 'var(--color-green)', borderColor: 'var(--color-bg)' }} />
+                  style={{ background: 'var(--color-green)', borderColor: 'var(--color-base)' }} />
               </span>
               <div>
                 <div className="flex items-center gap-2">

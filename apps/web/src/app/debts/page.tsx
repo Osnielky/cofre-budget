@@ -43,13 +43,13 @@ export default function DebtsPage() {
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
-        <div className="p-6 flex flex-col gap-5">
+        <div className="p-4 sm:p-6 flex flex-col gap-5">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(24px, 3vw, 34px)' }}>Loans &amp; Debts</h1>
               <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>Track money you lent and money you owe</p>
             </div>
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 flex-wrap">
               <button onClick={() => setShowRecordPayment(true)}
                 className="px-4 py-2.5 text-sm font-semibold rounded-xl flex items-center gap-2 transition-all hover:bg-[var(--color-elevated)]"
                 style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>

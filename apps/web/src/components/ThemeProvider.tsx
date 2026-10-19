@@ -35,8 +35,8 @@ const FALLBACK: ThemeColors = {
   primary: '#1E90FF', green: '#22C55E', rose: '#FF6B6B', amber: '#FBBF24',
   orange: '#F97316', sky: '#38BDF8', violet: '#A855F7',
   greenSoft: '#A7F3D0', roseSoft: '#FFC9C9',
-  textPrimary: '#E6EDF7', textSecondary: '#94A3B8', textMuted: '#5E7095',
-  border: 'rgba(30,144,255,0.14)', elevated: 'rgba(21,36,68,0.80)',
+  textPrimary: '#EAF0FA', textSecondary: '#A6B6D2', textMuted: '#7C8DB0',
+  border: 'rgba(77,166,255,0.16)', elevated: 'rgba(26,44,80,0.86)',
 };
 
 export function useThemeColors(): ThemeColors {

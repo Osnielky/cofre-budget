@@ -83,7 +83,11 @@ export default function Sidebar() {
         style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(2px)' }} />
     )}
 
-    <aside className={`w-64 shrink-0 flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-out md:static md:z-auto md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`} style={{
+    {/* Three widths: a slide-in drawer below md, a 76px icon rail on tablets
+        (md–lg) so content keeps most of the screen, and the full 256px
+        sidebar from lg up. Labels, section headings and the user block's text
+        only render at lg; the rail shows icons with title tooltips. */}
+    <aside className={`w-64 md:w-[76px] lg:w-64 shrink-0 flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-out md:static md:z-auto md:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`} style={{
       background: 'var(--color-surface)',
       backdropFilter: 'var(--glass-blur)',
       WebkitBackdropFilter: 'var(--glass-blur)',
@@ -100,17 +104,17 @@ export default function Sidebar() {
       </button>
 
       {/* ── Brand ── */}
-      <div className="px-6 pt-7 pb-6 mb-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
-        <Link href="/dashboard" className="flex items-center gap-3.5 no-underline">
-          <span className="w-14 h-14 rounded-full flex items-center justify-center shrink-0 overflow-hidden"
+      <div className="px-6 md:px-0 lg:px-6 pt-7 md:pt-5 lg:pt-7 pb-6 md:pb-4 lg:pb-6 mb-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
+        <Link href="/dashboard" className="flex items-center md:justify-center lg:justify-start gap-3.5 no-underline" title="Cofre">
+          <span className="w-14 h-14 md:w-11 md:h-11 lg:w-14 lg:h-14 rounded-full flex items-center justify-center shrink-0 overflow-hidden"
             style={{
               color: 'var(--color-primary)',
               border: '1px solid color-mix(in srgb, var(--color-primary) 45%, transparent)',
               boxShadow: '0 0 0 3px color-mix(in srgb, var(--color-primary) 10%, transparent)',
             }}>
-            <Logo size={30} className="block" />
+            <Logo size={30} className="block md:scale-[0.8] lg:scale-100" />
           </span>
-          <div className="flex flex-col gap-1.5">
+          <div className="flex md:hidden lg:flex flex-col gap-1.5">
             <span className="brand-name" style={{ color: 'var(--color-text-primary)' }}>
               Cofre
             </span>
@@ -123,14 +127,14 @@ export default function Sidebar() {
       </div>
 
       {/* ── Nav ── */}
-      <nav className="flex flex-col gap-1.5 px-4 flex-1 pt-2">
-        <p className="text-[10.5px] font-semibold uppercase pl-3 mb-1.5 mt-1"
+      <nav className="flex flex-col gap-1.5 px-4 md:px-2.5 lg:px-4 flex-1 pt-2">
+        <p className="md:hidden lg:block text-[10.5px] font-semibold uppercase pl-3 mb-1.5 mt-1"
           style={{ color: 'var(--color-text-muted)', letterSpacing: '0.28em' }}>Overview</p>
         {NAV.map(({ label, href, icon: Icon }) => {
           const active = pathname === href;
           return (
-            <Link key={href} href={href}
-              className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] transition-all group relative"
+            <Link key={href} href={href} title={label}
+              className="flex items-center md:justify-center lg:justify-start gap-3.5 px-3.5 md:px-0 lg:px-3.5 py-3 rounded-xl text-[15px] transition-all group relative"
               style={{
                 color: active ? 'var(--nav-active-fg, var(--color-text-primary))' : 'var(--color-text-secondary)',
                 background: active ? 'var(--nav-active-bg)' : 'transparent',
@@ -148,21 +152,21 @@ export default function Sidebar() {
               <span style={{ color: active ? 'var(--nav-icon-active)' : 'var(--color-text-secondary)', transition: 'color .15s' }}>
                 <Icon />
               </span>
-              {label}
+              <span className="md:hidden lg:inline">{label}</span>
             </Link>
           );
         })}
       </nav>
 
       {/* ── Settings ── */}
-      <div className="px-4 pb-2 flex flex-col gap-1.5">
-        <p className="text-[10.5px] font-semibold uppercase pl-3 mb-1.5"
+      <div className="px-4 md:px-2.5 lg:px-4 pb-2 flex flex-col gap-1.5">
+        <p className="md:hidden lg:block text-[10.5px] font-semibold uppercase pl-3 mb-1.5"
           style={{ color: 'var(--color-text-muted)', letterSpacing: '0.28em' }}>Account</p>
         {user?.isAdmin && (() => {
           const active = pathname === '/admin';
           return (
-            <Link href="/admin"
-              className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] transition-all relative"
+            <Link href="/admin" title="Admin"
+              className="flex items-center md:justify-center lg:justify-start gap-3.5 px-3.5 md:px-0 lg:px-3.5 py-3 rounded-xl text-[15px] transition-all relative"
               style={{
                 color: active ? 'var(--nav-active-fg, var(--color-text-primary))' : 'var(--color-text-secondary)',
                 background: active ? 'var(--nav-active-bg)' : 'transparent',
@@ -178,15 +182,15 @@ export default function Sidebar() {
                   style={{ background: 'var(--nav-active-bar)' }} />
               )}
               <span style={{ color: active ? 'var(--nav-icon-active)' : 'var(--color-text-muted)' }}><AdminIcon /></span>
-              Admin
+              <span className="md:hidden lg:inline">Admin</span>
             </Link>
           );
         })()}
         {(() => {
           const active = pathname === '/settings';
           return (
-            <Link href="/settings"
-              className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl text-[15px] transition-all relative"
+            <Link href="/settings" title="Settings"
+              className="flex items-center md:justify-center lg:justify-start gap-3.5 px-3.5 md:px-0 lg:px-3.5 py-3 rounded-xl text-[15px] transition-all relative"
               style={{
                 color: active ? 'var(--nav-active-fg, var(--color-text-primary))' : 'var(--color-text-secondary)',
                 background: active ? 'var(--nav-active-bg)' : 'transparent',
@@ -202,17 +206,18 @@ export default function Sidebar() {
                   style={{ background: 'var(--nav-active-bar)' }} />
               )}
               <span style={{ color: active ? 'var(--nav-icon-active)' : 'var(--color-text-muted)' }}><SettingsIcon /></span>
-              Settings
+              <span className="md:hidden lg:inline">Settings</span>
             </Link>
           );
         })()}
       </div>
 
       {/* ── User block ── */}
-      <div className="mx-3 mb-4 p-3 rounded-2xl flex items-center gap-2.5"
-        style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)' }}>
+      <div className="mx-3 md:mx-2 lg:mx-3 mb-4 p-3 md:p-2 lg:p-3 rounded-2xl flex md:flex-col lg:flex-row items-center gap-2.5 md:gap-2 lg:gap-2.5"
+        style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)' }}
+        title={user?.email ?? undefined}>
         <Avatar name={user?.name} email={user?.email} src={user?.avatarUrl} size={32} rounded={12} />
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 md:hidden lg:block">
           <div className="flex items-center gap-1.5">
             <p className="text-xs font-semibold truncate leading-tight" style={{ color: 'var(--color-text-primary)' }}>
               {displayName}

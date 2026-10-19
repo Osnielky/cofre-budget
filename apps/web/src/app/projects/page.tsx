@@ -467,26 +467,28 @@ export default function ProjectsPage() {
       <main className="flex-1 flex flex-col overflow-hidden pt-14 md:pt-0">
 
         {/* Header */}
-        <div className="shrink-0 px-6 pt-5 pb-4 flex items-center justify-between gap-3 z-20"
-          style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
-          <div>
+        <div className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-5 pb-4 flex items-center justify-between gap-3 z-20"
+          style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">Projects &amp; Assets</h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-xs mt-0.5 hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>
               Track cost basis and P&amp;L — cars, property, businesses, trading accounts.
             </p>
           </div>
           <button onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110"
+            className="flex items-center gap-2 px-3.5 sm:px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 shrink-0 whitespace-nowrap"
             style={{ background: 'var(--color-card-violet)' }}>
-            <PlusIcon /> New Project
+            <PlusIcon /> <span className="hidden sm:inline">New Project</span><span className="sm:hidden">New</span>
           </button>
         </div>
 
-        {/* ── Two-column body ── */}
+        {/* ── Two-column body. Below lg it is master/detail: the list fills the
+            screen until a project is picked, then the detail takes over with a
+            back button in its header. ── */}
         <div className="flex flex-1 min-h-0">
 
           {/* ── Left: project list ── */}
-          <div className="w-96 shrink-0 overflow-y-auto flex flex-col gap-1.5 p-3"
+          <div className={`${selectedId ? 'hidden lg:flex' : 'flex'} w-full lg:w-96 shrink-0 overflow-y-auto flex-col gap-1.5 p-3`}
             style={{ borderRight: '1px solid var(--color-border)' }}>
 
             {loading && <p className="text-xs p-2" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>}
@@ -579,7 +581,7 @@ export default function ProjectsPage() {
           </div>
 
           {/* ── Right: detail panel ── */}
-          <div className="flex-1 overflow-y-auto">
+          <div className={`${selectedId ? 'block' : 'hidden lg:block'} flex-1 min-w-0 overflow-y-auto`}>
             {(() => {
               const sel = selectedId ? projects.find((p) => p.id === selectedId) : null;
               if (!sel) return (
@@ -601,13 +603,21 @@ export default function ProjectsPage() {
                 <div className="flex flex-col">
 
                   {/* ── Compact header ── */}
-                  <div className="flex items-center gap-4 px-5 py-4 shrink-0"
+                  <div className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 shrink-0 flex-wrap sm:flex-nowrap"
                     style={{
                       background: `linear-gradient(135deg, ${color}18 0%, transparent 70%)`,
                       borderBottom: '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)',
                     }}>
+                    {/* Back to the list (phones and tablets only) */}
+                    <button type="button" onClick={() => setSelectedId(null)} aria-label="Back to projects"
+                      className="lg:hidden w-9 h-9 -ml-1 rounded-xl flex items-center justify-center shrink-0 transition-colors hover:bg-[var(--color-elevated)]"
+                      style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <path d="M15 18l-6-6 6-6" />
+                      </svg>
+                    </button>
                     {/* Image / icon box */}
-                    <div className="w-20 h-20 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center text-4xl"
+                    <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center text-3xl sm:text-4xl"
                       style={{
                         background: sel.imageUrl ? undefined : `${color}25`,
                         border: `1px solid ${color}45`,
@@ -649,8 +659,8 @@ export default function ProjectsPage() {
                         <p className="text-xs mt-1 truncate" style={{ color: 'var(--color-text-secondary)' }}>{sel.description}</p>
                       )}
                     </div>
-                    {/* Actions */}
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    {/* Actions: their own row on phones so the title keeps its width */}
+                    <div className="flex items-center gap-1.5 shrink-0 basis-full sm:basis-auto justify-end">
                       {!closed && closureKind(sel.type) === 'sale' && (
                         <button onClick={() => { setShowSell(sel); setSellForm({ salePrice: '', saleDate: new Date().toISOString().slice(0, 10) }); }}
                           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl hover:brightness-110"
@@ -686,7 +696,7 @@ export default function ProjectsPage() {
                   </div>
 
                   {/* ── Body ── */}
-                  <div className="flex flex-col gap-5 px-5 py-4">
+                  <div className="flex flex-col gap-5 px-4 sm:px-5 py-4">
 
                     {/* P&L breakdown */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -759,7 +769,7 @@ export default function ProjectsPage() {
                       const hasData       = lineData.length >= 2;
 
                       return (
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                           {/* Chart 1 */}
                           <div className="rounded-2xl p-4 flex flex-col gap-3"

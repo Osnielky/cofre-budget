@@ -23,16 +23,20 @@
    theme never requires component changes.
 ───────────────────────────────────────────── */
 :root {
-  /* Surfaces — translucent midnight-blue cards (light blur) on a navy gradient */
-  --color-base:     #0B1220;
-  --color-surface:  rgba(15, 27, 51, 0.55);
-  --color-elevated: rgba(21, 36, 68, 0.80);
-  --color-border:   rgba(30, 144, 255, 0.14);
+  /* Surfaces — translucent midnight-blue cards (light blur) on a navy gradient.
+     Surface and elevated sit two clear luminance steps above the base so the
+     page → card → control hierarchy reads without relying on borders alone. */
+  --color-base:     #0A1222;
+  --color-surface:  rgba(18, 32, 60, 0.62);
+  --color-elevated: rgba(26, 44, 80, 0.86);
+  --color-border:   rgba(77, 166, 255, 0.16);
 
-  /* Text */
-  --color-text-primary:   #E6EDF7;
-  --color-text-secondary: #94A3B8;
-  --color-text-muted:     #5E7095;
+  /* Text. Secondary and muted are tinted toward the accent instead of neutral
+     grey so they sit *in* the navy rather than on top of it. Muted measures
+     ≥ 4.5:1 on the surface — it carries most 10–11px labels. */
+  --color-text-primary:   #EAF0FA;
+  --color-text-secondary: #A6B6D2;
+  --color-text-muted:     #7C8DB0;
 
   /* Semantic. NOTE: --color-primary (electric blue) and --color-indigo
      are UI accents only — never chart series; blue/indigo/violet are
@@ -67,7 +71,7 @@
   --color-card-red:    #FF6B6B;
 
   /* Nav */
-  --nav-active-bg:   rgba(30, 144, 255, 0.12);
+  --nav-active-bg:   rgba(30, 144, 255, 0.13);
   --nav-active-bar:  linear-gradient(180deg, #1E90FF 0%, #6366F1 100%);
   --nav-icon-active: #4DA6FF;
 
@@ -77,9 +81,101 @@
 
   /* Glass — light blur, thin cyan-blue border, soft glow */
   --glass-blur:   blur(14px) saturate(140%);
-  --glass-border: 1px solid rgba(30, 144, 255, 0.16);
-  --glass-shadow: 0 12px 34px rgba(3, 8, 20, 0.55), 0 0 24px rgba(30, 144, 255, 0.05), inset 0 1px 0 rgba(230, 237, 247, 0.05);
-  --popover-bg: #13203C;
+  --glass-border: 1px solid rgba(77, 166, 255, 0.18);
+  --glass-shadow: 0 12px 34px rgba(3, 8, 20, 0.55), 0 0 24px rgba(30, 144, 255, 0.06), inset 0 1px 0 rgba(230, 237, 247, 0.06);
+  --popover-bg: #142242;
+
+  /* Page backdrop — a theme supplies its own gradient stack here. */
+  --bg-gradient:
+    radial-gradient(ellipse 90% 45% at 50% -10%, rgba(30, 144, 255, 0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(99, 102, 241, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 35% at 0% 60%, rgba(56, 189, 248, 0.05) 0%, transparent 60%),
+    linear-gradient(165deg, #10203C 0%, #0B1426 55%, #080E1C 100%);
+
+  /* Primary CTA (.btn-gold) — the two gradient stops plus its glow colour. */
+  --btn-primary-top:    #4DA6FF;
+  --btn-primary-bottom: #1E78E0;
+  --btn-primary-glow:   rgba(30, 144, 255, 0.38);
+  --btn-primary-text:   #FFFFFF;
+}
+
+/* ─────────────────────────────────────────────
+   Theme: Noir Gold — charcoal base, warm gold accent (matches the auth
+   page's gilded quote). Chart series are unchanged: the validated
+   green/sky/orange/amber/violet set stays CVD-safe on a neutral base.
+───────────────────────────────────────────── */
+html[data-theme="noir-gold"] {
+  --color-base:     #0D0D10;
+  --color-surface:  rgba(26, 26, 32, 0.74);
+  --color-elevated: rgba(38, 38, 46, 0.90);
+  --color-border:   rgba(224, 180, 90, 0.16);
+
+  --color-text-primary:   #F3EFE6;
+  --color-text-secondary: #B9B2A4;
+  --color-text-muted:     #8C877B;
+
+  --color-primary:  #E0B45A;
+  --color-indigo:   #C9A24E;
+
+  --nav-active-bg:   rgba(224, 180, 90, 0.12);
+  --nav-active-bar:  linear-gradient(180deg, #F2CF7A 0%, #B98A2E 100%);
+  --nav-icon-active: #F2CF7A;
+
+  --sidebar-bg: rgba(12, 12, 15, 0.90);
+  --header-bg:  rgba(14, 14, 18, 0.92);
+
+  --glass-border: 1px solid rgba(224, 180, 90, 0.18);
+  --glass-shadow: 0 12px 34px rgba(0, 0, 0, 0.60), 0 0 24px rgba(224, 180, 90, 0.05), inset 0 1px 0 rgba(255, 250, 240, 0.05);
+  --popover-bg: #1C1C22;
+
+  --bg-gradient:
+    radial-gradient(ellipse 90% 45% at 50% -10%, rgba(224, 180, 90, 0.10) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(185, 138, 46, 0.06) 0%, transparent 60%),
+    linear-gradient(165deg, #17171C 0%, #0F0F13 55%, #0A0A0D 100%);
+
+  --btn-primary-top:    #F2CF7A;
+  --btn-primary-bottom: #C9962F;
+  --btn-primary-glow:   rgba(224, 180, 90, 0.35);
+  --btn-primary-text:   #1A1406;
+}
+
+/* ─────────────────────────────────────────────
+   Theme: Aurora — deep teal base, mint-green accent. Primary is a UI accent
+   only; chart series stay the same validated palette.
+───────────────────────────────────────────── */
+html[data-theme="aurora"] {
+  --color-base:     #071512;
+  --color-surface:  rgba(14, 36, 33, 0.66);
+  --color-elevated: rgba(20, 50, 46, 0.88);
+  --color-border:   rgba(52, 211, 153, 0.16);
+
+  --color-text-primary:   #E9F5F1;
+  --color-text-secondary: #A3BFB6;
+  --color-text-muted:     #76958C;
+
+  --color-primary:  #34D399;
+  --color-indigo:   #2DD4BF;
+
+  --nav-active-bg:   rgba(52, 211, 153, 0.12);
+  --nav-active-bar:  linear-gradient(180deg, #6EE7B7 0%, #14B8A6 100%);
+  --nav-icon-active: #6EE7B7;
+
+  --sidebar-bg: rgba(6, 18, 16, 0.90);
+  --header-bg:  rgba(7, 21, 18, 0.92);
+
+  --glass-border: 1px solid rgba(52, 211, 153, 0.18);
+  --glass-shadow: 0 12px 34px rgba(0, 10, 8, 0.58), 0 0 24px rgba(52, 211, 153, 0.05), inset 0 1px 0 rgba(233, 245, 241, 0.05);
+  --popover-bg: #0F2622;
+
+  --bg-gradient:
+    radial-gradient(ellipse 90% 45% at 50% -10%, rgba(52, 211, 153, 0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(45, 212, 191, 0.07) 0%, transparent 60%),
+    linear-gradient(165deg, #0C2622 0%, #08191A 55%, #061213 100%);
+
+  --btn-primary-top:    #6EE7B7;
+  --btn-primary-bottom: #10B981;
+  --btn-primary-glow:   rgba(52, 211, 153, 0.35);
+  --btn-primary-text:   #04150F;
 }
 
 /* ── Reset ── */
@@ -96,11 +192,8 @@ body {
   margin: 0;
   min-height: 100dvh;
   background-color: var(--color-base);
-  /* Deep-navy gradient + faint electric-blue glow (style-guide visual language) */
-  background-image:
-    radial-gradient(ellipse 90% 45% at 50% -10%, rgba(30, 144, 255, 0.10) 0%, transparent 70%),
-    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(99, 102, 241, 0.06) 0%, transparent 60%),
-    linear-gradient(165deg, #0F1B33 0%, #0B1220 55%, #090E1C 100%);
+  /* Gradient stack comes from the theme (--bg-gradient). */
+  background-image: var(--bg-gradient);
   background-attachment: fixed;
 }
 body::before {
@@ -122,10 +215,10 @@ body::before {
 
 ::-webkit-scrollbar        { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: rgba(30, 144, 255, 0.25); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(30, 144, 255, 0.45); }
-:focus-visible { outline: 2px solid rgba(30, 144, 255, 0.60); outline-offset: 2px; border-radius: 6px; }
-::selection    { background: rgba(30, 144, 255, 0.30); color: #fff; }
+::-webkit-scrollbar-thumb  { background: color-mix(in srgb, var(--color-primary) 28%, transparent); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--color-primary) 48%, transparent); }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--color-primary) 65%, transparent); outline-offset: 2px; border-radius: 6px; }
+::selection    { background: color-mix(in srgb, var(--color-primary) 32%, transparent); color: var(--color-text-primary); }
 
 /* ── Card hover lift (style guide §4) — slight rise + stronger glow ── */
 .card-lift {
@@ -133,7 +226,7 @@ body::before {
 }
 .card-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 40px rgba(3, 8, 20, 0.60), 0 0 32px rgba(30, 144, 255, 0.10), inset 0 1px 0 rgba(230, 237, 247, 0.06);
+  box-shadow: 0 16px 40px rgba(3, 8, 20, 0.60), 0 0 32px color-mix(in srgb, var(--color-primary) 12%, transparent), inset 0 1px 0 rgba(230, 237, 247, 0.07);
 }
 @media (prefers-reduced-motion: reduce) {
   .card-lift, .card-lift:hover { transform: none; }
@@ -245,13 +338,13 @@ body::before {
    Class name .btn-gold is legacy (pre-Cobalt); it is the themed
    primary CTA. Restyle per theme here rather than renaming call sites. */
 .btn-gold {
-  background: linear-gradient(180deg, #4DA6FF, #1E78E0);
-  color: #FFFFFF;
-  box-shadow: 0 6px 22px rgba(30, 144, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  background: linear-gradient(180deg, var(--btn-primary-top), var(--btn-primary-bottom));
+  color: var(--btn-primary-text);
+  box-shadow: 0 6px 22px var(--btn-primary-glow), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 .btn-gold:hover {
-  background: linear-gradient(180deg, #6BB5FF, #4DA6FF);
-  box-shadow: 0 8px 28px rgba(30, 144, 255, 0.50);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--btn-primary-top) 80%, white), var(--btn-primary-top));
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--btn-primary-glow) 100%, var(--color-primary) 25%);
 }
 
 /* Top-tier CTA (Elite plan). Built from the theme's amber so a new theme only

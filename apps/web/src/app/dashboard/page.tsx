@@ -175,16 +175,16 @@ export default function DashboardPage() {
   const balanceBase     = netWorth - (d.daily.at(-1)?.net ?? 0);
   const money           = (n: number) => `${n < 0 ? '-' : ''}$${fmt(Math.abs(n))}`;
   const statCards: StatCardDef[] = [
-    { label: 'Total Balance',    value: money(netWorth), delta: d.netWorth.deltaPct,
+    { label: 'Total Balance',    short: 'Balance', value: money(netWorth), delta: d.netWorth.deltaPct,
       sub: receivables > 0 ? `incl. ${money(receivables)} owed to you` : payables > 0 ? `incl. ${money(payables)} you owe` : 'vs last month',
       accent: tc.sky, icon: 'wallet', spark: d.daily.map(p => balanceBase + p.net) },
-    { label: 'Monthly Income',   value: money(income), delta: incDelta, sub: targetPct != null ? `${targetPct}% of ${money(incomeTarget!)} target` : `vs ${monthShort(prevM)}: ${money(prevInc)}`,
+    { label: 'Monthly Income',   short: 'Income', value: money(income), delta: incDelta, sub: targetPct != null ? `${targetPct}% of ${money(incomeTarget!)} target` : `vs ${monthShort(prevM)}: ${money(prevInc)}`,
       accent: tc.green, icon: 'trendup', spark: d.daily.map(p => p.income) },
-    { label: 'Monthly Expenses', value: money(expenses), delta: expDelta, inverseDelta: true, sub: `vs ${monthShort(prevM)}: ${money(prevExp)}`,
+    { label: 'Monthly Expenses', short: 'Expenses', value: money(expenses), delta: expDelta, inverseDelta: true, sub: `vs ${monthShort(prevM)}: ${money(prevExp)}`,
       accent: tc.orange, icon: 'trenddn', spark: d.daily.map(p => p.expenses) },
-    { label: 'Monthly Savings',  value: money(net), delta: savDelta, sub: [income > 0 ? `${savingsRate.toFixed(1)}% savings rate` : null, invested > 0 ? `${money(invested)} invested` : null].filter(Boolean).join(' · ') || 'vs last month',
+    { label: 'Monthly Savings',  short: 'Savings', value: money(net), delta: savDelta, sub: [income > 0 ? `${savingsRate.toFixed(1)}% savings rate` : null, invested > 0 ? `${money(invested)} invested` : null].filter(Boolean).join(' · ') || 'vs last month',
       accent: tc.violet, icon: 'savings', spark: d.daily.map(p => p.net) },
-    { label: 'Budget Remaining', value: money(budgetRemaining), delta: null, sub: totalBudgeted > 0 ? `of ${money(totalBudgeted)} budgeted` : 'no budgets set',
+    { label: 'Budget Remaining', short: 'Budget left', value: money(budgetRemaining), delta: null, sub: totalBudgeted > 0 ? `of ${money(totalBudgeted)} budgeted` : 'no budgets set',
       accent: tc.amber, icon: 'budget', spark: totalBudgeted > 0 ? d.daily.map(p => totalBudgeted - p.expenses) : [] },
   ];
 
@@ -200,40 +200,39 @@ export default function DashboardPage() {
     : budgetsOver === 0 ? `All budgets are on track for ${monthName}.`
     : `${NUM_WORDS[budgetsOver] ?? budgetsOver} budget${budgetsOver === 1 ? '' : 's'} need${budgetsOver === 1 ? 's' : ''} attention before the end of ${monthName}.`;
 
-  const pillBase: React.CSSProperties = { padding: '14px 26px', letterSpacing: '0.18em' };
+  /* Pill CTAs: roomy on desktop, compact on phones so the three controls share a row. */
+  const pill = 'inline-flex items-center justify-center rounded-full text-[11.5px] sm:text-[12.5px] font-semibold uppercase no-underline transition-all px-4 py-2.5 sm:px-[26px] sm:py-3.5 tracking-[0.12em] sm:tracking-[0.18em] whitespace-nowrap';
 
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
-        <div className="px-6 md:px-8 py-6 flex flex-col gap-4">
+        <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-6 flex flex-col gap-4">
 
           {/* ── Topbar ── */}
-          <div className="flex items-end justify-between gap-6 flex-wrap">
-            <div>
-              <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(36px, 3.6vw, 48px)', lineHeight: 1.08 }}>
+          <div className="flex items-end justify-between gap-4 sm:gap-6 flex-wrap">
+            <div className="min-w-0">
+              <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(30px, 3.6vw, 48px)', lineHeight: 1.08 }}>
                 {greeting()}{user?.name ? <>, <span style={{ color: 'var(--color-primary)' }}>{user.name.split(' ')[0]}</span></> : ''}
               </h1>
-              <div className="rounded-full" style={{ width: 56, height: 3, background: 'var(--color-primary)', margin: '18px 0 14px' }} />
-              <p style={{ fontSize: 17, fontWeight: 300, color: 'var(--color-text-secondary)', maxWidth: 520, lineHeight: 1.65 }}>
+              <div className="rounded-full my-3.5 sm:mt-[18px] sm:mb-3.5" style={{ width: 56, height: 3, background: 'var(--color-primary)' }} />
+              <p className="text-[15px] sm:text-[17px]" style={{ fontWeight: 300, color: 'var(--color-text-secondary)', maxWidth: 520, lineHeight: 1.6 }}>
                 {healthLine} {attentionLine}
               </p>
             </div>
-            <div className="flex items-center gap-3.5 pb-2 flex-wrap">
+            <div className="flex items-center gap-2.5 sm:gap-3.5 pb-1 sm:pb-2 flex-wrap">
               {loading && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-green)' }} />}
-              <div className="flex items-center gap-0.5 rounded-full px-1.5 py-1.5" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+              <div className="flex items-center gap-0.5 rounded-full px-1.5 py-1" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                 <button onClick={() => !isEarliestMonth && setMonth(prevMonth)} disabled={isEarliestMonth} aria-label="Previous month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: 'var(--color-text-secondary)' }}>‹</button>
-                <span className="text-[12.5px] font-semibold uppercase px-1 min-w-28 text-center" style={{ letterSpacing: '0.12em' }}>{monthLabel(month)}</span>
+                <span className="text-[11.5px] sm:text-[12.5px] font-semibold uppercase px-1 min-w-24 sm:min-w-28 text-center tracking-[0.08em] sm:tracking-[0.12em]">{monthLabel(month)}</span>
                 <button onClick={() => setMonth(nextMonth)} disabled={isCurrentMonth} aria-label="Next month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-default" style={{ color: 'var(--color-text-secondary)' }}>›</button>
               </div>
               <Link href="/budgets"
-                className="inline-flex items-center justify-center rounded-full text-[12.5px] font-semibold uppercase no-underline transition-all hover:brightness-125"
-                style={{ ...pillBase, background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
+                className={`${pill} hover:brightness-125`}
+                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
                 View Reports
               </Link>
-              <Link href="/transactions"
-                className="btn-gold inline-flex items-center justify-center rounded-full text-[12.5px] font-semibold uppercase no-underline transition-all"
-                style={pillBase}>
+              <Link href="/transactions" className={`btn-gold ${pill}`}>
                 Add Transaction
               </Link>
             </div>

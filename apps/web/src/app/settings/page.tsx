@@ -530,12 +530,15 @@ function SettingsPageInner() {
 
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
         {/* Page header */}
-        <div className="sticky top-14 md:top-0 z-10 px-6 pt-6 pb-4"
-          style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
-          <h1 className="text-2xl font-bold tracking-tight mb-4">Settings</h1>
+        {/* top-0, not top-14: <main> already pads for the phone top bar, and a
+            scroll container's padding is excluded from the sticky box, so a 56px
+            offset here would double up and hide the first rows of every tab. */}
+        <div className="sticky top-0 z-10 px-4 sm:px-6 pt-5 sm:pt-6 pb-3 sm:pb-4"
+          style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
+          <h1 className="text-2xl font-bold tracking-tight mb-3 sm:mb-4">Settings</h1>
 
           {/* Tab bar */}
-          <div className="overflow-x-auto -mx-6 px-6 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none' }}>
+          <div className="overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none' }}>
           <div className="flex gap-1 p-1 rounded-xl w-full min-w-fit" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
             {TABS.map((tab) => (
               <Fragment key={tab.id}>
@@ -559,16 +562,16 @@ function SettingsPageInner() {
           </div>
         </div>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
 
           {/* ── BANK ACCOUNTS TAB ── */}
           {activeTab === 'banks' && (
             <div className="flex flex-col gap-5 max-w-3xl"><>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
                 <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
                   Connect your bank for automatic updates or add accounts manually.
                 </p>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                   <button onClick={openPlaidLink} disabled={connecting}
                     className="px-4 py-2 text-sm font-semibold text-white rounded-xl transition-all hover:brightness-110 disabled:opacity-60 flex items-center gap-2"
                     style={{ background: 'var(--color-card-green)' }}>
@@ -908,7 +911,7 @@ function SettingsPageInner() {
 
                     return (
                       <div key={account.id}
-                        className="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all hover:brightness-110"
+                        className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 sm:gap-4 px-3 sm:px-4 py-3 sm:py-3.5 rounded-2xl transition-all hover:brightness-110"
                         style={{ background: 'var(--color-elevated)', border: `1px solid ${color}28`, borderLeft: `3px solid ${color}` }}>
 
                         {/* Mini card visual */}
@@ -939,10 +942,10 @@ function SettingsPageInner() {
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>
-                              {account.accountName}
-                            </span>
+                          <p className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>
+                            {account.accountName}
+                          </p>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
                               style={{ background: `${meta.accent}18`, color: meta.accent }}>
                               {meta.label}
@@ -973,9 +976,11 @@ function SettingsPageInner() {
                           </p>
                         </div>
 
-                        {/* Balance */}
+                        {/* Balance + actions: their own row on phones (indented under the
+                            name), inline cells from sm up via display: contents. */}
+                        <div className="basis-full sm:basis-auto sm:contents flex items-center justify-between gap-2 pl-[4.25rem]">
                         <div className="text-right shrink-0">
-                          <p className="font-black text-base tabular-nums"
+                          <p className="font-black text-sm sm:text-base tabular-nums"
                             style={{ color: isDebt && balance > 0 ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>
                             {isDebt && balance > 0 ? '−' : ''}{account.currency} {Math.abs(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </p>
@@ -1017,6 +1022,7 @@ function SettingsPageInner() {
                             title="Remove account">
                             {deletingId === account.id ? <span className="text-xs">…</span> : <TrashIcon />}
                           </button>
+                        </div>
                         </div>
                       </div>
                     );

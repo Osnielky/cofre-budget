@@ -65,6 +65,20 @@ plus extras: bank accounts, Plaid, CSV import, projects, debts) are not listed.
 - **Premium plan structure** — large. `user.plan` field exists; needs free/pro
   limits + gating + upgrade UI + billing (Stripe is its own mini-project).
 
+## UI follow-ups (from the 2026-10-19 responsive + theme pass)
+
+- **Insights column at `lg`** — small. The Transactions "Financial Intelligence"
+  column now only renders at `xl` (below that it squeezed the list to ~250px).
+  At 1024–1279px a collapsible toggle would bring it back without the squeeze.
+- **Theme coverage on public pages** — small. The auth shell, landing page and
+  pricing page still hardcode Cobalt blues/gold; they ignore `data-theme`.
+- **Recharts container warnings** — small. Every `ResponsiveContainer` logs a
+  "width(-1)/height(-1)" warning on first paint; a `minWidth={0}` or an initial
+  size on the wrapper would silence it.
+- **`nx lint web` fails on `dev`** — small. Pre-existing: `react-hooks/exhaustive-deps`
+  "definition not found" (plugin not registered in the flat config) and several
+  `no-empty-function` hits in `ThemeProvider`/`UserProvider`.
+
 ## Suggested order
 
 Quick wins (privacy, export) → savings goals + reports (reuse existing patterns)

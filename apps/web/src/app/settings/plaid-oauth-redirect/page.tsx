@@ -121,7 +121,7 @@ export default function PlaidOAuthRedirectPage() {
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
-      <main className="flex-1 flex items-center justify-center px-6 text-center">
+      <main className="flex-1 flex items-center justify-center px-6 text-center pt-14 md:pt-0">
         <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
           {status === 'error' ? 'Could not complete bank connection. Return to Settings and try again.' : 'Finishing bank connection…'}
         </p>

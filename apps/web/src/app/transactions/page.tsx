@@ -976,8 +976,8 @@ export default function TransactionsPage() {
       <main className="flex-1 overflow-y-auto min-w-0 pt-14 md:pt-0">
 
         {/* ── Sticky header (desktop only — too tall to pin on narrow viewports) ── */}
-        <div className="md:sticky md:top-0 z-20 px-6 pt-5 pb-4 flex flex-col gap-4"
-          style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
+        <div className="md:sticky md:top-0 z-20 px-4 sm:px-6 pt-4 sm:pt-5 pb-4 flex flex-col gap-3 sm:gap-4"
+          style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
 
           {/* Title + actions */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -1052,7 +1052,9 @@ export default function TransactionsPage() {
                 <button onClick={() => { setShowImportPicker((v) => !v); setShowAddAccForm(false); setAddAccError(''); }}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
                   style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 28%, transparent)', color: 'var(--color-primary)' }}>
-                  <UploadIcon /> Import Transactions (CSV)
+                  <UploadIcon />
+                  <span className="hidden lg:inline">Import Transactions (CSV)</span>
+                  <span className="lg:hidden">Import CSV</span>
                 </button>
                 {showImportPicker && (
                   <div className="absolute right-0 top-full mt-2 z-30 rounded-2xl overflow-hidden"
@@ -1345,9 +1347,10 @@ export default function TransactionsPage() {
 
           {/* ── Status tabs ── */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex gap-1 p-1 rounded-xl"
-                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+            <div className="flex items-center gap-3 flex-wrap min-w-0 max-w-full">
+              {/* Segmented controls scroll sideways on narrow phones rather than pushing the page wider. */}
+              <div className="flex gap-1 p-1 rounded-xl max-w-full overflow-x-auto"
+                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', scrollbarWidth: 'none' }}>
                 {([
                   { id: 'all',       label: 'All',       count: transactions.length },
                   { id: 'expense',   label: 'Expenses',  count: transactions.filter((t) => Number(t.amount) < 0).length },
@@ -1355,7 +1358,7 @@ export default function TransactionsPage() {
                   { id: 'recurring', label: 'Recurring', count: transactions.filter(isRecurringTx).length },
                 ] as { id: Filter; label: string; count: number }[]).map((f) => (
                   <button key={f.id} onClick={() => setFilter(f.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 whitespace-nowrap"
                     style={filter === f.id
                       ? { background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
                       : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
@@ -1366,13 +1369,13 @@ export default function TransactionsPage() {
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>Group by</span>
-                <div role="radiogroup" aria-label="Group transactions by" className="flex gap-1 p-1 rounded-xl"
-                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+                <div role="radiogroup" aria-label="Group transactions by" className="flex gap-1 p-1 rounded-xl max-w-full overflow-x-auto"
+                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', scrollbarWidth: 'none' }}>
                   {GROUP_BY_OPTIONS.map((o) => {
                     const on = groupBy === o.value;
                     return (
                       <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => setGroupBy(o.value)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                         style={on
                           ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
                           : { color: 'var(--color-text-muted)', border: '1px solid transparent' }}>
@@ -1383,7 +1386,7 @@ export default function TransactionsPage() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button onClick={() => setFilter('uncategorized')}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:brightness-110"
                 style={{
@@ -1412,7 +1415,7 @@ export default function TransactionsPage() {
         </div>
 
         {/* ── Transaction list ── */}
-        <div className="px-6 py-5 flex flex-col gap-4">
+        <div className="px-3 sm:px-6 py-4 sm:py-5 flex flex-col gap-4">
 
           {loading ? (
             <p className="py-16 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading transactions…</p>
@@ -2453,8 +2456,8 @@ export default function TransactionsPage() {
                           </div>
 
                           {/* Amount */}
-                          <p className="text-sm font-bold tabular-nums w-24 text-right shrink-0"
-                            style={{ color: txIsTransfer ? '#6B6B8A' : isIncome ? 'var(--color-green)' : 'white' }}>
+                          <p className="text-sm font-bold tabular-nums w-[4.75rem] sm:w-24 text-right shrink-0"
+                            style={{ color: txIsTransfer ? 'var(--color-text-muted)' : isIncome ? 'var(--color-green)' : 'var(--color-text-primary)' }}>
                             {formatAmount(amount)}
                           </p>
                         </div>
@@ -2974,18 +2977,18 @@ export default function TransactionsPage() {
         )}
       </main>
 
-      {/* ── Drag handle ── */}
+      {/* ── Drag handle (desktop only, with the insights column) ── */}
       <div
         onMouseDown={startBudgetResize}
-        className="w-1.5 shrink-0 cursor-col-resize group relative hover:bg-violet-500/30 transition-colors duration-150"
+        className="hidden xl:block w-1.5 shrink-0 cursor-col-resize group relative hover:bg-violet-500/30 transition-colors duration-150"
         style={{ background: 'var(--color-elevated)' }}
       >
         <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 opacity-0 group-hover:opacity-100 rounded-full transition-opacity duration-150"
           style={{ background: 'color-mix(in srgb, var(--color-primary) 70%, transparent)' }} />
       </div>
 
-      {/* ── Insights column ── */}
-      <div className="hidden md:flex shrink-0 flex-col overflow-hidden border-l"
+      {/* ── Insights column (xl+ only: below that it would squeeze the list to ~250px) ── */}
+      <div className="hidden xl:flex shrink-0 flex-col overflow-hidden border-l"
         style={{ width: budgetWidth, minWidth: 180, maxWidth: 480, borderColor: 'var(--color-border)', background: 'var(--color-surface)' }}>
         <InsightsPanel
           selectedTx={selectedTx}
@@ -3001,10 +3004,10 @@ export default function TransactionsPage() {
         />
       </div>
 
-      {/* ── Mobile bottom sheet (md and below only) ── */}
+      {/* ── Bottom sheet (below xl, where the insights column is hidden) ── */}
       {selectedTx && createPortal(
         <div
-          className="md:hidden fixed inset-0 z-50 flex items-end"
+          className="xl:hidden fixed inset-0 z-50 flex items-end"
           style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
           onMouseDown={(e) => { if (e.target === e.currentTarget) setSelectedTx(null); }}>
           <div className="w-full rounded-t-2xl flex flex-col overflow-hidden"
