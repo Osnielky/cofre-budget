@@ -157,3 +157,17 @@ keeping Cofre's dark Cobalt palette and glass cards. Changes, all in
   alerts (the dashboard panel still marks those as coming soon).
 - Faint vertical guide lines (`.landing-lines`) sit behind the pillars and trust
   sections, drawn in the theme border colour so every theme keeps them subtle.
+
+### Hero video (2026-10-20)
+
+The hero backdrop is a muted, looping clip (`public/hero-loop.mp4`, 720p, 3.9 MB,
+13 s) with `public/hero-poster.jpg` as its first frame. Tablets and up play the
+loop; phones and `prefers-reduced-motion` get the poster. A darker scrim than the
+night-sky art keeps the white headline card readable over daylight footage.
+
+Current clip: Coverr "Woman Reviewing Bills and Budget on Tablet at Home"
+(https://coverr.co/videos/online-payment-and-budget-planning), Coverr free
+license (commercial use, no attribution). It is a placeholder until the user
+films their own: replace the two files in `public/` and nothing else changes.
+A home-made clip should be landscape, 10–15 s, no sound, and under ~4 MB
+(720p H.264 is enough behind the scrim).

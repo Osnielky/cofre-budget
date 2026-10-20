@@ -5,14 +5,45 @@ import { container } from './landing-styles';
 import DashboardMockup from './mockups/DashboardMockup';
 import ChatMockup from './mockups/ChatMockup';
 
-/** Full-bleed artwork, headline card bottom-left, product cards floating on the right. */
+/* Hero backdrop. To swap the footage, replace these two files in apps/web/public:
+   hero-loop.mp4 (landscape, muted, 10–15 s, under ~4 MB) and hero-poster.jpg
+   (a frame of it, 1280×720). Nothing else needs to change. */
+const HERO_VIDEO = '/hero-loop.mp4';
+const HERO_POSTER = '/hero-poster.jpg';
+
+/** Full-bleed looping video, headline card bottom-left, product cards floating on the right. */
 export default function LandingHero() {
+  // `isolate` keeps the -z-10 backdrop inside this section's stacking context;
+  // without it the video paints behind the section background and vanishes.
   return (
-    <section className="landing-art relative -mt-[68px] pt-[68px]">
+    <section className="relative isolate -mt-[68px] pt-[68px] overflow-hidden" style={{ background: 'var(--color-base)' }}>
+      {/* Backdrop: the loop on tablets and up, the poster frame on phones and for
+          anyone who prefers reduced motion. Both sit under the same scrim. */}
+      <div aria-hidden="true" className="absolute inset-0 -z-10">
+        <video
+          className="hidden sm:block motion-reduce:hidden absolute inset-0 w-full h-full object-cover"
+          src={HERO_VIDEO}
+          poster={HERO_POSTER}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          disablePictureInPicture
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element -- plain background frame, no optimisation needed */}
+        <img
+          className="sm:hidden motion-reduce:block absolute inset-0 w-full h-full object-cover"
+          src={HERO_POSTER}
+          alt=""
+        />
+        <div className="landing-hero-scrim absolute inset-0" />
+      </div>
+
       <div className={`${container} grid lg:grid-cols-12 gap-10 lg:gap-8 items-end pt-10 sm:pt-16 lg:pt-24 pb-14 lg:pb-24 lg:min-h-[760px]`}>
         <div className="lg:col-span-5 rounded-[28px] p-6 sm:p-9"
           style={{
-            background: 'linear-gradient(165deg, rgba(14,24,48,0.72) 0%, rgba(7,13,28,0.62) 100%)',
+            background: 'linear-gradient(165deg, rgba(14,24,48,0.76) 0%, rgba(7,13,28,0.68) 100%)',
             backdropFilter: 'blur(18px) saturate(140%)',
             WebkitBackdropFilter: 'blur(18px) saturate(140%)',
             border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)',

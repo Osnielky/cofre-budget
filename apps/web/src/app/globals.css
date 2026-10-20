@@ -627,3 +627,10 @@ body::before {
   border-radius: 18px;
   box-shadow: 0 24px 60px rgba(3, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
 }
+/* Hero video scrim: daylight footage needs more darkening than the night art
+   for the white headline to read; the bottom fades into the page base. */
+.landing-hero-scrim {
+  background-image:
+    linear-gradient(180deg, rgba(6, 10, 20, 0.58) 0%, rgba(6, 10, 20, 0.46) 45%, var(--color-base) 100%),
+    linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 18%, transparent) 0%, transparent 55%);
+}
