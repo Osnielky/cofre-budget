@@ -1,4 +1,4 @@
-import { glassCard, tint } from '../landing-styles';
+import { tint } from '../landing-styles';
 
 const ROWS = [
   { label: 'Groceries', amount: 486, pct: 78, color: 'var(--color-card-green)' },
@@ -9,9 +9,12 @@ const ROWS = [
 
 export default function SpendingMockup({ className = '' }: { className?: string }) {
   return (
-    <figure aria-label="Spending by category with dining flagged" className={`w-full max-w-md rounded-[var(--radius-card)] p-4 sm:p-5 ${className}`} style={glassCard}>
+    <figure aria-label="Spending by category with dining flagged as 38% over last month" className={`landing-mock w-full max-w-md p-4 sm:p-5 ${className}`}>
       <div aria-hidden="true" className="flex flex-col gap-3.5">
-        <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>This month</span>
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Spending this month</span>
+          <span style={{ color: 'var(--color-text-muted)' }}>$1,183 of $1,450 budgeted</span>
+        </div>
         {ROWS.map((r) => (
           <div key={r.label} className="text-sm">
             <div className="flex items-center justify-between gap-2 mb-1.5">

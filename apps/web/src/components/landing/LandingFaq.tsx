@@ -26,13 +26,13 @@ const FAQS: { q: string; a: string }[] = [
 
 export default function LandingFaq() {
   return (
-    <section aria-labelledby="faq-heading" className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-      <h2 id="faq-heading" className="text-3xl sm:text-4xl font-bold tracking-tight text-center" style={{ color: 'var(--color-text-primary)' }}>
+    <section id="faq" aria-labelledby="faq-heading" className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-24 scroll-mt-24">
+      <h2 id="faq-heading" className="landing-display text-[36px] sm:text-[48px] text-center" style={{ color: 'var(--color-text-primary)' }}>
         Questions
       </h2>
-      <div className="mt-8 flex flex-col gap-3">
+      <div className="mt-10 flex flex-col gap-3">
         {FAQS.map((f) => (
-          <details key={f.q} className="group rounded-[var(--radius-card)] px-5 py-4" style={glassCard}>
+          <details key={f.q} className="group rounded-2xl px-5 py-4" style={glassCard}>
             <summary className="cursor-pointer list-none flex items-center justify-between gap-4 font-semibold" style={{ color: 'var(--color-text-primary)' }}>
               {f.q}
               <span aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-45" style={{ color: 'var(--color-text-muted)' }}>+</span>

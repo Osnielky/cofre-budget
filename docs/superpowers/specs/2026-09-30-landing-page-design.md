@@ -127,3 +127,33 @@ blue/indigo as series colors.
 
 Analytics (Phase 1 item 4, separate change), blog/content pages, screenshots,
 testimonials, a CMS, internationalization.
+
+## 2026-10-20 restyle (Monarch-inspired)
+
+The user asked for the page to follow monarch.com's structure and rhythm while
+keeping Cofre's dark Cobalt palette and glass cards. Changes, all in
+`components/landing/` and `app/page.tsx`:
+
+- **Type.** Landing headlines use Fraunces (serif, weight 300) via `next/font`,
+  loaded in `app/page.tsx` only and exposed as `--font-display`; the app keeps
+  Inter. Small uppercase eyebrows in the brand blue label each section.
+- **Hero.** Full-bleed night-sky artwork (the auth page's three crops, swapped by
+  viewport in `.landing-art`), a glass headline card bottom-left with one CTA, and
+  a coded dashboard mockup on the right with the Ask Cofre card overlapping its
+  bottom-left corner. Headline: "The calm way to run your money" (`HOME_HEADLINE`,
+  also used by the OG image).
+- **Structure.** Nav as a floating glass bar (Features, Pricing, FAQ anchors) →
+  hero → four pillars (Track, Budget, Ask, Grow; each with the colour its charts
+  use) → seven feature sections with floating product cards (Accounts + net-worth
+  chip, Transactions, Ask Cofre, Recurring, Budgets, Goals with the gold script
+  line, Cards) → trust → pricing teaser band + the real pricing cards → FAQ →
+  closing CTA on the artwork → four-column footer.
+- **Mockups.** New `DashboardMockup`, `TransactionsMockup`, `RecurringMockup`,
+  `CardMockup`, `NetWorthChip`; the others were restyled onto `.landing-mock`.
+  Still coded, fake data, `aria-hidden` with a figure label. `WealthPathBand` was
+  folded into the Goals feature section and deleted.
+- **Claims.** Unchanged from "Allowed claims". The recurring section says Cofre
+  spots repeating charges and totals what is due; it does not claim price-increase
+  alerts (the dashboard panel still marks those as coming soon).
+- Faint vertical guide lines (`.landing-lines`) sit behind the pillars and trust
+  sections, drawn in the theme border colour so every theme keeps them subtle.

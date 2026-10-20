@@ -3,7 +3,7 @@ import { PLAN_PRICES } from './plans';
 
 export const SITE_URL = 'https://budgetcofre.com';
 export const SITE_NAME = 'Cofre';
-export const HOME_HEADLINE = 'Your bank, synced. Your money questions, answered.';
+export const HOME_HEADLINE = 'The calm way to run your money';
 export const HOME_TITLE = 'Cofre — Budgeting on autopilot, with an AI that answers your money questions';
 export const HOME_DESCRIPTION =
   'Cofre helps you cut wasteful spending and see your path to $1M. Pro adds automatic bank sync and an AI that answers your money questions.';

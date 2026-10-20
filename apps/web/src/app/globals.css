@@ -562,3 +562,68 @@ body::before {
   .budget-range::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -9px; }
   .budget-range::-moz-range-thumb { width: 18px; height: 18px; }
 }
+
+/* ─────────────────────────────────────────────
+   Landing page (app/page.tsx)
+   Serif display type, the auth artwork as a hero backdrop, and faint
+   vertical guide lines behind sections. Everything else is theme vars.
+───────────────────────────────────────────── */
+.landing-display {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 300;
+  letter-spacing: -0.012em;
+  line-height: 1.08;
+}
+.landing-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+/* Six faint columns, like paper guides; the colour is the theme border so it
+   recedes on every theme. */
+.landing-lines {
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--color-border) 55%, transparent) 1px, transparent 1px);
+  background-size: calc(100% / 6) 100%;
+  background-position: -1px 0;
+}
+/* Hero + closing band: the login artwork, scrimmed so white type stays legible
+   and fading into the page base at the bottom. Crops swap by viewport shape. */
+.landing-art {
+  --auth-art: url('/login-bg-wide.jpg');
+  background-color: var(--color-base);
+  background-image:
+    linear-gradient(180deg, rgba(6, 10, 20, 0.30) 0%, rgba(6, 10, 20, 0.22) 45%, var(--color-base) 100%),
+    linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 14%, transparent) 0%, transparent 55%),
+    var(--auth-art);
+  background-size: cover;
+  background-position: center 38%;
+  background-repeat: no-repeat;
+}
+.landing-art-band {
+  --auth-art: url('/login-bg-wide.jpg');
+  background-color: var(--color-base);
+  background-image:
+    linear-gradient(180deg, var(--color-base) 0%, rgba(6, 10, 20, 0.42) 25%, rgba(6, 10, 20, 0.42) 75%, var(--color-base) 100%),
+    var(--auth-art);
+  background-size: cover;
+  background-position: center 60%;
+  background-repeat: no-repeat;
+}
+@media (max-width: 1100px) {
+  .landing-art, .landing-art-band { --auth-art: url('/login-bg-square.jpg'); }
+}
+@media (max-width: 640px) {
+  .landing-art, .landing-art-band { --auth-art: url('/login-bg-mobile.jpg'); }
+}
+/* Product mockups: a slightly tighter radius than page cards so they read as
+   "the app", and a deeper shadow so they float over the artwork. */
+.landing-mock {
+  background: var(--color-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: var(--glass-border);
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(3, 8, 20, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+}
