@@ -7,6 +7,7 @@ import { PlaidItem } from '../../plaid/plaid-item.entity';
 import { Category } from '../../categories/category.entity';
 import { Budget } from '../../budgets/budget.entity';
 import { CategorizationRule } from '../../categorization-rules/categorization-rule.entity';
+import { RecurringRule } from '../../transactions/recurring-rule.entity';
 import { Project } from '../../projects/project.entity';
 import { ProjectCategory } from '../../projects/project-category.entity';
 import { BankAccountsService } from '../../bank-accounts/bank-accounts.service';
@@ -33,7 +34,7 @@ let budgets: BudgetsService;
 beforeEach(async () => {
   ds = new DataSource({
     type: 'better-sqlite3', database: ':memory:', dropSchema: true, synchronize: true,
-    entities: [User, BankAccount, Transaction, PlaidItem, Category, Budget, CategorizationRule, Project, ProjectCategory],
+    entities: [User, BankAccount, Transaction, PlaidItem, Category, Budget, CategorizationRule, RecurringRule, Project, ProjectCategory],
   });
   await ds.initialize();
   await ds.getRepository(User).save([
@@ -42,7 +43,7 @@ beforeEach(async () => {
   ]);
   const r = <T extends object>(e: new () => T) => ds.getRepository(e);
   accounts = new BankAccountsService(r(BankAccount), r(Transaction), r(PlaidItem), null as unknown as PlaidService);
-  categories = new CategoriesService(r(Category), r(Transaction), r(Budget), r(CategorizationRule));
+  categories = new CategoriesService(r(Category), r(Transaction), r(Budget), r(CategorizationRule), ds);
   projects = new ProjectsService(r(Project), r(ProjectCategory), r(Transaction));
   budgets = new BudgetsService(r(Budget), r(Transaction), r(Project), r(Category), r(ProjectCategory));
 });

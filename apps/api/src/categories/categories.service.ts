@@ -1,11 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { Category } from './category.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { Budget } from '../budgets/budget.entity';
 import { UpsertCategoryDto, CATEGORY_FIELDS } from './dto/upsert-category.dto';
+import { MergeCategoryDto } from './dto/merge-category.dto';
 import { CategorizationRule, ruleIdentityKey } from '../categorization-rules/categorization-rule.entity';
+import { RecurringRule } from '../transactions/recurring-rule.entity';
 import { pickFields } from '../common/http/pick-fields';
 
 const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'createdAt' | 'updatedAt' | 'isFixed' | 'wantNeed'>[] = [
@@ -46,6 +48,9 @@ export class CategoriesService {
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
     @InjectRepository(Budget) private budgetRepo: Repository<Budget>,
     @InjectRepository(CategorizationRule) private rulesRepo: Repository<CategorizationRule>,
+    /* merge() runs in one transaction and reaches RecurringRule through the
+       transactional manager, so no repository is injected for it. */
+    @InjectDataSource() private dataSource: DataSource,
   ) {}
 
   async findAllByUser(userId: string): Promise<Category[]> {
@@ -141,4 +146,65 @@ export class CategoriesService {
     await this.repo.remove(cat);
   }
 
+  /**
+   * Fold `oldId` into `dto.targetId`: every transaction, budget, categorization
+   * rule and recurring rule that pointed at the old category now points at the
+   * target, the target is optionally renamed, and the old category is deleted.
+   * One DB transaction, so a failure part-way leaves both categories untouched.
+   */
+  async merge(oldId: string, userId: string, dto: MergeCategoryDto): Promise<Category> {
+    if (!dto?.targetId) throw new BadRequestException('Pick a category to merge into.');
+    if (dto.targetId === oldId) throw new BadRequestException('A category cannot be merged into itself.');
+
+    const [old, target] = await Promise.all([this.repo.findOneBy({ id: oldId }), this.repo.findOneBy({ id: dto.targetId })]);
+    if (!old || !target) throw new NotFoundException();
+    if (old.userId !== userId || target.userId !== userId) throw new ForbiddenException();
+
+    const newName = typeof dto.name === 'string' ? dto.name.trim() : '';
+
+    return this.dataSource.transaction(async (em) => {
+      await em.getRepository(Transaction).update({ categoryId: old.id }, { categoryId: target.id });
+      await em.getRepository(RecurringRule).update({ categoryId: old.id }, { categoryId: target.id });
+
+      // Budgets: unique(userId, categoryId, month). Months only the old category
+      // budgeted move over as-is; months both budgeted add the amounts onto the
+      // target's row (its settings win) and drop the old row.
+      const budgets = em.getRepository(Budget);
+      const [oldBudgets, targetBudgets] = await Promise.all([
+        budgets.find({ where: { categoryId: old.id } }),
+        budgets.find({ where: { categoryId: target.id } }),
+      ]);
+      const targetByMonth = new Map(targetBudgets.map((b) => [b.month, b]));
+      for (const b of oldBudgets) {
+        const existing = targetByMonth.get(b.month);
+        if (existing) {
+          existing.amount = Number(existing.amount) + Number(b.amount);
+          await budgets.save(existing);
+          await budgets.delete(b.id);
+        } else {
+          await budgets.update(b.id, { categoryId: target.id });
+        }
+      }
+
+      // Categorization rules: unique(userId, matchType, matchValue, matchStrategy).
+      // A rule on the old category whose match the target already has is redundant.
+      const rules = em.getRepository(CategorizationRule);
+      const [oldRules, targetRules] = await Promise.all([
+        rules.find({ where: { categoryId: old.id } }),
+        rules.find({ where: { categoryId: target.id } }),
+      ]);
+      const targetKeys = new Set(targetRules.map(ruleIdentityKey));
+      const colliding = oldRules.filter((r) => targetKeys.has(ruleIdentityKey(r)));
+      if (colliding.length > 0) await rules.delete(colliding.map((r) => r.id));
+      await rules.update({ categoryId: old.id }, { categoryId: target.id });
+
+      const cats = em.getRepository(Category);
+      if (newName && newName !== target.name) {
+        target.name = newName;
+        await cats.save(target);
+      }
+      await cats.delete(old.id);
+      return cats.findOneByOrFail({ id: target.id });
+    });
+  }
 }

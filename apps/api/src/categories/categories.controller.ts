@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request, 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CategoriesService } from './categories.service';
 import { UpsertCategoryDto } from './dto/upsert-category.dto';
+import { MergeCategoryDto } from './dto/merge-category.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('categories')
@@ -26,6 +27,13 @@ export class CategoriesController {
   @Get(':id/usage')
   usage(@Param('id') id: string, @Request() req: any) {
     return this.service.getUsageCount(id, req.user.id);
+  }
+
+  /** Fold :id into body.targetId (optionally renaming the target); :id is deleted. */
+  @Post(':id/merge')
+  @HttpCode(200)
+  merge(@Param('id') id: string, @Request() req: any, @Body() dto: MergeCategoryDto) {
+    return this.service.merge(id, req.user.id, dto);
   }
 
   @Delete(':id')

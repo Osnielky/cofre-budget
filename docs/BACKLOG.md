@@ -83,3 +83,14 @@ plus extras: bank accounts, Plaid, CSV import, projects, debts) are not listed.
 
 Quick wins (privacy, export) → savings goals + reports (reuse existing patterns)
 → mobile responsive → bills + safe-to-spend (together) → i18n & billing last.
+
+## Category merge follow-ups (2026-10-20)
+
+- **Undo for a merge** — medium. Merging is one-way today. An undo would need a
+  snapshot of the old category plus every row it owned (transactions, budgets,
+  rules), like the AI pending-action undo payload.
+- **Merge from the transactions category picker** — small. Today merge lives only
+  in Settings → Categories; the row picker could offer "merge into…" when two
+  near-identical names show up side by side.
+- **Suggest duplicates** — medium. Flag categories with near-identical names
+  (case, plural, "&" vs "and") on the Categories tab and offer merge in one click.

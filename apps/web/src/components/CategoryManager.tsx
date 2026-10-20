@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import CategoryFormModal, { Category as CatType } from './CategoryFormModal';
+import MergeCategoryModal from './MergeCategoryModal';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -36,6 +37,7 @@ export default function CategoryManager() {
   const [usageLoading, setUsageLoading]     = useState(false);
   const [deleteAction, setDeleteAction]     = useState<'uncat' | 'reassign'>('uncat');
   const [reassignTarget, setReassignTarget] = useState('');
+  const [mergeCat, setMergeCat]             = useState<Category | null>(null);
 
   useEffect(() => {
     fetch(`${API}/categories`, { credentials: 'include' })
@@ -65,6 +67,11 @@ export default function CategoryManager() {
     const data = await res.json();
     setUsageCount(data.count ?? 0);
     setUsageLoading(false);
+  }
+
+  function handleMerged(survivor: Category, removedId: string) {
+    setCategories((prev) => prev.filter((c) => c.id !== removedId).map((c) => (c.id === survivor.id ? survivor : c)));
+    setMergeCat(null);
   }
 
   async function confirmDelete() {
@@ -108,6 +115,11 @@ export default function CategoryManager() {
         />
       )}
 
+      {/* Merge modal: fold one category into another (two names for the same thing). */}
+      {mergeCat && (
+        <MergeCategoryModal source={mergeCat} categories={categories} onClose={() => setMergeCat(null)} onMerged={handleMerged} />
+      )}
+
 
       {/* 3-column category layout */}
       {loading ? (
@@ -126,7 +138,7 @@ export default function CategoryManager() {
             title="Expenses" color="#F07A3E" icon="💸"
             cats={[...expenseCats, ...bothCats]}
             groupByWantNeed
-            onEdit={startEdit} onDelete={openDeleteConfirm} deletingId={deletingId}
+            onEdit={startEdit} onMerge={setMergeCat} onDelete={openDeleteConfirm} deletingId={deletingId}
           />
 
           {/* ── Income column ── */}
@@ -134,7 +146,7 @@ export default function CategoryManager() {
             title="Income" color="#4FBF7F" icon="💰"
             cats={incomeCats}
 
-            onEdit={startEdit} onDelete={openDeleteConfirm} deletingId={deletingId}
+            onEdit={startEdit} onMerge={setMergeCat} onDelete={openDeleteConfirm} deletingId={deletingId}
           />
 
           {/* ── Savings + Transfers column ── */}
@@ -143,14 +155,14 @@ export default function CategoryManager() {
               <CategoryColumn
                 title="Savings" color="#9B6DFF" icon="🏦"
                 cats={savingsCats}
-                onEdit={startEdit} onDelete={openDeleteConfirm} deletingId={deletingId}
+                onEdit={startEdit} onMerge={setMergeCat} onDelete={openDeleteConfirm} deletingId={deletingId}
               />
             )}
             <CategoryColumn
               title="Transfers" color="#6B6B8A" icon="🔄"
               cats={transferCats}
   
-              onEdit={startEdit} onDelete={openDeleteConfirm} deletingId={deletingId}
+              onEdit={startEdit} onMerge={setMergeCat} onDelete={openDeleteConfirm} deletingId={deletingId}
             />
             {/* Transfer info tip */}
             {transferCats.length > 0 && (
@@ -289,10 +301,11 @@ interface ColProps {
   cats: Category[];
   groupByWantNeed?: boolean;
   onEdit: (c: Category) => void;
+  onMerge: (c: Category) => void;
   onDelete: (c: Category) => void;
   deletingId: string | null;
 }
-function CategoryColumn({ title, color, icon, cats, groupByWantNeed, onEdit, onDelete, deletingId }: ColProps) {
+function CategoryColumn({ title, color, icon, cats, groupByWantNeed, onEdit, onMerge, onDelete, deletingId }: ColProps) {
   const glass: React.CSSProperties = {
     background: 'var(--color-surface)',
     backdropFilter: 'var(--glass-blur)',
@@ -339,7 +352,7 @@ function CategoryColumn({ title, color, icon, cats, groupByWantNeed, onEdit, onD
               )}
               {g.items.map((cat, i) => (
                 <CategoryRow key={cat.id} cat={cat} bordered={i > 0} showWantNeed={!!groupByWantNeed}
-                  onEdit={onEdit} onDelete={onDelete} deletingId={deletingId} />
+                  onEdit={onEdit} onMerge={onMerge} onDelete={onDelete} deletingId={deletingId} />
               ))}
             </div>
           ))}
@@ -353,10 +366,11 @@ function CategoryColumn({ title, color, icon, cats, groupByWantNeed, onEdit, onD
 interface RowProps {
   cat: Category; bordered: boolean; showWantNeed: boolean;
   onEdit: (c: Category) => void;
+  onMerge: (c: Category) => void;
   onDelete: (c: Category) => void;
   deletingId: string | null;
 }
-function CategoryRow({ cat, bordered, showWantNeed, onEdit, onDelete, deletingId }: RowProps) {
+function CategoryRow({ cat, bordered, showWantNeed, onEdit, onMerge, onDelete, deletingId }: RowProps) {
   const isBoth = cat.type === 'both';
   const wantNeedMeta = showWantNeed ? WANT_NEED_META[cat.wantNeed ?? 'unclassified'] : null;
 
@@ -404,6 +418,11 @@ function CategoryRow({ cat, bordered, showWantNeed, onEdit, onDelete, deletingId
           title="Edit" style={{ color: 'var(--color-text-secondary)' }}>
           <PencilIcon />
         </button>
+        <button onClick={() => onMerge(cat)}
+          className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
+          title="Merge into another category" aria-label={`Merge ${cat.name} into another category`} style={{ color: 'var(--color-text-secondary)' }}>
+          <MergeIcon />
+        </button>
         <button onClick={() => onDelete(cat)} disabled={deletingId === cat.id}
           className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 disabled:opacity-40"
           title="Delete">
@@ -425,6 +444,16 @@ function PencilIcon() {
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
       <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+  );
+}
+
+function MergeIcon() {
+  // Two branches joining into one.
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 4v4a4 4 0 0 0 4 4h4a4 4 0 0 1 4 4v4" />
+      <path d="M18 4v16" />
     </svg>
   );
 }
