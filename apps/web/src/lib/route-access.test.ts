@@ -30,6 +30,13 @@ describe('routeDecision', () => {
     }
   });
 
+  // The page itself decides what to do with a signed-in visitor (it checks /auth/me),
+  // so the middleware must leave it alone in both states.
+  it('lets anyone reach the demo entry page', () => {
+    expect(routeDecision('/demo', false)).toBe('allow');
+    expect(routeDecision('/demo', true)).toBe('allow');
+  });
+
   it('does not treat a prefix of a public path as public', () => {
     expect(routeDecision('/pricing-admin', false)).toBe('to-login');
   });

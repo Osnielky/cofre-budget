@@ -10,6 +10,9 @@ export function connectBankError(status: number, body: unknown): { message: stri
       message: 'Automatic bank sync is a Pro feature. Upgrade to connect your bank — your accounts and imported transactions stay as they are.',
     };
   }
+  if (status === 403 && code === 'DEMO_READ_ONLY') {
+    return { upgrade: false, message: 'Bank connections are not available in the demo. Create a free account to connect your own bank.' };
+  }
   if (status === 403 && code === 'INSTITUTION_LIMIT_REACHED') {
     return { upgrade: true, message: message ?? 'You have reached the bank limit for your plan.' };
   }

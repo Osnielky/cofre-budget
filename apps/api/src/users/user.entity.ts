@@ -46,6 +46,13 @@ export class User {
   @Column({ default: false })
   emailVerified: boolean;
 
+  /* True for public demo sandboxes created by POST /demo/start: short-lived,
+     wiped on logout or after 24 h, and blocked from bank linking, billing and
+     account changes (DemoGuard). The permanent Rockefeller demo account is a
+     normal user (isDemo = false). */
+  @Column({ default: false })
+  isDemo: boolean;
+
   /* Plaid's persistent user identifier (from /user/create) — required by
      linkTokenCreate's `user_id` field for integrations approved after Dec 10, 2025
      (see PlaidService.getOrCreatePlaidUserId). Null until the user's first Plaid

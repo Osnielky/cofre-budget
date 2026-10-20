@@ -6,7 +6,7 @@
 export const PUBLIC_PATHS: readonly string[] = [
   '/', '/login', '/signup', '/forgot-password', '/reset-password',
   '/privacy', '/terms', '/pricing', '/report-error', '/report-vitals',
-  '/opengraph-image',
+  '/opengraph-image', '/demo',
 ];
 
 export type RouteDecision = 'allow' | 'to-login' | 'to-dashboard';

@@ -10,6 +10,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleCallbackGuard } from './guards/google-callback.guard';
 import { isAdminEmail } from '../admin/admin-emails';
 import { cookieOptions } from '../common/http/cookies';
+import { BlockedInDemo } from '../common/demo/blocked-in-demo.decorator';
+import { DemoService } from '../demo/demo.service';
 
 const COOKIE_OPTS = cookieOptions(undefined, 7 * 24 * 60 * 60 * 1000);
 // clearCookie must match the same attributes or the browser won't remove it.
@@ -21,6 +23,7 @@ export class AuthController {
     private authService: AuthService,
     private usersService: UsersService,
     private config: ConfigService,
+    private demo: DemoService,
   ) {}
 
   // 5 attempts per 15 minutes — brute-force protection
@@ -68,6 +71,7 @@ export class AuthController {
   }
 
   @Throttle({ default: { ttl: 900_000, limit: 5 } })
+  @BlockedInDemo()
   @Post('resend-verification')
   @HttpCode(200)
   async resendVerification(@Body() body: { email: string }) {
@@ -78,7 +82,9 @@ export class AuthController {
   @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  logout(@Res() res: Response) {
+  async logout(@Request() req: any, @Res() res: Response) {
+    // A demo sandbox ends with the visit: everything it owns goes, user row included.
+    if (req.user?.isDemo) await this.demo.wipe(req.user.id).catch(() => undefined);
     res.clearCookie('access_token', COOKIE_CLEAR_OPTS);
     return res.json({ message: 'Logged out' });
   }
@@ -91,6 +97,7 @@ export class AuthController {
 
   @SkipThrottle()
   @UseGuards(JwtAuthGuard)
+  @BlockedInDemo()
   @Patch('profile')
   updateProfile(@Request() req: any, @Body() body: { name?: string }) {
     return this.usersService.updateProfile(req.user.id, { name: body.name });
@@ -98,6 +105,7 @@ export class AuthController {
 
   @Throttle({ default: { ttl: 900_000, limit: 10 } })
   @UseGuards(JwtAuthGuard)
+  @BlockedInDemo()
   @Post('change-password')
   @HttpCode(200)
   async changePassword(@Request() req: any, @Body() body: { currentPassword: string; newPassword: string }) {

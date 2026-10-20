@@ -3,9 +3,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PlanGuard } from '../auth/guards/plan.guard';
 import { RequiresPlan } from '../auth/decorators/require-plan.decorator';
 import { PlaidService, ExchangeDecision } from './plaid.service';
+import { BlockedInDemo } from '../common/demo/blocked-in-demo.decorator';
 
 @UseGuards(JwtAuthGuard, PlanGuard)
 @RequiresPlan('pro', 'elite')
+@BlockedInDemo()
 @Controller('plaid')
 export class PlaidController {
   constructor(private service: PlaidService) {}

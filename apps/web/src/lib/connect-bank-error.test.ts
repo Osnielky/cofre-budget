@@ -14,6 +14,12 @@ describe('connectBankError', () => {
       .toEqual({ upgrade: true, message: 'Pro is limited to 4 linked institutions — upgrade to Elite for unlimited.' });
   });
 
+  it('tells a demo visitor to create an account rather than upgrade', () => {
+    const r = connectBankError(403, { code: 'DEMO_READ_ONLY' });
+    expect(r.upgrade).toBe(false);
+    expect(r.message).toMatch(/demo/i);
+  });
+
   it('reports anything else as a connection problem, not a credentials problem', () => {
     const r = connectBankError(500, null);
     expect(r.upgrade).toBe(false);

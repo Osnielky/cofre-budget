@@ -4,12 +4,14 @@ import * as crypto from 'crypto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GmailService } from './gmail.service';
 import { cookieOptions } from '../common/http/cookies';
+import { BlockedInDemo } from '../common/demo/blocked-in-demo.decorator';
 
 @Controller('gmail')
 export class GmailController {
   constructor(private gmail: GmailService) {}
 
   @UseGuards(JwtAuthGuard)
+  @BlockedInDemo()
   @Get('connect')
   connect(@Request() req: any, @Res() res: Response) {
     const nonce = crypto.randomBytes(16).toString('hex');
@@ -18,6 +20,7 @@ export class GmailController {
     return res.redirect(url);
   }
 
+  @BlockedInDemo()
   @Get('callback')
   async callback(
     @Query('code') code: string,
@@ -38,6 +41,7 @@ export class GmailController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @BlockedInDemo()
   @Delete('disconnect')
   async disconnect(@Request() req: any) {
     await this.gmail.disconnect(req.user.id);

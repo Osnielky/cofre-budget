@@ -15,6 +15,8 @@ interface User {
   emailVerified?: boolean;
   createdAt?: string;
   isAdmin?: boolean;
+  /** Public demo sandbox: discarded on logout; bank linking, billing and account changes are blocked. */
+  isDemo?: boolean;
 }
 
 export type { User };

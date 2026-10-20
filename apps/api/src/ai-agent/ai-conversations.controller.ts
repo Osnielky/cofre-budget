@@ -19,7 +19,7 @@ export class AiConversationsController {
   /** How many Ask Cofre messages the user has left today. */
   @Get('usage')
   async usage(@Request() req: any) {
-    return messageUsage(req.user.plan, await this.service.countUserMessagesToday(req.user.id));
+    return messageUsage(req.user.plan, await this.service.countUserMessagesToday(req.user.id), new Date(), !!req.user.isDemo);
   }
 
   @Get()

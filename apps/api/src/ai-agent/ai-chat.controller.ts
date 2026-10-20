@@ -23,7 +23,7 @@ export class AiChatController {
     @Body() body: { content: string; month?: string },
     @Res() res: Response,
   ) {
-    const before = messageUsage(req.user.plan, await this.conversations.countUserMessagesToday(req.user.id));
+    const before = messageUsage(req.user.plan, await this.conversations.countUserMessagesToday(req.user.id), new Date(), !!req.user.isDemo);
     if (before.remaining <= 0) {
       throw new ForbiddenException({
         message: `You've used all ${before.limit} of today's Ask Cofre messages. They reset at midnight UTC.`,
@@ -49,7 +49,7 @@ export class AiChatController {
         onTextDelta: (text) => res.write(`data: ${JSON.stringify({ type: 'text_delta', text })}\n\n`),
       });
       const message = await this.conversations.appendAssistantMessage(id, result.text, result.widget);
-      const usage = messageUsage(req.user.plan, await this.conversations.countUserMessagesToday(req.user.id));
+      const usage = messageUsage(req.user.plan, await this.conversations.countUserMessagesToday(req.user.id), new Date(), !!req.user.isDemo);
       res.write(`data: ${JSON.stringify({ type: 'done', message, usage })}\n\n`);
     } catch (err) {
       res.write(`data: ${JSON.stringify({ type: 'error', message: 'Something went wrong. Please try again.' })}\n\n`);

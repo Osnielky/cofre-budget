@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ClientIpThrottlerGuard } from '../common/client-ip-throttler.guard';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import databaseConfig from '../config/database.config';
 import { UsersModule } from '../users/users.module';
@@ -23,6 +23,8 @@ import { NetWorthGoalModule } from '../net-worth-goal/net-worth-goal.module';
 import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { BillingModule } from '../billing/billing.module';
 import { AdminModule } from '../admin/admin.module';
+import { DemoModule } from '../demo/demo.module';
+import { DemoInterceptor } from '../common/demo/demo.interceptor';
 import { HealthController } from '../health/health.controller';
 
 @Module({
@@ -52,11 +54,16 @@ import { HealthController } from '../health/health.controller';
     AiAgentModule,
     BillingModule,
     AdminModule,
+    DemoModule,
   ],
   controllers: [HealthController],
   providers: [
     // Apply globally — all routes inherit the 100 req/min default
     { provide: APP_GUARD, useClass: ClientIpThrottlerGuard },
+    // Blocks @BlockedInDemo routes for public demo sandboxes (User.isDemo). An
+    // interceptor, not a guard: global guards run before the route's JwtAuthGuard,
+    // so req.user would still be empty there.
+    { provide: APP_INTERCEPTOR, useClass: DemoInterceptor },
   ],
 })
 export class AppModule {}

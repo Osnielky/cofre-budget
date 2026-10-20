@@ -94,3 +94,14 @@ Quick wins (privacy, export) → savings goals + reports (reuse existing pattern
   near-identical names show up side by side.
 - **Suggest duplicates** — medium. Flag categories with near-identical names
   (case, plural, "&" vs "and") on the Categories tab and offer merge in one click.
+
+## Demo follow-ups (2026-10-20)
+
+- **Billing tab in the demo** — small. Checkout shows a plain alert for demo
+  visitors; a styled inline notice would match the rest of the app.
+- **Demo persona switcher** — medium. One seed today (Rockefeller). A second,
+  leaner persona (student / single account) would show the Free plan path.
+- **Scheduled sweep** — small. Stale sandboxes are swept on `/demo/start` and at
+  boot; a Cloud Scheduler ping would keep the table tidy on quiet days.
+- **Hide demo users from admin stats** — small. Visitor sandboxes count as
+  users in `/admin` totals until they are swept; filter `isDemo` out.

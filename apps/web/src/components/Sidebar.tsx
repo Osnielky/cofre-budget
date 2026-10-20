@@ -231,25 +231,36 @@ export default function Sidebar() {
               </span>
             )}
           </div>
-          {user?.email && (
+          {user?.email && !user.isDemo && (
             <p className="text-[10px] truncate leading-tight" style={{ color: 'var(--color-text-muted)' }}>
               {user.email}
             </p>
           )}
-          {user && user.plan === 'free' && (
+          {user?.isDemo && (
+            <p className="text-[10px] truncate leading-tight" style={{ color: 'var(--color-text-muted)' }}>
+              Demo sandbox
+            </p>
+          )}
+          {user && !user.isDemo && user.plan === 'free' && (
             <Link href="/settings?tab=billing" className="text-[10px] font-semibold leading-tight hover:underline"
               style={{ color: 'var(--color-primary)' }}>
               Upgrade to Pro
             </Link>
           )}
-          {user && user.plan === 'pro' && (
+          {user && !user.isDemo && user.plan === 'pro' && (
             <Link href="/settings?tab=billing" className="text-[10px] font-semibold leading-tight hover:underline"
               style={{ color: 'var(--color-primary)' }}>
               Upgrade to Elite
             </Link>
           )}
+          {user?.isDemo && (
+            <Link href="/signup" className="text-[10px] font-semibold leading-tight hover:underline"
+              style={{ color: 'var(--color-primary)' }}>
+              Create your own account
+            </Link>
+          )}
         </div>
-        <button onClick={handleLogout} disabled={loggingOut} title="Sign out"
+        <button onClick={handleLogout} disabled={loggingOut} title={user?.isDemo ? 'Leave demo' : 'Sign out'} aria-label={user?.isDemo ? 'Leave demo' : 'Sign out'}
           className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 shrink-0 disabled:opacity-40"
           style={{ color: 'var(--color-text-muted)' }}>
           {loggingOut ? <span className="text-[10px]">…</span> : <SignOutIcon />}

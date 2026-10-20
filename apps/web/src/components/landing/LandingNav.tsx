@@ -5,6 +5,7 @@ const LINKS = [
   { href: '#features', label: 'Features' },
   { href: '#pricing', label: 'Pricing' },
   { href: '#faq', label: 'FAQ' },
+  { href: '/demo', label: 'Try the demo' },
 ];
 
 /** Floating glass bar inset from the edges; collapses to logo + Log in + Start free on phones. */

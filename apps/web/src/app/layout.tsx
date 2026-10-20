@@ -3,6 +3,7 @@ import { Inter, Great_Vibes } from 'next/font/google';
 import './globals.css';
 import ThemeProvider from '@/components/ThemeProvider';
 import UserProvider from '@/components/UserProvider';
+import DemoBanner from '@/components/DemoBanner';
 import WebVitals from '@/components/WebVitals';
 import { SITE_URL, SITE_NAME, HOME_DESCRIPTION } from '@/lib/seo';
 
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <UserProvider>
             {children}
+            <DemoBanner />
           </UserProvider>
         </ThemeProvider>
       </body>

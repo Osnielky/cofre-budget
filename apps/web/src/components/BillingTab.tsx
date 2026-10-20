@@ -110,6 +110,10 @@ export default function BillingTab() {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
         body: JSON.stringify({ tier, interval }),
       });
+      if (res.status === 403) {
+        const body = await res.json().catch(() => null);
+        if (body?.code === 'DEMO_READ_ONLY') { window.alert('Billing is not available in the demo. Create a free account to subscribe.'); return; }
+      }
       if (!res.ok) return;
       const { url } = await res.json();
       window.location.href = url;

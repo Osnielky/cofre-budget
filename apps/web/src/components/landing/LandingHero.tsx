@@ -58,10 +58,14 @@ export default function LandingHero() {
           </p>
           <div className="mt-7 flex flex-col sm:flex-row sm:items-center gap-3">
             <Link href="/signup" className="btn-gold px-7 py-3.5 rounded-full font-semibold text-center whitespace-nowrap">Start free</Link>
-            <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-              Free forever. Pro comes with a {TRIAL_DAYS}-day trial.
-            </span>
+            <Link href="/demo" className="px-6 py-3.5 rounded-full font-semibold text-center whitespace-nowrap"
+              style={{ border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)', color: 'var(--color-text-primary)', background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }}>
+              Explore the demo
+            </Link>
           </div>
+          <p className="mt-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            Free forever. Pro comes with a {TRIAL_DAYS}-day trial. The demo needs no account.
+          </p>
         </div>
 
         <div className="lg:col-span-7 relative lg:pl-6 lg:pb-12">

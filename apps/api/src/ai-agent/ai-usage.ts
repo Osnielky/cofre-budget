@@ -1,5 +1,7 @@
-/** Ask Cofre messages a user may send per UTC day, by plan. */
-const DAILY_MESSAGE_LIMITS: Record<string, number> = { pro: 25, elite: 50 };
+/** Ask Cofre messages a user may send per UTC day, by plan. The 'demo' plan is
+ *  virtual: public demo sandboxes (User.isDemo) use it whatever plan the
+ *  sandbox user carries, so strangers can't run up the Anthropic bill. */
+const DAILY_MESSAGE_LIMITS: Record<string, number> = { pro: 25, elite: 50, demo: 5 };
 
 export function dailyMessageLimit(plan: string): number {
   return DAILY_MESSAGE_LIMITS[plan] ?? 0;
@@ -17,8 +19,8 @@ export interface MessageUsage {
   resetsAt: string;
 }
 
-export function messageUsage(plan: string, used: number, now: Date = new Date()): MessageUsage {
-  const limit = dailyMessageLimit(plan);
+export function messageUsage(plan: string, used: number, now: Date = new Date(), isDemo = false): MessageUsage {
+  const limit = dailyMessageLimit(isDemo ? 'demo' : plan);
   const resetsAt = new Date(startOfUtcDay(now).getTime() + 24 * 60 * 60 * 1000).toISOString();
   return { limit, used, remaining: Math.max(0, limit - used), resetsAt };
 }

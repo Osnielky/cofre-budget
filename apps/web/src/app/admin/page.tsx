@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
-import { useAdminStats } from '@/hooks/useAdmin';
+import { useAdminStats, resetDemoOwner } from '@/hooks/useAdmin';
+import DemoResetPanel from './components/DemoResetPanel';
 import AdminStatTiles from './components/AdminStatTiles';
 import SignupsChart from './components/SignupsChart';
 import PlansPanel from './components/PlansPanel';
@@ -64,6 +65,7 @@ export default function AdminPage() {
                     <HealthPanel h={data.health} />
                     <div className="md:col-span-2 xl:col-span-1 min-w-0 flex flex-col [&>*]:flex-1"><EngagementPanel e={data.engagement} total={data.users.total} /></div>
                     <div className="md:col-span-2 xl:col-span-3 min-w-0 flex flex-col [&>*]:flex-1"><UsersTable refreshKey={refreshKey} /></div>
+                    <DemoResetPanel onReset={resetDemoOwner} />
                   </div>
                 </>
               )}

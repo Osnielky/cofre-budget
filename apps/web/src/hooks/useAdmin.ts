@@ -51,3 +51,9 @@ export function useAdminUsers(search: string, page: number, refreshKey = 0) {
 
   return { data, loading, error };
 }
+
+/** POST /admin/demo/reset-owner — rebuilds the Rockefeller demo account from the seed. */
+export async function resetDemoOwner(): Promise<void> {
+  const r = await fetch(`${API}/admin/demo/reset-owner`, { method: 'POST', credentials: 'include' });
+  if (!r.ok) throw new Error(`Could not reset the demo account (${r.status}).`);
+}

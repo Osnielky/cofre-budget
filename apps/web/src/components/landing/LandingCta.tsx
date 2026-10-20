@@ -12,6 +12,11 @@ export default function LandingCta() {
         <Link href="/signup" className="btn-gold inline-block mt-9 px-8 py-4 rounded-full font-semibold">
           Get started today
         </Link>
+        <p className="mt-4 text-sm">
+          <Link href="/demo" className="underline underline-offset-4" style={{ color: 'rgba(238,243,250,0.75)' }}>
+            Or explore the demo with a year of sample data
+          </Link>
+        </p>
       </div>
     </section>
   );

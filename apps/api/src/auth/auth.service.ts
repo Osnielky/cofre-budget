@@ -5,6 +5,7 @@ import { UsersService } from '../users/users.service';
 import { MailService } from '../mail/mail.service';
 import { User } from '../users/user.entity';
 import * as bcrypt from 'bcryptjs';
+import { normaliseLoginIdentifier } from './login-identifier';
 
 @Injectable()
 export class AuthService {
@@ -27,7 +28,8 @@ export class AuthService {
   }
 
   async validateUser(email: string, password: string): Promise<User | null> {
-    const user = await this.usersService.findByEmailWithPassword(email);
+    // "Rockefeller" (no @) resolves to the demo account's email.
+    const user = await this.usersService.findByEmailWithPassword(normaliseLoginIdentifier(email));
     if (!user?.password) return null;
     const valid = await bcrypt.compare(password, user.password);
     return valid ? user : null;
