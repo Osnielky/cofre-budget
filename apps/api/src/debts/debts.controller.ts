@@ -1,4 +1,6 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { BlockedInDemo } from '../common/demo/blocked-in-demo.decorator';
+import { isDemoRestricted } from '../common/demo/demo-restricted';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DebtsService, CreateDebtDto, PaymentDto } from './debts.service';
 
@@ -15,7 +17,9 @@ export class DebtsController {
 
   @Post(':id/payments')
   addPayment(@Param('id') id: string, @Request() req: any, @Body() dto: PaymentDto) {
-    return this.service.addPayment(id, req.user.id, req.user.name || req.user.email, dto);
+    // Demo accounts never send mail: a sandbox could otherwise relay receipts to any address.
+    const safe = isDemoRestricted(req.user) ? { ...dto, emailReceipt: false } : dto;
+    return this.service.addPayment(id, req.user.id, req.user.name || req.user.email, safe);
   }
 
   @Delete(':id/payments/:pid')
@@ -23,6 +27,7 @@ export class DebtsController {
     return this.service.removePayment(id, pid, req.user.id);
   }
 
+  @BlockedInDemo()
   @Post(':id/send-statement')
   sendStatement(@Param('id') id: string, @Request() req: any) {
     return this.service.sendStatement(id, req.user.id, req.user.name || req.user.email);

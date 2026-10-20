@@ -136,11 +136,15 @@ describe('DemoService owner (Rockefeller)', () => {
     expect(await ds.getRepository(User).countBy({ id: owner.id })).toBe(1);
   });
 
-  it('resetOwner restores the seed after the owner deleted things', async () => {
+  it('resetOwner restores the seed, the name and the password after the owner was changed', async () => {
     const owner = await service.ensureOwner(NOW);
     await ds.getRepository(Transaction).delete({ userId: owner.id });
+    await ds.getRepository(User).update(owner.id, { name: 'Hacked', password: await bcrypt.hash('something-else', 4) });
     const after = await service.resetOwner(NOW);
     expect(after.id).toBe(owner.id);
+    expect(after.name).toBe('Rockefeller');
     expect((await rowsOwnedBy(owner.id)).transactions).toBeGreaterThan(900);
+    const withPw = await ds.getRepository(User).createQueryBuilder('u').addSelect('u.password').where('u.id = :id', { id: owner.id }).getOne();
+    expect(await bcrypt.compare(DEMO_OWNER_PASSWORD, withPw!.password)).toBe(true);
   });
 });

@@ -34,10 +34,12 @@ normalised to `<name>@demo.cofre` (lower-cased). That makes `Rockefeller` / `dem
 the normal login form. Password `demo` is set directly by the seeder (bcrypt), bypassing
 the 8-character rule that applies to self-registration.
 
-> Note for the owner: the password will be visible to anyone who watches a video. Anyone
-> can then log in and change Rockefeller's data. The admin "Reset Rockefeller" button
-> restores it in one click; if that becomes a nuisance, change the password from Settings
-> (change-password still works for Rockefeller).
+> Note for the owner: the password will be visible to anyone who watches a video, so anyone
+> can log in and change Rockefeller's data. Because of that, Rockefeller gets the **same
+> route blocks as visitors** (no bank linking, billing, Gmail, password or profile
+> changes, no outbound email) — a stranger can rearrange the demo but cannot attach real
+> data, spend money or lock the owner out. The admin "Reset Rockefeller" button restores
+> the data, the name and the `demo` password in one click.
 
 ### Seed generator — `apps/api/src/demo/demo-seed.ts`
 
@@ -100,7 +102,7 @@ cascades because several entities have none.
 - Ask Cofre: not blocked, but `messageUsage` treats a demo user as a **5-message** plan
   (`dailyMessageLimit('demo')`) so strangers can't run up the Anthropic bill.
 
-Rockefeller is not restricted (it is the owner's account).
+Rockefeller is restricted the same way (`isDemoRestricted` = `isDemo` or the owner email): its password is public. Also blocked: debts `send-statement`; `emailReceipt` on debt payments is forced off. Receipts import only works through Gmail, which is already blocked. Ask Cofre keeps the Pro limit for Rockefeller (25/day) so the owner can demo it.
 
 **Tests** (sqlite unless noted):
 - `demo-seed.test.ts`: deterministic (same seed → same JSON), every transaction date within

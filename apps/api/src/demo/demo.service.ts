@@ -97,11 +97,14 @@ export class DemoService implements OnApplicationBootstrap {
     return users.findOneByOrFail({ id: user.id });
   }
 
-  /** Wipes Rockefeller's data and re-seeds it. Creates the account if missing. */
+  /** Wipes Rockefeller's data, re-seeds it and restores the published password. Creates the account if missing. */
   async resetOwner(now: Date = new Date()): Promise<User> {
     const owner = await this.ensureOwner(now);
     await this.wipe(owner.id);
     await this.populate(owner.id, generateDemoData({ year: now.getUTCFullYear(), today: todayIso(now) }));
+    // change-password is blocked for this account, but the hash is restored anyway so a
+    // reset always leaves the login exactly as announced.
+    await this.ds.getRepository(User).update(owner.id, { password: await bcrypt.hash(DEMO_OWNER_PASSWORD, 10), name: DEMO_OWNER_NAME, plan: 'pro' });
     return this.ds.getRepository(User).findOneByOrFail({ id: owner.id });
   }
 

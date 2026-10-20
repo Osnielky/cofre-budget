@@ -35,9 +35,13 @@ describe('DemoInterceptor', () => {
     expect(() => interceptor.intercept(context({ id: 'v1', isDemo: true }, { onClass: true }), next)).toThrow(ForbiddenException);
   });
 
-  it('lets real users and Rockefeller through the same route', async () => {
-    expect(await interceptor.intercept(context({ id: 'u1', isDemo: false }, { onHandler: true }), next).toPromise()).toBe('handled');
+  it('lets real users through the same route', async () => {
+    expect(await interceptor.intercept(context({ id: 'u1', isDemo: false, email: 'owner@cofre.dev' }, { onHandler: true }), next).toPromise()).toBe('handled');
     expect(await interceptor.intercept(context({ id: 'u2' }, { onHandler: true }), next).toPromise()).toBe('handled');
+  });
+
+  it('blocks the Rockefeller owner account too, since its password is public', () => {
+    expect(() => interceptor.intercept(context({ id: 'o1', isDemo: false, email: 'rockefeller@demo.cofre' }, { onHandler: true }), next)).toThrow(ForbiddenException);
   });
 
   it('ignores routes without the decorator, even for visitors', async () => {
