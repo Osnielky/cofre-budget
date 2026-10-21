@@ -5,6 +5,8 @@ import { Transaction } from './transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
 import { Project } from '../projects/project.entity';
+import { Category } from '../categories/category.entity';
+import { categoriesForKind, defaultTransferKind, isTransferKind, transferKindOptions, TRANSFER_CATEGORY_DEFAULTS, type TransferKind } from './transfer-kind';
 import { DebtsService } from '../debts/debts.service';
 import { isLiabilityType } from '../bank-accounts/account-types';
 import { CategorizationRulesService } from '../categorization-rules/categorization-rules.service';
@@ -51,6 +53,7 @@ export class TransactionsService {
     @InjectRepository(Project) private projectRepo: Repository<Project>,
     private debtsService: DebtsService,
     private rulesService: CategorizationRulesService,
+    @InjectRepository(Category) private categoryRepo: Repository<Category>,
   ) {}
 
   async getCategoryHints(userId: string): Promise<Record<string, { id: string; name: string; icon: string; color: string }>> {
@@ -492,7 +495,8 @@ export class TransactionsService {
     id: string, userId: string,
     transferAccountId: string | null,
     matchTxId?: string | null,
-  ): Promise<Transaction> {
+    kind?: TransferKind | null,
+  ): Promise<Transaction & { counterpart?: { id: string; categoryId: string | null; categoryRef: Category | null } }> {
     const tx = await this.repo.findOneByOrFail({ id, userId });
     const amount = Number(tx.amount);
 
@@ -508,24 +512,53 @@ export class TransactionsService {
     tx.transferAccountId = transferAccountId ?? undefined;
     await this.repo.save(tx);
 
-    /* Auto-categorize the matched transaction on the other side */
+    /* Pair with the matched transaction and categorise BOTH sides from what
+       the transfer means (savings, card payment, …) — never by copying the
+       category of whichever side the user happened to start from. */
+    let counterpart: { id: string; categoryId: string | null; categoryRef: Category | null } | undefined;
     if (matchTxId) {
       const matchTx = await this.repo.findOneBy({ id: matchTxId, userId });
       if (matchTx) {
         if (matchTx.transferAccountId) {
           await this.adjustTransferBalance(matchTx.transferAccountId, userId, Number(matchTx.amount), 'undo');
         }
-        matchTx.categoryId        = tx.categoryId ?? undefined;
-        matchTx.categorizedByRuleId = null;
+        const [fromTx, toTx] = amount < 0 ? [tx, matchTx] : [matchTx, tx];
+        const [fromAcc, toAcc] = await Promise.all([
+          fromTx.bankAccountId ? this.accountRepo.findOneBy({ id: fromTx.bankAccountId, userId }) : null,
+          toTx.bankAccountId ? this.accountRepo.findOneBy({ id: toTx.bankAccountId, userId }) : null,
+        ]);
+        const allowed = transferKindOptions(fromAcc?.accountType ?? '', toAcc?.accountType ?? '');
+        const resolved: TransferKind = kind == null ? defaultTransferKind(fromAcc?.accountType ?? '', toAcc?.accountType ?? '') : kind;
+        if (!isTransferKind(resolved) || !allowed.includes(resolved)) {
+          throw new BadRequestException(`This transfer cannot be marked as "${String(kind)}" between these accounts.`);
+        }
+        const names = categoriesForKind(resolved);
+        const fromCat = await this.ensureCategory(userId, names.from);
+        const toCat = await this.ensureCategory(userId, names.to);
+
+        fromTx.categoryId = fromCat.id; fromTx.categorizedByRuleId = null;
+        toTx.categoryId = toCat.id; toTx.categorizedByRuleId = null;
         matchTx.transferAccountId = tx.bankAccountId ?? undefined;
         matchTx.counterpartTxId   = id;
-        await this.repo.save(matchTx);
+        tx.counterpartTxId = matchTxId;
+        await this.repo.save([tx, matchTx]);
+        counterpart = { id: matchTx.id, categoryId: matchTx.categoryId ?? null, categoryRef: matchTx.id === toTx.id ? toCat : fromCat };
+      } else {
+        await this.repo.update(id, { counterpartTxId: matchTxId });
       }
-      /* Store the back-reference */
-      await this.repo.update(id, { counterpartTxId: matchTxId });
     }
 
-    return this.repo.findOne({ where: { id }, relations: ['categoryRef', 'bankAccount', 'transferAccount'] });
+    const fresh = await this.repo.findOne({ where: { id }, relations: ['categoryRef', 'bankAccount', 'transferAccount'] });
+    return counterpart ? Object.assign(fresh!, { counterpart }) : fresh!;
+  }
+
+  /** The user's category of that name, created from the transfer defaults if they lack it. */
+  private async ensureCategory(userId: string, name: string): Promise<Category> {
+    const existing = await this.categoryRepo.findOneBy({ userId, name });
+    if (existing) return existing;
+    const def = TRANSFER_CATEGORY_DEFAULTS.find((d) => d.name === name);
+    if (!def) throw new BadRequestException(`Unknown transfer category "${name}".`);
+    return this.categoryRepo.save(this.categoryRepo.create({ ...def, userId, isDefault: true }));
   }
 
   /* delta = -amount: outgoing -$2000 → dest gets +$2000; incoming +$2000 → source loses $2000 */

@@ -15,7 +15,8 @@ import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import LinkIcon from '@/components/LinkIcon';
 import InfoIcon from '@/components/InfoIcon';
-import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiability } from '@/lib/accountTypes';
+import { ACCOUNT_GROUPS, accountTypeLabel, accountTypeMeta, isImportable, isLiability, isTrackingAccount } from '@/lib/accountTypes';
+import type { TransferKind } from '@/lib/transactions/transferKind';
 // Lazy: pulls in @dnd-kit (~19 KB gz) only when someone opens the split modal.
 const SplitTransactionModal = dynamic(() => import('@/components/SplitTransactionModal'), { ssr: false });
 import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
@@ -788,26 +789,29 @@ export default function TransactionsPage() {
     } finally { setLinkingProj(false); }
   }
 
-  async function setTransferAccount(txId: string, transferAccountId: string | null, matchTxId?: string) {
+  async function setTransferAccount(txId: string, transferAccountId: string | null, matchTxId?: string, kind?: TransferKind) {
     try {
       const res = await fetch(`${API}/transactions/${txId}/transfer-account`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ transferAccountId, matchTxId: matchTxId ?? null }),
+        body: JSON.stringify({ transferAccountId, matchTxId: matchTxId ?? null, kind: kind ?? null }),
       });
-      if (!res.ok) return;
-      const updated: Transaction = await res.json();
+      if (!res.ok) throw new Error(`link failed (${res.status})`);
+      // The server categorises both sides from the transfer kind and returns the counterpart's category.
+      const updated: Transaction & { counterpart?: { id: string; categoryId: string | null; categoryRef: Category | null } } = await res.json();
       setTransactions((prev) => prev.map((t) => {
-        if (t.id === txId) return { ...t, transferAccountId: updated.transferAccountId, transferAccount: updated.transferAccount, counterpartTxId: matchTxId ?? null };
+        if (t.id === txId) return { ...t, categoryId: updated.categoryId, categoryRef: updated.categoryRef, transferAccountId: updated.transferAccountId, transferAccount: updated.transferAccount, counterpartTxId: matchTxId ?? null };
         if (matchTxId && t.id === matchTxId) {
           const srcAcc = prev.find((s) => s.id === txId)?.bankAccount ?? null;
-          return { ...t, categoryId: updated.categoryId, categoryRef: updated.categoryRef, transferAccountId: updated.bankAccountId, transferAccount: srcAcc, counterpartTxId: txId };
+          const cp = updated.counterpart;
+          return { ...t, categoryId: cp ? cp.categoryId : t.categoryId, categoryRef: cp ? cp.categoryRef : t.categoryRef, transferAccountId: updated.bankAccountId, transferAccount: srcAcc, counterpartTxId: txId };
         }
         return t;
       }));
       fetch(`${API}/bank-accounts`, { credentials: 'include' })
         .then((r) => r.json()).then((accs) => { if (Array.isArray(accs)) setAccounts(accs); });
-    } catch {
-      // network error — ignore
+    } catch (e) {
+      // Surface it: the link dialog shows a message and keeps the user's selection.
+      throw e;
     } finally {
       setOpenPickerId(null);
       setPickerTransferStep(false);
@@ -904,7 +908,11 @@ export default function TransactionsPage() {
   /** Neither income nor spending: transfers plus money moved into savings. */
   const isNonSpending = (t: Transaction) => isTransfer(t) || t.categoryRef?.type === 'savings';
   const openDebts = debts.filter((d) => d.status === 'open');
-  const uncategorizedCount = transactions.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
+  /* Still waiting for a category: not transfers, not project rows, and not the
+     internal movements of a tracking account (investment, mortgage…), which are
+     net-worth only and never need one. */
+  const needsCategory = (t: Transaction) => !t.categoryId && !t.projectId && !isTransfer(t) && !isTrackingAccount(t.bankAccount?.accountType ?? '');
+  const uncategorizedCount = transactions.filter((t) => needsCategory(t)).length;
   /* Current + previous window: gives buildRecurringMap the ≥2 months it needs
      to detect repeats even inside a one-month view. Declared before `visible`,
      which calls isRecurringTx during the same render pass. */
@@ -923,7 +931,7 @@ export default function TransactionsPage() {
 
   const isRecurringTx = (t: Transaction) => Number(t.amount) < 0 && recurringMap.has(normalize(t.name));
   const visible = transactions.filter((t) => {
-    if (filter === 'uncategorized' && (t.categoryId || t.projectId || isTransfer(t))) return false;
+    if (filter === 'uncategorized' && !needsCategory(t)) return false;
     if (filter === 'expense'       && (Number(t.amount) >= 0 || isNonSpending(t))) return false;
     if (filter === 'income'        && (Number(t.amount) < 0  || isNonSpending(t))) return false;
     if (filter === 'recurring'     && !isRecurringTx(t)) return false;
@@ -1445,7 +1453,7 @@ export default function TransactionsPage() {
               const isCollapsed = collapsed.has(accountId);
               const accIncome       = txList.filter((t) => Number(t.amount) >= 0 && !isNonSpending(t)).reduce((s, t) => s + Number(t.amount), 0);
               const accExpense      = txList.filter((t) => Number(t.amount) < 0  && !isNonSpending(t)).reduce((s, t) => s + Number(t.amount), 0);
-              const accUncategorized = txList.filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
+              const accUncategorized = txList.filter((t) => needsCategory(t)).length;
               const accColor        = g.kind === 'bank' ? (acc?.color || '#9B6DFF') : GROUP_COLORS[g.kind];
 
               const dateMap = txList.reduce<Record<string, Transaction[]>>((m, tx) => {
@@ -1572,7 +1580,7 @@ export default function TransactionsPage() {
                   {dates.map((date, dateIdx) => {
                     const dateKey       = `${accountId}::${date}`;
                     const dateCollapsed = collapsedDates.has(dateKey);
-                    const dayUncategorized = dateMap[date].filter((t) => !t.categoryId && !t.projectId && !isTransfer(t)).length;
+                    const dayUncategorized = dateMap[date].filter((t) => needsCategory(t)).length;
                     const isLast = dateIdx === dates.length - 1;
                     return (
                     <div key={date} className="relative">
@@ -1834,6 +1842,7 @@ export default function TransactionsPage() {
                                   return { background: `${_c}18`, border: `1px solid ${_c}35`, color: _c };
                                 }
                                 if (cat) return { background: `${cat.color}18`, border: `1px solid ${cat.color}35`, color: cat.color };
+                                if (isTrackingAccount(tx.bankAccount?.accountType ?? '')) return { background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' };
                                 return { background: 'color-mix(in srgb, var(--color-amber) 10%, transparent)', border: '1px dashed color-mix(in srgb, var(--color-amber) 45%, transparent)', color: 'var(--color-amber)' };
                               })()}>
                               {updatingId === tx.id ? (
@@ -1868,6 +1877,8 @@ export default function TransactionsPage() {
                                   )}
                                   <ChevronIcon />
                                 </>
+                              ) : isTrackingAccount(tx.bankAccount?.accountType ?? '') ? (
+                                <><span>{accountTypeMeta(tx.bankAccount?.accountType ?? '').icon}</span><span>{accountTypeLabel(tx.bankAccount?.accountType ?? '')} · not in budgets</span><ChevronIcon /></>
                               ) : (
                                 <><TagIcon /><span>Categorize</span><ChevronIcon /></>
                               )}
@@ -2787,10 +2798,12 @@ export default function TransactionsPage() {
             matchesLoading={transferModalLoading}
             accounts={accounts}
             onClose={() => { setTransferModal(null); setTransferModalMatches([]); }}
-            onLink={async (accountId, matchTxId, note) => {
+            onLink={async (accountId, matchTxId, note, kind) => {
               const srcTx = transferModal.tx;
-              await assignCategory(srcTx.id, transferModal.categoryId, true);
-              await setTransferAccount(srcTx.id, accountId, matchTxId ?? undefined);
+              // With a counterpart the server sets both categories from the kind; a bare
+              // account link (cash) keeps the transfer category picked in the row.
+              if (!matchTxId) await assignCategory(srcTx.id, transferModal.categoryId, true);
+              await setTransferAccount(srcTx.id, accountId, matchTxId ?? undefined, kind);
               // The link is what was asked for, so a failed note must not undo it.
               if (note) await saveTransferNote([srcTx.id, matchTxId], note);
               setTransferModal(null);

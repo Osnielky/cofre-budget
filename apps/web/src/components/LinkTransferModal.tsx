@@ -6,6 +6,7 @@ import AccountTypeIcon from './AccountTypeIcon';
 import LinkIcon from './LinkIcon';
 import InfoIcon from './InfoIcon';
 import { accountTypeLabel } from '@/lib/accountTypes';
+import { transferKindOptions, explainTransfer, KIND_LABELS, type TransferKind } from '@/lib/transactions/transferKind';
 import {
   amountOf, describeMatch, orientSides, searchCandidates, type LinkTx,
 } from '@/lib/transactions/transferLink';
@@ -28,8 +29,8 @@ interface Props {
   matchesLoading: boolean;
   accounts: Account[];
   onClose: () => void;
-  /** Commits the link. `matchTxId` is null when linking to a bare account. */
-  onLink: (accountId: string | null, matchTxId: string | null, note: string) => Promise<void>;
+  /** Commits the link. `matchTxId` is null when linking to a bare account; `kind` says what the transfer means. */
+  onLink: (accountId: string | null, matchTxId: string | null, note: string, kind: TransferKind) => Promise<void>;
 }
 
 type Tab = 'suggested' | 'find' | 'cash';
@@ -229,6 +230,23 @@ export default function LinkTransferModal({
   const srcIsOutgoing = amountOf(tx) < 0;
   const hasSelection = !!chosenTx || !!chosenAccountId;
 
+  /* What the transfer means. Options depend on the two account types; the first is the default. */
+  const fromAccount = (from as TransferTx | null)?.bankAccount ?? (!from && !srcIsOutgoing ? chosenAccount : null);
+  const toAccount = (to as TransferTx | null)?.bankAccount ?? (!to && srcIsOutgoing ? chosenAccount : null);
+  const kindOptions = useMemo(
+    () => transferKindOptions(fromAccount?.accountType ?? '', toAccount?.accountType ?? ''),
+    [fromAccount?.accountType, toAccount?.accountType],
+  );
+  const [kindChoice, setKindChoice] = useState<TransferKind | null>(null);
+  const kind: TransferKind = kindChoice && kindOptions.includes(kindChoice) ? kindChoice : kindOptions[0];
+  const explanation = hasSelection && fromAccount && toAccount
+    ? explainTransfer(kind, {
+        from: { name: `${fromAccount.bankName} · ${fromAccount.accountName}`, accountType: fromAccount.accountType, provider: (fromAccount as Account & { provider?: string }).provider },
+        to: { name: `${toAccount.bankName} · ${toAccount.accountName}`, accountType: toAccount.accountType, provider: (toAccount as Account & { provider?: string }).provider },
+        amount: amountOf(tx),
+      })
+    : null;
+
   function choose(t: TransferTx) {
     setChosenAccountId(null);
     setChosenTx((prev) => (prev?.id === t.id ? null : t));
@@ -240,7 +258,7 @@ export default function LinkTransferModal({
     setError('');
     try {
       const accountId = chosenTx ? chosenTx.bankAccountId : chosenAccountId;
-      await onLink(accountId, chosenTx?.id ?? null, note.trim());
+      await onLink(accountId, chosenTx?.id ?? null, note.trim(), kind);
     } catch {
       setError('Could not link these transactions. Nothing was changed.');
       setLinking(false);
@@ -430,18 +448,54 @@ export default function LinkTransferModal({
               style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
           </div>
 
-          {/* Outcome */}
-          <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-            style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-            <span className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-              style={{ background: 'color-mix(in srgb, var(--color-violet) 20%, transparent)', color: 'var(--color-violet)' }}>
-              <LinkIcon size={15} />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-bold" style={{ color: 'var(--color-text-primary)' }}>Keep both records connected</p>
-              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Open either transaction to see its linked record.</p>
+          {/* What is this transfer? + how it will be recorded */}
+          {hasSelection && explanation && (
+            <div className="flex flex-col gap-3">
+              {kindOptions.length > 1 && (
+                <div>
+                  <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>What is this movement?</p>
+                  <div role="radiogroup" aria-label="What is this movement?" className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {kindOptions.map((k) => {
+                      const on = k === kind;
+                      return (
+                        <button key={k} type="button" role="radio" aria-checked={on} onClick={() => setKindChoice(k)}
+                          className="text-left px-3 py-2.5 rounded-xl transition-colors"
+                          style={{
+                            background: on ? 'color-mix(in srgb, var(--color-violet) 16%, transparent)' : 'var(--color-surface)',
+                            border: `1px solid ${on ? 'var(--color-violet)' : 'var(--color-border)'}`,
+                          }}>
+                          <p className="text-xs font-semibold" style={{ color: on ? 'var(--color-violet)' : 'var(--color-text-primary)' }}>{KIND_LABELS[k].title}</p>
+                          <p className="text-[10px] mt-0.5 leading-snug" style={{ color: 'var(--color-text-muted)' }}>{KIND_LABELS[k].hint}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-xl p-4 flex flex-col gap-3"
+                style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                  This is how it will be recorded
+                </p>
+                {[explanation.from, explanation.to].map((side) => (
+                  <div key={side.account} className="flex items-start gap-3">
+                    <span className="text-sm font-bold tabular-nums shrink-0 w-24 text-right"
+                      style={{ color: side.amount < 0 ? 'var(--color-rose)' : 'var(--color-green)' }}>
+                      {money(side.amount)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                        {side.account} <span style={{ color: 'var(--color-text-muted)' }}>→</span>{' '}
+                        <span className="px-1.5 py-0.5 rounded-md" style={{ background: 'color-mix(in srgb, var(--color-violet) 16%, transparent)', color: 'var(--color-violet)' }}>{side.category}</span>
+                      </p>
+                      <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'var(--color-text-secondary)' }}>{side.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {error && <p className="text-xs" style={{ color: 'var(--color-rose)' }}>{error}</p>}
         </div>

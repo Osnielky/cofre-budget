@@ -55,7 +55,9 @@ export class AiReadToolsService {
     if (args.startDate) qb.andWhere('tx.date >= :start', { start: args.startDate });
     if (args.endDate) qb.andWhere('tx.date <= :end', { end: args.endDate });
     if (args.categoryId) qb.andWhere('tx.categoryId = :categoryId', { categoryId: args.categoryId });
-    if (args.uncategorizedOnly) qb.andWhere('tx.categoryId IS NULL');
+    // Tracking accounts (investment, mortgage, other assets/liabilities) are net-worth only;
+    // their internal movements never need a category, so don't offer them for review.
+    if (args.uncategorizedOnly) qb.andWhere('tx.categoryId IS NULL AND (bankAccount.accountType IS NULL OR bankAccount.accountType NOT IN (:...tracking))', { tracking: ['investment', 'mortgage', 'other_asset', 'other_liability'] });
     if (args.accountId) qb.andWhere('tx.bankAccountId = :accountId', { accountId: args.accountId });
     if (args.merchant) qb.andWhere('(tx.merchantName ILIKE :m OR tx.name ILIKE :m)', { m: `%${args.merchant}%` });
 

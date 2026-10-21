@@ -4,6 +4,7 @@ import { Transaction } from './transaction.entity';
 import { RecurringRule } from './recurring-rule.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
+import { Category } from '../categories/category.entity';
 import { Project } from '../projects/project.entity';
 import { Receipt } from '../receipts/receipt.entity';
 import { TransactionsService } from './transactions.service';
@@ -15,7 +16,7 @@ import { GmailModule } from '../gmail/gmail.module';
 import { CategorizationRulesModule } from '../categorization-rules/categorization-rules.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Transaction, RecurringRule, BankAccount, ProjectCategory, Project, Receipt]), DebtsModule, GmailModule, CategorizationRulesModule],
+  imports: [TypeOrmModule.forFeature([Transaction, RecurringRule, BankAccount, ProjectCategory, Project, Receipt, Category]), DebtsModule, GmailModule, CategorizationRulesModule],
   providers: [TransactionsService, ReceiptFinderService, RecurringService],
   controllers: [TransactionsController],
   exports: [TransactionsService, ReceiptFinderService, RecurringService],

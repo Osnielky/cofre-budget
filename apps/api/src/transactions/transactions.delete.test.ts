@@ -32,6 +32,7 @@ function makeService(ds: DataSource) {
     ds.getRepository(Project),
     debts as any,
     {} as any,
+    ds.getRepository(Category),
   );
 }
 

@@ -46,6 +46,7 @@ beforeEach(async () => {
     ds.getRepository(Project),
     { removePaymentByTransaction: vi.fn() } as any,
     {} as any,
+    ds.getRepository(Category),
   );
 });
 

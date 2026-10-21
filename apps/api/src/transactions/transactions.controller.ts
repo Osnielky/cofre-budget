@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Re
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TransactionsService, CsvRow, SplitPiece } from './transactions.service';
 import { ReceiptFinderService } from './receipt-finder.service';
+import { isTransferKind } from './transfer-kind';
 import { RecurringService, CreateRuleDto } from './recurring.service';
 
 @UseGuards(JwtAuthGuard)
@@ -182,7 +183,9 @@ export class TransactionsController {
     @Request() req: any,
     @Body('transferAccountId') transferAccountId: string | null,
     @Body('matchTxId') matchTxId?: string | null,
+    @Body('kind') kind?: unknown,
   ) {
-    return this.service.updateTransferAccount(id, req.user.id, transferAccountId, matchTxId);
+    // What the transfer means (savings, card payment, …); the service validates it against the account pair.
+    return this.service.updateTransferAccount(id, req.user.id, transferAccountId, matchTxId, isTransferKind(kind) ? kind : null);
   }
 }

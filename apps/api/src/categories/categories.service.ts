@@ -36,6 +36,7 @@ const DEFAULTS: Omit<Category, 'id' | 'userId' | 'user' | 'isDefault' | 'created
   { name: 'Salary',         icon: '💼', color: '#4FBF7F', type: 'income',   description: 'Regular employment income' },
   { name: 'Freelance',      icon: '💻', color: '#9B6DFF', type: 'income',   description: 'Contract & self-employment earnings' },
   { name: 'Investments',    icon: '📈', color: '#F5C842', type: 'savings',  description: 'Money you invest or save — brokerage, retirement & savings contributions' },
+  { name: 'Investment income', icon: '💹', color: '#4FBF7F', type: 'income', description: 'Gains, dividends and interest you took out of an investment or savings account' },
   { name: 'Other',               icon: '📦', color: '#5C5C78', type: 'both',     description: 'Anything that doesn\'t fit another category' },
   { name: 'Credit Card Payment', icon: '💳', color: '#6B6B8A', type: 'transfer', description: 'Paying off your credit card balance' },
   { name: 'Internal Transfer',   icon: '🔄', color: '#6B6B8A', type: 'transfer', description: 'Moving money between your own accounts' },
