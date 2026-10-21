@@ -9,10 +9,13 @@ import { motion, AnimatePresence, useReducedMotion, type Variants } from 'motion
    same way; reduced-motion users get instant changes (motion/react reads the
    OS preference through useReducedMotion). */
 
-export const chatSpring = { type: 'spring', stiffness: 420, damping: 34, mass: 0.8 } as const;
+/* Soft enough to be seen: a row travels ~30px and settles in about half a second
+   with a small overshoot. (A stiffer 420/34 spring finished in 300ms and 14px,
+   which users read as "no animation".) */
+export const chatSpring = { type: 'spring', stiffness: 260, damping: 22, mass: 0.9 } as const;
 
 const messageVariants: Variants = {
-  hidden: (role: 'user' | 'assistant') => ({ opacity: 0, y: 14, x: role === 'user' ? 18 : -18, scale: 0.98 }),
+  hidden: (role: 'user' | 'assistant') => ({ opacity: 0, y: 28, x: role === 'user' ? 40 : -40, scale: 0.94 }),
   show: { opacity: 1, y: 0, x: 0, scale: 1, transition: chatSpring },
   exit: { opacity: 0, transition: { duration: 0.12 } },
 };
@@ -86,6 +89,19 @@ export function ThinkingBubble() {
         </motion.p>
       </AnimatePresence>
     </div>
+  );
+}
+
+/** The reply body taking the thinking bubble's place: the bubble fades out, the
+    first words rise in. Use inside `<AnimatePresence mode="wait">` with distinct keys. */
+export function ReplyIn({ children, className }: { children: React.ReactNode; className?: string }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div className={className}
+      initial={reduce ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6, transition: { duration: 0.16 } }}
+      transition={{ ...chatSpring, stiffness: 300 }}>
+      {children}
+    </motion.div>
   );
 }
 

@@ -11,7 +11,7 @@ import SavingsTrendWidget from './SavingsTrendWidget';
 import SafeToSpendWidget from './SafeToSpendWidget';
 import FinancialSnapshotPanel from './FinancialSnapshotPanel';
 import { resetsIn } from '@/lib/ai/usage';
-import { AnimatePresence, MessageIn, WidgetIn, Stagger, StaggerItem, ThinkingBubble, AiAvatar, SendButton } from './motion';
+import { AnimatePresence, MessageIn, WidgetIn, Stagger, StaggerItem, ThinkingBubble, AiAvatar, SendButton, ReplyIn } from './motion';
 
 const SUGGESTED_PROMPTS = [
   {
@@ -177,9 +177,11 @@ export default function AskCofrePage() {
                         </div>
                       ) : (
                         <div className="text-sm pt-1 min-w-0" style={{ color: 'var(--color-text-primary)' }}>
-                          {m.text
-                            ? <div className={streaming ? 'chat-streaming' : undefined}><ChatMarkdown text={m.text} /></div>
-                            : (streaming ? <ThinkingBubble /> : null)}
+                          <AnimatePresence mode="wait" initial={false}>
+                            {m.text
+                              ? <ReplyIn key="reply" className={streaming ? 'chat-streaming' : undefined}><ChatMarkdown text={m.text} /></ReplyIn>
+                              : (streaming ? <ReplyIn key="thinking"><ThinkingBubble /></ReplyIn> : null)}
+                          </AnimatePresence>
                           {m.widget && m.widget.type === 'proposal' && (() => {
                             const actionId = m.widget.actionId;
                             return (
