@@ -144,3 +144,14 @@ monthly growth it needs. `WealthJourney` shows the artwork clearly (`.journey-ar
 with level names under each node; on phones it becomes a vertical ladder
 (`.journey-art-tall`) instead of a sideways scroll. Layout: hero → chart beside next
 step (xl) → journey. `JourneyStats` and the unused `HeroGoalCard` were removed.
+
+### Wide screens (2026-10-21)
+
+The page no longer caps its width at 1280px — on a 2560px monitor it left a third of
+the screen empty. `MilestonesCard` lists every level with the month it was reached
+(from history crossings, "Reached" when history starts above it) or the month it lands
+at the current pace (`projectReach`; "Not at this pace" when pace is ≤ 0). Layout:
+below xl it stacks; at xl it spans the chart + next-step row as a two-column list; at
+2xl it becomes a third column (`minmax(0,1fr)_380px_360px`) with a one-column list.
+The other pages already fill the width (audited at 2560px: dashboard, transactions,
+budgets, cards, debts, projects, Ask Cofre).

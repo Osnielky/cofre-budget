@@ -10,6 +10,7 @@ import GoalsHero from './components/GoalsHero';
 import NetWorthHistoryChart from './components/NetWorthHistoryChart';
 import WealthJourney from './components/WealthJourney';
 import NextStepCard from './components/NextStepCard';
+import MilestonesCard from './components/MilestonesCard';
 
 function currentMonth() { return new Date().toISOString().slice(0, 7); }
 
@@ -23,7 +24,8 @@ export default function GoalsPage() {
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 min-w-0 overflow-y-auto pt-14 md:pt-0">
-        <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-6 flex flex-col gap-5 max-w-7xl">
+        {/* No width cap: on wide screens the chart row grows a third column (milestones). */}
+        <div className="px-4 sm:px-6 md:px-8 2xl:px-10 py-5 sm:py-6 flex flex-col gap-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(26px, 3vw, 38px)' }}>Your road to $1,000,000</h1>
@@ -50,9 +52,12 @@ export default function GoalsPage() {
             <>
               <GoalsHero netWorth={breakdown.total} monthNet={breakdown.monthNet} />
               {dataError && <p className="text-sm" style={{ color: 'var(--color-rose)' }}>{dataError}</p>}
-              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_380px_360px] gap-5 items-start">
                 <NetWorthHistoryChart points={history.points} loading={history.loading} error={history.error} />
                 <NextStepCard netWorth={breakdown.total} history={history.points} targetDate={goal.targetDate} onSetTargetDate={setTargetDate} />
+                <div className="xl:col-span-2 2xl:col-span-1 min-w-0">
+                  <MilestonesCard netWorth={breakdown.total} history={history.points} />
+                </div>
               </div>
               <WealthJourney netWorth={breakdown.total} />
             </>
