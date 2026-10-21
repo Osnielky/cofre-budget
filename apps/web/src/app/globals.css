@@ -634,3 +634,43 @@ body::before {
     linear-gradient(180deg, rgba(6, 10, 20, 0.58) 0%, rgba(6, 10, 20, 0.46) 45%, var(--color-base) 100%),
     linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 18%, transparent) 0%, transparent 55%);
 }
+
+/* ── Goals page hero ──
+   The login night-sky art behind the net-worth hero, scrimmed to the surface
+   colour so the figures stay legible and the card still reads as glass. */
+.goals-hero-art {
+  --auth-art: url('/login-bg-wide.jpg');
+  background-color: var(--color-surface);
+  background-image:
+    linear-gradient(100deg, color-mix(in srgb, var(--color-base) 88%, transparent) 0%, color-mix(in srgb, var(--color-base) 72%, transparent) 55%, color-mix(in srgb, var(--color-base) 40%, transparent) 100%),
+    var(--auth-art);
+  background-size: cover;
+  background-position: right 30%;
+  background-repeat: no-repeat;
+}
+@media (max-width: 1100px) { .goals-hero-art { --auth-art: url('/login-bg-square.jpg'); background-position: center 30%; } }
+@media (max-width: 640px) { .goals-hero-art { --auth-art: url('/login-bg-mobile.jpg'); background-position: center 20%; } }
+
+/* The journey artwork, shown clearly: a light bottom-weighted scrim only
+   where the labels sit, instead of the old grey wash across the whole band. */
+.journey-art-clear {
+  --journey-art: url('/wealth-journey-background-1800x500.webp');
+  background-color: var(--color-elevated);
+  background-image:
+    linear-gradient(180deg, rgba(9, 15, 30, 0.10) 0%, rgba(9, 15, 30, 0.22) 45%, rgba(9, 15, 30, 0.90) 100%),
+    var(--journey-art);
+  background-size: cover;
+  background-position: center 45%;
+  background-repeat: no-repeat;
+}
+/* Vertical ladder on phones: a tall crop of the same art, left to right becomes top to bottom. */
+.journey-art-tall {
+  --journey-art: url('/wealth-journey-background-1800x500.webp');
+  background-color: var(--color-elevated);
+  background-image:
+    linear-gradient(90deg, rgba(9, 15, 30, 0.92) 0%, rgba(9, 15, 30, 0.72) 55%, rgba(9, 15, 30, 0.30) 100%),
+    var(--journey-art);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}

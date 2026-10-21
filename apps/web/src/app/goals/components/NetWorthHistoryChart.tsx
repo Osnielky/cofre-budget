@@ -65,16 +65,31 @@ export default function NetWorthHistoryChart({ points, loading, error }: Props) 
   const spanDays = data.length > 1 ? (data[data.length - 1].t - data[0].t) / 86400000 : 0;
   const tickFmt: Intl.DateTimeFormatOptions = spanDays < 90 ? { month: 'short', day: 'numeric' } : { month: 'short', year: 'numeric' };
   const hasEstimate = visible.some((p) => p.estimated);
-  const first = data[0];
   const last = data[data.length - 1];
+  /* One tick per distinct label (month, or day on short ranges), at most seven,
+     so "Oct 2026" never repeats three times along the axis. */
+  const ticks = useMemo(() => {
+    const seen = new Set<string>();
+    const out: number[] = [];
+    for (const d of data) {
+      const key = new Date(d.t).toLocaleDateString('en-US', tickFmt);
+      if (seen.has(key)) continue;
+      seen.add(key); out.push(d.t);
+    }
+    if (out.length <= 7) return out;
+    const step = Math.ceil(out.length / 7);
+    return out.filter((_, i) => i % step === 0 || i === out.length - 1);
+  }, [data, tickFmt]);
 
   return (
-    <section className="rounded-2xl p-4 sm:p-5"
+    <section className="rounded-3xl p-4 sm:p-5 min-w-0"
       style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
       <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
         <div>
           <h2 className="text-lg font-bold">Net worth over time</h2>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>From your first record to today</p>
+          <p className="text-xs mt-0.5 tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
+            {summary ? `${compactMoney(summary.start)} → ${compactMoney(summary.end)}` : 'From your first record to today'}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div role="group" aria-label="Chart range" className="flex p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
@@ -107,7 +122,7 @@ export default function NetWorthHistoryChart({ points, loading, error }: Props) 
         </div>
       ) : (
         <>
-          <div className="h-64 sm:h-72">
+          <div className="h-56 sm:h-72 lg:h-80">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={data} margin={{ top: 28, right: 24, left: 0, bottom: 0 }}>
                 <defs>
@@ -117,7 +132,7 @@ export default function NetWorthHistoryChart({ points, loading, error }: Props) 
                   </linearGradient>
                 </defs>
                 <CartesianGrid stroke={c.border} vertical={false} />
-                <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickCount={6}
+                <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} ticks={ticks}
                   tickFormatter={(t: number) => new Date(t).toLocaleDateString('en-US', tickFmt)}
                   tick={{ fill: c.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v: number) => compactMoney(v)} width={60}
@@ -127,13 +142,10 @@ export default function NetWorthHistoryChart({ points, loading, error }: Props) 
                 <Line dataKey="est" stroke={c.green} strokeOpacity={0.6} strokeWidth={2} strokeDasharray="5 5" dot={false} isAnimationActive={false} />
                 <Area dataKey="real" stroke={c.green} strokeWidth={2.5} fill="url(#nw-fill)" dot={false} isAnimationActive={false} />
                 {crossings.map((x) => (
-                  <ReferenceDot key={x.level.n} x={toTime(x.date)} y={x.value} r={5} fill={c.green} stroke={c.textPrimary}
-                    label={{ value: `${x.estimated ? '≈' : ''}${x.level.short} reached`, position: 'top', fill: c.green, fontSize: 11, fontWeight: 700 }} />
+                  <ReferenceDot key={x.level.n} x={toTime(x.date)} y={x.value} r={5} fill={c.amber} stroke={c.textPrimary}
+                    label={{ value: `${x.estimated ? '≈' : ''}${x.level.short}`, position: 'top', fill: c.amber, fontSize: 11, fontWeight: 700, offset: 10 }} />
                 ))}
-                {first && <ReferenceDot x={first.t} y={first.value} r={4} fill={c.textPrimary} stroke={c.green}
-                  label={{ value: compactMoney(first.value), position: 'right', fill: c.textSecondary, fontSize: 11 }} />}
-                {last && <ReferenceDot x={last.t} y={last.value} r={5} fill={c.textPrimary} stroke={c.green}
-                  label={{ value: compactMoney(last.value), position: 'left', fill: c.textSecondary, fontSize: 11 }} />}
+                {last && <ReferenceDot x={last.t} y={last.value} r={5} fill={c.textPrimary} stroke={c.green} />}
               </ComposedChart>
             </ResponsiveContainer>
           </div>

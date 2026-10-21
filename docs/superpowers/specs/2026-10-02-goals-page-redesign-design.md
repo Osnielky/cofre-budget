@@ -130,3 +130,17 @@ existing level colours.
 
 Custom date-range picker, nightly snapshot job, backfilling real history from Plaid
 balance history, asset-value changes inside estimates, projections to $1M on the chart.
+
+## 2026-10-21 restyle
+
+The four stat tiles were replaced by one hero band (`GoalsHero`): net worth and this
+month's change, a thin $0 → $1M progress line, and a level ring with the distance to
+the next level, over the login night-sky art (`.goals-hero-art`). The chart keeps its
+data but de-duplicates axis ticks, marks milestone crossings with small amber chips and
+shows "start → today" in its subtitle. `NextStepCard` now projects: pace = average
+net-worth change over the last 90 days of history (`lib/goals/pace.ts`, tested), the
+month the next level and $1M are reached at that pace, and, with a target date, the
+monthly growth it needs. `WealthJourney` shows the artwork clearly (`.journey-art-clear`)
+with level names under each node; on phones it becomes a vertical ladder
+(`.journey-art-tall`) instead of a sideways scroll. Layout: hero → chart beside next
+step (xl) → journey. `JourneyStats` and the unused `HeroGoalCard` were removed.

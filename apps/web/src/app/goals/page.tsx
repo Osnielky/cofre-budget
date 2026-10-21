@@ -6,7 +6,7 @@ import { useNetWorthGoal } from '@/hooks/useNetWorthGoal';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useNetWorthHistory } from '@/hooks/useNetWorthHistory';
 import { netWorthBreakdown } from '@/lib/dashboard/derive';
-import JourneyStats from './components/JourneyStats';
+import GoalsHero from './components/GoalsHero';
 import NetWorthHistoryChart from './components/NetWorthHistoryChart';
 import WealthJourney from './components/WealthJourney';
 import NextStepCard from './components/NextStepCard';
@@ -22,8 +22,8 @@ export default function GoalsPage() {
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
-        <div className="px-4 sm:px-6 md:px-8 py-6 flex flex-col gap-5 max-w-7xl">
+      <main className="flex-1 min-w-0 overflow-y-auto pt-14 md:pt-0">
+        <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-6 flex flex-col gap-5 max-w-7xl">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(26px, 3vw, 38px)' }}>Your road to $1,000,000</h1>
@@ -40,18 +40,21 @@ export default function GoalsPage() {
           </div>
 
           {goalLoading || dataLoading ? (
-            <p style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
+            <div className="flex flex-col gap-5" aria-busy="true">
+              <div className="h-56 rounded-3xl animate-pulse" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }} />
+              <div className="h-80 rounded-3xl animate-pulse" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }} />
+            </div>
           ) : !goal ? (
             <p style={{ color: 'var(--color-rose)' }}>{goalError ?? 'Could not load your net worth goal.'}</p>
           ) : (
             <>
-              <JourneyStats netWorth={breakdown.total} monthNet={breakdown.monthNet} />
+              <GoalsHero netWorth={breakdown.total} monthNet={breakdown.monthNet} />
               {dataError && <p className="text-sm" style={{ color: 'var(--color-rose)' }}>{dataError}</p>}
-              <NetWorthHistoryChart points={history.points} loading={history.loading} error={history.error} />
-              <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-5 items-start">
-                <WealthJourney netWorth={breakdown.total} />
-                <NextStepCard netWorth={breakdown.total} targetDate={goal.targetDate} onSetTargetDate={setTargetDate} />
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+                <NetWorthHistoryChart points={history.points} loading={history.loading} error={history.error} />
+                <NextStepCard netWorth={breakdown.total} history={history.points} targetDate={goal.targetDate} onSetTargetDate={setTargetDate} />
               </div>
+              <WealthJourney netWorth={breakdown.total} />
             </>
           )}
         </div>
