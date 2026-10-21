@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { AdminStats, AdminUsersPage, AdminTraffic } from '@/lib/admin/types';
+import type { AdminStats, AdminUsersPage, AdminTraffic, AdminTicket, AdminTicketPage, TicketStatus } from '@/lib/admin/types';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -71,3 +71,36 @@ export function useAdminTraffic(refreshKey = 0) {
   }, [refreshKey]);
   return { data, error };
 }
+
+export function useAdminTickets(status: TicketStatus | 'all', page: number, refreshKey = 0) {
+  const [data, setData] = useState<AdminTicketPage | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setError(null);
+    const qs = new URLSearchParams({ page: String(page) });
+    if (status !== 'all') qs.set('status', status);
+    fetch(`${API}/admin/tickets?${qs}`, { credentials: 'include', signal: ctrl.signal })
+      .then(async (r) => { if (!r.ok) throw new Error(`Could not load tickets (${r.status}).`); setData(await r.json()); })
+      .catch((e: Error) => { if (e.name !== 'AbortError') setError(e.message); });
+    return () => ctrl.abort();
+  }, [status, page, refreshKey]);
+  return { data, error };
+}
+
+export async function fetchAdminTicket(id: string): Promise<AdminTicket> {
+  const r = await fetch(`${API}/admin/tickets/${id}`, { credentials: 'include' });
+  if (!r.ok) throw new Error(r.status === 404 ? 'That ticket no longer exists.' : `Could not load the ticket (${r.status}).`);
+  return r.json();
+}
+
+export async function patchAdminTicket(id: string, body: { status?: TicketStatus; reply?: string | null; adminNote?: string | null }): Promise<AdminTicket> {
+  const r = await fetch(`${API}/admin/tickets/${id}`, {
+    method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => null))?.message ?? `Could not update the ticket (${r.status}).`);
+  return r.json();
+}
+
+/** The screenshot URL for an admin view (the API checks the admin allowlist). */
+export const adminTicketScreenshotUrl = (id: string) => `${API}/support/tickets/${id}/screenshot`;

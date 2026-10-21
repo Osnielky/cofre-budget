@@ -59,3 +59,30 @@ export interface AdminTraffic {
   funnel: { landingVisitors: number; demoStarts: number; signups: number };
   retentionDays: number;
 }
+
+/* Mirrors apps/api/src/support/support.types.ts. */
+export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+export interface AdminTicket {
+  id: string;
+  status: TicketStatus;
+  description: string;
+  page: string;
+  createdAt: string;
+  resolvedAt: string | null;
+  reply: string | null;
+  hasScreenshot: boolean;
+  viewport: string;
+  userAgent: string;
+  screenshotBytes: number;
+  adminNote: string | null;
+  replySentAt: string | null;
+  updatedAt: string;
+  user: { id: string; name: string | null; email: string | null };
+}
+export interface AdminTicketPage {
+  tickets: AdminTicket[];
+  page: number;
+  lastPage: number;
+  total: number;
+  counts: Record<TicketStatus, number>;
+}

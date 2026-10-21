@@ -5,6 +5,7 @@ import Sidebar from '@/components/Sidebar';
 import { useAdminStats, resetDemoOwner } from '@/hooks/useAdmin';
 import DemoResetPanel from './components/DemoResetPanel';
 import TrafficPanel from './components/TrafficPanel';
+import TicketsPanel from './components/TicketsPanel';
 import AdminStatTiles from './components/AdminStatTiles';
 import SignupsChart from './components/SignupsChart';
 import PlansPanel from './components/PlansPanel';
@@ -60,6 +61,7 @@ export default function AdminPage() {
                 <>
                   <AdminStatTiles s={data} />
                   <TrafficPanel refreshKey={refreshKey} />
+                  <TicketsPanel refreshKey={refreshKey} />
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
                     {/* Panel's colSpan={2} only spans at xl, so the wide panels are wrapped to span a full row at md; Engagement fills the odd cell at md and sits beside Users at xl. */}
                     <div className="md:col-span-2 xl:col-span-2 min-w-0 flex flex-col [&>*]:flex-1"><SignupsChart weeks={data.users.weeklySignups} /></div>

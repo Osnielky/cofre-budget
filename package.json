@@ -83,6 +83,7 @@
     "cheerio": "^1.2.0",
     "cookie-parser": "^1.4.7",
     "googleapis": "^173.0.0",
+    "html-to-image": "^1.11.13",
     "jsonwebtoken": "^9.0.3",
     "motion": "^12.43.0",
     "next": "~16.1.6",

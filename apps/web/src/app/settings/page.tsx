@@ -21,11 +21,12 @@ import { useTheme } from '@/components/ThemeProvider';
 import { THEMES } from '@/lib/theme';
 import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
 import { connectBankError } from '@/lib/connect-bank-error';
+import MyTicketsList from '@/components/support/MyTicketsList';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 type AccountType = string;
-type Tab = 'account' | 'banks' | 'categories' | 'recurring' | 'rules' | 'projects' | 'appearance' | 'integrations' | 'billing' | 'data';
+type Tab = 'account' | 'banks' | 'categories' | 'recurring' | 'rules' | 'projects' | 'appearance' | 'integrations' | 'billing' | 'help' | 'data';
 
 interface BankAccount {
   id: string;
@@ -208,6 +209,16 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
+    id: 'help',
+    label: 'Help & Feedback',
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/>
+        <path d="M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M14.83 9.17l4.24-4.24M9.17 14.83l-4.24 4.24"/>
+      </svg>
+    ),
+  },
+  {
     id: 'data',
     label: 'Data & Privacy',
     icon: (
@@ -264,7 +275,7 @@ function SettingsPageInner() {
       return;
     }
     const tab = searchParams.get('tab') as Tab | null;
-    if (tab && ['account', 'banks', 'categories', 'rules', 'projects', 'appearance', 'integrations', 'billing'].includes(tab)) {
+    if (tab && ['account', 'banks', 'categories', 'rules', 'projects', 'appearance', 'integrations', 'billing', 'help'].includes(tab)) {
       setActiveTab(tab);
     }
     // Re-run whenever the query string actually changes (e.g. clicking "Upgrade" while
@@ -1064,6 +1075,9 @@ function SettingsPageInner() {
           {activeTab === 'billing' && <BillingTab />}
 
           {/* ── APPEARANCE TAB ── */}
+          {activeTab === 'help' && (
+            <div className="max-w-2xl"><MyTicketsList /></div>
+          )}
           {activeTab === 'appearance' && (
             <div className="flex flex-col gap-6 max-w-2xl">
               <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
