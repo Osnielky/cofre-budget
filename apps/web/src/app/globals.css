@@ -674,3 +674,17 @@ body::before {
   background-position: center;
   background-repeat: no-repeat;
 }
+
+/* ── Ask Cofre: typing caret at the end of a streaming reply ── */
+@keyframes chat-caret { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.chat-streaming > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: var(--color-primary);
+  border-radius: 1px;
+  animation: chat-caret 0.9s steps(1) infinite;
+}

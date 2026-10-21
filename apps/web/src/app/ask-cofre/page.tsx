@@ -11,6 +11,7 @@ import SavingsTrendWidget from './SavingsTrendWidget';
 import SafeToSpendWidget from './SafeToSpendWidget';
 import FinancialSnapshotPanel from './FinancialSnapshotPanel';
 import { resetsIn } from '@/lib/ai/usage';
+import { AnimatePresence, MessageIn, WidgetIn, Stagger, StaggerItem, ThinkingBubble, AiAvatar, SendButton } from './motion';
 
 const SUGGESTED_PROMPTS = [
   {
@@ -35,13 +36,6 @@ function currentMonth() { return new Date().toISOString().slice(0, 7); }
 function monthLabel(m: string) {
   const [y, mo] = m.split('-');
   return new Date(Number(y), Number(mo) - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
-}
-
-function AiAvatar() {
-  return (
-    // eslint-disable-next-line @next/next/no-img-element -- fixed-color brand asset, not a themed vector icon
-    <img src="/ask-cofre-logo.png" alt="" width={28} height={28} className="rounded-full shrink-0" style={{ objectFit: 'contain' }} />
-  );
 }
 
 function UserAvatar({ name }: { name?: string | null }) {
@@ -161,61 +155,71 @@ export default function AskCofrePage() {
             {loading ? (
               <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
             ) : messages.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-10">
+              <MessageIn role="assistant" className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-10">
                 {/* eslint-disable-next-line @next/next/no-img-element -- fixed-color brand asset, not a themed vector icon */}
                 <img src="/ask-cofre-logo.png" alt="" className="w-14 h-14 mb-1" style={{ objectFit: 'contain' }} />
                 <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>What do you want to know?</p>
                 <p className="text-xs max-w-sm" style={{ color: 'var(--color-text-muted)' }}>
                   Ask about your spending, budgets, or net worth — or pick a prompt below to get started.
                 </p>
-              </div>
+              </MessageIn>
             ) : (
-              messages.map((m) => (
-                <div key={m.id} className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse self-end max-w-[80%]' : 'self-start max-w-[88%]'}`}>
-                  {m.role === 'user' ? <UserAvatar name={user?.name} /> : <AiAvatar />}
-                  {m.role === 'user' ? (
-                    <div className="px-4 py-2.5 rounded-2xl text-sm" style={{ background: 'var(--color-primary)', color: 'white' }}>
-                      {m.text}
-                    </div>
-                  ) : (
-                    <div className="text-sm pt-1 min-w-0" style={{ color: 'var(--color-text-primary)' }}>
-                      {m.text ? <ChatMarkdown text={m.text} /> : (sending && m.id === 'streaming' ? '…' : '')}
-                      {m.widget && m.widget.type === 'proposal' && (() => {
-                        const actionId = m.widget.actionId;
-                        return (
-                          <ProposalCard
-                            summary={m.text || 'A change was proposed.'}
-                            initialStatus={m.widget.status}
-                            onConfirm={() => confirmAction(actionId)}
-                            onReject={() => rejectAction(actionId)}
-                          />
-                        );
-                      })()}
-                      {m.widget && m.widget.type === 'safe_to_spend' && (
-                        <SafeToSpendWidget data={m.widget.data} />
+              <AnimatePresence initial={false}>
+                {messages.map((m) => {
+                  const streaming = m.id === 'streaming' && sending;
+                  return (
+                    <MessageIn key={m.id} role={m.role}
+                      className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse self-end max-w-[80%]' : 'self-start max-w-[88%]'}`}>
+                      {m.role === 'user' ? <UserAvatar name={user?.name} /> : <AiAvatar busy={streaming} />}
+                      {m.role === 'user' ? (
+                        <div className="px-4 py-2.5 rounded-2xl text-sm" style={{ background: 'var(--color-primary)', color: 'white' }}>
+                          {m.text}
+                        </div>
+                      ) : (
+                        <div className="text-sm pt-1 min-w-0" style={{ color: 'var(--color-text-primary)' }}>
+                          {m.text
+                            ? <div className={streaming ? 'chat-streaming' : undefined}><ChatMarkdown text={m.text} /></div>
+                            : (streaming ? <ThinkingBubble /> : null)}
+                          {m.widget && m.widget.type === 'proposal' && (() => {
+                            const actionId = m.widget.actionId;
+                            return (
+                              <WidgetIn>
+                                <ProposalCard
+                                  summary={m.text || 'A change was proposed.'}
+                                  initialStatus={m.widget.status}
+                                  onConfirm={() => confirmAction(actionId)}
+                                  onReject={() => rejectAction(actionId)}
+                                />
+                              </WidgetIn>
+                            );
+                          })()}
+                          {m.widget && m.widget.type === 'safe_to_spend' && (
+                            <WidgetIn><SafeToSpendWidget data={m.widget.data} /></WidgetIn>
+                          )}
+                          {m.widget && m.widget.type === 'savings_trend' && (
+                            <WidgetIn><SavingsTrendWidget data={m.widget.data} /></WidgetIn>
+                          )}
+                        </div>
                       )}
-                      {m.widget && m.widget.type === 'savings_trend' && (
-                        <SavingsTrendWidget data={m.widget.data} />
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))
+                    </MessageIn>
+                  );
+                })}
+              </AnimatePresence>
             )}
             <div ref={bottomRef} />
           </div>
 
           {/* Suggested prompts */}
-          <div className="grid grid-cols-2 gap-2">
+          <Stagger className="grid grid-cols-2 gap-2">
             {SUGGESTED_PROMPTS.map((p) => (
-              <button key={p.text} onClick={() => setInput(p.text)}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-left cursor-pointer card-lift"
+              <StaggerItem key={p.text} onClick={() => setInput(p.text)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-left cursor-pointer"
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
                 <span className="shrink-0" style={{ color: 'var(--color-primary)' }}>{p.icon}</span>
                 <span className="truncate">{p.text}</span>
-              </button>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
 
           {/* Input bar */}
           <form onSubmit={(e) => { e.preventDefault(); handleSend(input); }}
@@ -237,10 +241,7 @@ export default function AskCofrePage() {
             <input type="month" value={month} onChange={(e) => setMonth(e.target.value)}
               className="text-xs bg-transparent outline-none px-2 py-1 rounded-full shrink-0"
               style={{ border: '1px solid var(--color-border)' }} title={monthLabel(month)} />
-            <button type="submit" disabled={sending || !input.trim() || outOfMessages}
-              className="btn-gold w-9 h-9 rounded-full flex items-center justify-center cursor-pointer disabled:opacity-40 shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-            </button>
+            <SendButton sending={sending} disabled={sending || !input.trim() || outOfMessages} />
           </form>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[10.5px] px-1">
             {usage && usage.limit > 0 ? (
