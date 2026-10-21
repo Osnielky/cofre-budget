@@ -41,7 +41,7 @@ export class SupportService {
 
   async create(userId: string, body: unknown, userAgent: string | undefined, now = new Date()): Promise<MyTicket> {
     const parsed = parseReport(body, userAgent);
-    if (!parsed.ok) throw new BadRequestException(parsed.message);
+    if (parsed.ok === false) throw new BadRequestException(parsed.message);
     const v = parsed.value;
 
     const ticket = await this.ds.transaction(async (em) => {

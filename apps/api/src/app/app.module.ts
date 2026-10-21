@@ -25,6 +25,7 @@ import { BillingModule } from '../billing/billing.module';
 import { AdminModule } from '../admin/admin.module';
 import { DemoModule } from '../demo/demo.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
+import { SupportModule } from '../support/support.module';
 import { DemoInterceptor } from '../common/demo/demo.interceptor';
 import { HealthController } from '../health/health.controller';
 
@@ -57,6 +58,7 @@ import { HealthController } from '../health/health.controller';
     AdminModule,
     DemoModule,
     AnalyticsModule,
+    SupportModule,
   ],
   controllers: [HealthController],
   providers: [
