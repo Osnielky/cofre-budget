@@ -20,5 +20,6 @@ import { Subscription } from '../billing/subscription.entity';
 import { NetWorthSnapshot } from '../net-worth-goal/net-worth-snapshot.entity';
 import { CreditCardDetail } from '../cards/credit-card-detail.entity';
 import { CardProfile } from '../cards/card-profile.entity';
+import { PageView } from '../analytics/page-view.entity';
 
-export const ENTITIES = [User, BankAccount, PlaidItem, Transaction, RecurringRule, Category, Budget, Project, ProjectCategory, Debt, DebtPayment, ConnectedApp, Receipt, CategorizationRule, AiConversation, AiMessage, AiPendingAction, Subscription, NetWorthSnapshot, CreditCardDetail, CardProfile];
+export const ENTITIES = [User, BankAccount, PlaidItem, Transaction, RecurringRule, Category, Budget, Project, ProjectCategory, Debt, DebtPayment, ConnectedApp, Receipt, CategorizationRule, AiConversation, AiMessage, AiPendingAction, Subscription, NetWorthSnapshot, CreditCardDetail, CardProfile, PageView];

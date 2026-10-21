@@ -105,3 +105,10 @@ Quick wins (privacy, export) → savings goals + reports (reuse existing pattern
   boot; a Cloud Scheduler ping would keep the table tidy on quiet days.
 - **Hide demo users from admin stats** — small. Visitor sandboxes count as
   users in `/admin` totals until they are swept; filter `isDemo` out.
+
+## Traffic analytics follow-ups (2026-10-21)
+
+- **Country / device breakdown** — small. The beacon could send the viewport class; the
+  API could map IP → country before hashing (no IP stored). Only worth it with volume.
+- **Weekly email digest** — small. Visitors, signups and demo starts for the week, sent
+  to ADMIN_EMAILS via Resend.

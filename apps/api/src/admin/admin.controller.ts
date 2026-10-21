@@ -3,12 +3,13 @@ import { AdminJwtGuard } from './admin-jwt.guard';
 import { AdminGuard } from './admin.guard';
 import { AdminService } from './admin.service';
 import { DemoService } from '../demo/demo.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 
 /* Read-only. Anonymous visitors (AdminJwtGuard) and non-admins (AdminGuard) both get 404. Search text is never logged. */
 @Controller('admin')
 @UseGuards(AdminJwtGuard, AdminGuard)
 export class AdminController {
-  constructor(private admin: AdminService, private demo: DemoService) {}
+  constructor(private admin: AdminService, private demo: DemoService, private analytics: AnalyticsService) {}
 
   @Get('stats')
   stats() {
@@ -22,6 +23,12 @@ export class AdminController {
       search: typeof search === 'string' ? search : undefined,
       page: typeof page === 'string' ? page : undefined,
     });
+  }
+
+  /** Page-view traffic for the last 30 days (first-party, cookie-less). */
+  @Get('traffic')
+  traffic() {
+    return this.analytics.traffic(new Date());
   }
 
   /** Wipes the Rockefeller demo account and re-seeds it from the generator. */

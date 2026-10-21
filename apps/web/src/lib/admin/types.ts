@@ -45,3 +45,17 @@ export interface AdminUserRow {
 }
 
 export interface AdminUsersPage { rows: AdminUserRow[]; total: number; page: number; pageSize: number }
+
+/* Mirrors apps/api/src/analytics/analytics.types.ts — keep the two in sync. */
+export interface TrafficWindow { today: number; d7: number; d30: number }
+export interface AdminTraffic {
+  generatedAt: string;
+  visits: TrafficWindow;
+  visitors: TrafficWindow;
+  daily: { date: string; visits: number; visitors: number }[];
+  topPages: { path: string; visits: number; visitors: number }[];
+  topReferrers: { host: string; visits: number }[];
+  split: { anonymous: number; signedIn: number; demo: number };
+  funnel: { landingVisitors: number; demoStarts: number; signups: number };
+  retentionDays: number;
+}

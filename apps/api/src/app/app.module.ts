@@ -24,6 +24,7 @@ import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { BillingModule } from '../billing/billing.module';
 import { AdminModule } from '../admin/admin.module';
 import { DemoModule } from '../demo/demo.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 import { DemoInterceptor } from '../common/demo/demo.interceptor';
 import { HealthController } from '../health/health.controller';
 
@@ -55,6 +56,7 @@ import { HealthController } from '../health/health.controller';
     BillingModule,
     AdminModule,
     DemoModule,
+    AnalyticsModule,
   ],
   controllers: [HealthController],
   providers: [

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { AdminStats, AdminUsersPage } from '@/lib/admin/types';
+import type { AdminStats, AdminUsersPage, AdminTraffic } from '@/lib/admin/types';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -56,4 +56,18 @@ export function useAdminUsers(search: string, page: number, refreshKey = 0) {
 export async function resetDemoOwner(): Promise<void> {
   const r = await fetch(`${API}/admin/demo/reset-owner`, { method: 'POST', credentials: 'include' });
   if (!r.ok) throw new Error(`Could not reset the demo account (${r.status}).`);
+}
+
+export function useAdminTraffic(refreshKey = 0) {
+  const [data, setData] = useState<AdminTraffic | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const ctrl = new AbortController();
+    setError(null);
+    fetch(`${API}/admin/traffic`, { credentials: 'include', signal: ctrl.signal })
+      .then(async (r) => { if (!r.ok) throw new Error(`Could not load traffic (${r.status}).`); setData(await r.json()); })
+      .catch((e: Error) => { if (e.name !== 'AbortError') setError(e.message); });
+    return () => ctrl.abort();
+  }, [refreshKey]);
+  return { data, error };
 }

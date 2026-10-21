@@ -89,7 +89,11 @@ export default function PrivacyPolicyPage() {
         display preferences such as your chosen theme. We don&rsquo;t use advertising cookies or third-party ad
         trackers.</p>
 
-      <H2>7. Data retention and deletion</H2>
+            <p>To know how many people use Cofre, we count page views ourselves, without cookies and without
+        any third-party analytics service. Each view records the page, the site you came from, and a
+        one-way hash of your network address and browser that changes every day, so it cannot identify you
+        or follow you from one day to the next. These counts are kept for 90 days.</p>
+<H2>7. Data retention and deletion</H2>
       <p>We keep your data for as long as your account is open. You can erase your financial data at any time from
         Settings → Data &amp; Privacy. When you ask us to delete your account, we delete your account and its data from our
         production database within 30 days. Copies in encrypted backups expire on their normal schedule. Payment

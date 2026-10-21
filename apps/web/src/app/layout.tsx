@@ -4,6 +4,7 @@ import './globals.css';
 import ThemeProvider from '@/components/ThemeProvider';
 import UserProvider from '@/components/UserProvider';
 import DemoBanner from '@/components/DemoBanner';
+import PageViewBeacon from '@/components/PageViewBeacon';
 import WebVitals from '@/components/WebVitals';
 import { SITE_URL, SITE_NAME, HOME_DESCRIPTION } from '@/lib/seo';
 
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <UserProvider>
             {children}
             <DemoBanner />
+            <PageViewBeacon />
           </UserProvider>
         </ThemeProvider>
       </body>
