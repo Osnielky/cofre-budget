@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Panel, { PanelEmpty } from '@/components/dashboard/Panel';
 import { useAdminTickets, fetchAdminTicket, patchAdminTicket, adminTicketScreenshotUrl } from '@/hooks/useAdmin';
 import { relativeTime } from '@/lib/admin/format';
@@ -126,7 +127,8 @@ function TicketDrawer({ id, onClose, onChanged }: { id: string; onClose: () => v
 
   const dirty = t ? status !== t.status || note.trim() !== (t.adminNote ?? '') || reply.trim() !== (t.reply ?? '') : false;
 
-  return (
+  // Portalled: the Panel's backdrop-filter would otherwise become the containing block of this fixed drawer.
+  return createPortal(
     <div className="fixed inset-0 z-[70] flex items-end md:items-stretch md:justify-end" style={{ background: 'rgba(0,0,0,0.55)' }}
       onMouseDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <aside role="dialog" aria-modal="true" aria-label="Problem report"
@@ -193,7 +195,8 @@ function TicketDrawer({ id, onClose, onChanged }: { id: string; onClose: () => v
           </>
         )}
       </aside>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

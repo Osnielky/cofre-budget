@@ -46,6 +46,11 @@ export default function PrivacyPolicyPage() {
         only the resulting structured receipt (merchant, items, total, and the subject line) is saved to your
         account. Your Gmail OAuth tokens are encrypted at rest (AES-256-GCM) and are only used to fetch the emails
         matching that search — never to send email, read unrelated messages, or access anything outside that scope.</p>
+      <p><strong style={{ color: 'var(--color-text-primary)' }}>Problem reports</strong> — when you use &ldquo;Report a
+        problem&rdquo;, we store your description, the page you were on, your screen size and browser, and the
+        screenshot you chose to send (which may show your own balances). Only you and Cofre&rsquo;s support team can
+        open it. Screenshots are deleted 90 days after the report is resolved; the description stays with your
+        account so you can see what was answered.</p>
 
       <H2>2. Google user data &amp; Limited Use</H2>
       <p>
@@ -98,7 +103,8 @@ export default function PrivacyPolicyPage() {
         Settings → Data &amp; Privacy. When you ask us to delete your account, we delete your account and its data from our
         production database within 30 days. Copies in encrypted backups expire on their normal schedule. Payment
         records held by Stripe are kept as required by tax and accounting law. Disconnecting Gmail or a bank revokes
-        our access token immediately.</p>
+        our access token immediately. Screenshots attached to problem reports are deleted 90 days after the report
+        is resolved.</p>
 
       <H2>8. Security</H2>
       <p>Passwords are hashed with bcrypt and never stored in plain text. OAuth tokens for Gmail and bank

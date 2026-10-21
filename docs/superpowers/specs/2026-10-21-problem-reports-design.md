@@ -1,7 +1,10 @@
 # Problem reports (support tickets) — design
 
 Date: 2026-10-21
-Status: proposed
+Status: built (same day). One change from the proposal: the image bytes live in a
+side table `support_screenshots` (`ticketId` PK, `data` bytea, `mimeType`) instead of a
+`select: false` column, because the sqlite test driver has no `bytea`; the ticket row
+keeps `screenshotType` / `screenshotBytes` so lists never touch the image table.
 
 ## Goal
 

@@ -112,3 +112,12 @@ Quick wins (privacy, export) → savings goals + reports (reuse existing pattern
   API could map IP → country before hashing (no IP stored). Only worth it with volume.
 - **Weekly email digest** — small. Visitors, signups and demo starts for the week, sent
   to ADMIN_EMAILS via Resend.
+
+## Problem reports follow-ups (2026-10-21)
+
+- Comment thread per ticket (user replies to the admin's reply) instead of one reply field.
+- More than one image per report; short screen recordings.
+- Slack / Discord webhook on new tickets, besides the admin email.
+- Move `support_screenshots` to Cloud Storage behind the same endpoint if volume grows.
+- Let signed-out visitors report from the landing page (today: the support email).
+- Sidebar label could show the count of open replies the user has not read yet.
