@@ -11,6 +11,7 @@ import NetWorthHistoryChart from './components/NetWorthHistoryChart';
 import WealthJourney from './components/WealthJourney';
 import NextStepCard from './components/NextStepCard';
 import MilestonesCard from './components/MilestonesCard';
+import NetWorthMixCard from './components/NetWorthMixCard';
 
 function currentMonth() { return new Date().toISOString().slice(0, 7); }
 
@@ -54,7 +55,10 @@ export default function GoalsPage() {
               {dataError && <p className="text-sm" style={{ color: 'var(--color-rose)' }}>{dataError}</p>}
               <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_380px_360px] gap-5 items-start">
                 <NetWorthHistoryChart points={history.points} loading={history.loading} error={history.error} />
-                <NextStepCard netWorth={breakdown.total} history={history.points} targetDate={goal.targetDate} onSetTargetDate={setTargetDate} />
+                <div className="flex flex-col gap-5 min-w-0">
+                  <NextStepCard netWorth={breakdown.total} history={history.points} targetDate={goal.targetDate} onSetTargetDate={setTargetDate} />
+                  <NetWorthMixCard breakdown={breakdown} />
+                </div>
                 <div className="xl:col-span-2 2xl:col-span-1 min-w-0">
                   <MilestonesCard netWorth={breakdown.total} history={history.points} />
                 </div>

@@ -155,3 +155,15 @@ below xl it stacks; at xl it spans the chart + next-step row as a two-column lis
 2xl it becomes a third column (`minmax(0,1fr)_380px_360px`) with a one-column list.
 The other pages already fill the width (audited at 2560px: dashboard, transactions,
 budgets, cards, debts, projects, Ask Cofre).
+
+### What makes up your net worth (2026-10-21)
+
+`NetWorthMixCard` sits under "Your next step" (same column at xl and 2xl; stacked on
+phones). It answers "which accounts add to the total and which take away": a donut of
+asset accounts (net worth in the centre), an "Adds up" list with each account's share of
+all assets, a "Takes away" list in red (liability accounts, debts you owe, overdrawn asset
+accounts) with liabilities as a share of assets on a thin bar, and the sum line
+`assets − liabilities = net worth`. `lib/goals/mix.ts` (`netWorthMix`, tested) does the
+sorting, percentages and folds two or more slices under 3% into "Other". Slices take the
+CVD-safe chart palette in order rather than the accounts' own colours (two blues
+clashed). Empty state links to Settings → Accounts.
