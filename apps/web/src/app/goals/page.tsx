@@ -53,14 +53,18 @@ export default function GoalsPage() {
             <>
               <GoalsHero netWorth={breakdown.total} monthNet={breakdown.monthNet} />
               {dataError && <p className="text-sm" style={{ color: 'var(--color-rose)' }}>{dataError}</p>}
-              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_380px_360px] gap-5 items-start">
-                <NetWorthHistoryChart points={history.points} loading={history.loading} error={history.error} />
-                <div className="flex flex-col gap-5 min-w-0">
-                  <NextStepCard netWorth={breakdown.total} history={history.points} targetDate={goal.targetDate} onSetTargetDate={setTargetDate} />
-                  <NetWorthMixCard breakdown={breakdown} />
+              {/* Two columns from xl, balanced by height: chart + wide net-worth mix on the left,
+                  next step + milestones on the right. Stacked below xl. */}
+              {/* Below xl the column wrappers dissolve (`contents`) so the cards stack in reading
+                  order: chart, next step, mix, milestones. */}
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-5 items-start">
+                <div className="contents xl:flex xl:flex-col xl:gap-5 xl:min-w-0">
+                  <div className="order-1 xl:order-none min-w-0"><NetWorthHistoryChart points={history.points} loading={history.loading} error={history.error} /></div>
+                  <div className="order-3 xl:order-none min-w-0"><NetWorthMixCard breakdown={breakdown} /></div>
                 </div>
-                <div className="xl:col-span-2 2xl:col-span-1 min-w-0">
-                  <MilestonesCard netWorth={breakdown.total} history={history.points} />
+                <div className="contents xl:flex xl:flex-col xl:gap-5 xl:min-w-0">
+                  <div className="order-2 xl:order-none min-w-0"><NextStepCard netWorth={breakdown.total} history={history.points} targetDate={goal.targetDate} onSetTargetDate={setTargetDate} /></div>
+                  <div className="order-4 xl:order-none min-w-0"><MilestonesCard netWorth={breakdown.total} history={history.points} /></div>
                 </div>
               </div>
               <WealthJourney netWorth={breakdown.total} />

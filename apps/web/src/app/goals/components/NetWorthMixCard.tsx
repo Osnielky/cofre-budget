@@ -55,7 +55,8 @@ export default function NetWorthMixCard({ breakdown }: Props) {
         </p>
       ) : (
         <>
-          <div className="flex flex-col items-center gap-4">
+          {/* Narrow: donut over the lists. Wide (xl, under the chart): donut beside the two lists. */}
+          <div className="flex flex-col items-center xl:flex-row xl:items-start gap-4 xl:gap-8">
             {assets.length > 0 && (
               <div className="relative shrink-0" style={{ width: 168, height: 168 }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -73,13 +74,13 @@ export default function NetWorthMixCard({ breakdown }: Props) {
                 </div>
               </div>
             )}
-            <div className="w-full min-w-0">
+            <div className="w-full flex-1 min-w-0 grid grid-cols-1 2xl:grid-cols-2 gap-4 2xl:gap-8">
+            <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-green)' }}>Adds up · {money(mix.assetTotal)}</p>
               {assets.length === 0
                 ? <p className="text-sm py-1" style={{ color: 'var(--color-text-muted)' }}>No assets yet.</p>
                 : <ul className="divide-y" style={{ borderColor: 'var(--color-border)' }}>{assets.map((s) => <Row key={s.id} slice={s} sign="+" />)}</ul>}
             </div>
-          </div>
 
           <div className="min-w-0">
             <div className="flex items-baseline justify-between gap-3 mb-1">
@@ -100,6 +101,8 @@ export default function NetWorthMixCard({ breakdown }: Props) {
                 <ul className="divide-y" style={{ borderColor: 'var(--color-border)' }}>{liabilities.map((s) => <Row key={s.id} slice={s} sign="−" />)}</ul>
               </>
             )}
+          </div>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 pt-3 text-xs" style={{ borderTop: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>

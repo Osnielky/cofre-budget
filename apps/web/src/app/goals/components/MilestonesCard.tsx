@@ -26,8 +26,8 @@ export default function MilestonesCard({ netWorth, history }: Props) {
           When you got there, and when the rest arrive at {pace == null ? 'your pace' : `${pace >= 0 ? '+' : '−'}$${Math.abs(pace).toLocaleString('en-US', { maximumFractionDigits: 0 })}/month`}.
         </p>
       </div>
-      {/* Two columns while the card spans the row (xl), one column once it has its own column (2xl). */}
-      <ol className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-1 xl:gap-x-8">
+      {/* Two columns while the card spans the full width (below xl), one column in its own column from xl. */}
+      <ol className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 sm:gap-x-8">
         {LEVELS.map((l) => {
           const done = p.current >= l.n;
           const isNext = p.next?.n === l.n;

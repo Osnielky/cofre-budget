@@ -167,3 +167,12 @@ accounts) with liabilities as a share of assets on a thin bar, and the sum line
 sorting, percentages and folds two or more slices under 3% into "Other". Slices take the
 CVD-safe chart palette in order rather than the accounts' own colours (two blues
 clashed). Empty state links to Settings → Accounts.
+
+### Balanced columns (2026-10-21, later the same day)
+
+The three-column 2xl layout left a hole under the chart while the middle column ran
+long. Replaced from xl by two columns balanced by height: left (1fr) chart over the
+net-worth mix in a wide form (donut beside the lists; lists two-up only at 2xl, since at
+1440px they truncated names), right (380px) next step over milestones. Below xl the
+wrappers dissolve (`display: contents`) and `order-*` keeps reading order: chart, next
+step, mix, milestones.
