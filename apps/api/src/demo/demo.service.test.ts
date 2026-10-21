@@ -63,7 +63,7 @@ describe('DemoService visitors', () => {
     expect(user.emailVerified).toBe(true);
     const rows = await rowsOwnedBy(user.id);
     expect(rows.transactions).toBeGreaterThan(900);
-    expect(rows.accounts).toBe(6);
+    expect(rows.accounts).toBe(7);
     expect(rows.budgets).toBeGreaterThanOrEqual(12 * 10);
     expect(rows.recurring).toBe(5);
     expect(rows.projects).toBe(2);

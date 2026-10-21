@@ -8,6 +8,12 @@ import { PlaidService } from '../plaid/plaid.service';
 import { CreateBankAccountDto, BANK_ACCOUNT_FIELDS } from './dto/create-bank-account.dto';
 import { pickFields } from '../common/http/pick-fields';
 
+/** Everyone has some cash. New users get this account on their first visit; the
+ *  balance stays $0 until they type what they have on hand. */
+export const DEFAULT_CASH_ACCOUNT = {
+  bankName: 'Cash', accountName: 'My Cash', accountType: 'cash', balance: 0, currency: 'USD', color: '#4FBF7F', provider: 'manual',
+} as const;
+
 @Injectable()
 export class BankAccountsService {
   constructor(
@@ -29,7 +35,14 @@ export class BankAccountsService {
   }
 
   async findAllByUser(userId: string): Promise<(BankAccount & { txCount: number; plaidStatus: string | null })[]> {
-    const accounts = await this.repo.find({ where: { userId }, order: { createdAt: 'ASC' } });
+    let accounts = await this.repo.find({ where: { userId }, order: { createdAt: 'ASC' } });
+    // First visit, no accounts at all: start them off with a cash account. Only
+    // when the list is empty, so a deleted cash account stays deleted as long as
+    // the user keeps any other account.
+    if (accounts.length === 0) {
+      await this.repo.save(this.repo.create({ ...DEFAULT_CASH_ACCOUNT, userId }));
+      accounts = await this.repo.find({ where: { userId }, order: { createdAt: 'ASC' } });
+    }
     const counts = await this.txRepo
       .createQueryBuilder('t')
       .select('t.bankAccountId', 'id')

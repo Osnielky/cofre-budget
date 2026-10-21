@@ -189,7 +189,7 @@ export class DemoService implements OnApplicationBootstrap {
     for (const a of data.accounts) {
       const row = await repo.save(repo.create({
         userId, bankName: a.bankName, accountName: a.accountName, accountType: a.accountType,
-        balance: a.balance, currency: 'USD', color: a.color, last4: a.last4, provider: 'manual',
+        balance: a.balance, currency: 'USD', color: a.color, last4: a.last4 || undefined, provider: 'manual',
       }));
       ids.set(a.key, row.id);
     }

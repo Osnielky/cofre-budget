@@ -974,6 +974,13 @@ function SettingsPageInner() {
                           <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
                             {account.bankName}{account.currency !== 'USD' ? ` · ${account.currency}` : ''}
                           </p>
+                          {isCash && balance === 0 && (account.txCount ?? 0) === 0 && (
+                            <button type="button" onClick={() => openEdit(account)}
+                              className="mt-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full cursor-pointer"
+                              style={{ background: 'color-mix(in srgb, var(--color-amber) 14%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 35%, transparent)' }}>
+                              Set how much cash you have →
+                            </button>
+                          )}
                         </div>
 
                         {/* Balance + actions: their own row on phones (indented under the

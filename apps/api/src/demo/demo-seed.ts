@@ -90,6 +90,7 @@ export function generateDemoData({ year, today }: DemoOptions): DemoData {
     { key: 'sapphire', bankName: 'Chase', accountName: 'Sapphire Preferred', accountType: 'credit', openingBalance: 1180.2, balance: 0, color: '#1C3F6E', last4: '7731', liability: true },
     { key: 'brokerage', bankName: 'Fidelity', accountName: 'Brokerage', accountType: 'investment', openingBalance: 31250, balance: 0, color: '#4BA8D8', last4: '5560', liability: false },
     { key: 'carloan', bankName: 'Toyota Financial', accountName: 'RAV4 loan', accountType: 'other_liability', openingBalance: 14890, balance: 0, color: '#F5C842', last4: '2210', liability: true },
+    { key: 'cash', bankName: 'Cash', accountName: 'My Cash', accountType: 'cash', openingBalance: 260, balance: 0, color: '#4FBF7F', last4: '', liability: false },
   ];
 
   /* ── Categories: the app's defaults plus a few personal ones ── */
@@ -220,6 +221,9 @@ export function generateDemoData({ year, today }: DemoOptions): DemoData {
     for (let i = 0; i < int(2, 4); i++) spend(day(m, 1, last), 'Uber', between(13, 38), 'sapphire', 'Transport');
     for (let i = 0; i < 2; i++) spend(day(m, 1, last), 'Shell', between(42, 68), 'amex', 'Transport');
     for (let i = 0; i < int(1, 2); i++) spend(day(m, 1, last), 'Icon Parking', between(18, 45), 'sapphire', 'Transport');
+    // Cash: an ATM withdrawal from checking, then small cash purchases
+    transfer(day(m, 2, 9), 'checking', 'cash', 200, 'ATM withdrawal', 'Internal Transfer');
+    for (let i = 0; i < int(2, 4); i++) spend(day(m, 1, last), pick(['Farmers market', 'Halal cart', 'Barber', 'Laundromat', 'Tip jar']), between(6, 38), 'cash', pick(['Food & Dining', 'Groceries', 'Health', 'Housing']));
     for (let i = 0; i < int(2, 4); i++) spend(day(m, 1, last), pick(shopping), between(18, 140), 'sapphire', 'Shopping');
     if (rand() < 0.8) spend(day(m, 1, last), pick(clothes), between(38, 160), 'sapphire', 'Clothes');
     for (let i = 0; i < int(1, 3); i++) spend(day(m, 1, last), pick(entertainment), between(14, 95), 'sapphire', 'Entertainment');
