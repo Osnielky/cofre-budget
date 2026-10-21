@@ -41,19 +41,19 @@ export class SupportTicket {
   @Column({ type: 'text', nullable: true })
   reply: string | null;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: Date, nullable: true })
   replySentAt: Date | null;
 
   /* Internal, never returned to the reporter. */
   @Column({ type: 'text', nullable: true })
   adminNote: string | null;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: Date, nullable: true })
   resolvedAt: Date | null;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn()
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn()
   updatedAt: Date;
 }

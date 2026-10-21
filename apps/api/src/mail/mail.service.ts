@@ -153,6 +153,30 @@ export class MailService {
 </div>`;
   }
 
+  /** To each admin when a user files a problem report. The excerpt is already cut to 300 chars by the caller. */
+  async sendTicketOpened(to: string, d: { reporter: string; page: string; excerpt: string; link: string }): Promise<void> {
+    await this.send(
+      to,
+      `New problem report: ${d.page}`,
+      `${esc(d.reporter || 'A user')} reported a problem on ${esc(d.page)}`,
+      `&ldquo;${esc(d.excerpt)}&rdquo;`,
+      'Open the ticket',
+      d.link,
+    );
+  }
+
+  /** To the reporter when an admin resolves their ticket with a reply. */
+  async sendTicketResolved(to: string, name: string, d: { excerpt: string; reply: string }): Promise<void> {
+    await this.send(
+      to,
+      'We looked into what you reported',
+      `Thanks${name ? ', ' + esc(name) : ''} — here's what we found`,
+      `You reported: &ldquo;${esc(d.excerpt)}&rdquo;<br><br>${esc(d.reply).replace(/\n/g, '<br>')}`,
+      'See your reports',
+      `${this.appUrl}/settings?tab=help`,
+    );
+  }
+
   private async send(to: string, subject: string, heading: string, body: string, cta: string, link: string): Promise<void> {
     if (!this.resend) { this.logger.warn(`[dev] email not sent (no RESEND_API_KEY): "${subject}"`); return; }
     try {
