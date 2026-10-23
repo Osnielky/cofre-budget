@@ -358,7 +358,7 @@ export class DemoService implements OnApplicationBootstrap {
     const conv = await convs.save(convs.create({ userId, title: data.conversation.title, createdAt: when, updatedAt: when }));
     const msgs = em.getRepository(AiMessage);
     for (const [i, m] of data.conversation.messages.entries()) {
-      await msgs.save(msgs.create({ conversationId: conv.id, role: m.role, text: m.text, widget: null, createdAt: new Date(when.getTime() + i * 60_000) }));
+      await msgs.save(msgs.create({ conversationId: conv.id, role: m.role, text: m.text, widget: m.widget ?? null, createdAt: new Date(when.getTime() + i * 60_000) }));
     }
   }
 }

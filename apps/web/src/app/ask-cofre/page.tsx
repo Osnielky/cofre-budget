@@ -13,6 +13,19 @@ import FinancialSnapshotPanel from './FinancialSnapshotPanel';
 import { resetsIn } from '@/lib/ai/usage';
 import { AnimatePresence, MessageIn, WidgetIn, Stagger, StaggerItem, ThinkingBubble, AiAvatar, SendButton, ReplyIn } from './motion';
 
+/** True below Tailwind's `sm` (640px); false during server rendering. */
+function useNarrowScreen(): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const update = () => setNarrow(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return narrow;
+}
+
 const SUGGESTED_PROMPTS = [
   {
     text: 'How much can I safely spend this month?',
@@ -64,6 +77,7 @@ export default function AskCofrePage() {
     if (q) setInput(q.slice(0, 500));
   }, []);
   const [month, setMonth] = useState(currentMonth());
+  const narrow = useNarrowScreen();
   const [showHistory, setShowHistory] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -101,13 +115,14 @@ export default function AskCofrePage() {
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-hidden pt-14 md:pt-0 flex">
-        <div className="flex-1 flex flex-col min-w-0 px-4 sm:px-6 md:px-8 py-4 sm:py-6 gap-4">
+        {/* Phones get a compact header and tighter spacing so the conversation keeps most of the height. */}
+        <div className="flex-1 flex flex-col min-w-0 px-4 sm:px-6 md:px-8 py-3 sm:py-6 gap-3 sm:gap-4">
           {/* Header */}
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center sm:items-start justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
               <span className="relative shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element -- fixed-color brand asset, not a themed vector icon */}
-                <img src="/ask-cofre-logo.png" alt="" className="w-10 h-10" style={{ objectFit: 'contain' }} />
+                <img src="/ask-cofre-logo.png" alt="" className="w-8 h-8 sm:w-10 sm:h-10" style={{ objectFit: 'contain' }} />
                 <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2"
                   style={{ background: 'var(--color-green)', borderColor: 'var(--color-base)' }} />
               </span>
@@ -119,19 +134,21 @@ export default function AskCofrePage() {
                     {user?.plan === 'elite' ? 'Elite' : 'Pro'}
                   </span>
                 </div>
-                <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Reads your whole account. Asks before it changes anything.</p>
+                <p className="text-xs hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>Reads your whole account. Asks before it changes anything.</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setShowHistory((s) => !s)}
-                className="px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer"
+            <div className="flex items-center gap-2 shrink-0">
+              <button onClick={() => setShowHistory((s) => !s)} aria-label="Conversation history" title="History"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer"
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                History
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                <span className="hidden sm:inline">History</span>
               </button>
-              <button onClick={() => startNewConversation()}
-                className="px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer"
+              <button onClick={() => startNewConversation()} aria-label="New chat" title="New chat"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer"
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                New chat
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                <span className="hidden sm:inline">New chat</span>
               </button>
             </div>
           </div>
@@ -151,7 +168,7 @@ export default function AskCofrePage() {
           )}
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto flex flex-col gap-4 min-h-0">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col gap-4 min-h-0">
             {loading ? (
               <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
             ) : messages.length === 0 ? (
@@ -212,13 +229,14 @@ export default function AskCofrePage() {
           </div>
 
           {/* Suggested prompts */}
-          <Stagger className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {/* Suggested prompts: one swipeable row on phones, a two-column grid from sm. */}
+          <Stagger className="flex overflow-x-auto gap-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 sm:overflow-visible [scrollbar-width:none]">
             {SUGGESTED_PROMPTS.map((p) => (
               <StaggerItem key={p.text} onClick={() => setInput(p.text)}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-left cursor-pointer"
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-left cursor-pointer shrink-0 sm:shrink sm:min-w-0 whitespace-nowrap sm:whitespace-normal"
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
                 <span className="shrink-0" style={{ color: 'var(--color-primary)' }}>{p.icon}</span>
-                <span className="truncate">{p.text}</span>
+                <span className="sm:truncate">{p.text}</span>
               </StaggerItem>
             ))}
           </Stagger>
@@ -234,15 +252,15 @@ export default function AskCofrePage() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95L10.13 17.1a2 2 0 0 1-2.83-2.83l8.49-8.49"/></svg>
             </button>
             <input value={input} onChange={(e) => setInput(e.target.value)} disabled={outOfMessages}
-              placeholder={outOfMessages ? 'Daily message limit reached' : 'Ask anything, or tell me what to change…'}
+              placeholder={outOfMessages ? 'Daily message limit reached' : narrow ? 'Ask anything…' : 'Ask anything, or tell me what to change…'}
               className="flex-1 bg-transparent outline-none text-sm px-1 min-w-0" />
             <button type="button" disabled title="Voice input coming soon"
               className="w-8 h-8 rounded-full hidden sm:flex items-center justify-center shrink-0 disabled:opacity-40"
               style={{ color: 'var(--color-text-muted)' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4"/></svg>
             </button>
-            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)}
-              className="text-xs bg-transparent outline-none px-2 py-1 rounded-full shrink-0"
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month to ask about"
+              className="text-[11px] sm:text-xs bg-transparent outline-none px-1.5 sm:px-2 py-1 rounded-full shrink-0 w-[6.75rem] sm:w-auto"
               style={{ border: '1px solid var(--color-border)' }} title={monthLabel(month)} />
             <SendButton sending={sending} disabled={sending || !input.trim() || outOfMessages} />
           </form>
@@ -258,7 +276,8 @@ export default function AskCofrePage() {
                 )}
               </span>
             ) : <span />}
-            <span style={{ color: 'var(--color-text-muted)' }}>Cofre can make mistakes. Changes always need your confirmation first.</span>
+            <span className="hidden sm:inline" style={{ color: 'var(--color-text-muted)' }}>Cofre can make mistakes. Changes always need your confirmation first.</span>
+            <span className="sm:hidden" style={{ color: 'var(--color-text-muted)' }}>Cofre can make mistakes.</span>
           </div>
         </div>
 

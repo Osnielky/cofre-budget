@@ -1,3 +1,4 @@
+import type { AiMessageWidget } from '../ai-agent/ai-message.entity';
 /**
  * Demo data generator. Pure and deterministic: the same { year, today } always
  * produces the same graph, so Rockefeller and every visitor sandbox match and
@@ -55,7 +56,7 @@ export interface DemoData {
   cardProfile: { goal: 'pay_off_debt' | 'cashback' | 'travel' | 'build_credit'; annualFeeOk: boolean; creditScoreBand: '740-799'; monthlyDebtBudget: number };
   netWorthSnapshots: { date: string; value: number }[];
   goalTargetDate: string;
-  conversation: { title: string; messages: { role: 'user' | 'assistant'; text: string }[] };
+  conversation: { title: string; messages: { role: 'user' | 'assistant'; text: string; widget?: AiMessageWidget }[] };
 }
 
 /* ── Deterministic PRNG (mulberry32) ── */
@@ -351,6 +352,18 @@ export function generateDemoData({ year, today }: DemoOptions): DemoData {
         { role: 'assistant', text: 'So far this month you’ve spent **$412.60** on Food & Dining across 9 purchases, about 38% more than the same point last month. Most of it is weekday lunches near the office. Want me to propose a $400 dining budget for next month?' },
         { role: 'user', text: 'Not yet. Where am I overspending overall?' },
         { role: 'assistant', text: 'Two categories are ahead of pace: **Food & Dining** (86% of budget with 11 days left) and **Shopping** (74%). Everything else is on track, and you’re on pace to save about $1,480 this month.' },
+        { role: 'user', text: 'How is my saving going this year?' },
+        {
+          role: 'assistant',
+          text: 'Steady. You’ve saved an average of **$1,515** a month over the last six months, with June the standout at $2,860 (the bonus). October is tracking a little under that average — trimming dining is the fastest way to push it back above $1,500.',
+          widget: {
+            type: 'savings_trend',
+            data: {
+              months: [`${year}-05`, `${year}-06`, `${year}-07`, `${year}-08`, `${year}-09`, `${year}-10`].map((month, i) => ({ month, net: [1240, 2860, 1410, 1320, 1180, 1080][i] })),
+              projected: 1480, sixMonthAvg: 1515, transactionCount: 764, accountCount: 7,
+            },
+          },
+        },
       ],
     },
   };
