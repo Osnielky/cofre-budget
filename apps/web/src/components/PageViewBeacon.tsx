@@ -20,9 +20,14 @@ export default function PageViewBeacon() {
   useEffect(() => {
     if (!pathname || loading || lastSent.current === pathname) return;
     lastSent.current = pathname;
+    // The first page of a visit carries the referrer and the landing query string (UTM tags);
+    // later client-side navigations send neither.
     const body = JSON.stringify({
       path: pathname,
       referrer: first.current ? document.referrer : undefined,
+      search: first.current ? window.location.search : undefined,
+      entry: first.current,
+      viewportWidth: window.innerWidth,
       signedIn: !!user,
       isDemo: !!user?.isDemo,
     });

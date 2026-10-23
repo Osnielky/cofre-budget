@@ -33,6 +33,45 @@ export class PageView {
   @Column({ default: false })
   isDemo: boolean;
 
+  /* First page of a visit (the beacon's first load in that tab). */
+  @Column({ default: false })
+  entry: boolean;
+
+  /* Derived at ingest and non-identifying; the IP, user agent and headers are discarded. */
+  @Column({ type: 'varchar', length: 2, nullable: true })
+  country: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  region: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  city: string | null;
+
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  device: string | null;
+
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  browser: string | null;
+
+  @Column({ type: 'varchar', length: 40, nullable: true })
+  os: string | null;
+
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  language: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  viewportWidth: number | null;
+
+  /* Campaign tags from the landing URL, entry views only. */
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  utmSource: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  utmMedium: string | null;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  utmCampaign: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

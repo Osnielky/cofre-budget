@@ -92,7 +92,11 @@ export default function PrivacyPolicyPage() {
       <p>Cofre uses one essential cookie, <code>access_token</code>, to keep you signed in. It is
         <code> httpOnly</code>, so scripts on the page can&rsquo;t read it. Your browser&rsquo;s local storage keeps
         display preferences such as your chosen theme. We don&rsquo;t use advertising cookies or third-party ad
-        trackers.</p>
+        trackers. Our own page-view counter keeps, with each view, a country and city derived from your network
+        address at the moment of the visit (the address itself is not kept), your device type, browser and
+        operating system family, your browser&rsquo;s language, your screen width, and any campaign tags
+        (<code>utm_source</code> and similar) on the link you arrived from. Those are kept for 90 days and are never
+        joined to an account or across days.</p>
 
             <p>To know how many people use Cofre, we count page views ourselves, without cookies and without
         any third-party analytics service. Each view records the page, the site you came from, and a

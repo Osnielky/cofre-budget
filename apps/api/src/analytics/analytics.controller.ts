@@ -12,6 +12,7 @@ export class AnalyticsController {
   @Post('view')
   @HttpCode(204)
   async view(@Request() req: any, @Body() body: unknown): Promise<void> {
-    await this.analytics.record(body, { ip: clientIp(req), userAgent: req.headers?.['user-agent'] }).catch(() => false);
+    const lang = req.headers?.['accept-language'];
+    await this.analytics.record(body, { ip: clientIp(req), userAgent: req.headers?.['user-agent'], acceptLanguage: typeof lang === 'string' ? lang : undefined }).catch(() => false);
   }
 }

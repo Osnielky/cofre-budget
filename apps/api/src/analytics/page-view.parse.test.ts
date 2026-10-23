@@ -4,7 +4,14 @@ import { parsePageView, visitorHash, isBot, referrerHost, dayKey, dateKeyOf } fr
 describe('parsePageView', () => {
   it('keeps a well-formed beacon, normalising ids out of the path', () => {
     expect(parsePageView({ path: '/transactions/9d6c2f10-1b2a-4c3d-8e9f-0a1b2c3d4e5f?x=1', referrer: 'https://news.ycombinator.com/item?id=1', signedIn: true, isDemo: false }))
-      .toEqual({ path: '/transactions/:id', referrerHost: 'news.ycombinator.com', signedIn: true, isDemo: false });
+      .toEqual({ path: '/transactions/:id', referrerHost: 'news.ycombinator.com', signedIn: true, isDemo: false, entry: false, search: null, viewportWidth: null });
+  });
+  it('keeps the landing query string and viewport on entry views only', () => {
+    const entry = parsePageView({ path: '/', entry: true, search: '?utm_source=reddit', viewportWidth: 1440.4 });
+    expect(entry).toMatchObject({ entry: true, search: '?utm_source=reddit', viewportWidth: 1440 });
+    const later = parsePageView({ path: '/pricing', entry: false, search: '?utm_source=reddit', viewportWidth: -5 });
+    expect(later).toMatchObject({ entry: false, search: null, viewportWidth: null });
+    expect(parsePageView({ path: '/', entry: true, search: 'x'.repeat(3000) })?.search).toBeNull();
   });
   it('drops anything that is not a page path', () => {
     expect(parsePageView(null)).toBeNull();
@@ -13,7 +20,7 @@ describe('parsePageView', () => {
     expect(parsePageView({})).toBeNull();
   });
   it('treats missing flags as an anonymous visitor and tolerates a bad referrer', () => {
-    expect(parsePageView({ path: '/pricing', referrer: 'not a url' })).toEqual({ path: '/pricing', referrerHost: null, signedIn: false, isDemo: false });
+    expect(parsePageView({ path: '/pricing', referrer: 'not a url' })).toEqual({ path: '/pricing', referrerHost: null, signedIn: false, isDemo: false, entry: false, search: null, viewportWidth: null });
   });
 });
 

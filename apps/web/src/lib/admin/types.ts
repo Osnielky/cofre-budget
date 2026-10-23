@@ -48,15 +48,48 @@ export interface AdminUsersPage { rows: AdminUserRow[]; total: number; page: num
 
 /* Mirrors apps/api/src/analytics/analytics.types.ts — keep the two in sync. */
 export interface TrafficWindow { today: number; d7: number; d30: number }
-export interface AdminTraffic {
-  generatedAt: string;
+export interface Counted { label: string; visitors: number }
+export interface TrafficSegment {
   visits: TrafficWindow;
   visitors: TrafficWindow;
   daily: { date: string; visits: number; visitors: number }[];
   topPages: { path: string; visits: number; visitors: number }[];
   topReferrers: { host: string; visits: number }[];
+}
+export interface ProspectProfile {
+  countries: { country: string; visitors: number }[];
+  cities: { label: string; country: string; visitors: number }[];
+  devices: Counted[];
+  browsers: Counted[];
+  os: Counted[];
+  languages: Counted[];
+  landingPages: { path: string; visitors: number }[];
+  campaigns: { source: string; medium: string | null; campaign: string | null; visitors: number }[];
+  unknownLocation: number;
+}
+export interface ProspectVisit {
+  date: string;
+  firstSeen: string;
+  lastSeen: string;
+  minutes: number;
+  views: number;
+  pages: string[];
+  country: string | null;
+  city: string | null;
+  device: string | null;
+  browser: string | null;
+  os: string | null;
+  language: string | null;
+  referrerHost: string | null;
+  campaign: string | null;
+  isDemo: boolean;
+}
+export interface AdminTraffic extends TrafficSegment {
+  generatedAt: string;
   split: { anonymous: number; signedIn: number; demo: number };
   funnel: { landingVisitors: number; demoStarts: number; signups: number };
+  segments: { prospects: TrafficSegment; customers: TrafficSegment };
+  prospects: { profile: ProspectProfile; recent: ProspectVisit[] };
   retentionDays: number;
 }
 

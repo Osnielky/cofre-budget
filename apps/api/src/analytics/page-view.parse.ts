@@ -1,6 +1,13 @@
 import { createHash } from 'crypto';
 
-export interface ParsedPageView { path: string; referrerHost: string | null; signedIn: boolean; isDemo: boolean }
+export interface ParsedPageView {
+  path: string; referrerHost: string | null; signedIn: boolean; isDemo: boolean;
+  /** First page of a visit. */
+  entry: boolean;
+  /** Query string of the landing URL (entry views only), for UTM tags. */
+  search: string | null;
+  viewportWidth: number | null;
+}
 
 const ID_SEGMENT = /^(\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
 
@@ -23,13 +30,18 @@ export function referrerHost(referrer: unknown, ownHost?: string): string | null
 /** Validates a beacon from PageViewBeacon.tsx; anything else is dropped. */
 export function parsePageView(body: unknown, ownHost?: string): ParsedPageView | null {
   if (!body || typeof body !== 'object') return null;
-  const { path, referrer, signedIn, isDemo } = body as Record<string, unknown>;
+  const { path, referrer, signedIn, isDemo, entry, search, viewportWidth } = body as Record<string, unknown>;
   if (typeof path !== 'string' || !path.startsWith('/') || path.length > 500) return null;
+  const isEntry = entry === true;
+  const width = typeof viewportWidth === 'number' && Number.isFinite(viewportWidth) && viewportWidth > 0 && viewportWidth < 20000 ? Math.round(viewportWidth) : null;
   return {
     path: normalizePath(path).slice(0, 200),
     referrerHost: referrerHost(referrer, ownHost),
     signedIn: signedIn === true,
     isDemo: isDemo === true,
+    entry: isEntry,
+    search: isEntry && typeof search === 'string' && search.length <= 2000 ? search : null,
+    viewportWidth: width,
   };
 }
 

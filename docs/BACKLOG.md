@@ -121,3 +121,9 @@ Quick wins (privacy, export) → savings goals + reports (reuse existing pattern
 - Move `support_screenshots` to Cloud Storage behind the same endpoint if volume grows.
 - Let signed-out visitors report from the landing page (today: the support email).
 - Sidebar label could show the count of open replies the user has not read yet.
+
+## Prospect analytics follow-ups (2026-10-23)
+
+- Returning-visitor tracking (first-party visitor id in localStorage) to see new vs returning prospects and which pre-signup visits became customers — needs a consent notice for EU visitors and a privacy-policy change; offered and parked.
+- Time on site is first-to-last view within a day; a leave beacon (`visibilitychange`) would make single-page visits measurable.
+- Refresh the GeoLite2 data on a schedule (geoip-lite ships a snapshot; `npm update geoip-lite` picks up newer data).

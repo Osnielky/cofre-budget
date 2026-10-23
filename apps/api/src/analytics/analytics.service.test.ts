@@ -106,3 +106,64 @@ describe('AnalyticsService.sweep', () => {
     expect(await ds.getRepository(PageView).count()).toBe(1);
   });
 });
+
+describe('Prospects vs customers', () => {
+  const geo = (ip: string | undefined) => ip === '1.1.1.1' ? { country: 'US', region: 'NY', city: 'New York' } : ip === '2.2.2.2' ? { country: 'ES', region: 'MD', city: 'Madrid' } : { country: null, region: null, city: null };
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+  beforeEach(() => { service = new AnalyticsService(ds, 'test-salt', 'budgetcofre.com', undefined, geo); });
+
+  it('stores derived location, device, language and campaign, never the raw headers', async () => {
+    await service.record({ path: '/', entry: true, search: '?utm_source=Reddit&utm_campaign=launch', viewportWidth: 390 },
+      { ip: '1.1.1.1', userAgent: IPHONE, acceptLanguage: 'es-US,es;q=0.9' }, NOW);
+    const [row] = await ds.getRepository(PageView).find();
+    expect(row).toMatchObject({ entry: true, country: 'US', region: 'NY', city: 'New York', device: 'mobile', browser: 'Safari', os: 'iOS', language: 'es-us', viewportWidth: 390, utmSource: 'reddit', utmCampaign: 'launch', utmMedium: null });
+    expect(JSON.stringify(row)).not.toContain('1.1.1.1');
+    expect(JSON.stringify(row)).not.toContain('AppleWebKit');
+  });
+
+  it('separates prospects (anonymous + demo) from customers (signed in)', async () => {
+    await service.record({ path: '/', entry: true }, meta('1.1.1.1'), NOW);
+    await service.record({ path: '/pricing' }, meta('1.1.1.1'), new Date(NOW.getTime() + 60_000));
+    await service.record({ path: '/dashboard', isDemo: true, signedIn: true }, meta('3.3.3.3'), NOW);
+    await service.record({ path: '/dashboard', signedIn: true }, meta('9.9.9.9'), NOW);
+    await service.record({ path: '/goals', signedIn: true }, meta('9.9.9.9'), NOW);
+    const t = await service.traffic(NOW);
+    expect(t.segments.prospects.visits.today).toBe(3);
+    expect(t.segments.prospects.visitors.today).toBe(2);
+    expect(t.segments.customers.visits.today).toBe(2);
+    expect(t.segments.customers.visitors.today).toBe(1);
+    expect(t.segments.customers.topPages.map((p) => p.path).sort()).toEqual(['/dashboard', '/goals']);
+    expect(t.segments.prospects.topPages.map((p) => p.path)).toContain('/pricing');
+    expect(t.visits.today).toBe(5);
+  });
+
+  it('profiles prospects by place, device, language, landing page and campaign', async () => {
+    await service.record({ path: '/', entry: true, search: '?utm_source=reddit&utm_medium=post' }, { ip: '1.1.1.1', userAgent: IPHONE, acceptLanguage: 'en-US' }, NOW);
+    await service.record({ path: '/pricing' }, { ip: '1.1.1.1', userAgent: IPHONE, acceptLanguage: 'en-US' }, NOW);
+    await service.record({ path: '/pricing', entry: true }, { ip: '2.2.2.2', userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36', acceptLanguage: 'es' }, NOW);
+    await service.record({ path: '/', entry: true }, { ip: '10.0.0.5', userAgent: IPHONE }, NOW);
+    await service.record({ path: '/dashboard', signedIn: true, entry: true }, meta('9.9.9.9'), NOW); // customer, excluded
+    const p = (await service.traffic(NOW)).prospects.profile;
+    expect(p.countries).toEqual([{ country: 'ES', visitors: 1 }, { country: 'US', visitors: 1 }]);
+    expect(p.cities).toEqual([{ label: 'Madrid', country: 'ES', visitors: 1 }, { label: 'New York', country: 'US', visitors: 1 }]);
+    expect(p.devices).toEqual([{ label: 'mobile', visitors: 2 }, { label: 'desktop', visitors: 1 }]);
+    expect(p.browsers.find((b) => b.label === 'Chrome')?.visitors).toBe(1);
+    expect(p.languages).toEqual([{ label: 'en-us', visitors: 1 }, { label: 'es', visitors: 1 }]);
+    expect(p.landingPages).toEqual([{ path: '/', visitors: 2 }, { path: '/pricing', visitors: 1 }]);
+    expect(p.campaigns).toEqual([{ source: 'reddit', medium: 'post', campaign: null, visitors: 1 }]);
+    expect(p.unknownLocation).toBe(1);
+  });
+
+  it('lists recent prospect visits with their page path, newest first', async () => {
+    await service.record({ path: '/', entry: true, referrer: 'https://www.reddit.com/r/x', search: '?utm_source=reddit&utm_campaign=launch' }, { ip: '1.1.1.1', userAgent: IPHONE, acceptLanguage: 'en' }, NOW);
+    await service.record({ path: '/pricing' }, { ip: '1.1.1.1', userAgent: IPHONE }, new Date(NOW.getTime() + 2 * 60_000));
+    await service.record({ path: '/demo' }, { ip: '1.1.1.1', userAgent: IPHONE }, new Date(NOW.getTime() + 5 * 60_000));
+    await service.record({ path: '/pricing', entry: true }, { ip: '2.2.2.2', userAgent: IPHONE }, new Date(NOW.getTime() + 10 * 60_000));
+    await service.record({ path: '/dashboard', signedIn: true }, meta('9.9.9.9'), new Date(NOW.getTime() + 20 * 60_000));
+    const recent = (await service.traffic(new Date(NOW.getTime() + 30 * 60_000))).prospects.recent;
+    expect(recent).toHaveLength(2);
+    expect(recent[0]).toMatchObject({ pages: ['/pricing'], views: 1, minutes: 0, country: 'ES', city: 'Madrid' });
+    expect(recent[1]).toMatchObject({ pages: ['/', '/pricing', '/demo'], views: 3, minutes: 5, country: 'US', city: 'New York', device: 'mobile', referrerHost: 'reddit.com', campaign: 'reddit / launch', isDemo: false });
+    expect(recent[1].firstSeen).toBe(NOW.toISOString());
+  });
+});

@@ -8,5 +8,6 @@ import { CreditCardDetails1792090417461 } from './1792090417461-CreditCardDetail
 import { UserIsDemo1792200000000 } from './1792200000000-UserIsDemo';
 import { PageViews1792590514718 } from './1792590514718-PageViews';
 import { SupportTickets1792611889908 } from './1792611889908-SupportTickets';
+import { VisitorProfile1792783917409 } from './1792783917409-VisitorProfile';
 
-export const MIGRATIONS = [Baseline1790610365591, NetWorthSnapshots1790968124309, InvestmentsAsSavings1791301606403, UserLastSeen1791904532417, CreditCardDetails1792090417461, UserIsDemo1792200000000, PageViews1792590514718, SupportTickets1792611889908];
+export const MIGRATIONS = [Baseline1790610365591, NetWorthSnapshots1790968124309, InvestmentsAsSavings1791301606403, UserLastSeen1791904532417, CreditCardDetails1792090417461, UserIsDemo1792200000000, PageViews1792590514718, SupportTickets1792611889908, VisitorProfile1792783917409];
