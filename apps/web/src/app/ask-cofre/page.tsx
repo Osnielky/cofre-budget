@@ -212,7 +212,7 @@ export default function AskCofrePage() {
           </div>
 
           {/* Suggested prompts */}
-          <Stagger className="grid grid-cols-2 gap-2">
+          <Stagger className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {SUGGESTED_PROMPTS.map((p) => (
               <StaggerItem key={p.text} onClick={() => setInput(p.text)}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-left cursor-pointer"
@@ -227,8 +227,9 @@ export default function AskCofrePage() {
           <form onSubmit={(e) => { e.preventDefault(); handleSend(input); }}
             className="flex items-center gap-1.5 p-2 rounded-full"
             style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+            {/* The two "coming soon" buttons are hidden on phones so the text field keeps its width. */}
             <button type="button" disabled title="Attachments coming soon"
-              className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40"
+              className="w-8 h-8 rounded-full hidden sm:flex items-center justify-center shrink-0 disabled:opacity-40"
               style={{ color: 'var(--color-text-muted)' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95L10.13 17.1a2 2 0 0 1-2.83-2.83l8.49-8.49"/></svg>
             </button>
@@ -236,7 +237,7 @@ export default function AskCofrePage() {
               placeholder={outOfMessages ? 'Daily message limit reached' : 'Ask anything, or tell me what to change…'}
               className="flex-1 bg-transparent outline-none text-sm px-1 min-w-0" />
             <button type="button" disabled title="Voice input coming soon"
-              className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 disabled:opacity-40"
+              className="w-8 h-8 rounded-full hidden sm:flex items-center justify-center shrink-0 disabled:opacity-40"
               style={{ color: 'var(--color-text-muted)' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4"/></svg>
             </button>

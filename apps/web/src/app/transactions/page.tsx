@@ -1663,7 +1663,9 @@ export default function TransactionsPage() {
                               if ((e.target as HTMLElement).closest('button,input,textarea,select,[role="button"]')) return;
                               setSelectedTx((prev) => prev?.id === tx.id ? null : tx);
                             }}>
-                            <div className="flex items-center gap-3 px-4 py-3">
+                            {/* Phones: two lines — icon · name · amount, then the category picker and
+                                actions on their own line. From sm the row is a single line. */}
+                            <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 px-4 py-3">
 
                               {/* Category icon chip (direction color fallback) */}
                               {(() => {
@@ -1685,7 +1687,7 @@ export default function TransactionsPage() {
                               })()}
 
                               {/* Name + source */}
-                              <div className="flex-1 min-w-0">
+                              <div className="flex-1 min-w-0 order-2 sm:order-none">
                                 <p className="text-sm font-medium truncate leading-snug">{tx.name}</p>
                                 {tx.note && (
                                   <p className="text-[11px] truncate leading-snug" style={{ color: 'var(--color-text-muted)' }}>{tx.note}</p>
@@ -1752,6 +1754,10 @@ export default function TransactionsPage() {
                                   )}
                                 </div>
                               </div>
+
+                          {/* Picker, suggestions and actions: a second full-width line on phones
+                              (indented under the name), inline (display: contents) from sm. */}
+                          <div className="order-4 sm:order-none basis-full sm:basis-auto sm:contents flex flex-wrap items-center gap-2 pl-12 sm:pl-0 min-w-0">
 
                           {/* ── Category suggestion ── */}
                           {(() => {
@@ -1868,7 +1874,7 @@ export default function TransactionsPage() {
                                   <span>{cat.icon}</span>
                                   <span>{cat.name}</span>
                                   {cat.type === 'transfer' && (
-                                    <span className="opacity-70">
+                                    <span className="opacity-70 hidden md:inline">
                                       {Number(tx.amount) >= 0
                                         ? <>{tx.transferAccount?.accountName ?? '?'} → {tx.bankAccount?.accountName ?? '?'}</>
                                         : <>{tx.bankAccount?.accountName ?? '?'} → {tx.transferAccount?.accountName ?? '?'}</>
@@ -2465,9 +2471,10 @@ export default function TransactionsPage() {
                               document.body
                             )}
                           </div>
+                          </div>
 
                           {/* Amount */}
-                          <p className="text-sm font-bold tabular-nums w-[4.75rem] sm:w-24 text-right shrink-0"
+                          <p className="text-sm font-bold tabular-nums w-[4.75rem] sm:w-24 text-right shrink-0 order-3 sm:order-last"
                             style={{ color: txIsTransfer ? 'var(--color-text-muted)' : isIncome ? 'var(--color-green)' : 'var(--color-text-primary)' }}>
                             {formatAmount(amount)}
                           </p>
