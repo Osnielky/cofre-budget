@@ -146,52 +146,84 @@ export class TransactionsService {
 
   async checkDuplicates(
     userId: string, bankAccountId: string, rows: CsvRow[],
-  ): Promise<{ newCount: number; duplicateCount: number; duplicateExternalIds: string[] }> {
+  ): Promise<{
+    newCount: number; duplicateCount: number; duplicateExternalIds: string[];
+    /* Duplicates that live outside this account (another account, or orphaned by
+       a deleted one). importCsv skips them too, so the preview must count them —
+       otherwise a row shows as "new" on every import while never being saved. */
+    elsewhereCount: number; elsewhereAccounts: string[];
+  }> {
     const account = await this.accountRepo.findOneBy({ id: bankAccountId });
     if (!account || account.userId !== userId) throw new ForbiddenException();
 
-    /* Load all existing CSV transactions for this account once */
-    const existing = await this.repo.find({
-      where: { bankAccountId, userId, source: 'csv' },
-      select: ['id', 'externalId', 'date', 'amount', 'name'],
-    });
-
-    /* Build lookup maps for fast in-memory checks */
-    const byExternalId = new Map(existing.filter((t) => t.externalId).map((t) => [t.externalId, true]));
-
-    const duplicateExternalIds: string[] = [];
-
-    for (const row of rows) {
+    /* Candidate keys per row — the same three forms importCsv matches on. */
+    const keysOf = (row: CsvRow) => {
       const ref = row.referenceNumber?.trim();
       const amt2 = Number(row.amount).toFixed(2);           // "10.00"
       const amtRaw = String(row.amount);                    // "10" (old format, no toFixed)
+      return {
+        ref: ref ? `csv_${ref}` : null,
+        key2: `csv_${row.date}|${row.name}|${amt2}`,
+        keyOld: `csv_${row.date}|${row.name}|${amtRaw}`,
+      };
+    };
 
-      /* 1. Exact match by bank reference number */
-      if (ref && byExternalId.has(`csv_${ref}`)) {
-        duplicateExternalIds.push(`csv_${ref}`); continue;
-      }
+    /* 1–3. externalId lookup, USER-wide — any account, any source — because that
+       is what importCsv checks (and what the unique index on userId+externalId
+       enforces). Done in batches to keep the IN list bounded. */
+    const allKeys = [...new Set(rows.flatMap((r) => { const k = keysOf(r); return [k.ref, k.key2, k.keyOld].filter((x): x is string => !!x); }))];
+    const owner = new Map<string, string | null>(); // externalId → bankAccountId (null = orphan)
+    for (let i = 0; i < allKeys.length; i += 2000) {
+      const hits = await this.repo.find({
+        where: { userId, externalId: In(allKeys.slice(i, i + 2000)) },
+        select: ['externalId', 'bankAccountId'],
+      });
+      for (const h of hits) owner.set(h.externalId, h.bankAccountId ?? null);
+    }
 
-      /* 2. Composite key — new format (amount.toFixed(2)) */
-      const key2 = `csv_${row.date}|${row.name}|${amt2}`;
-      if (byExternalId.has(key2)) { duplicateExternalIds.push(key2); continue; }
+    /* 4. Field match within this account (any source, like importCsv) — catches
+       rows stored without an externalId. */
+    const existing = await this.repo.find({
+      where: { bankAccountId, userId },
+      select: ['id', 'date', 'amount', 'name'],
+    });
 
-      /* 3. Composite key — old format (${amount} without toFixed) for backward compat */
-      const keyOld = `csv_${row.date}|${row.name}|${amtRaw}`;
-      if (byExternalId.has(keyOld)) { duplicateExternalIds.push(keyOld); continue; }
+    const duplicateExternalIds: string[] = [];
+    const elsewhereAccountIds = new Set<string | null>();
+    let elsewhereCount = 0;
 
-      /* 4. Field match — catches transactions stored without externalId */
+    const noteHit = (key: string) => {
+      duplicateExternalIds.push(key);
+      const acct = owner.get(key);
+      if (acct !== bankAccountId) { elsewhereCount++; elsewhereAccountIds.add(acct ?? null); }
+    };
+
+    for (const row of rows) {
+      const k = keysOf(row);
+      if (k.ref && owner.has(k.ref)) { noteHit(k.ref); continue; }
+      if (owner.has(k.key2))         { noteHit(k.key2); continue; }
+      if (owner.has(k.keyOld))       { noteHit(k.keyOld); continue; }
+
       const match = existing.find((t) =>
         t.date === row.date &&
         t.name === row.name &&
         Math.abs(Number(t.amount) - Number(row.amount)) < 0.005,
       );
-      if (match) { duplicateExternalIds.push(`csv_${row.date}|${row.name}|${amt2}`); }
+      if (match) duplicateExternalIds.push(k.key2);
     }
+
+    /* Name the other accounts so the UI can say where the rows already live. */
+    const otherIds = [...elsewhereAccountIds].filter((id): id is string => !!id);
+    const others = otherIds.length ? await this.accountRepo.find({ where: { id: In(otherIds), userId }, select: ['id', 'bankName', 'accountName'] }) : [];
+    const elsewhereAccounts = others.map((a) => `${a.bankName} — ${a.accountName}`);
+    if (elsewhereAccountIds.has(null)) elsewhereAccounts.push('a deleted account');
 
     return {
       newCount: rows.length - duplicateExternalIds.length,
       duplicateCount: duplicateExternalIds.length,
       duplicateExternalIds,
+      elsewhereCount,
+      elsewhereAccounts,
     };
   }
 

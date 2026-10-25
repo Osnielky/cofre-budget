@@ -3,28 +3,52 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { parseCsv, detectCsvFingerprint, extractFileLast4, bankNamesMatch } from '@/lib/csvImport';
-import type { CsvRow } from '@/lib/csvImport';
+import type { CsvRow, CsvFingerprint } from '@/lib/csvImport';
 import { rankAccounts } from '@/lib/accountMatch';
 import type { MatchAccount, RankResult, MatchTier } from '@/lib/accountMatch';
 import { BANKS } from '@/components/BankSelect';
+import {
+  isAcceptedImportFile, dateRangeOf, balanceCarriers, createKeyFor, defaultNewAccount, summarizeImports,
+} from '@/lib/import/multiFile';
+import type { NewAccountDraft, FileImportOutcome } from '@/lib/import/multiFile';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-export interface ImportReconcileResult {
-  imported: number;
-  skipped: number;
-  account: MatchAccount;
-  dateRange: { from: string; to: string } | null;
-}
+export type ImportReconcileResult = FileImportOutcome;
 
 interface Props {
   accounts: MatchAccount[];
   onClose: () => void;
-  onImported: (r: ImportReconcileResult) => void;
+  /** Called once per batch with every file that imported successfully. */
+  onImported: (results: ImportReconcileResult[]) => void;
   onAccountCreated: (a: MatchAccount) => void;
 }
 
-interface DupCheck { newCount: number; duplicateCount: number; duplicateIds: Set<string>; }
+interface DupCheck {
+  newCount: number; duplicateCount: number; duplicateIds: Set<string>;
+  /* Duplicates that live in another account (or one that was deleted). */
+  elsewhereCount: number; elsewhereAccounts: string[];
+}
+
+/* One dropped file. `target` is an account id, a create-key (see
+   createKeyFor — files for the same new account share one), or null when
+   the file could not be parsed. */
+interface FileEntry {
+  id: string;
+  name: string;
+  rows: CsvRow[];
+  finalBalance?: number;
+  fingerprint: CsvFingerprint;
+  last4: string | null;
+  ranking: RankResult | null;
+  target: string | null;
+  error?: string;
+  dupCheck: DupCheck | null;
+  dupChecking: boolean;
+  showPreview: boolean;
+}
+
+interface FileOutcome extends FileImportOutcome { error?: string }
 
 const TIER_COLORS: Record<MatchTier, string> = {
   exact:  'var(--color-green)',
@@ -42,6 +66,8 @@ const TIER_LABELS: Record<MatchTier, string> = {
 
 const ACC_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0'];
 
+const isCreateKey = (target: string | null): target is string => !!target && target.startsWith('create:');
+
 /* Map a detected fingerprint bank (lowercase, e.g. "bank of america", "citi")
    to the BANKS registry's canonical display name so the saved account resolves
    to a known logo. Falls back to title-case when no registry entry matches. */
@@ -51,93 +77,113 @@ function canonicalBankName(detected: string | null): string {
   return hit ? hit.name : detected.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function readFileText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve((ev.target?.result as string) ?? '');
+    reader.onerror = () => reject(new Error('Could not read the file.'));
+    reader.readAsText(file);
+  });
+}
+
+function detectedLabel(fp: CsvFingerprint): string {
+  const bank = fp.bank ? canonicalBankName(fp.bank) : '';
+  const type = fp.type === 'bank' ? 'checking' : fp.type === 'unknown' ? '' : fp.type;
+  return [bank, type].filter(Boolean).join(' ') || 'Unrecognized format';
+}
+
+/* "another account (Chase — Checking)" / "a deleted account" / "2 other places" */
+function formatElsewhere(names: string[]): string {
+  if (names.length === 0) return 'another account';
+  if (names.length === 1) return names[0] === 'a deleted account' ? 'a deleted account' : `another account (${names[0]})`;
+  return `${names.length} other places (${names.join(', ')})`;
+}
+
+let nextId = 0;
+
 export default function ImportReconcileModal({ accounts, onClose, onImported, onAccountCreated }: Props) {
-  const [rows, setRows]             = useState<CsvRow[]>([]);
-  const [csvBalance, setCsvBalance] = useState<number | undefined>(undefined);
-  const [fileName, setFileName]     = useState('');
+  const [entries, setEntries]       = useState<FileEntry[]>([]);
+  const [drafts, setDrafts]         = useState<Record<string, NewAccountDraft>>({});
   const [error, setError]           = useState('');
-  const [ranking, setRanking]       = useState<RankResult | null>(null);
-  const [selectedId, setSelectedId] = useState<string | 'create' | null>(null);
   const [importing, setImporting]   = useState(false);
   const [progress, setProgress]     = useState<{ done: number; total: number } | null>(null);
-  const [result, setResult]         = useState<{ imported: number; skipped: number } | null>(null);
+  const [outcomes, setOutcomes]     = useState<FileOutcome[] | null>(null);
   const [dragging, setDragging]     = useState(false);
-  const [dupCheck, setDupCheck]     = useState<DupCheck | null>(null);
-  const [dupChecking, setDupChecking] = useState(false);
-
-  // Create-new-account form state
-  const [newAcc, setNewAcc] = useState({
-    bankName: '', accountName: '', accountType: 'checking', last4: '', color: '#9B6DFF',
-  });
-
   const inputRef = useRef<HTMLInputElement>(null);
 
-  async function checkDups(parsed: CsvRow[], accountId: string) {
-    setDupChecking(true); setDupCheck(null);
+  const patchEntry = (id: string, patch: Partial<FileEntry> | ((e: FileEntry) => Partial<FileEntry>)) =>
+    setEntries((prev) => prev.map((e) => e.id === id ? { ...e, ...(typeof patch === 'function' ? patch(e) : patch) } : e));
+
+  async function checkDups(entryId: string, rows: CsvRow[], accountId: string) {
+    patchEntry(entryId, { dupChecking: true, dupCheck: null });
     try {
       const res = await fetch(`${API}/transactions/check-duplicates`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ bankAccountId: accountId, rows: parsed }),
+        body: JSON.stringify({ bankAccountId: accountId, rows }),
       });
       if (!res.ok) return;
       const data = await res.json();
-      setDupCheck({ newCount: data.newCount, duplicateCount: data.duplicateCount, duplicateIds: new Set(data.duplicateExternalIds) });
+      // The user may have re-targeted this file while the request was in flight.
+      patchEntry(entryId, (e) => e.target === accountId
+        ? { dupCheck: {
+            newCount: data.newCount, duplicateCount: data.duplicateCount, duplicateIds: new Set(data.duplicateExternalIds),
+            elsewhereCount: data.elsewhereCount ?? 0, elsewhereAccounts: data.elsewhereAccounts ?? [],
+          } }
+        : {});
     } catch {
       // network/CORS error — silently skip dup check
-    } finally { setDupChecking(false); }
+    } finally { patchEntry(entryId, { dupChecking: false }); }
   }
 
-  function processFile(file: File) {
-    setError(''); setRows([]); setResult(null); setRanking(null); setSelectedId(null);
-    setDupCheck(null);
-    setFileName(file.name);
-    if (!file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.txt')) {
-      setError('Please select a CSV or TXT file.'); return;
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
+  async function addFiles(files: File[]) {
+    setError(''); setOutcomes(null);
+    const fresh: FileEntry[] = [];
+    for (const file of files) {
+      if (entries.some((e) => e.name === file.name) || fresh.some((e) => e.name === file.name)) continue; // already in the batch
+      const base: FileEntry = {
+        id: `f${nextId++}`, name: file.name, rows: [], fingerprint: { bank: null, type: 'unknown' }, last4: null,
+        ranking: null, target: null, dupCheck: null, dupChecking: false, showPreview: false,
+      };
+      if (!isAcceptedImportFile(file.name)) { fresh.push({ ...base, error: 'Not a CSV or TXT file.' }); continue; }
       try {
-        const raw = ev.target?.result as string;
-        const { rows: parsed, finalBalance } = parseCsv(raw);
-        if (parsed.length === 0) throw new Error('No transactions found in this file.');
+        const raw = await readFileText(file);
+        const { rows, finalBalance } = parseCsv(raw);
+        if (rows.length === 0) throw new Error('No transactions found in this file.');
         const fingerprint = detectCsvFingerprint(raw);
         const last4 = extractFileLast4(file.name, raw);
-        const rank = rankAccounts(accounts, fingerprint, last4);
-        setRows(parsed);
-        setCsvBalance(finalBalance);
-        setRanking(rank);
-        const bestId = rank.best ? rank.best.account.id : 'create';
-        setSelectedId(bestId);
-
-        // Prefill create-form from file fingerprint. Use the canonical bank name
-        // from the BANKS registry so the saved account matches a known logo
-        // (detection yields e.g. "bank of america" / "citi"; the registry has
-        // "Bank of America" / "Citibank").
-        const detectedType = fingerprint.type === 'credit' ? 'credit'
-          : fingerprint.type === 'investment' ? 'investment' : 'checking';
-        const bank = canonicalBankName(fingerprint.bank);
-        const typeLabel = detectedType.charAt(0).toUpperCase() + detectedType.slice(1);
-        setNewAcc({
-          bankName: bank,
-          accountName: `${bank ? bank + ' ' : ''}${typeLabel}${last4 ? ' ••' + last4 : ''}`.trim(),
-          accountType: detectedType,
-          last4: last4 ?? '',
-          color: '#9B6DFF',
-        });
-
-        if (bestId !== 'create') {
-          checkDups(parsed, bestId);
-        }
+        const ranking = rankAccounts(accounts, fingerprint, last4);
+        const target = ranking.best ? ranking.best.account.id : createKeyFor(fingerprint, last4);
+        fresh.push({ ...base, rows, finalBalance, fingerprint, last4, ranking, target });
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Could not parse CSV file.');
+        fresh.push({ ...base, error: err instanceof Error ? err.message : 'Could not parse CSV file.' });
       }
-    };
-    reader.readAsText(file);
+    }
+    if (fresh.length === 0) return;
+
+    // One draft per new-account key, prefilled from the first file that needs it.
+    setDrafts((prev) => {
+      const next = { ...prev };
+      for (const e of fresh) {
+        if (isCreateKey(e.target) && !next[e.target]) {
+          next[e.target] = defaultNewAccount(e.fingerprint, e.last4, canonicalBankName(e.fingerprint.bank));
+        }
+      }
+      return next;
+    });
+    setEntries((prev) => [...prev, ...fresh]);
+    for (const e of fresh) {
+      if (e.target && !isCreateKey(e.target)) checkDups(e.id, e.rows, e.target);
+    }
+  }
+
+  function removeFile(id: string) {
+    setEntries((prev) => prev.filter((e) => e.id !== id));
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = ''; // allow re-selecting the same file after removing it
+    if (files.length) addFiles(files);
   }
 
   function handleDragOver(e: React.DragEvent) {
@@ -148,96 +194,134 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
   }
   function handleDrop(e: React.DragEvent) {
     e.preventDefault(); setDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
+    const files = Array.from(e.dataTransfer.files ?? []);
+    if (files.length) addFiles(files);
   }
 
-  function handleSelectChange(value: string) {
-    setSelectedId(value as string | 'create');
-    setDupCheck(null);
-    if (value !== 'create' && rows.length > 0) {
-      checkDups(rows, value);
+  function handleTargetChange(entry: FileEntry, value: string) {
+    if (value === 'create') {
+      const key = createKeyFor(entry.fingerprint, entry.last4);
+      setDrafts((prev) => prev[key] ? prev : { ...prev, [key]: defaultNewAccount(entry.fingerprint, entry.last4, canonicalBankName(entry.fingerprint.bank)) });
+      patchEntry(entry.id, { target: key, dupCheck: null });
+      return;
     }
+    patchEntry(entry.id, { target: value, dupCheck: null });
+    checkDups(entry.id, entry.rows, value);
   }
+
+  const valid = entries.filter((e): e is FileEntry & { target: string } => !e.error && e.rows.length > 0 && !!e.target);
+  const createKeysInUse = [...new Set(valid.map((e) => e.target).filter(isCreateKey))];
+  const draftReady = (d: NewAccountDraft | undefined) => !!d && d.bankName.trim() !== '' && d.accountName.trim() !== '';
+  const draftsReady = createKeysInUse.every((k) => draftReady(drafts[k]));
 
   async function handleImport() {
     setImporting(true); setError(''); setProgress(null);
-    try {
-      let account: MatchAccount;
-      if (selectedId === 'create') {
-        if (!newAcc.bankName.trim() || !newAcc.accountName.trim()) {
-          setError('Bank name and account name are required.'); setImporting(false); return;
+    const created = new Map<string, MatchAccount>();
+    const results: FileOutcome[] = [];
+    const carriers = balanceCarriers(valid.map((e) => ({ name: e.name, rows: e.rows, finalBalance: e.finalBalance, target: e.target })));
+    const total = valid.reduce((s, e) => s + e.rows.length, 0);
+    let done = 0;
+    setProgress({ done, total });
+
+    for (let fi = 0; fi < valid.length; fi++) {
+      const entry = valid[fi];
+      const target = entry.target;
+      const dateRange = dateRangeOf(entry.rows);
+      try {
+        let account: MatchAccount;
+        if (isCreateKey(target)) {
+          const existing = created.get(target);
+          if (existing) account = existing;
+          else {
+            const d = drafts[target];
+            if (!draftReady(d)) throw new Error('Bank name and account name are required.');
+            const res = await fetch(`${API}/bank-accounts`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+              body: JSON.stringify({
+                bankName: d.bankName.trim(),
+                accountName: d.accountName.trim(),
+                accountType: d.accountType,
+                color: d.color,
+                currency: 'USD',
+                balance: entry.finalBalance ?? 0,
+                last4: d.last4 || null,
+              }),
+            });
+            if (!res.ok) throw new Error('Could not create the account.');
+            account = await res.json();
+            created.set(target, account);
+            onAccountCreated(account);
+          }
+        } else {
+          const found = accounts.find((a) => a.id === target);
+          if (!found) throw new Error('That account no longer exists.');
+          account = found;
         }
-        const res = await fetch(`${API}/bank-accounts`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-          body: JSON.stringify({
-            bankName: newAcc.bankName.trim(),
-            accountName: newAcc.accountName.trim(),
-            accountType: newAcc.accountType,
-            color: newAcc.color,
-            currency: 'USD',
-            balance: csvBalance ?? 0,
-            last4: newAcc.last4 || null,
-          }),
-        });
-        if (!res.ok) throw new Error('Could not create the account.');
-        account = await res.json();
-        onAccountCreated(account);
-      } else {
-        const found = accounts.find((a) => a.id === selectedId);
-        if (!found) { setImporting(false); return; }
-        account = found;
-      }
 
-      // Import in chunks so we can show real progress and keep each request small.
-      // Dedup is per-row (server-side), so chunks are independent; finalBalance is
-      // sent only with the last chunk to set the account's closing balance once.
-      const CHUNK = 200;
-      let imported = 0, skipped = 0;
-      setProgress({ done: 0, total: rows.length });
-      for (let i = 0; i < rows.length; i += CHUNK) {
-        const slice = rows.slice(i, i + CHUNK);
-        const isLast = i + CHUNK >= rows.length;
-        const imp = await fetch(`${API}/transactions/import`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-          body: JSON.stringify({ bankAccountId: account.id, rows: slice, finalBalance: isLast ? csvBalance : undefined }),
+        // Import in chunks so we can show real progress and keep each request
+        // small. Dedup is per-row (server-side), so chunks are independent.
+        // finalBalance rides on the last chunk of the one file per account whose
+        // statement is newest, so an older statement never overwrites the balance.
+        const CHUNK = 200;
+        const sendsBalance = carriers.has(fi);
+        let imported = 0, skipped = 0;
+        for (let i = 0; i < entry.rows.length; i += CHUNK) {
+          const slice = entry.rows.slice(i, i + CHUNK);
+          const isLast = i + CHUNK >= entry.rows.length;
+          const imp = await fetch(`${API}/transactions/import`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+            body: JSON.stringify({ bankAccountId: account.id, rows: slice, finalBalance: isLast && sendsBalance ? entry.finalBalance : undefined }),
+          });
+          if (!imp.ok) throw new Error('Import failed partway through. Re-import this file to finish.');
+          const data = await imp.json();
+          imported += data.imported ?? 0;
+          skipped += data.skipped ?? 0;
+          done += slice.length;
+          setProgress({ done, total });
+        }
+        results.push({ fileName: entry.name, imported, skipped, account, dateRange });
+      } catch (err: unknown) {
+        done += entry.rows.length;
+        setProgress({ done, total });
+        results.push({
+          fileName: entry.name, imported: 0, skipped: 0, dateRange,
+          account: { id: '', bankName: '', accountName: '', accountType: '', color: '' },
+          error: err instanceof Error ? err.message : 'Import failed.',
         });
-        if (!imp.ok) throw new Error('Import failed partway through. Re-run the import into that account to finish.');
-        const data = await imp.json();
-        imported += data.imported ?? 0;
-        skipped += data.skipped ?? 0;
-        setProgress({ done: Math.min(i + CHUNK, rows.length), total: rows.length });
       }
+    }
 
-      setResult({ imported, skipped });
-      const dates = rows.map((r) => r.date).sort();
-      const dateRange = dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null;
-      onImported({ imported, skipped, account, dateRange });
-    } catch (err: any) {
-      setError(err.message ?? 'Import failed. Please try again.');
-    } finally { setImporting(false); }
+    setOutcomes(results);
+    setImporting(false);
+    const ok = results.filter((r) => !r.error);
+    if (ok.length) onImported(ok);
+    else setError('Nothing was imported. Check the errors below and try again.');
   }
 
-  const income   = rows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
-  const newCount = dupCheck ? dupCheck.newCount : rows.length;
+  /* ── Derived totals ── */
+  const totalRows   = valid.reduce((s, e) => s + e.rows.length, 0);
+  const anyChecking = valid.some((e) => e.dupChecking);
+  const newCount    = valid.reduce((s, e) => s + (e.dupCheck ? e.dupCheck.newCount : e.rows.length), 0);
+  const dupCount    = valid.reduce((s, e) => s + (e.dupCheck?.duplicateCount ?? 0), 0);
+  const income      = valid.reduce((s, e) => s + e.rows.filter((r) => r.amount > 0).reduce((a, r) => a + r.amount, 0), 0);
+  const targetCount = new Set(valid.map((e) => e.target)).size;
+  const anyBalance  = valid.some((e) => e.finalBalance !== undefined);
+  const nothingNew  = valid.length > 0 && createKeysInUse.length === 0 && valid.every((e) => e.dupCheck && e.dupCheck.newCount === 0);
+  const importDisabled = valid.length === 0 || importing || anyChecking || !draftsReady;
+  const summary = outcomes ? summarizeImports(outcomes.filter((o) => !o.error)) : null;
 
-  const selectedRanked = ranking?.ranked.find((r) => r.account.id === selectedId) ?? null;
-  const confidenceText = selectedRanked?.reason ?? '';
-  const confidenceTier: MatchTier = selectedRanked?.tier ?? 'none';
-  const tierColor = TIER_COLORS[confidenceTier];
-  const tierLabel = selectedRanked ? TIER_LABELS[confidenceTier] : '';
-
-  const createReady = selectedId === 'create' && newAcc.bankName.trim() !== '' && newAcc.accountName.trim() !== '';
-  const importDisabled = !selectedId || importing || dupChecking || (selectedId === 'create' && !createReady);
+  const headline = entries.length === 0
+    ? 'Drop one or more CSVs to get started'
+    : `${entries.length} file${entries.length !== 1 ? 's' : ''} · ${totalRows.toLocaleString()} transaction${totalRows !== 1 ? 's' : ''}`;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget && !importing) onClose(); }}
     >
       <div
-        className="w-full max-w-xl flex flex-col rounded-2xl overflow-hidden"
+        className="w-full max-w-2xl flex flex-col rounded-2xl overflow-hidden"
         style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '90vh' }}
       >
         {/* Header */}
@@ -254,14 +338,13 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
             </div>
             <div className="min-w-0">
               <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>Import transactions</p>
-              <p className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
-                {fileName || 'Drop a CSV to get started'}
-              </p>
+              <p className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>{headline}</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)] transition-colors shrink-0"
+            disabled={importing}
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[color-mix(in_srgb,var(--color-primary)_8%,transparent)] transition-colors shrink-0 disabled:opacity-40"
             style={{ color: 'var(--color-text-muted)' }}
           >
             ✕
@@ -271,24 +354,25 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
         <div className="flex flex-col gap-4 px-5 py-4 overflow-y-auto flex-1">
 
           {/* Drop zone */}
-          {!result && (
+          {!outcomes && (
             <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
-              <input ref={inputRef} type="file" accept=".csv,.txt" onChange={handleFile} className="hidden" />
+              <input ref={inputRef} type="file" accept=".csv,.txt" multiple onChange={handleFile} className="hidden" />
               <button
                 onClick={() => inputRef.current?.click()}
                 type="button"
-                className="w-full py-6 rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all"
+                disabled={importing}
+                className={`w-full rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${entries.length ? 'py-3' : 'py-6'}`}
                 style={{
-                  borderColor: dragging ? 'var(--color-primary)' : rows.length ? 'color-mix(in srgb, var(--color-green) 35%, transparent)' : 'var(--color-elevated)',
-                  background: dragging ? 'color-mix(in srgb, var(--color-primary) 8%, transparent)' : rows.length ? 'color-mix(in srgb, var(--color-green) 5%, transparent)' : 'var(--color-elevated)',
+                  borderColor: dragging ? 'var(--color-primary)' : entries.length ? 'color-mix(in srgb, var(--color-green) 35%, transparent)' : 'var(--color-elevated)',
+                  background: dragging ? 'color-mix(in srgb, var(--color-primary) 8%, transparent)' : entries.length ? 'color-mix(in srgb, var(--color-green) 5%, transparent)' : 'var(--color-elevated)',
                 }}
               >
-                <span className="text-xl">{dragging ? '📥' : rows.length ? '✅' : '📂'}</span>
+                <span className="text-xl">{dragging ? '📥' : entries.length ? '➕' : '📂'}</span>
                 <div className="text-left">
-                  <p className="text-sm font-semibold" style={{ color: rows.length ? 'var(--color-green)' : 'var(--color-text-secondary)' }}>
-                    {dragging ? 'Drop to import' : rows.length ? `${rows.length} transactions — ${fileName}` : 'Click to select or drag & drop'}
+                  <p className="text-sm font-semibold" style={{ color: entries.length ? 'var(--color-green)' : 'var(--color-text-secondary)' }}>
+                    {dragging ? 'Drop to add' : entries.length ? 'Add more files' : 'Click to select or drag & drop — several files at once is fine'}
                   </p>
-                  {!rows.length && !dragging && (
+                  {!entries.length && !dragging && (
                     <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                       Supports Chase, Bank of America, Wells Fargo, Schwab & most banks
                     </p>
@@ -298,243 +382,175 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
             </div>
           )}
 
-          {/* Stats + table + account selector */}
-          {rows.length > 0 && !result && (
-            <>
-              {/* Stats bar */}
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { label: 'Total',   value: rows.length,                                          color: 'var(--color-primary)' },
-                  { label: 'New',     value: dupChecking ? '…' : newCount,                         color: 'var(--color-green)' },
-                  { label: 'Skipped', value: dupChecking ? '…' : (dupCheck?.duplicateCount ?? 0),  color: dupCheck?.duplicateCount ? 'var(--color-amber)' : 'var(--color-text-muted)' },
-                  { label: 'Income',  value: income > 0 ? `+$${income.toFixed(2)}` : '$0.00',      color: income > 0 ? 'var(--color-green)' : 'var(--color-text-muted)' },
-                ].map((s) => (
-                  <div
-                    key={s.label}
-                    className="flex flex-col items-center py-2.5 rounded-xl"
-                    style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}
-                  >
-                    <p className="text-[9px] uppercase tracking-widest font-bold" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
-                    <p className="font-black text-base mt-0.5 tabular-nums" style={{ color: s.color }}>{s.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              {/* Duplicate notice */}
-              {dupCheck && dupCheck.duplicateCount > 0 && (
+          {/* Stats bar */}
+          {valid.length > 0 && !outcomes && (
+            <div className="grid grid-cols-4 gap-2">
+              {[
+                { label: 'Total',   value: totalRows,                                  color: 'var(--color-primary)' },
+                { label: 'New',     value: anyChecking ? '…' : newCount,               color: 'var(--color-green)' },
+                { label: 'Skipped', value: anyChecking ? '…' : dupCount,               color: dupCount ? 'var(--color-amber)' : 'var(--color-text-muted)' },
+                { label: 'Income',  value: income > 0 ? `+$${income.toFixed(2)}` : '$0.00', color: income > 0 ? 'var(--color-green)' : 'var(--color-text-muted)' },
+              ].map((s) => (
                 <div
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-xs"
-                  style={{ background: 'color-mix(in srgb, var(--color-amber) 7%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 18%, transparent)' }}
+                  key={s.label}
+                  className="flex flex-col items-center py-2.5 rounded-xl"
+                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}
                 >
-                  <span style={{ color: 'var(--color-amber)' }}>⟳</span>
-                  <span style={{ color: 'var(--color-amber)' }}>
-                    <strong>{dupCheck.duplicateCount} already imported</strong> — skipped automatically.
-                    Only <strong>{dupCheck.newCount} new</strong> will be added.
-                  </span>
+                  <p className="text-[9px] uppercase tracking-widest font-bold" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
+                  <p className="font-black text-base mt-0.5 tabular-nums" style={{ color: s.color }}>{s.value}</p>
                 </div>
-              )}
-
-              {/* Table */}
-              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
-                <div className="max-h-52 overflow-y-auto">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0">
-                      <tr style={{ background: 'var(--color-elevated)', borderBottom: '1px solid var(--color-border)' }}>
-                        <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Date</th>
-                        <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Description</th>
-                        <th className="text-right px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.slice(0, 150).map((row, i) => {
-                        const extId = row.referenceNumber ? `csv_${row.referenceNumber}` : null;
-                        const compositeKey = `csv_${row.date}|${row.name}|${row.amount.toFixed(2)}`;
-                        const isDup = dupCheck
-                          ? (extId ? dupCheck.duplicateIds.has(extId) : false) || dupCheck.duplicateIds.has(compositeKey)
-                          : false;
-                        return (
-                          <tr key={i} style={{ borderTop: '1px solid var(--color-border)', opacity: isDup ? 0.35 : 1 }}>
-                            <td className="px-3 py-2 tabular-nums whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{row.date}</td>
-                            <td className="px-3 py-2 truncate max-w-xs" style={{ color: isDup ? 'var(--color-text-muted)' : 'var(--color-text-primary)', textDecoration: isDup ? 'line-through' : 'none' }}>{row.name}</td>
-                            <td
-                              className="px-3 py-2 text-right tabular-nums font-semibold whitespace-nowrap"
-                              style={{ color: isDup ? 'var(--color-text-muted)' : row.amount >= 0 ? 'var(--color-green)' : 'var(--color-text-primary)' }}
-                            >
-                              {row.amount >= 0 ? '+' : ''}${Math.abs(row.amount).toFixed(2)}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  {rows.length > 150 && (
-                    <p className="text-center py-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                      +{rows.length - 150} more transactions
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Account selector */}
-              {ranking && (
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                    Import into account
-                  </label>
-                  <SelectMenu
-                    value={selectedId ?? ''}
-                    onChange={handleSelectChange}
-                    ariaLabel="Import into account"
-                    options={[
-                      ...ranking.ranked.map((r) => ({
-                        value: r.account.id,
-                        label: `${r.account.bankName} — ${r.account.accountName}`,
-                        note: r.tier === 'none' ? 'no match' : TIER_LABELS[r.tier],
-                        noteColor: TIER_COLORS[r.tier],
-                      })),
-                      { value: 'create', label: '＋ Create new account…', accent: true },
-                    ]}
-                  />
-
-                  {/* Existing-account confidence label */}
-                  {selectedId && selectedId !== 'create' && (
-                    <div className="flex items-center gap-2 text-xs">
-                      {tierLabel && (
-                        <span
-                          className="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wide"
-                          style={{ background: `color-mix(in srgb, ${tierColor} 15%, transparent)`, color: tierColor, border: `1px solid color-mix(in srgb, ${tierColor} 30%, transparent)` }}
-                        >
-                          {tierLabel}
-                        </span>
-                      )}
-                      <span style={{ color: tierColor }}>{confidenceText}</span>
-                    </div>
-                  )}
-
-                  {/* Create-account notice — make it clear a brand-new account is being made */}
-                  {selectedId === 'create' && (
-                    <div
-                      className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl text-xs"
-                      style={{ background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 28%, transparent)' }}
-                    >
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
-                        strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5" style={{ color: 'var(--color-primary)' }}>
-                        <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
-                      </svg>
-                      <span style={{ color: 'var(--color-text-secondary)' }}>
-                        No matching account found. A <strong style={{ color: 'var(--color-primary)' }}>new account</strong>
-                        {newAcc.accountName.trim() ? <> — <strong style={{ color: 'var(--color-text-primary)' }}>“{newAcc.accountName.trim()}”</strong></> : null}
-                        {' '}will be created and these {rows.length} transaction{rows.length !== 1 ? 's' : ''} imported into it. Review the details below.
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Inline create-account form */}
-                  {selectedId === 'create' && (
-                    <div
-                      className="flex flex-col gap-3 mt-1 p-4 rounded-xl"
-                      style={{ background: 'color-mix(in srgb, var(--color-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 18%, transparent)' }}
-                    >
-                      <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--color-primary)' }}>
-                        New account details
-                      </p>
-
-                      {/* Bank name */}
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                          Bank name <span style={{ color: 'var(--color-card-orange)' }}>*</span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Chase"
-                          value={newAcc.bankName}
-                          onChange={(e) => setNewAcc((f) => ({ ...f, bankName: e.target.value }))}
-                          className="w-full px-3 py-2 text-sm rounded-xl outline-none"
-                          style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
-                        />
-                      </div>
-
-                      {/* Account name */}
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
-                          Account name <span style={{ color: 'var(--color-card-orange)' }}>*</span>
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Checking ••1234"
-                          value={newAcc.accountName}
-                          onChange={(e) => setNewAcc((f) => ({ ...f, accountName: e.target.value }))}
-                          className="w-full px-3 py-2 text-sm rounded-xl outline-none"
-                          style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
-                        />
-                      </div>
-
-                      {/* Account type + last 4 */}
-                      <div className="flex gap-2">
-                        <div className="flex flex-col gap-1 flex-1">
-                          <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</label>
-                          <SelectMenu
-                            value={newAcc.accountType}
-                            onChange={(v) => setNewAcc((f) => ({ ...f, accountType: v }))}
-                            ariaLabel="Account type"
-                            options={[
-                              { value: 'checking',   label: 'Checking' },
-                              { value: 'savings',    label: 'Savings' },
-                              { value: 'credit',     label: 'Credit' },
-                              { value: 'investment', label: 'Investment' },
-                            ]}
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1" style={{ width: '90px' }}>
-                          <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Last 4</label>
-                          <input
-                            type="text"
-                            placeholder="1234"
-                            maxLength={4}
-                            value={newAcc.last4}
-                            onChange={(e) => setNewAcc((f) => ({ ...f, last4: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
-                            className="w-full px-3 py-2 text-sm rounded-xl outline-none tabular-nums"
-                            style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Color swatches */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</label>
-                        <div className="flex items-center gap-2">
-                          {ACC_COLORS.map((c) => (
-                            <button
-                              key={c}
-                              type="button"
-                              onClick={() => setNewAcc((f) => ({ ...f, color: c }))}
-                              className="w-5 h-5 rounded-full transition-transform hover:scale-110 shrink-0"
-                              style={{ background: c, outline: newAcc.color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
+              ))}
+            </div>
           )}
 
-          {/* Success */}
-          {result && (
-            <div className="py-8 flex flex-col items-center gap-3 text-center">
+          {/* File list */}
+          {entries.length > 0 && !outcomes && (
+            <div className="flex flex-col gap-2">
+              {entries.map((entry) => (
+                <FileCard
+                  key={entry.id}
+                  entry={entry}
+                  draft={isCreateKey(entry.target) ? drafts[entry.target] : undefined}
+                  disabled={importing}
+                  onRemove={() => removeFile(entry.id)}
+                  onTargetChange={(v) => handleTargetChange(entry, v)}
+                  onTogglePreview={() => patchEntry(entry.id, (e) => ({ showPreview: !e.showPreview }))}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* New-account forms — one per distinct new account, shared by the files that feed it */}
+          {!outcomes && createKeysInUse.map((key) => {
+            const d = drafts[key];
+            if (!d) return null;
+            const feeders = valid.filter((e) => e.target === key);
+            const update = (patch: Partial<NewAccountDraft>) => setDrafts((prev) => ({ ...prev, [key]: { ...prev[key], ...patch } }));
+            return (
               <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-                style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 30%, transparent)' }}
+                key={key}
+                className="flex flex-col gap-3 p-4 rounded-xl"
+                style={{ background: 'color-mix(in srgb, var(--color-primary) 5%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 18%, transparent)' }}
               >
-                🎉
+                <div className="flex items-start gap-2.5">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"
+                    strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5" style={{ color: 'var(--color-primary)' }}>
+                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                  <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+                    No matching account found. A <strong style={{ color: 'var(--color-primary)' }}>new account</strong>
+                    {d.accountName.trim() ? <> — <strong style={{ color: 'var(--color-text-primary)' }}>“{d.accountName.trim()}”</strong></> : null}
+                    {' '}will be created for {feeders.length === 1 ? <strong>{feeders[0].name}</strong> : <>{feeders.length} files: <strong>{feeders.map((f) => f.name).join(', ')}</strong></>}.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                      Bank name <span style={{ color: 'var(--color-card-orange)' }}>*</span>
+                    </label>
+                    <input
+                      type="text" placeholder="e.g. Chase" value={d.bankName} disabled={importing}
+                      onChange={(e) => update({ bankName: e.target.value })}
+                      className="w-full px-3 py-2 text-sm rounded-xl outline-none"
+                      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                      Account name <span style={{ color: 'var(--color-card-orange)' }}>*</span>
+                    </label>
+                    <input
+                      type="text" placeholder="e.g. Checking ••1234" value={d.accountName} disabled={importing}
+                      onChange={(e) => update({ accountName: e.target.value })}
+                      className="w-full px-3 py-2 text-sm rounded-xl outline-none"
+                      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-3 items-end">
+                  <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
+                    <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</label>
+                    <SelectMenu
+                      value={d.accountType}
+                      onChange={(v) => update({ accountType: v as NewAccountDraft['accountType'] })}
+                      ariaLabel="Account type"
+                      options={[
+                        { value: 'checking',   label: 'Checking' },
+                        { value: 'savings',    label: 'Savings' },
+                        { value: 'credit',     label: 'Credit' },
+                        { value: 'investment', label: 'Investment' },
+                      ]}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1" style={{ width: '90px' }}>
+                    <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Last 4</label>
+                    <input
+                      type="text" placeholder="1234" maxLength={4} value={d.last4} disabled={importing}
+                      onChange={(e) => update({ last4: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                      className="w-full px-3 py-2 text-sm rounded-xl outline-none tabular-nums"
+                      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</label>
+                    <div className="flex items-center gap-2 h-[38px]">
+                      {ACC_COLORS.map((c) => (
+                        <button
+                          key={c} type="button" disabled={importing}
+                          onClick={() => update({ color: c })}
+                          className="w-5 h-5 rounded-full transition-transform hover:scale-110 shrink-0"
+                          style={{ background: c, outline: d.color === c ? `2px solid ${c}` : 'none', outlineOffset: '2px' }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <p className="font-bold text-lg" style={{ color: 'var(--color-green)' }}>{result.imported} transactions imported</p>
-                {result.skipped > 0 && (
-                  <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>{result.skipped} duplicates skipped</p>
-                )}
+            );
+          })}
+
+          {/* Results */}
+          {outcomes && summary && (
+            <div className="flex flex-col gap-4">
+              <div className="py-4 flex flex-col items-center gap-3 text-center">
+                <div
+                  className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
+                  style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 30%, transparent)' }}
+                >
+                  {summary.imported > 0 ? '🎉' : '✓'}
+                </div>
+                <div>
+                  <p className="font-bold text-lg" style={{ color: 'var(--color-green)' }}>
+                    {summary.imported} transaction{summary.imported !== 1 ? 's' : ''} imported
+                  </p>
+                  <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                    {summary.files} of {outcomes.length} file{outcomes.length !== 1 ? 's' : ''}
+                    {summary.accounts.length > 0 && <> · {summary.accounts.length} account{summary.accounts.length !== 1 ? 's' : ''}</>}
+                    {summary.skipped > 0 && <> · {summary.skipped} duplicate{summary.skipped !== 1 ? 's' : ''} skipped</>}
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+                {outcomes.map((o, i) => (
+                  <div key={i} className="flex items-center gap-3 px-3 py-2.5 text-xs"
+                    style={{ borderTop: i ? '1px solid var(--color-border)' : 'none' }}>
+                    <span className="shrink-0" style={{ color: o.error ? 'var(--color-rose)' : 'var(--color-green)' }}>{o.error ? '✕' : '✓'}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{o.fileName}</p>
+                      <p className="truncate" style={{ color: o.error ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
+                        {o.error ?? `${o.account.bankName} — ${o.account.accountName}`}
+                      </p>
+                    </div>
+                    {!o.error && (
+                      <div className="shrink-0 text-right tabular-nums">
+                        <p className="font-semibold" style={{ color: 'var(--color-green)' }}>{o.imported} new</p>
+                        {o.skipped > 0 && <p style={{ color: 'var(--color-text-muted)' }}>{o.skipped} skipped</p>}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -558,25 +574,29 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
 
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-          <span />
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            {!outcomes && valid.length > 1 && targetCount > 0 && (
+              <>{valid.length} files → {targetCount} account{targetCount !== 1 ? 's' : ''}</>
+            )}
+          </span>
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
+              disabled={importing}
+              className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors disabled:opacity-40"
               style={{ color: 'var(--color-text-secondary)' }}
             >
-              {result ? 'Close' : 'Cancel'}
+              {outcomes ? 'Close' : 'Cancel'}
             </button>
-            {rows.length > 0 && !result && (() => {
-              const nothingNew = dupCheck && dupCheck.newCount === 0 && selectedId !== 'create';
+            {valid.length > 0 && !outcomes && (() => {
               if (nothingNew) {
-                // Already imported — but let the user refresh the balance from the
-                // file's ending balance (server applies it even with 0 new rows).
-                if (csvBalance !== undefined) return (
+                // Already imported — but let the user refresh balances from the
+                // files' ending balances (server applies them even with 0 new rows).
+                if (anyBalance) return (
                   <button onClick={handleImport} disabled={importing}
                     className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50 transition-all"
                     style={{ background: 'var(--color-primary)' }}>
-                    {importing ? 'Updating…' : `Update balance to $${csvBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                    {importing ? 'Updating…' : targetCount > 1 ? 'Update balances' : 'Update balance'}
                   </button>
                 );
                 return (
@@ -588,6 +608,12 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
                   </span>
                 );
               }
+              const label = importing ? 'Importing…'
+                : anyChecking ? 'Checking…'
+                : !draftsReady ? 'Fill in account details'
+                : createKeysInUse.length > 0
+                  ? `Create ${createKeysInUse.length} account${createKeysInUse.length !== 1 ? 's' : ''} & import ${newCount} transaction${newCount !== 1 ? 's' : ''}`
+                  : `Import ${newCount} transaction${newCount !== 1 ? 's' : ''}`;
               return (
                 <button
                   onClick={handleImport}
@@ -595,18 +621,155 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
                   className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50 transition-all"
                   style={{ background: 'var(--color-primary)' }}
                 >
-                  {importing ? 'Importing…'
-                    : dupChecking ? 'Checking…'
-                    : selectedId === 'create' && !createReady ? 'Fill in account details'
-                    : selectedId === 'create' ? `Create & import ${rows.length} transaction${rows.length !== 1 ? 's' : ''}`
-                    : dupCheck ? `Import ${dupCheck.newCount} transaction${dupCheck.newCount !== 1 ? 's' : ''}`
-                    : `Import ${rows.length} transactions`}
+                  {label}
                 </button>
               );
             })()}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── One file in the batch ─────────────────────────────────────────── */
+function FileCard({
+  entry, draft, disabled, onRemove, onTargetChange, onTogglePreview,
+}: {
+  entry: FileEntry;
+  draft?: NewAccountDraft;
+  disabled: boolean;
+  onRemove: () => void;
+  onTargetChange: (value: string) => void;
+  onTogglePreview: () => void;
+}) {
+  const creating = isCreateKey(entry.target);
+  const ranked = !creating && entry.ranking ? entry.ranking.ranked.find((r) => r.account.id === entry.target) ?? null : null;
+  const tier: MatchTier = ranked?.tier ?? 'none';
+  const tierColor = TIER_COLORS[tier];
+  const newCount = entry.dupCheck ? entry.dupCheck.newCount : entry.rows.length;
+
+  return (
+    <div className="rounded-xl p-3 flex flex-col gap-2.5"
+      style={{
+        background: 'var(--color-elevated)',
+        border: `1px solid ${entry.error ? 'color-mix(in srgb, var(--color-rose) 30%, transparent)' : 'var(--color-border)'}`,
+      }}>
+      {/* Title row */}
+      <div className="flex items-center gap-2.5 min-w-0">
+        <span className="text-base shrink-0">{entry.error ? '⚠️' : '📄'}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{entry.name}</p>
+          <p className="text-[11px] truncate" style={{ color: entry.error ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
+            {entry.error ?? <>
+              {entry.rows.length.toLocaleString()} transaction{entry.rows.length !== 1 ? 's' : ''} · {detectedLabel(entry.fingerprint)}
+              {entry.last4 && <> ••{entry.last4}</>}
+            </>}
+          </p>
+        </div>
+        {!entry.error && (
+          <button type="button" onClick={onTogglePreview} disabled={disabled}
+            className="text-[11px] font-semibold px-2 py-1 rounded-lg shrink-0 hover:bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] transition-colors"
+            style={{ color: 'var(--color-text-muted)' }}>
+            {entry.showPreview ? 'Hide' : 'Preview'}
+          </button>
+        )}
+        <button type="button" onClick={onRemove} disabled={disabled} aria-label={`Remove ${entry.name}`}
+          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 hover:bg-[color-mix(in_srgb,var(--color-rose)_12%,transparent)] transition-colors disabled:opacity-40"
+          style={{ color: 'var(--color-text-muted)' }}>
+          ✕
+        </button>
+      </div>
+
+      {/* Target account */}
+      {!entry.error && entry.ranking && (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex-1 min-w-[220px]">
+              <SelectMenu
+                value={creating ? 'create' : (entry.target ?? '')}
+                onChange={onTargetChange}
+                ariaLabel={`Import ${entry.name} into account`}
+                options={[
+                  ...entry.ranking.ranked.map((r) => ({
+                    value: r.account.id,
+                    label: `${r.account.bankName} — ${r.account.accountName}`,
+                    note: r.tier === 'none' ? 'no match' : TIER_LABELS[r.tier],
+                    noteColor: TIER_COLORS[r.tier],
+                  })),
+                  { value: 'create', label: draft ? `＋ New: ${draft.accountName || 'account'}` : '＋ Create new account…', accent: true },
+                ]}
+              />
+            </div>
+            <span className="text-[11px] tabular-nums shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+              {creating ? <span style={{ color: 'var(--color-primary)' }}>{entry.rows.length} new</span>
+                : entry.dupChecking ? 'Checking…'
+                : entry.dupCheck ? <>
+                    <span style={{ color: 'var(--color-green)' }}>{newCount} new</span>
+                    {entry.dupCheck.duplicateCount > 0 && <span style={{ color: 'var(--color-amber)' }}> · {entry.dupCheck.duplicateCount} already imported</span>}
+                  </>
+                : null}
+            </span>
+          </div>
+          {entry.dupCheck && entry.dupCheck.elsewhereCount > 0 && (
+            <p className="text-[11px]" style={{ color: 'var(--color-amber)' }}>
+              {entry.dupCheck.elsewhereCount} of the skipped rows {entry.dupCheck.elsewhereCount === 1 ? 'lives' : 'live'} in {formatElsewhere(entry.dupCheck.elsewhereAccounts)}, not in this account.
+            </p>
+          )}
+          {ranked && (
+            <div className="flex items-center gap-2 text-[11px]">
+              <span
+                className="px-1.5 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wide"
+                style={{ background: `color-mix(in srgb, ${tierColor} 15%, transparent)`, color: tierColor, border: `1px solid color-mix(in srgb, ${tierColor} 30%, transparent)` }}
+              >
+                {TIER_LABELS[tier]}
+              </span>
+              <span style={{ color: tierColor }}>{ranked.reason}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Preview table */}
+      {!entry.error && entry.showPreview && (
+        <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+          <div className="max-h-44 overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead className="sticky top-0">
+                <tr style={{ background: 'var(--color-elevated)', borderBottom: '1px solid var(--color-border)' }}>
+                  <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Date</th>
+                  <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Description</th>
+                  <th className="text-right px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entry.rows.slice(0, 150).map((row, i) => {
+                  const extId = row.referenceNumber ? `csv_${row.referenceNumber}` : null;
+                  const compositeKey = `csv_${row.date}|${row.name}|${row.amount.toFixed(2)}`;
+                  const isDup = entry.dupCheck
+                    ? (extId ? entry.dupCheck.duplicateIds.has(extId) : false) || entry.dupCheck.duplicateIds.has(compositeKey)
+                    : false;
+                  return (
+                    <tr key={i} style={{ borderTop: '1px solid var(--color-border)', opacity: isDup ? 0.35 : 1 }}>
+                      <td className="px-3 py-1.5 tabular-nums whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>{row.date}</td>
+                      <td className="px-3 py-1.5 truncate max-w-xs" style={{ color: isDup ? 'var(--color-text-muted)' : 'var(--color-text-primary)', textDecoration: isDup ? 'line-through' : 'none' }}>{row.name}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums font-semibold whitespace-nowrap"
+                        style={{ color: isDup ? 'var(--color-text-muted)' : row.amount >= 0 ? 'var(--color-green)' : 'var(--color-text-primary)' }}>
+                        {row.amount >= 0 ? '+' : ''}${Math.abs(row.amount).toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {entry.rows.length > 150 && (
+              <p className="text-center py-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
+                +{entry.rows.length - 150} more transactions
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

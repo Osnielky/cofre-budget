@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { isLiability } from '@/lib/accountTypes';
 import { parseCsv, detectCsvFingerprint, bankNamesMatch, extractFileLast4 } from '@/lib/csvImport';
 import type { CsvRow } from '@/lib/csvImport';
+import { isAcceptedImportFile, mergeFileRows, pickFinalBalance, dateRangeOf } from '@/lib/import/multiFile';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -25,13 +26,15 @@ interface Props {
 
 interface Warning { level: 'warn' | 'error'; message: string; }
 
-const glass: React.CSSProperties = {
-  background: 'var(--color-surface)',
-  backdropFilter: 'var(--glass-blur)',
-  WebkitBackdropFilter: 'var(--glass-blur)',
-  border: 'var(--glass-border)',
-  boxShadow: 'var(--glass-shadow)',
-};
+/* One dropped file, already parsed and validated against the account. */
+interface FileEntry {
+  id: string;
+  name: string;
+  rows: CsvRow[];
+  finalBalance?: number;
+  warnings: Warning[];
+  error?: string;
+}
 
 const ACC_ICONS: Record<string, string> = {
   checking: '💳', savings: '🏦', cash: '💵', credit: '💳', investment: '📈', debit: '💳',
@@ -39,62 +42,92 @@ const ACC_ICONS: Record<string, string> = {
   other_asset: '📦', other_liability: '📉', loan: '🤝',
 };
 
-interface DupCheck { newCount: number; duplicateCount: number; duplicateIds: Set<string> }
+interface DupCheck {
+  newCount: number; duplicateCount: number; duplicateIds: Set<string>;
+  /* Duplicates that live in another account (or one that was deleted). */
+  elsewhereCount: number; elsewhereAccounts: string[];
+}
+
+function readFileText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve((ev.target?.result as string) ?? '');
+    reader.onerror = () => reject(new Error('Could not read the file.'));
+    reader.readAsText(file);
+  });
+}
+
+let nextId = 0;
 
 export default function CsvImportModal({ account, onClose, onImported }: Props) {
-  const [rows, setRows]         = useState<CsvRow[]>([]);
-  const [csvBalance, setCsvBalance] = useState<number | undefined>(undefined);
-  const [fileName, setFileName] = useState('');
+  const [files, setFiles]       = useState<FileEntry[]>([]);
   const [error, setError]       = useState('');
-  const [warnings, setWarnings] = useState<Warning[]>([]);
   const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [result, setResult]     = useState<{ imported: number; skipped: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [dupCheck, setDupCheck] = useState<DupCheck | null>(null);
   const [dupChecking, setDupChecking] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  async function checkDups(parsed: CsvRow[]) {
-    setDupChecking(true); setDupCheck(null);
-    try {
-      const res = await fetch(`${API}/transactions/check-duplicates`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ bankAccountId: account.id, rows: parsed }),
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      setDupCheck({ newCount: data.newCount, duplicateCount: data.duplicateCount, duplicateIds: new Set(data.duplicateExternalIds) });
-    } catch {
-      // network/CORS error — silently skip dup check
-    } finally { setDupChecking(false); }
-  }
+  const validFiles = useMemo(() => files.filter((f) => !f.error && f.rows.length > 0), [files]);
+  // All files go into ONE account, so their rows merge into a single import;
+  // rows repeated across overlapping statements are dropped up front.
+  const merged     = useMemo(() => mergeFileRows(validFiles), [validFiles]);
+  const rows       = merged.rows;
+  const csvBalance = useMemo(() => pickFinalBalance(validFiles), [validFiles]);
 
-  function processFile(file: File) {
-    setError(''); setRows([]); setResult(null); setWarnings([]); setDupCheck(null);
-    setFileName(file.name);
-    if (!file.name.toLowerCase().endsWith('.csv') && !file.name.toLowerCase().endsWith('.txt')) {
-      setError('Please select a CSV or TXT file.'); return;
-    }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
+  // Re-check duplicates whenever the set of rows changes.
+  useEffect(() => {
+    if (rows.length === 0) { setDupCheck(null); return; }
+    let cancelled = false;
+    setDupChecking(true); setDupCheck(null);
+    (async () => {
       try {
-        const raw = ev.target?.result as string;
+        const res = await fetch(`${API}/transactions/check-duplicates`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({ bankAccountId: account.id, rows }),
+        });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!cancelled) setDupCheck({
+          newCount: data.newCount, duplicateCount: data.duplicateCount, duplicateIds: new Set(data.duplicateExternalIds),
+          elsewhereCount: data.elsewhereCount ?? 0, elsewhereAccounts: data.elsewhereAccounts ?? [],
+        });
+      } catch {
+        // network/CORS error — silently skip dup check
+      } finally { if (!cancelled) setDupChecking(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [rows, account.id]);
+
+  async function addFiles(list: File[]) {
+    setError(''); setResult(null);
+    const fresh: FileEntry[] = [];
+    for (const file of list) {
+      if (files.some((f) => f.name === file.name) || fresh.some((f) => f.name === file.name)) continue;
+      const base: FileEntry = { id: `f${nextId++}`, name: file.name, rows: [], warnings: [] };
+      if (!isAcceptedImportFile(file.name)) { fresh.push({ ...base, error: 'Not a CSV or TXT file.' }); continue; }
+      try {
+        const raw = await readFileText(file);
         const { rows: parsed, finalBalance } = parseCsv(raw);
         if (parsed.length === 0) throw new Error('No transactions found in this file.');
-        setRows(parsed);
-        setCsvBalance(finalBalance);
-        setWarnings(validate(parsed, account, file.name, raw));
-        checkDups(parsed);
-      } catch (err: any) {
-        setError(err.message ?? 'Could not parse CSV file.');
+        fresh.push({ ...base, rows: parsed, finalBalance, warnings: validate(parsed, account, file.name, raw) });
+      } catch (err: unknown) {
+        fresh.push({ ...base, error: err instanceof Error ? err.message : 'Could not parse CSV file.' });
       }
-    };
-    reader.readAsText(file);
+    }
+    if (fresh.length) setFiles((prev) => [...prev, ...fresh]);
+  }
+
+  function removeFile(id: string) {
+    setFiles((prev) => prev.filter((f) => f.id !== id));
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
+    const list = Array.from(e.target.files ?? []);
+    e.target.value = '';
+    if (list.length) addFiles(list);
   }
 
   function handleDragOver(e: React.DragEvent) {
@@ -105,42 +138,57 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
   }
   function handleDrop(e: React.DragEvent) {
     e.preventDefault(); setDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) processFile(file);
+    const list = Array.from(e.dataTransfer.files ?? []);
+    if (list.length) addFiles(list);
   }
 
   async function handleImport() {
-    setImporting(true); setError('');
+    setImporting(true); setError(''); setProgress(null);
     try {
-      const res = await fetch(`${API}/transactions/import`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ bankAccountId: account.id, rows, finalBalance: csvBalance }),
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setResult(data);
-      const dates = rows.map((r) => r.date).sort();
-      const dateRange = dates.length ? { from: dates[0], to: dates[dates.length - 1] } : null;
-      onImported({ imported: data.imported, skipped: data.skipped, account, dateRange });
-    } catch {
-      setError('Import failed. Please try again.');
+      // Chunked so a stack of statements shows real progress and keeps each
+      // request small. finalBalance rides on the last chunk only.
+      const CHUNK = 200;
+      let imported = 0, skipped = 0;
+      setProgress({ done: 0, total: rows.length });
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const slice = rows.slice(i, i + CHUNK);
+        const isLast = i + CHUNK >= rows.length;
+        const res = await fetch(`${API}/transactions/import`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ bankAccountId: account.id, rows: slice, finalBalance: isLast ? csvBalance : undefined }),
+        });
+        if (!res.ok) throw new Error('Import failed partway through. Re-import to finish — rows already saved are skipped.');
+        const data = await res.json();
+        imported += data.imported ?? 0;
+        skipped += data.skipped ?? 0;
+        setProgress({ done: Math.min(i + CHUNK, rows.length), total: rows.length });
+      }
+      setResult({ imported, skipped });
+      onImported({ imported, skipped, account, dateRange: dateRangeOf(rows) });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Import failed. Please try again.');
     } finally { setImporting(false); }
   }
 
+  // Warnings: a file's own name is prefixed only when several files are loaded.
+  const warnings: Warning[] = validFiles.flatMap((f) =>
+    f.warnings.map((w) => validFiles.length > 1 ? { ...w, message: `${f.name}: ${w.message}` } : w));
   const hasErrors   = warnings.some((w) => w.level === 'error');
   const income      = rows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
-  const expenses    = rows.filter((r) => r.amount < 0).reduce((s, r) => s + r.amount, 0);
   const accIcon     = ACC_ICONS[account.accountType] ?? '🏦';
   const accLabel    = `${account.bankName} — ${account.accountName}`;
+  const newCount    = dupCheck ? dupCheck.newCount : rows.length;
 
-  const newCount = dupCheck ? dupCheck.newCount : rows.length;
+  const dropLabel = dragging ? 'Drop to add'
+    : files.length === 0 ? 'Click to select or drag & drop — several files at once is fine'
+    : 'Add more files';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)' }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      onClick={(e) => { if (e.target === e.currentTarget && !importing) onClose(); }}>
 
       <div className="w-full max-w-xl flex flex-col rounded-2xl overflow-hidden"
         style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '90vh' }}>
@@ -162,8 +210,8 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
               {account.accountType}
             </span>
           </div>
-          <button onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors shrink-0"
+          <button onClick={onClose} disabled={importing}
+            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[var(--color-elevated)] transition-colors shrink-0 disabled:opacity-40"
             style={{ color: 'var(--color-text-muted)' }}>✕</button>
         </div>
 
@@ -172,25 +220,55 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
           {/* Drop zone */}
           {!result && (
             <div onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
-              <input ref={inputRef} type="file" accept=".csv,.txt" onChange={handleFile} className="hidden" />
-              <button onClick={() => inputRef.current?.click()} type="button"
-                className="w-full py-6 rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all"
+              <input ref={inputRef} type="file" accept=".csv,.txt" multiple onChange={handleFile} className="hidden" />
+              <button onClick={() => inputRef.current?.click()} type="button" disabled={importing}
+                className={`w-full rounded-xl border-2 border-dashed flex items-center justify-center gap-3 transition-all ${files.length ? 'py-3' : 'py-6'}`}
                 style={{
                   borderColor: dragging ? account.color : rows.length ? 'color-mix(in srgb, var(--color-green) 35%, transparent)' : 'var(--color-elevated)',
                   background: dragging ? `${account.color}08` : rows.length ? 'color-mix(in srgb, var(--color-green) 5%, transparent)' : 'var(--color-elevated)',
                 }}>
-                <span className="text-xl">{dragging ? '📥' : rows.length ? '✅' : '📂'}</span>
+                <span className="text-xl">{dragging ? '📥' : files.length ? '➕' : '📂'}</span>
                 <div className="text-left">
                   <p className="text-sm font-semibold" style={{ color: rows.length ? 'var(--color-green)' : 'var(--color-text-secondary)' }}>
-                    {dragging ? 'Drop to import' : rows.length ? `${rows.length} transactions — ${fileName}` : 'Click to select or drag & drop'}
+                    {dropLabel}
                   </p>
-                  {!rows.length && !dragging && (
+                  {!files.length && !dragging && (
                     <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                       Supports Chase, Bank of America, Wells Fargo & most banks
                     </p>
                   )}
                 </div>
               </button>
+            </div>
+          )}
+
+          {/* File list */}
+          {files.length > 0 && !result && (
+            <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+              {files.map((f, i) => (
+                <div key={f.id} className="flex items-center gap-2.5 px-3 py-2 text-xs"
+                  style={{ borderTop: i ? '1px solid var(--color-border)' : 'none', background: 'var(--color-elevated)' }}>
+                  <span className="shrink-0">{f.error ? '⚠️' : '📄'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{f.name}</p>
+                    <p className="truncate" style={{ color: f.error ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
+                      {f.error ?? <>
+                        {f.rows.length.toLocaleString()} transaction{f.rows.length !== 1 ? 's' : ''}
+                        {(() => { const r = dateRangeOf(f.rows); return r ? <> · {r.from} → {r.to}</> : null; })()}
+                        {f.finalBalance !== undefined && <> · balance ${f.finalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</>}
+                      </>}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => removeFile(f.id)} disabled={importing} aria-label={`Remove ${f.name}`}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 hover:bg-[color-mix(in_srgb,var(--color-rose)_12%,transparent)] transition-colors disabled:opacity-40"
+                    style={{ color: 'var(--color-text-muted)' }}>✕</button>
+                </div>
+              ))}
+              {merged.repeated > 0 && (
+                <p className="px-3 py-2 text-[11px]" style={{ borderTop: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
+                  {merged.repeated} transaction{merged.repeated !== 1 ? 's' : ''} appeared in more than one file and {merged.repeated !== 1 ? 'were' : 'was'} counted once.
+                </p>
+              )}
             </div>
           )}
 
@@ -233,7 +311,12 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
                   <span style={{ color: 'var(--color-amber)' }}>⟳</span>
                   <span style={{ color: 'var(--color-amber)' }}>
                     <strong>{dupCheck.duplicateCount} already imported</strong> — skipped automatically.
-                    Only <strong>{dupCheck.newCount} new</strong> will be added.
+                    {dupCheck.newCount > 0
+                      ? <> Only <strong>{dupCheck.newCount} new</strong> will be added.</>
+                      : <> Nothing new to add.</>}
+                    {dupCheck.elsewhereCount > 0 && (
+                      <> {dupCheck.elsewhereCount} of them {dupCheck.elsewhereCount === 1 ? 'lives' : 'live'} in {formatElsewhere(dupCheck.elsewhereAccounts)}, not in this account.</>
+                    )}
                   </span>
                 </div>
               )}
@@ -286,9 +369,11 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
                 style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 30%, transparent)' }}>🎉</div>
               <div>
                 <p className="font-bold text-lg" style={{ color: 'var(--color-green)' }}>{result.imported} transactions imported</p>
-                {result.skipped > 0 && (
-                  <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>{result.skipped} duplicates skipped</p>
-                )}
+                <p className="text-sm mt-1" style={{ color: 'var(--color-text-muted)' }}>
+                  {validFiles.length > 1 && <>from {validFiles.length} files</>}
+                  {validFiles.length > 1 && result.skipped > 0 && <> · </>}
+                  {result.skipped > 0 && <>{result.skipped} duplicates skipped</>}
+                </p>
               </div>
             </div>
           )}
@@ -296,22 +381,38 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
           {error && <p className="text-xs px-1" style={{ color: 'var(--color-card-orange)' }}>{error}</p>}
         </div>
 
+        {/* Import progress */}
+        {importing && progress && (
+          <div className="px-5 pt-3">
+            <div className="flex items-center justify-between mb-1.5 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              <span>Importing transactions…</span>
+              <span className="tabular-nums">{progress.done.toLocaleString()} / {progress.total.toLocaleString()}</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-elevated)' }}>
+              <div className="h-full rounded-full transition-all duration-200 ease-out"
+                style={{ width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%`, background: account.color }} />
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex items-center justify-between px-5 py-4"
           style={{ borderTop: '1px solid var(--color-border)' }}>
-          <span />
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            {!result && validFiles.length > 1 && <>{validFiles.length} files merged</>}
+          </span>
           <div className="flex gap-2">
-            <button onClick={onClose}
-              className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors"
+            <button onClick={onClose} disabled={importing}
+              className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-elevated)] transition-colors disabled:opacity-40"
               style={{ color: 'var(--color-text-secondary)' }}>
               {result ? 'Close' : 'Cancel'}
             </button>
             {rows.length > 0 && !result && (() => {
               const nothingNew = dupCheck && dupCheck.newCount === 0;
               if (nothingNew) {
-                // Everything's already imported — but if the file's ending balance
-                // differs from the account's, let the user refresh just the balance
-                // (sends the import; the server applies finalBalance with 0 new rows).
+                // Everything's already imported — but if the newest file's ending
+                // balance differs from the account's, let the user refresh just the
+                // balance (sends the import; the server applies finalBalance with 0 new rows).
                 const canUpdateBalance = csvBalance !== undefined && Number(account.balance ?? 0) !== csvBalance;
                 if (canUpdateBalance) return (
                   <button onClick={handleImport} disabled={importing}
@@ -342,6 +443,13 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
       </div>
     </div>
   );
+}
+
+/* "another account (Chase — Checking)" / "a deleted account" / "2 other places" */
+function formatElsewhere(names: string[]): string {
+  if (names.length === 0) return 'another account';
+  if (names.length === 1) return names[0] === 'a deleted account' ? 'a deleted account' : `another account (${names[0]})`;
+  return `${names.length} other places (${names.join(', ')})`;
 }
 
 /* ── Validation ─────────────────────────────────────────────────── */
@@ -441,9 +549,4 @@ function validate(rows: CsvRow[], account: BankAccount, fileName: string, rawTex
   }
 
   return warnings;
-}
-
-function hexToRgb(hex: string) {
-  const n = parseInt(hex.replace('#', ''), 16);
-  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }

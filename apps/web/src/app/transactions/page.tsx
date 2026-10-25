@@ -10,6 +10,8 @@ import Avatar from '@/components/Avatar';
 import { useUser } from '@/components/UserProvider';
 import CsvImportModal from '@/components/CsvImportModal';
 import ImportReconcileModal from '@/components/ImportReconcileModal';
+import { summarizeImports } from '@/lib/import/multiFile';
+import type { FileImportOutcome, ImportSummary } from '@/lib/import/multiFile';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
@@ -243,7 +245,7 @@ export default function TransactionsPage() {
   const [selectedTx, setSelectedTx]       = useState<Transaction | null>(null);
   const [subscriptions, setSubscriptions] = useState<SubscriptionStore>({});
 
-  const [importToast, setImportToast] = useState<{ imported: number; skipped: number; account: { bankName: string; accountName: string; accountType: string; color: string } } | null>(null);
+  const [importToast, setImportToast] = useState<ImportSummary | null>(null);
   const importToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [ruleToast, setRuleToast] = useState<RuleToast | null>(null);
@@ -298,15 +300,28 @@ export default function TransactionsPage() {
      outside the currently-viewed month — switch to a custom range covering it
      and scope the account filter to what was just imported, so the list isn't
      left showing "No transactions found" right after a successful import. */
-  function jumpToImportedRange(result: { account: { id: string }; dateRange: { from: string; to: string } | null }) {
-    if (!result.dateRange) return;
-    const alreadyVisible = result.dateRange.from >= from && result.dateRange.to <= to;
+  function jumpToImportedRange(summary: ImportSummary) {
+    if (!summary.dateRange) return;
+    const alreadyVisible = summary.dateRange.from >= from && summary.dateRange.to <= to;
     if (!alreadyVisible) {
       setRangeMode('custom');
-      setCustomFrom(result.dateRange.from);
-      setCustomTo(result.dateRange.to);
+      setCustomFrom(summary.dateRange.from);
+      setCustomTo(summary.dateRange.to);
     }
-    setAccountFilter(result.account.id);
+    // One account → focus it; a batch spread over several → show them all.
+    setAccountFilter(summary.accounts.length === 1 ? summary.accounts[0].id : 'all');
+  }
+
+  /* Shared by both import modals. A batch of files arrives as one call. */
+  function handleImported(results: FileImportOutcome[]) {
+    setImportAccount(null);
+    setShowFileImport(false);
+    const summary = summarizeImports(results);
+    jumpToImportedRange(summary);
+    loadTransactions();
+    setImportToast(summary);
+    if (importToastTimer.current) clearTimeout(importToastTimer.current);
+    importToastTimer.current = setTimeout(() => setImportToast(null), 6000);
   }
 
   /* Previous window (for stat deltas + insight card): previous month, or the
@@ -1084,8 +1099,8 @@ export default function TransactionsPage() {
                         >
                           <UploadIcon />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold">Import a file — auto-detect account</p>
-                            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Drop a CSV; we&apos;ll find the right account</p>
+                            <p className="text-sm font-semibold">Import files — auto-detect accounts</p>
+                            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Drop one or many CSVs; we&apos;ll match each to the right account</p>
                           </div>
                         </button>
                         <div className="px-4 pt-3.5 pb-2 flex items-center gap-2"
@@ -2845,18 +2860,22 @@ export default function TransactionsPage() {
               maxWidth: '340px',
               animation: 'slideUp 0.25s ease-out',
             }}>
-            {/* Account icon */}
+            {/* Account icon — one account shows its own icon; a batch shows a generic one */}
             <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
-              style={{ background: `${importToast.account.color || '#9B6DFF'}22` }}>
-              <AccountTypeIcon type={importToast.account.accountType} size={18} />
+              style={{ background: `${importToast.accounts[0]?.color || '#9B6DFF'}22` }}>
+              {importToast.accounts.length === 1
+                ? <AccountTypeIcon type={importToast.accounts[0].accountType} size={18} />
+                : <UploadIcon />}
             </div>
             {/* Content */}
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold" style={{ color: 'var(--color-text-muted)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-                Import complete
+                Import complete{importToast.files > 1 && <> · {importToast.files} files</>}
               </p>
               <p className="text-sm font-semibold mt-0.5 truncate">
-                {importToast.account.bankName} · {importToast.account.accountName}
+                {importToast.accounts.length === 1
+                  ? <>{importToast.accounts[0].bankName} · {importToast.accounts[0].accountName}</>
+                  : <>{importToast.accounts.length} accounts</>}
               </p>
               <div className="flex items-center gap-3 mt-1.5">
                 <span className="flex items-center gap-1 text-xs font-semibold"
@@ -2968,14 +2987,7 @@ export default function TransactionsPage() {
           <CsvImportModal
             account={importAccount}
             onClose={() => setImportAccount(null)}
-            onImported={(result) => {
-              setImportAccount(null);
-              jumpToImportedRange(result);
-              loadTransactions();
-              setImportToast(result);
-              if (importToastTimer.current) clearTimeout(importToastTimer.current);
-              importToastTimer.current = setTimeout(() => setImportToast(null), 6000);
-            }}
+            onImported={(result) => handleImported([{ fileName: '', ...result }])}
           />
         )}
 
@@ -2985,14 +2997,7 @@ export default function TransactionsPage() {
             accounts={accounts}
             onClose={() => setShowFileImport(false)}
             onAccountCreated={(a) => setAccounts((prev) => prev.some((x) => x.id === a.id) ? prev : [...prev, a as BankAccount])}
-            onImported={(result) => {
-              setShowFileImport(false);
-              jumpToImportedRange(result);
-              loadTransactions();
-              setImportToast(result);
-              if (importToastTimer.current) clearTimeout(importToastTimer.current);
-              importToastTimer.current = setTimeout(() => setImportToast(null), 6000);
-            }}
+            onImported={handleImported}
           />
         )}
       </main>
