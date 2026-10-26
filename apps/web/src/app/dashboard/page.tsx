@@ -201,26 +201,27 @@ export default function DashboardPage() {
     : `${NUM_WORDS[budgetsOver] ?? budgetsOver} budget${budgetsOver === 1 ? '' : 's'} need${budgetsOver === 1 ? 's' : ''} attention before the end of ${monthName}.`;
 
   /* Pill CTAs: roomy on desktop, compact on phones so the three controls share a row. */
-  const pill = 'inline-flex items-center justify-center rounded-full text-[11.5px] sm:text-[12.5px] font-semibold uppercase no-underline transition-all px-4 py-2.5 sm:px-[26px] sm:py-3.5 tracking-[0.12em] sm:tracking-[0.18em] whitespace-nowrap';
+  const pill = 'items-center justify-center rounded-full text-[11.5px] sm:text-[12.5px] font-semibold uppercase no-underline transition-all px-4 py-2.5 sm:px-[26px] sm:py-3.5 tracking-[0.12em] sm:tracking-[0.18em] whitespace-nowrap';
 
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
-        <div className="px-4 sm:px-6 md:px-8 py-5 sm:py-6 flex flex-col gap-4">
+        <div className="px-4 sm:px-6 md:px-8 py-4 sm:py-6 flex flex-col gap-3 sm:gap-4">
 
-          {/* ── Topbar ── */}
-          <div className="flex items-end justify-between gap-4 sm:gap-6 flex-wrap">
+          {/* ── Topbar. Phones: smaller greeting, one status sentence, no rule, icon buttons;
+                 the full pills and the two-sentence line return from sm. ── */}
+          <div className="flex items-end justify-between gap-3 sm:gap-6 flex-wrap">
             <div className="min-w-0">
-              <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(30px, 3.6vw, 48px)', lineHeight: 1.08 }}>
+              <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(26px, 3.6vw, 48px)', lineHeight: 1.08 }}>
                 {greeting()}{user?.name ? <>, <span style={{ color: 'var(--color-primary)' }}>{user.name.split(' ')[0]}</span></> : ''}
               </h1>
-              <div className="rounded-full my-3.5 sm:mt-[18px] sm:mb-3.5" style={{ width: 56, height: 3, background: 'var(--color-primary)' }} />
-              <p className="text-[15px] sm:text-[17px]" style={{ fontWeight: 300, color: 'var(--color-text-secondary)', maxWidth: 520, lineHeight: 1.6 }}>
-                {healthLine} {attentionLine}
+              <div className="hidden sm:block rounded-full sm:mt-[18px] sm:mb-3.5" style={{ width: 56, height: 3, background: 'var(--color-primary)' }} />
+              <p className="mt-1.5 sm:mt-0 text-[13px] sm:text-[17px]" style={{ fontWeight: 300, color: 'var(--color-text-secondary)', maxWidth: 520, lineHeight: 1.5 }}>
+                <span className="hidden sm:inline">{healthLine} </span>{attentionLine}
               </p>
             </div>
-            <div className="flex items-center gap-2.5 sm:gap-3.5 pb-1 sm:pb-2 flex-wrap">
+            <div className="flex items-center gap-2 sm:gap-3.5 pb-0 sm:pb-2 flex-wrap">
               {loading && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-green)' }} />}
               <div className="flex items-center gap-0.5 rounded-full px-1.5 py-1" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                 <button onClick={() => !isEarliestMonth && setMonth(prevMonth)} disabled={isEarliestMonth} aria-label="Previous month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: 'var(--color-text-secondary)' }}>‹</button>
@@ -228,12 +229,22 @@ export default function DashboardPage() {
                 <button onClick={() => setMonth(nextMonth)} disabled={isCurrentMonth} aria-label="Next month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-default" style={{ color: 'var(--color-text-secondary)' }}>›</button>
               </div>
               <Link href="/budgets"
-                className={`${pill} hover:brightness-125`}
+                className={`hidden sm:inline-flex ${pill} hover:brightness-125`}
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
                 View Reports
               </Link>
-              <Link href="/transactions" className={`btn-gold ${pill}`}>
+              <Link href="/transactions" className={`hidden sm:inline-flex btn-gold ${pill}`}>
                 Add Transaction
+              </Link>
+              {/* Phone-only icon buttons: same destinations, one row with the month picker. */}
+              <Link href="/budgets" aria-label="View reports" title="View reports"
+                className="sm:hidden w-10 h-10 rounded-full flex items-center justify-center"
+                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
+              </Link>
+              <Link href="/transactions" aria-label="Add transaction" title="Add transaction"
+                className="sm:hidden btn-gold w-10 h-10 rounded-full flex items-center justify-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
               </Link>
             </div>
           </div>
@@ -252,7 +263,7 @@ export default function DashboardPage() {
           {/* ── Stat cards ── */}
           <StatCardsRow cards={statCards} loading={loading} />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5">
             <IncomeExpensesPanel data={d.cashFlow} loading={loading} />
             <CashFlowTrendPanel data={d.trend} loading={loading} />
             <CategoryDonutPanel title="Income Sources" subtitle={periodLabel(incomePeriod)} colSpan={2}

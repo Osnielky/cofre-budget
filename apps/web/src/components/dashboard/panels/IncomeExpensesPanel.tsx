@@ -136,11 +136,12 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
           </ResponsiveContainer>
 
           {/* ── Series totals ── */}
-          <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(178px, 1fr))' }}>
+          {/* Phones: two tiles per row (no chip) instead of five stacked; from sm the chips return and auto-fit decides. */}
+          <div className="grid gap-2 sm:gap-2.5 [--tile-min:120px] sm:[--tile-min:178px]" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(var(--tile-min), 1fr))' }}>
             {tiles.map((t) => (
-              <div key={t.label} className="flex items-center gap-3 rounded-xl py-2.5 px-3 min-w-0"
+              <div key={t.label} className="flex items-center gap-3 rounded-xl py-2 sm:py-2.5 px-3 min-w-0"
                 style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${t.color} 4%, transparent)` }}>
-                <Chip color={t.color} d={t.icon} />
+                <span className="hidden sm:block"><Chip color={t.color} d={t.icon} /></span>
                 <div className="min-w-0">
                   <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-secondary)' }}>{t.label}</p>
                   <p className="text-[14px] font-bold tabular-nums" style={{ color: t.color }}>{money(t.value)}</p>

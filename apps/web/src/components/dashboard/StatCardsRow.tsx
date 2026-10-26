@@ -58,16 +58,20 @@ const ICONS: Record<StatCardDef['icon'], string> = {
   savings: ICON_SAVINGS, budget: ICON_BUDGET,
 };
 
+/* Phones (below sm): the first card is a full-width hero that keeps its sparkline; the
+   other four are compact 2×2 tiles (accent dot, label, value, delta) so all five fit in
+   about one third of the screen. From sm up every card has the full chip + sparkline. */
 export default function StatCardsRow({ cards, loading }: { cards: StatCardDef[]; loading: boolean }) {
   const tc = useThemeColors();
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-5">
-      {cards.map((c) => {
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2.5 sm:gap-5">
+      {cards.map((c, i) => {
+        const hero = i === 0;
         const good = c.delta == null ? true : (c.inverseDelta ? c.delta < 0 : c.delta > 0);
         const deltaTone = good ? tc.green : tc.rose;
         return (
           <div key={c.label}
-            className="card-lift p-3.5 sm:p-5 flex flex-col gap-2 sm:gap-2.5 rounded-2xl min-w-0 cursor-default select-none overflow-hidden"
+            className={`card-lift ${hero ? 'col-span-2 sm:col-span-1 p-4' : 'p-3'} sm:p-5 flex flex-col gap-1.5 sm:gap-2.5 rounded-2xl min-w-0 cursor-default select-none overflow-hidden`}
             style={{
               background: `linear-gradient(140deg, color-mix(in srgb, ${c.accent} 9%, transparent), var(--color-surface) 60%)`,
               backdropFilter: 'var(--glass-blur)',
@@ -76,16 +80,17 @@ export default function StatCardsRow({ cards, loading }: { cards: StatCardDef[];
               boxShadow: 'var(--glass-shadow)',
             }}>
             <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-              <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0"
+              <span className={`${hero ? 'flex' : 'hidden sm:flex'} w-8 h-8 sm:w-9 sm:h-9 rounded-xl items-center justify-center shrink-0`}
                 style={{ background: `color-mix(in srgb, ${c.accent} 18%, transparent)`, color: c.accent }}>
                 <StatIcon d={ICONS[c.icon]} />
               </span>
-              <span className="text-xs font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>
+              {!hero && <span aria-hidden="true" className="sm:hidden w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.accent }} />}
+              <span className="text-[11px] sm:text-xs font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>
                 <span className="sm:hidden">{c.short ?? c.label}</span>
                 <span className="hidden sm:inline">{c.label}</span>
               </span>
             </div>
-            <p className="text-[19px] sm:text-[22px] leading-7 font-bold tabular-nums truncate">
+            <p className={`${hero ? 'text-[26px]' : 'text-[17px]'} sm:text-[22px] leading-7 font-bold tabular-nums truncate`}>
               {loading ? <span className="opacity-30">—</span> : c.value}
             </p>
             <p className="flex items-center gap-1.5 text-[11px] min-w-0">
@@ -96,7 +101,9 @@ export default function StatCardsRow({ cards, loading }: { cards: StatCardDef[];
               )}
               <span className="truncate" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>
             </p>
-            <Sparkline values={loading ? [] : c.spark} color={c.accent} />
+            <div className={hero ? '' : 'hidden sm:block'}>
+              <Sparkline values={loading ? [] : c.spark} color={c.accent} />
+            </div>
           </div>
         );
       })}

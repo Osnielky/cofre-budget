@@ -104,13 +104,14 @@ export default function CashFlowTrendPanel({ data, loading }: { data: TrendPoint
       {empty ? <PanelEmpty message="No activity in this window." /> : (
         <div className="flex flex-col gap-3 flex-1">
           {/* Averages */}
-          <div className="grid gap-2.5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))' }}>
+          {/* Phones: two tiles per row (no chip); from sm the chips return and auto-fit decides. */}
+          <div className="grid gap-2 sm:gap-2.5 [--tile-min:120px] sm:[--tile-min:170px]" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(var(--tile-min), 1fr))' }}>
             {stats.map((s) => {
               const good = s.delta == null ? true : (s.inverse ? s.delta < 0 : s.delta > 0);
               return (
-                <div key={s.label} className="flex items-center gap-3 rounded-xl py-2.5 px-3 min-w-0"
+                <div key={s.label} className="flex items-center gap-3 rounded-xl py-2 sm:py-2.5 px-3 min-w-0"
                   style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${s.color} 4%, transparent)` }}>
-                  <Chip color={s.color} d={s.icon} />
+                  <span className="hidden sm:block"><Chip color={s.color} d={s.icon} /></span>
                   <div className="min-w-0">
                     <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-secondary)' }}>{s.label}</p>
                     <p className="text-[14px] font-bold tabular-nums" style={{ color: s.color }}>{money(+s.cur.toFixed(2))}</p>
