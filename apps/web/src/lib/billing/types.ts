@@ -25,13 +25,13 @@ export interface SubscriptionInfo {
 export const PAID_FEATURES: Record<'pro' | 'elite', { title: string; detail: string; icon: 'base' | 'sync' | 'bank' | 'ai' }[]> = {
   pro: [
     { title: 'Everything in Basic', detail: 'Budgets, goals, projects, debts and receipts', icon: 'base' },
-    { title: 'Automatic bank sync', detail: 'Transactions import on their own with Plaid', icon: 'sync' },
+    { title: 'Automatic bank sync', detail: 'Transactions import on their own with Plaid (US banks)', icon: 'sync' },
     { title: 'Up to 4 linked institutions', detail: 'Connect your main banks and cards', icon: 'bank' },
     { title: 'Ask Cofre AI assistant', detail: '25 messages a day', icon: 'ai' },
   ],
   elite: [
     { title: 'Everything in Pro', detail: 'All Basic and Pro features', icon: 'base' },
-    { title: 'Automatic bank sync', detail: 'Transactions import on their own with Plaid', icon: 'sync' },
+    { title: 'Automatic bank sync', detail: 'Transactions import on their own with Plaid (US banks)', icon: 'sync' },
     { title: 'Unlimited linked institutions', detail: 'Connect every bank, card and loan', icon: 'bank' },
     { title: 'Ask Cofre AI assistant', detail: '50 messages a day', icon: 'ai' },
   ],

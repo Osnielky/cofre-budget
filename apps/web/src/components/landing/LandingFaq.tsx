@@ -12,7 +12,7 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: 'How does bank sync work?',
-    a: 'You connect your bank through Plaid. Plaid sends Cofre your accounts, balances and up to 90 days of transactions; your bank login goes to Plaid, never to us.',
+    a: 'You connect your bank through Plaid. Plaid sends Cofre your accounts, balances and up to 90 days of transactions; your bank login goes to Plaid, never to us. Bank sync covers US banks today. Outside the US, the Free plan still works in full: add accounts by hand or import your bank’s CSV export, and Gmail receipts work anywhere.',
   },
   {
     q: 'Is my data safe?',

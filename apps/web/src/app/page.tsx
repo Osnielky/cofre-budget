@@ -51,7 +51,7 @@ export default function HomePage() {
         <FeatureBlock
           eyebrow="Accounts"
           title="All your accounts, in one place"
-          body="Connect banks, cards, savings and investments through Plaid. Balances refresh on their own, and the accounts you track by hand sit right beside them."
+          body="Connect US banks, cards, savings and investments through Plaid. Balances refresh on their own, and the accounts you track by hand or import from a CSV sit right beside them."
         >
           <AccountsMockup />
           <NetWorthChip className="absolute -top-7 -right-1 sm:right-8 lg:-right-5" />

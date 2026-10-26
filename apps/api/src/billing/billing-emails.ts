@@ -30,13 +30,13 @@ export function billingEmailFor(prev: SubState | null, next: SubState): BillingE
 const PLAN_FEATURES: Record<Tier, string[]> = {
   pro: [
     'Everything in Basic',
-    'Automatic bank sync with Plaid',
+    'Automatic bank sync with Plaid (US banks)',
     'Up to 4 linked institutions',
     'Ask Cofre AI assistant (25 messages a day)',
   ],
   elite: [
     'Everything in Pro',
-    'Automatic bank sync with Plaid',
+    'Automatic bank sync with Plaid (US banks)',
     'Unlimited linked institutions',
     'Ask Cofre AI assistant (50 messages a day)',
   ],

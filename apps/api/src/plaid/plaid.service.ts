@@ -7,10 +7,10 @@ import {
   PlaidApi,
   PlaidEnvironments,
   Products,
-  CountryCode,
   AccountType,
 } from 'plaid';
 import { PlaidItem } from './plaid-item.entity';
+import { parsePlaidCountries } from './plaid-countries';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { User } from '../users/user.entity';
@@ -107,7 +107,7 @@ export class PlaidService {
         ...(this.config.get<string>('PLAID_LIABILITIES_ENABLED') === 'true'
           ? { optional_products: [Products.Liabilities] }
           : {}),
-        country_codes: [CountryCode.Us],
+        country_codes: parsePlaidCountries(this.config.get<string>('PLAID_COUNTRY_CODES')),
         language: 'en',
         ...(webhook ? { webhook } : {}),
         ...(redirectUri ? { redirect_uri: redirectUri } : {}),
@@ -572,7 +572,7 @@ export class PlaidService {
         user_id: plaidUserId,
         client_name: 'Cofre Budget',
         access_token: accessToken,
-        country_codes: [CountryCode.Us],
+        country_codes: parsePlaidCountries(this.config.get<string>('PLAID_COUNTRY_CODES')),
         language: 'en',
         ...extra,
         ...(webhook ? { webhook } : {}),

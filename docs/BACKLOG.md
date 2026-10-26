@@ -151,3 +151,28 @@ spec: [docs/superpowers/specs/2026-10-26-growth-pages-design.md](superpowers/spe
   `series`; draw it (recharts, CVD-safe palette) above the milestones.
 - **Testimonials** — once real quotes exist, add them to the landing spec's
   allowed claims and to the landing page.
+
+## International readiness (2026-10-26)
+
+Visitors are arriving from Germany, France and India as well as the US. What
+limits them today, and what was done:
+
+- **Bank sync is US-only** — Plaid Link is pinned to the US. Now configurable:
+  `PLAID_COUNTRY_CODES` (default `US`, parsed by `plaid/plaid-countries.ts`).
+  To add Canada / UK / EU: enable the country for the client in the Plaid
+  dashboard first, then add it to the env var in `deploy/ci-deploy.sh`. Copy on
+  the landing page, pricing cards, billing tab, settings and compare pages now
+  says "US banks" and points everyone else at manual accounts + CSV import.
+- **Display currency** — medium/large. Accounts store a `currency` (Plaid or
+  `USD`), but about 80 formatting sites in the web app print `$` with `en-US`.
+  Proposed: one `currency` + `locale` preference on the user (Settings →
+  Account), a single `formatMoney(cents)` in `lib/money.ts` that reads them from
+  a provider, and a sweep replacing the inline templates. No conversion between
+  currencies in v1: one display currency per user; a Plaid account in another
+  currency shows its own code beside the amount. Needs its own spec.
+- **Language (Spanish first)** — large; already listed above under i18n.
+- **Dates** — `en-US` month/day order everywhere; falls out of the locale
+  preference above.
+- **Pricing** — Stripe charges in USD and accepts international cards; fine for
+  now. Local prices (EUR, INR) are a Stripe Prices change plus `PLAN_PRICES`
+  per currency, later.

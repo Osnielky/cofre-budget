@@ -580,7 +580,7 @@ function SettingsPageInner() {
             <div className="flex flex-col gap-5 max-w-3xl"><>
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                  Connect your bank for automatic updates or add accounts manually.
+                  Connect a US bank for automatic updates, or add accounts manually and import CSV exports from any bank.
                 </p>
                 <div className="flex gap-2 shrink-0">
                   <button onClick={openPlaidLink} disabled={connecting}
@@ -906,7 +906,7 @@ function SettingsPageInner() {
                   <span className="text-4xl">🏦</span>
                   <p className="font-medium">No accounts yet</p>
                   <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                    Connect your bank for automatic updates or add an account manually.
+                    Connect a US bank for automatic updates, or add an account manually and import a CSV from any bank.
                   </p>
                 </div>
               ) : (

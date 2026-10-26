@@ -76,7 +76,7 @@ const PLANS: PlanDef[] = [
       { icon: 'check', label: 'Debts & loans tracking' },
       { icon: 'check', label: 'Savings goals & net worth' },
       { icon: 'check', label: 'Receipt scanning via Gmail' },
-      { icon: 'minus', label: 'Automatic bank sync with Plaid', unavailable: true },
+      { icon: 'minus', label: 'Automatic bank sync with Plaid (US banks)', unavailable: true },
       { icon: 'minus', label: 'Linked bank institutions', unavailable: true },
       { icon: 'minus', label: 'Ask Cofre AI assistant', unavailable: true },
     ],
@@ -89,7 +89,7 @@ const PLANS: PlanDef[] = [
     accent: 'var(--color-primary)',
     features: [
       { icon: 'bank', label: 'Everything in Free' },
-      { icon: 'link', label: 'Automatic bank sync with Plaid' },
+      { icon: 'link', label: 'Automatic bank sync with Plaid (US banks)' },
       { icon: 'bank', label: 'Up to 4 linked institutions' },
       { icon: 'sparkle', label: 'Ask Cofre AI assistant · 25 messages/day' },
     ],
@@ -102,7 +102,7 @@ const PLANS: PlanDef[] = [
     accent: 'var(--color-card-amber)',
     features: [
       { icon: 'bank', label: 'Everything in Pro' },
-      { icon: 'link', label: 'Automatic bank sync with Plaid' },
+      { icon: 'link', label: 'Automatic bank sync with Plaid (US banks)' },
       { icon: 'infinity', label: 'Unlimited linked institutions' },
       { icon: 'sparkle', label: 'Ask Cofre AI assistant · 50 messages/day' },
     ],

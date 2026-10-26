@@ -40,7 +40,7 @@ export const COFRE_FACTS = {
   freePlan: 'Free forever: manual accounts, CSV import, budgets, recurring charges, debts, projects, net worth',
   trialDays: TRIAL_DAYS,
   platforms: 'Web (works on any phone or desktop browser)',
-  bankSync: 'Pro and Elite, through Plaid',
+  bankSync: 'Pro and Elite, through Plaid (US banks); CSV import everywhere on Free',
   aiAssistant: 'Ask Cofre (Pro and Elite): answers from your real numbers, proposes changes you confirm',
   netWorth: 'Yes, with milestones on the road to $1M',
 };
