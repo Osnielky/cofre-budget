@@ -87,7 +87,8 @@ export interface ProspectVisit {
 export interface AdminTraffic extends TrafficSegment {
   generatedAt: string;
   split: { anonymous: number; signedIn: number; demo: number };
-  funnel: { landingVisitors: number; demoStarts: number; signups: number };
+  /** 30-day counts, except `paying`, which is everyone active or past_due today. */
+  funnel: { landingVisitors: number; demoStarts: number; signups: number; trialStarts: number; paying: number };
   segments: { prospects: TrafficSegment; customers: TrafficSegment };
   prospects: { profile: ProspectProfile; recent: ProspectVisit[] };
   retentionDays: number;

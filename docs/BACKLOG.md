@@ -127,3 +127,27 @@ Quick wins (privacy, export) → savings goals + reports (reuse existing pattern
 - Returning-visitor tracking (first-party visitor id in localStorage) to see new vs returning prospects and which pre-signup visits became customers — needs a consent notice for EU visitors and a privacy-policy change; offered and parked.
 - Time on site is first-to-last view within a day; a leave beacon (`visibilitychange`) would make single-page visits measurable.
 - Refresh the GeoLite2 data on a schedule (geoip-lite ships a snapshot; `npm update geoip-lite` picks up newer data).
+
+## Growth follow-ups (2026-10-26)
+
+Phase 1 of the go-to-market plan shipped: three free calculators under `/tools`,
+compare pages under `/compare/<slug>`, `/mint-alternative`, and trial starts /
+paying customers in the admin funnel. Plan:
+[docs/marketing/2026-10-26-go-to-market-plan.md](marketing/2026-10-26-go-to-market-plan.md),
+spec: [docs/superpowers/specs/2026-10-26-growth-pages-design.md](superpowers/specs/2026-10-26-growth-pages-design.md).
+
+- **Monthly price check** — recurring chore. `competitors.test.ts` fails when
+  `pricesCheckedOn` is 120 days old; re-check the four pricing pages and bump it.
+- **Blog route** — medium. `/blog` on the same domain with MDX or plain TSX posts,
+  OG image per post, sitemap entries; first ten titles are in the plan.
+- **Referral program** — medium. `referrals` table, code on Settings, Stripe
+  coupon at checkout, one free month of Pro for both sides.
+- **Milestone share image** — small/medium. Generated 1200×630 card when a Road
+  to $1M level is reached, with a share button on Goals.
+- **Onboarding drip** — medium. Day 0 / 2 / 7 / 13 emails through `MailService`;
+  needs a scheduler (Cloud Scheduler → admin endpoint).
+- **Trial-end banner** — small. In-app notice three days before `trialEnd`.
+- **Calculator chart** — small. The millionaire calculator returns a yearly
+  `series`; draw it (recharts, CVD-safe palette) above the milestones.
+- **Testimonials** — once real quotes exist, add them to the landing spec's
+  allowed claims and to the landing page.

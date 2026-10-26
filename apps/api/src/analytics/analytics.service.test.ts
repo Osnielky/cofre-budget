@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DataSource } from 'typeorm';
 import { User } from '../users/user.entity';
+import { Subscription } from '../billing/subscription.entity';
 import { PageView } from './page-view.entity';
 import { AnalyticsService } from './analytics.service';
 
@@ -12,7 +13,7 @@ let ds: DataSource;
 let service: AnalyticsService;
 
 beforeEach(async () => {
-  ds = new DataSource({ type: 'better-sqlite3', database: ':memory:', dropSchema: true, entities: [User, PageView], synchronize: true });
+  ds = new DataSource({ type: 'better-sqlite3', database: ':memory:', dropSchema: true, entities: [User, Subscription, PageView], synchronize: true });
   await ds.initialize();
   service = new AnalyticsService(ds, 'test-salt', 'budgetcofre.com');
 });
@@ -94,7 +95,24 @@ describe('AnalyticsService.traffic', () => {
     ]);
     const t = await service.traffic(NOW);
     expect(t.split).toEqual({ anonymous: 2, signedIn: 1, demo: 1 });
-    expect(t.funnel).toEqual({ landingVisitors: 1, demoStarts: 1, signups: 1 });
+    expect(t.funnel).toEqual({ landingVisitors: 1, demoStarts: 1, signups: 1, trialStarts: 0, paying: 0 });
+  });
+
+  it('counts trial starts in the window and everyone currently paying', async () => {
+    const subs = ds.getRepository(Subscription);
+    const sub = (userId: string, status: Subscription['status'], daysAgo: number) =>
+      subs.create({ userId, stripeSubscriptionId: `sub_${userId}`, tier: 'pro', interval: 'month', status, createdAt: new Date(NOW.getTime() - daysAgo * DAY) });
+    await subs.save([
+      sub('u1', 'trialing', 2),     // started this month, still on trial
+      sub('u2', 'active', 10),      // started this month, converted
+      sub('u3', 'canceled', 5),     // started this month, cancelled: still a trial start
+      sub('u4', 'active', 200),     // old customer, still paying
+      sub('u5', 'past_due', 90),    // old customer, card failing: still counts as paying
+      sub('u6', 'canceled', 300),   // gone
+    ]);
+    const t = await service.traffic(NOW);
+    expect(t.funnel.trialStarts).toBe(3);
+    expect(t.funnel.paying).toBe(3);
   });
 });
 

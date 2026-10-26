@@ -33,6 +33,13 @@ describe('sitemapEntries', () => {
     expect(urls).toEqual([
       `${SITE_URL}/`, `${SITE_URL}/pricing`, `${SITE_URL}/signup`,
       `${SITE_URL}/login`, `${SITE_URL}/privacy`, `${SITE_URL}/terms`,
+      `${SITE_URL}/tools`,
+      `${SITE_URL}/tools/millionaire-calculator`,
+      `${SITE_URL}/tools/credit-card-payoff-calculator`,
+      `${SITE_URL}/tools/50-30-20-budget-calculator`,
+      `${SITE_URL}/mint-alternative`,
+      `${SITE_URL}/compare/monarch-money`, `${SITE_URL}/compare/ynab`,
+      `${SITE_URL}/compare/copilot-money`, `${SITE_URL}/compare/rocket-money`,
     ]);
   });
 });

@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import Logo from '@/components/Logo';
 
+// Anchors are absolute so the bar also works from /tools and /compare pages.
 const LINKS = [
-  { href: '#features', label: 'Features' },
-  { href: '#pricing', label: 'Pricing' },
-  { href: '#faq', label: 'FAQ' },
+  { href: '/#features', label: 'Features' },
+  { href: '/#pricing', label: 'Pricing' },
+  { href: '/tools', label: 'Free tools' },
+  { href: '/#faq', label: 'FAQ' },
   { href: '/demo', label: 'Try the demo' },
 ];
 
@@ -20,13 +22,13 @@ export default function LandingNav() {
         </Link>
         <div className="hidden md:flex items-center gap-1 text-sm font-medium">
           {LINKS.map((l) => (
-            <Link key={l.href} href={l.href} className="px-3 py-2 rounded-lg transition-colors hover:text-[var(--color-text-primary)]" style={{ color: 'var(--color-text-secondary)' }}>
+            <Link key={l.href} href={l.href} className="px-2 lg:px-3 py-2 rounded-lg whitespace-nowrap transition-colors hover:text-[var(--color-text-primary)]" style={{ color: 'var(--color-text-secondary)' }}>
               {l.label}
             </Link>
           ))}
         </div>
         <div className="flex items-center gap-1 sm:gap-2 text-sm font-medium">
-          <Link href="/login" className="px-3 py-2 rounded-lg" style={{ color: 'var(--color-text-secondary)' }}>Log in</Link>
+          <Link href="/login" className="px-3 py-2 rounded-lg whitespace-nowrap" style={{ color: 'var(--color-text-secondary)' }}>Log in</Link>
           <Link href="/signup" className="btn-gold px-4 py-2 rounded-full font-semibold whitespace-nowrap">Start free</Link>
         </div>
       </nav>

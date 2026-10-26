@@ -8,8 +8,23 @@ export const HOME_TITLE = 'Cofre — Budgeting on autopilot, with an AI that ans
 export const HOME_DESCRIPTION =
   'Cofre helps you cut wasteful spending and see your path to $1M. Pro adds automatic bank sync and an AI that answers your money questions.';
 
+/** Free calculators (no login). Paths are also the sitemap entries. */
+export const TOOL_PATHS = [
+  '/tools/millionaire-calculator',
+  '/tools/credit-card-payoff-calculator',
+  '/tools/50-30-20-budget-calculator',
+] as const;
+
+/** Competitor comparison pages; slugs match `lib/marketing/competitors.ts`. */
+export const COMPARE_PATHS = [
+  '/compare/monarch-money', '/compare/ynab', '/compare/copilot-money', '/compare/rocket-money',
+] as const;
+
 /** Public pages, in sitemap order. */
-export const INDEXABLE_PATHS = ['/', '/pricing', '/signup', '/login', '/privacy', '/terms'] as const;
+export const INDEXABLE_PATHS = [
+  '/', '/pricing', '/signup', '/login', '/privacy', '/terms',
+  '/tools', ...TOOL_PATHS, '/mint-alternative', ...COMPARE_PATHS,
+] as const;
 
 /** Signed-in areas (app/ route folders) plus the API — kept out of search results. */
 export const PRIVATE_PATH_PREFIXES = [

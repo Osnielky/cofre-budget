@@ -6,13 +6,21 @@
 export const PUBLIC_PATHS: readonly string[] = [
   '/', '/login', '/signup', '/forgot-password', '/reset-password',
   '/privacy', '/terms', '/pricing', '/report-error', '/report-vitals',
-  '/opengraph-image', '/demo',
+  '/opengraph-image', '/demo', '/mint-alternative',
 ];
+
+/** Public sections: the prefix itself and anything under it (`/tools`, `/tools/x`). */
+export const PUBLIC_PATH_PREFIXES: readonly string[] = ['/tools', '/compare'];
 
 export type RouteDecision = 'allow' | 'to-login' | 'to-dashboard';
 
+function isPublic(pathname: string): boolean {
+  if (PUBLIC_PATHS.includes(pathname)) return true;
+  return PUBLIC_PATH_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
 export function routeDecision(pathname: string, signedIn: boolean): RouteDecision {
   if (signedIn && (pathname === '/' || pathname === '/login')) return 'to-dashboard';
-  if (!signedIn && !PUBLIC_PATHS.includes(pathname)) return 'to-login';
+  if (!signedIn && !isPublic(pathname)) return 'to-login';
   return 'allow';
 }

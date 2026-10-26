@@ -40,4 +40,18 @@ describe('routeDecision', () => {
   it('does not treat a prefix of a public path as public', () => {
     expect(routeDecision('/pricing-admin', false)).toBe('to-login');
   });
+
+  // Growth pages (calculators, compare pages) are useful signed in or out, so
+  // neither state redirects.
+  it('keeps the free tools and compare pages public in both states', () => {
+    for (const p of ['/tools', '/tools/millionaire-calculator', '/compare/ynab', '/mint-alternative']) {
+      expect(routeDecision(p, false)).toBe('allow');
+      expect(routeDecision(p, true)).toBe('allow');
+    }
+  });
+
+  it('does not treat a prefix of a public section as public', () => {
+    expect(routeDecision('/toolsy', false)).toBe('to-login');
+    expect(routeDecision('/compared', false)).toBe('to-login');
+  });
 });

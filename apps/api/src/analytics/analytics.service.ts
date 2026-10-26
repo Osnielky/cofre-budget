@@ -111,11 +111,18 @@ export class AnalyticsService implements OnApplicationBootstrap {
 
     const distinctOn = async (path: string) => num((await qb().select('COUNT(DISTINCT v."date" || v."visitorHash")', 'n')
       .andWhere('v."date" >= :from AND v."path" = :path', { from: d30, path }).getRawOne())?.n);
-    const [landingVisitors, demoStarts, signupsRow, profile, recent] = await Promise.all([
+    const windowStart = sqlTimestamp(new Date(now.getTime() - 30 * DAY));
+    const [landingVisitors, demoStarts, signupsRow, trialsRow, payingRow, profile, recent] = await Promise.all([
       distinctOn('/'),
       distinctOn('/demo'),
       this.ds.createQueryBuilder().select('COUNT(*)', 'n').from('users', 'u')
-        .where('u."createdAt" >= :c AND u."isDemo" = :d', { c: sqlTimestamp(new Date(now.getTime() - 30 * DAY)), d: false }).getRawOne(),
+        .where('u."createdAt" >= :c AND u."isDemo" = :d', { c: windowStart, d: false }).getRawOne(),
+      // Every subscription starts as a trial, so rows created in the window are trial starts whatever they became.
+      this.ds.createQueryBuilder().select('COUNT(*)', 'n').from('subscriptions', 's')
+        .where('s."createdAt" >= :c', { c: windowStart }).getRawOne(),
+      // Paying today: active, or past_due (Stripe is still retrying the card). Not windowed.
+      this.ds.createQueryBuilder().select('COUNT(*)', 'n').from('subscriptions', 's')
+        .where('s."status" IN (:...st)', { st: ['active', 'past_due'] }).getRawOne(),
       this.prospectProfile(d30),
       this.recentProspects(d30),
     ]);
@@ -124,7 +131,7 @@ export class AnalyticsService implements OnApplicationBootstrap {
       generatedAt: now.toISOString(),
       ...all,
       split,
-      funnel: { landingVisitors, demoStarts, signups: num(signupsRow?.n) },
+      funnel: { landingVisitors, demoStarts, signups: num(signupsRow?.n), trialStarts: num(trialsRow?.n), paying: num(payingRow?.n) },
       segments: { prospects, customers },
       prospects: { profile, recent },
       retentionDays: RETENTION_DAYS,

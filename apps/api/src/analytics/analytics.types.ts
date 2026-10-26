@@ -61,7 +61,8 @@ export interface AdminTraffic {
   /** 30-day visits by kind of viewer. */
   split: { anonymous: number; signedIn: number; demo: number };
   /** 30 days: distinct visitors on the landing page → distinct visitors who opened /demo → real signups. */
-  funnel: { landingVisitors: number; demoStarts: number; signups: number };
+  /** 30-day counts, except `paying`, which is everyone active or past_due today. */
+  funnel: { landingVisitors: number; demoStarts: number; signups: number; trialStarts: number; paying: number };
   segments: { prospects: TrafficSegment; customers: TrafficSegment };
   prospects: { profile: ProspectProfile; recent: ProspectVisit[] };
   retentionDays: number;

@@ -56,6 +56,7 @@ export default function TrafficPanel({ refreshKey }: { refreshKey: number }) {
       { label: 'Prospects (30 days)', value: s.visitors.d30, sub: `${s.visits.d30} page views` },
       { label: 'Demo starts (30 days)', value: t.funnel.demoStarts, sub: `${t.funnel.landingVisitors} landing visitors` },
       { label: 'Signups (30 days)', value: t.funnel.signups, sub: `vs ${t.funnel.landingVisitors.toLocaleString()} landing visitors` },
+      { label: 'Trial starts (30 days)', value: t.funnel.trialStarts, sub: `from ${t.funnel.signups} signups` },
     ]
     : [
       { label: 'Customers today', value: s.visitors.today, sub: `${s.visits.today} page views` },
@@ -63,6 +64,7 @@ export default function TrafficPanel({ refreshKey }: { refreshKey: number }) {
       { label: 'Customers (30 days)', value: s.visitors.d30, sub: `${s.visits.d30} page views` },
       { label: 'All visitors (30 days)', value: t.visitors.d30, sub: `${t.visits.d30} page views` },
       { label: 'Signups (30 days)', value: t.funnel.signups, sub: 'new real accounts' },
+      { label: 'Paying customers', value: t.funnel.paying, sub: `active or past due · ${t.funnel.trialStarts} trials started this month` },
     ];
   const chart = s.daily.map((d) => ({ ...d, label: day(d.date) }));
   const total30 = t.split.anonymous + t.split.signedIn + t.split.demo;
