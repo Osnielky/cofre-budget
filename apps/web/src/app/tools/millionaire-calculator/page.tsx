@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 
 export default function MillionaireCalculatorPage() {
   return (
-    <MarketingShell eyebrow="Free tool" title="When will you be a millionaire?" lead="Three numbers in, a date out. The ladder below is the same one Cofre tracks for you on the Goals page.">
+    <MarketingShell eyebrow="Free tool" crumbs={[{ name: 'Free tools', path: '/tools' }, { name: 'Millionaire calculator', path: '/tools/millionaire-calculator' }]} title="When will you be a millionaire?" lead="Three numbers in, a date out. The ladder below is the same one Cofre tracks for you on the Goals page.">
       <MillionaireCalculator />
       <Explainer title="How this is calculated">
         <p>Each month your net worth grows by one twelfth of the yearly return, then your contribution is added. That is monthly compounding, the same way an index fund with automatic deposits behaves. The result is before inflation and taxes, so treat it as the optimistic end of the range.</p>

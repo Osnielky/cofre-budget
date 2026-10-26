@@ -42,7 +42,7 @@ export default async function ComparePage({ params }: { params: Promise<{ slug: 
   if (!c) notFound();
   const others = COMPETITORS.filter((o) => o.slug !== c.slug);
   return (
-    <MarketingShell eyebrow="Compare" title={c.headline} lead={c.intro} width="article">
+    <MarketingShell eyebrow="Compare" crumbs={[{ name: 'Mint alternatives', path: '/mint-alternative' }, { name: c.headline, path: `/compare/${c.slug}` }]} title={c.headline} lead={c.intro} width="article">
       <CompareTable competitors={[c]} />
       <Reasons title={`Why people switch from ${c.name} to Cofre`} items={c.switchReasons} />
       <Reasons title={`When ${c.name} is the better fit`} items={c.stayReasons} />

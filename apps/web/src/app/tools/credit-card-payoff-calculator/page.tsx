@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 
 export default function PayoffCalculatorPage() {
   return (
-    <MarketingShell eyebrow="Free tool" title="How long until this card is paid off?" lead="Balance, APR, payment. The months, the interest, and the one number lenders watch: utilization.">
+    <MarketingShell eyebrow="Free tool" crumbs={[{ name: 'Free tools', path: '/tools' }, { name: 'Credit card payoff calculator', path: '/tools/credit-card-payoff-calculator' }]} title="How long until this card is paid off?" lead="Balance, APR, payment. The months, the interest, and the one number lenders watch: utilization.">
       <PayoffCalculator />
       <Explainer title="How this is calculated">
         <p>Every month the card charges interest of balance × APR ÷ 12, then your payment lands. What is left after interest reduces the balance. If the payment is smaller than the interest, the balance grows and the calculator says so instead of inventing a date.</p>

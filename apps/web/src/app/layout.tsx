@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter, Great_Vibes } from 'next/font/google';
 import './globals.css';
 import ThemeProvider from '@/components/ThemeProvider';
@@ -17,8 +17,12 @@ export const metadata: Metadata = {
   description: HOME_DESCRIPTION,
   openGraph: { type: 'website', siteName: SITE_NAME },
   twitter: { card: 'summary_large_image' },
-  // Favicon comes from app/icon.svg (the golden chest, matching the in-app logo).
+  // Favicon comes from app/icon.svg (the golden chest, matching the in-app logo);
+  // the manifest (app/manifest.ts) and its PNG icons cover home-screen installs.
 };
+
+/** Browser chrome colour on phones; matches the Cobalt navy base. */
+export const viewport: Viewport = { themeColor: '#0B1326' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

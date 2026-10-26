@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function MintAlternativePage() {
   return (
-    <MarketingShell eyebrow="Compare" title="Looking for a Mint alternative?" lead="Mint closed in 2024 and the apps that replaced it mostly charge around $100 a year. Here is what each one costs today, and the free option." width="article">
+    <MarketingShell eyebrow="Compare" crumbs={[{ name: 'Mint alternatives', path: '/mint-alternative' }]} title="Looking for a Mint alternative?" lead="Mint closed in 2024 and the apps that replaced it mostly charge around $100 a year. Here is what each one costs today, and the free option." width="article">
       <CompareTable competitors={COMPETITORS} />
       <Explainer title="What Mint users usually miss">
         <ul className="flex flex-col gap-2 list-disc pl-5">

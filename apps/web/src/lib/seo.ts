@@ -4,7 +4,8 @@ import { PLAN_PRICES } from './plans';
 export const SITE_URL = 'https://budgetcofre.com';
 export const SITE_NAME = 'Cofre';
 export const HOME_HEADLINE = 'The calm way to run your money';
-export const HOME_TITLE = 'Cofre — Budgeting on autopilot, with an AI that answers your money questions';
+/** Under 65 characters so Google shows it whole; the longer tagline lives in the description. */
+export const HOME_TITLE = 'Cofre: free budget app with an AI you can ask about your money';
 export const HOME_DESCRIPTION =
   'Cofre helps you cut wasteful spending and see your path to $1M. Pro adds automatic bank sync and an AI that answers your money questions.';
 
@@ -67,6 +68,37 @@ export function softwareAppJsonLd(): Record<string, unknown> {
       offer('Elite (monthly)', PLAN_PRICES.elite.month),
       offer('Elite (yearly)', PLAN_PRICES.elite.year),
     ],
+  };
+}
+
+/** Who publishes the site: feeds Google's brand panel. `sameAs` grows as profiles are created. */
+export function organizationJsonLd(): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: SITE_NAME,
+    legalName: 'Osmio Services',
+    url: SITE_URL,
+    logo: `${SITE_URL}/icon-512.png`,
+    email: 'support@budgetcofre.com',
+    sameAs: ['https://www.youtube.com/@budgetcofre'],
+  };
+}
+
+export interface Crumb { name: string; path?: string }
+
+/** Breadcrumb trail for a public page; the home crumb is added here. Items without a path are plain text. */
+export function breadcrumbJsonLd(crumbs: Crumb[]): Record<string, unknown> {
+  const all: Crumb[] = [{ name: 'Home', path: '/' }, ...crumbs];
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: all.map((c, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: c.name,
+      ...(c.path ? { item: `${SITE_URL}${c.path}` } : {}),
+    })),
   };
 }
 

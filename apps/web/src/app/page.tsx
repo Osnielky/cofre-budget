@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Fraunces } from 'next/font/google';
-import { HOME_TITLE, HOME_DESCRIPTION, SITE_NAME, SITE_URL, softwareAppJsonLd, serializeJsonLd } from '@/lib/seo';
+import { HOME_TITLE, HOME_DESCRIPTION, SITE_NAME, SITE_URL, softwareAppJsonLd, organizationJsonLd, serializeJsonLd } from '@/lib/seo';
 import LandingNav from '@/components/landing/LandingNav';
 import LandingHero from '@/components/landing/LandingHero';
 import LandingPillars from '@/components/landing/LandingPillars';
@@ -116,6 +116,7 @@ export default function HomePage() {
       </main>
       <LandingFooter />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(softwareAppJsonLd()) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(organizationJsonLd()) }} />
     </div>
   );
 }

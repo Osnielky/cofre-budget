@@ -76,7 +76,7 @@ what Ask Cofre sends to Anthropic. Without this, the FAQ answer contradicts the 
 
 - **Metadata** — root `layout.tsx` gets `metadataBase: https://budgetcofre.com`, a
   title template (`%s · Cofre`) and default title/description; the homepage sets its
-  own title ("Cofre — Budgeting on autopilot, with an AI that answers your money
+  own title (since 2026-10-26: "Cofre: free budget app with an AI you can ask about your money", kept under 65 characters; before that "Cofre — Budgeting on autopilot, with an AI that answers your money
   questions") and a ~155-character description; canonical URL; Open Graph + Twitter
   card tags.
 - **`app/robots.ts`** — allow `/`, `/pricing`, `/privacy`, `/terms`, `/signup`,

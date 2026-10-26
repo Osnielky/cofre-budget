@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  SITE_URL, INDEXABLE_PATHS, PRIVATE_PATH_PREFIXES,
-  robotsConfig, sitemapEntries, softwareAppJsonLd, serializeJsonLd,
+  SITE_URL, HOME_TITLE, INDEXABLE_PATHS, PRIVATE_PATH_PREFIXES,
+  robotsConfig, sitemapEntries, softwareAppJsonLd, organizationJsonLd, breadcrumbJsonLd, serializeJsonLd,
 } from './seo';
 import { PLAN_PRICES } from './plans';
 
@@ -52,6 +52,26 @@ describe('softwareAppJsonLd', () => {
       expect.objectContaining({ name: 'Pro (monthly)', price: String(PLAN_PRICES.pro.month) }),
       expect.objectContaining({ name: 'Elite (monthly)', price: String(PLAN_PRICES.elite.month) }),
     ]));
+  });
+});
+
+describe('titles and structured data', () => {
+  it('keeps the homepage title short enough to show whole in results', () => {
+    expect(HOME_TITLE.length).toBeLessThanOrEqual(65);
+  });
+
+  it('names the publisher with an absolute logo URL', () => {
+    const org = organizationJsonLd();
+    expect(org['@type']).toBe('Organization');
+    expect(org.logo).toBe(`${SITE_URL}/icon-512.png`);
+  });
+
+  it('builds a breadcrumb trail from Home, linking only crumbs with a path', () => {
+    const items = breadcrumbJsonLd([{ name: 'Compare' }, { name: 'Cofre vs YNAB', path: '/compare/ynab' }]).itemListElement as Record<string, unknown>[];
+    expect(items.map((i) => i.position)).toEqual([1, 2, 3]);
+    expect(items[0]).toMatchObject({ name: 'Home', item: `${SITE_URL}/` });
+    expect(items[1]).not.toHaveProperty('item');
+    expect(items[2]).toMatchObject({ item: `${SITE_URL}/compare/ynab` });
   });
 });
 

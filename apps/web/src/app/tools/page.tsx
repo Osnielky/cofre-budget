@@ -31,7 +31,7 @@ const TOOLS = [
 
 export default function ToolsPage() {
   return (
-    <MarketingShell eyebrow="Free tools" title="Money calculators, no account needed" lead="Three quick answers. Cofre computes the same numbers from your real accounts every month, if you want to stop typing them in.">
+    <MarketingShell eyebrow="Free tools" crumbs={[{ name: 'Free tools', path: '/tools' }]} title="Money calculators, no account needed" lead="Three quick answers. Cofre computes the same numbers from your real accounts every month, if you want to stop typing them in.">
       <div className="grid gap-4 sm:grid-cols-3">
         {TOOLS.map((t) => (
           <Link key={t.href} href={t.href} className="card-lift rounded-3xl p-6 flex flex-col gap-2 no-underline" style={glassCard}>

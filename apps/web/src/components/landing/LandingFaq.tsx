@@ -1,7 +1,11 @@
+import Link from 'next/link';
 import { glassCard } from './landing-styles';
 import { TRIAL_DAYS } from '@/lib/plans';
 
-const FAQS: { q: string; a: string }[] = [
+const linkStyle = { color: 'var(--color-primary)' };
+
+// Every answer stays inside the spec's "Allowed claims"; links are fine, numbers about others are not.
+const FAQS: { q: string; a: React.ReactNode }[] = [
   {
     q: 'Is Cofre free?',
     a: `Yes — the Free plan is free forever and covers budgets, manual accounts, CSV import, goals and more. Automatic bank sync and Ask Cofre are part of Pro and Elite, which start with a ${TRIAL_DAYS}-day free trial.`,
@@ -21,6 +25,20 @@ const FAQS: { q: string; a: string }[] = [
   {
     q: 'What does the AI see?',
     a: 'Ask Cofre is powered by Anthropic’s Claude. When you ask a question, it reads your transactions, categories, budgets, accounts, debts and net-worth goal to answer. It can suggest changes — like a budget or a category — but nothing changes until you confirm, and it can’t move money or pay bills.',
+  },
+  {
+    q: 'How does Cofre compare to Mint, Monarch or YNAB?',
+    a: (
+      <>
+        Mint closed in 2024 and most of the apps that replaced it have no free plan. We keep a dated, sourced comparison on the{' '}
+        <Link href="/mint-alternative" style={linkStyle}>Mint alternatives</Link> page, with head-to-head pages for{' '}
+        <Link href="/compare/monarch-money" style={linkStyle}>Monarch Money</Link>,{' '}
+        <Link href="/compare/ynab" style={linkStyle}>YNAB</Link>,{' '}
+        <Link href="/compare/copilot-money" style={linkStyle}>Copilot</Link> and{' '}
+        <Link href="/compare/rocket-money" style={linkStyle}>Rocket Money</Link>. If you just want a quick number, the{' '}
+        <Link href="/tools" style={linkStyle}>free calculators</Link> need no account.
+      </>
+    ),
   },
 ];
 

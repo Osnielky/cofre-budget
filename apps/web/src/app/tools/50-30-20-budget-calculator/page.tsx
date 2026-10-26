@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 export default function RuleCalculatorPage() {
   return (
-    <MarketingShell eyebrow="Free tool" title="Your 50/30/20 budget" lead="Half for needs, thirty percent for wants, twenty for savings. Type your take-home pay and, if you know them, what you spend today.">
+    <MarketingShell eyebrow="Free tool" crumbs={[{ name: 'Free tools', path: '/tools' }, { name: '50/30/20 budget calculator', path: '/tools/50-30-20-budget-calculator' }]} title="Your 50/30/20 budget" lead="Half for needs, thirty percent for wants, twenty for savings. Type your take-home pay and, if you know them, what you spend today.">
       <RuleCalculator />
       <Explainer title="What goes where">
         <p><strong style={{ color: 'var(--color-text-primary)' }}>Needs</strong> are the bills that arrive whether you like it or not: housing, groceries, utilities, insurance, minimum debt payments, getting to work. <strong style={{ color: 'var(--color-text-primary)' }}>Wants</strong> are everything you could cut in a bad month: restaurants, streaming, travel, the upgrade. <strong style={{ color: 'var(--color-text-primary)' }}>Savings</strong> is the emergency fund, retirement, investments and any debt payment above the minimum.</p>
