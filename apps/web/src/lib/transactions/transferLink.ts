@@ -94,3 +94,13 @@ export function searchCandidates(src: LinkTx, pool: LinkTx[], query: string): Li
     .filter((c) => !q || c.name.toLowerCase().includes(q))
     .sort((a, b) => dayGap(src.date, a.date) - dayGap(src.date, b.date));
 }
+
+/**
+ * Whether an outgoing transaction reads like cash taken out at an ATM or a
+ * teller. Such a withdrawal never has a bank-side counterpart, so the link
+ * dialog points at the cash tab instead of a search that cannot succeed.
+ */
+export function looksLikeCashWithdrawal(tx: Pick<LinkTx, 'name' | 'amount'>): boolean {
+  if (amountOf(tx) >= 0) return false;
+  return /\b(atm|withdraw(al|l)?|withdrwl|cash out)\b/i.test(tx.name);
+}

@@ -8,7 +8,7 @@ import InfoIcon from './InfoIcon';
 import { accountTypeLabel } from '@/lib/accountTypes';
 import { transferKindOptions, explainTransfer, KIND_LABELS, type TransferKind } from '@/lib/transactions/transferKind';
 import {
-  amountOf, describeMatch, orientSides, searchCandidates, type LinkTx,
+  amountOf, describeMatch, looksLikeCashWithdrawal, orientSides, searchCandidates, type LinkTx,
 } from '@/lib/transactions/transferLink';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -265,10 +265,13 @@ export default function LinkTransferModal({
     }
   }
 
+  /* The cash tab is named for the direction of this transaction: an ATM
+     withdrawal lands in cash, a cash deposit comes out of it. */
+  const cashWithdrawal = looksLikeCashWithdrawal(tx);
   const TABS: { id: Tab; label: string }[] = [
     { id: 'suggested', label: 'Suggested match' },
     { id: 'find', label: 'Find a transaction' },
-    { id: 'cash', label: 'From My Cash' },
+    { id: 'cash', label: srcIsOutgoing ? 'To My Cash' : 'From My Cash' },
   ];
 
   return createPortal(
@@ -358,7 +361,16 @@ export default function LinkTransferModal({
               ) : matches.length === 0 ? (
                 <p className="text-xs py-4 text-center" style={{ color: 'var(--color-text-muted)' }}>
                   No transaction with the same amount and the opposite direction turned up within five days.
-                  Try <button type="button" onClick={() => setTab('find')} className="underline" style={{ color: 'var(--color-violet)' }}>finding it yourself</button>.
+                  {cashWithdrawal ? (
+                    <>
+                      {' '}This looks like cash you took out, so there is no second record to find — link it{' '}
+                      <button type="button" onClick={() => setTab('cash')} className="underline" style={{ color: 'var(--color-violet)' }}>to My Cash</button> instead.
+                    </>
+                  ) : (
+                    <>
+                      {' '}Try <button type="button" onClick={() => setTab('find')} className="underline" style={{ color: 'var(--color-violet)' }}>finding it yourself</button>.
+                    </>
+                  )}
                 </p>
               ) : (
                 <div className="flex flex-col gap-1.5">

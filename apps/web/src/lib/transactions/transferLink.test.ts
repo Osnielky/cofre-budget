@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  isEligibleCounterpart, describeMatch, orientSides, searchCandidates, dayGap, type LinkTx,
+  isEligibleCounterpart, describeMatch, orientSides, searchCandidates, dayGap, looksLikeCashWithdrawal, type LinkTx,
 } from './transferLink';
 
 /* The pair from the reported bug: a +$9.50 deposit into Chase on 2026-03-13. */
@@ -119,5 +119,18 @@ describe('dayGap', () => {
 
   it('is zero for the same date', () => {
     expect(dayGap('2026-03-13', '2026-03-13')).toBe(0);
+  });
+});
+
+describe('looksLikeCashWithdrawal', () => {
+  it('spots an outgoing ATM withdrawal', () => {
+    expect(looksLikeCashWithdrawal(tx({ name: 'BANK OF AMERICA ATM 10/24 #XXXXX0003972 WITHDRWL MIDWAY', amount: -600 }))).toBe(true);
+    expect(looksLikeCashWithdrawal(tx({ name: 'Cash withdrawal', amount: -40 }))).toBe(true);
+  });
+
+  it('ignores deposits and ordinary spending', () => {
+    expect(looksLikeCashWithdrawal(tx({ name: 'ATM CASH DEPOSIT', amount: 200 }))).toBe(false);
+    expect(looksLikeCashWithdrawal(tx({ name: 'SUNPASS', amount: -9.5 }))).toBe(false);
+    expect(looksLikeCashWithdrawal(tx({ name: 'ATMOSPHERE CAFE', amount: -12 }))).toBe(false);
   });
 });
