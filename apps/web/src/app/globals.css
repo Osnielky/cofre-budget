@@ -97,6 +97,15 @@
   --btn-primary-bottom: #1E78E0;
   --btn-primary-glow:   rgba(30, 144, 255, 0.38);
   --btn-primary-text:   #FFFFFF;
+  /* Elite CTA text (.btn-premium) — the base colour reads on the amber gradient
+     in the dark themes; a light theme needs an explicit dark ink. */
+  --btn-premium-text:   var(--color-base);
+
+  /* .card-lift hover shadow — dark themes drop a deep shadow, a light theme a soft one. */
+  --lift-shadow: 0 16px 40px rgba(3, 8, 20, 0.60), 0 0 32px color-mix(in srgb, var(--color-primary) 12%, transparent), inset 0 1px 0 rgba(230, 237, 247, 0.07);
+
+  /* Native controls (selects, date pickers, scrollbars) follow the theme. */
+  color-scheme: dark;
 }
 
 /* ─────────────────────────────────────────────
@@ -178,6 +187,78 @@ html[data-theme="aurora"] {
   --btn-primary-text:   #04150F;
 }
 
+/* ─────────────────────────────────────────────
+   Theme: Daylight — the one light theme. Soft off-white base, white glass
+   cards, blue accent, dark slate text.
+
+   DOCUMENTED EXCEPTION to "chart series are not per theme": the shared
+   green/sky/orange/amber/violet set was tuned for navy and is unreadable on
+   white (amber #FBBF24 measures 1.7:1, green #22C55E 2.0:1 — and both double
+   as text: "owed", "Synced", uncategorized pills). Daylight therefore ships a
+   darker set of the SAME hues, validated with the same method as the dark set
+   (scratch script: WCAG contrast on white + CIE76 ΔE after Machado 2009
+   protan/deutan simulation):
+     green #166534 7.1:1 · sky #0369A1 5.9 · orange #C2410C 4.6 ·
+     amber #B8860B 3.3 · violet #7C3AED 5.7 · rose #B91C1C 6.5
+     worst adjacent identity pair: ΔE 42.8 normal, 19.6 protan, 12.2 deutan
+   The cash-flow tints are deeper here, not lighter (a tint fades on white):
+     green-soft #16A34A 3.3:1, ΔE 32.5 from green · rose-soft #EF4444 3.8:1, ΔE 16.3.
+   Amber stays the weakest (3.3:1): keep amber text ≥ 11px bold, never body copy.
+───────────────────────────────────────────── */
+html[data-theme="daylight"] {
+  color-scheme: light;
+
+  --color-base:     #F3F5FA;
+  --color-surface:  rgba(255, 255, 255, 0.80);
+  --color-elevated: rgba(255, 255, 255, 0.97);
+  --color-border:   rgba(37, 99, 235, 0.14);
+
+  --color-text-primary:   #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted:     #64748B;   /* 4.8:1 on white */
+
+  --color-primary:  #2563EB;
+  --color-indigo:   #4F46E5;
+  --color-green:    #166534;
+  --color-rose:     #B91C1C;
+  --color-amber:    #B8860B;
+  --color-orange:   #C2410C;
+  --color-sky:      #0369A1;
+  --color-violet:   #7C3AED;
+  --color-green-soft: #16A34A;
+  --color-rose-soft:  #EF4444;
+
+  --color-card-amber:  #D97706;
+  --color-card-orange: #C2410C;
+  --color-card-violet: #7C3AED;
+  --color-card-green:  #15803D;
+  --color-card-sky:    #0369A1;
+  --color-card-red:    #B91C1C;
+
+  --nav-active-bg:   rgba(37, 99, 235, 0.10);
+  --nav-active-bar:  linear-gradient(180deg, #2563EB 0%, #4F46E5 100%);
+  --nav-icon-active: #1D4ED8;
+
+  --sidebar-bg: rgba(255, 255, 255, 0.88);
+  --header-bg:  rgba(246, 248, 252, 0.92);
+
+  --glass-border: 1px solid rgba(37, 99, 235, 0.14);
+  --glass-shadow: 0 10px 28px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --popover-bg: #FFFFFF;
+  --lift-shadow: 0 14px 34px rgba(15, 23, 42, 0.12), 0 0 24px color-mix(in srgb, var(--color-primary) 10%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  --bg-gradient:
+    radial-gradient(ellipse 90% 45% at 50% -10%, rgba(37, 99, 235, 0.10) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 90% 100%, rgba(79, 70, 229, 0.06) 0%, transparent 60%),
+    linear-gradient(165deg, #F8FAFD 0%, #EEF2F8 55%, #E9EEF6 100%);
+
+  --btn-primary-top:    #3B82F6;
+  --btn-primary-bottom: #1D4ED8;
+  --btn-primary-glow:   rgba(37, 99, 235, 0.30);
+  --btn-primary-text:   #FFFFFF;
+  --btn-premium-text:   #1F1300;
+}
+
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; border-width: 0; border-style: solid; }
 
@@ -226,7 +307,7 @@ body::before {
 }
 .card-lift:hover {
   transform: translateY(-2px);
-  box-shadow: 0 16px 40px rgba(3, 8, 20, 0.60), 0 0 32px color-mix(in srgb, var(--color-primary) 12%, transparent), inset 0 1px 0 rgba(230, 237, 247, 0.07);
+  box-shadow: var(--lift-shadow);
 }
 @media (prefers-reduced-motion: reduce) {
   .card-lift, .card-lift:hover { transform: none; }
@@ -351,7 +432,7 @@ body::before {
    has to redefine --color-card-amber / --color-base. */
 .btn-premium {
   background: linear-gradient(180deg, color-mix(in srgb, var(--color-card-amber) 70%, white), var(--color-card-amber));
-  color: var(--color-base);
+  color: var(--btn-premium-text);
   box-shadow: 0 6px 22px color-mix(in srgb, var(--color-card-amber) 35%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 .btn-premium:hover {

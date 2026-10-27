@@ -754,8 +754,8 @@ export default function ProjectsPage() {
 
                       const LineTip = ({ active, payload }: any) => active && payload?.length ? (
                         <div className="px-3 py-2 rounded-xl text-xs"
-                          style={{ background: 'rgba(6,12,38,0.97)', border: '1px solid rgba(120,135,170,0.40)', boxShadow: '0 8px 24px rgba(0,0,0,0.6)' }}>
-                          <p className="font-semibold mb-1" style={{ color: '#9AA5BC' }}>{fmtDate(payload[0].payload.date)}</p>
+                          style={{ background: 'var(--popover-bg)', border: '1px solid var(--color-border)', boxShadow: 'var(--glass-shadow)' }}>
+                          <p className="font-semibold mb-1" style={{ color: 'var(--color-text-secondary)' }}>{fmtDate(payload[0].payload.date)}</p>
                           {payload.map((p: any) => (
                             <p key={p.dataKey} className="font-bold" style={{ color: p.color }}>
                               {p.dataKey === 'income' ? '+' : '-'}${Number(p.value).toFixed(2)} {p.dataKey}

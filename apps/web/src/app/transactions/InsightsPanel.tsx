@@ -45,7 +45,7 @@ export function InsightsPanel({
     <>
       {/* Header */}
       <div className="px-4 py-4 border-b shrink-0 flex items-center justify-between gap-2"
-        style={{ borderColor: 'var(--color-border)', background: 'rgba(35,35,47,0.5)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
+        style={{ borderColor: 'var(--color-border)', background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
         <div className="flex items-center gap-2">
           <span aria-hidden="true">✨</span>
           <p className="text-sm font-bold tracking-tight">Financial Intelligence</p>
@@ -464,7 +464,7 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
     <div className="flex flex-col gap-3">
       {/* Header card */}
       <div className="rounded-xl p-3"
-        style={{ background: 'rgba(35,35,47,0.5)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '1px solid var(--color-border)' }}>
+        style={{ background: 'var(--color-surface)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: '1px solid var(--color-border)' }}>
         <p className="text-sm font-semibold truncate">{tx.name}</p>
         <p className="text-2xl font-bold tabular-nums mt-1"
           style={{ color: isIncome ? 'var(--color-green)' : 'var(--color-rose)' }}>
