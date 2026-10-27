@@ -157,7 +157,7 @@ export default function AskCofrePage() {
           )}
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col gap-4 min-h-0">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col gap-3 sm:gap-4 min-h-0">
             {loading ? (
               <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
             ) : messages.length === 0 ? (
@@ -174,15 +174,19 @@ export default function AskCofrePage() {
                 {messages.map((m) => {
                   const streaming = m.id === 'streaming' && sending;
                   return (
+                    /* Phones: no avatars, so replies run the full width and the user's bubble
+                       hugs the right edge; from sm the avatar column returns. */
                     <MessageIn key={m.id} role={m.role}
-                      className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse self-end max-w-[80%]' : 'self-start max-w-[88%]'}`}>
-                      {m.role === 'user' ? <UserAvatar name={user?.name} /> : <AiAvatar busy={streaming} />}
+                      className={`flex gap-2.5 ${m.role === 'user' ? 'flex-row-reverse self-end max-w-[85%] sm:max-w-[80%]' : 'self-start w-full sm:w-auto sm:max-w-[88%]'}`}>
+                      <span className="hidden sm:flex shrink-0">
+                        {m.role === 'user' ? <UserAvatar name={user?.name} /> : <AiAvatar busy={streaming} />}
+                      </span>
                       {m.role === 'user' ? (
-                        <div className="px-4 py-2.5 rounded-2xl text-sm" style={{ background: 'var(--color-primary)', color: 'white' }}>
+                        <div className="px-3.5 sm:px-4 py-2.5 rounded-2xl rounded-br-md sm:rounded-br-2xl text-sm" style={{ background: 'var(--color-primary)', color: 'white' }}>
                           {m.text}
                         </div>
                       ) : (
-                        <div className="text-sm pt-1 min-w-0" style={{ color: 'var(--color-text-primary)' }}>
+                        <div className="text-sm sm:pt-1 min-w-0" style={{ color: 'var(--color-text-primary)' }}>
                           <AnimatePresence mode="wait" initial={false}>
                             {m.text
                               ? <ReplyIn key="reply" className={streaming ? 'chat-streaming' : undefined}><ChatMarkdown text={m.text} /></ReplyIn>
@@ -248,25 +252,30 @@ export default function AskCofrePage() {
               style={{ color: 'var(--color-text-muted)' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4"/></svg>
             </button>
+            {/* The month picker sits in the input row from sm; on phones it moves to the
+                footer line below so the text field keeps its width. */}
             <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month to ask about"
-              className="text-[11px] sm:text-xs bg-transparent outline-none px-1.5 sm:px-2 py-1 rounded-full shrink-0 w-[6.75rem] sm:w-auto"
+              className="hidden sm:block text-xs bg-transparent outline-none px-2 py-1 rounded-full shrink-0"
               style={{ border: '1px solid var(--color-border)' }} title={monthLabel(month)} />
             <SendButton sending={sending} disabled={sending || !input.trim() || outOfMessages} />
           </form>
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[10.5px] px-1">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 sm:gap-x-4 gap-y-1 text-[10.5px] px-1">
+            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month to ask about"
+              className="sm:hidden text-[11px] bg-transparent outline-none px-2 py-1 rounded-full shrink-0"
+              style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }} title={monthLabel(month)} />
             {usage && usage.limit > 0 ? (
-              <span className="font-semibold" role="status"
+              <span className="font-semibold text-right sm:text-left" role="status"
                 style={{ color: outOfMessages ? 'var(--color-rose)' : usage.remaining <= 5 ? 'var(--color-amber)' : 'var(--color-text-secondary)' }}>
                 {outOfMessages
-                  ? `You've used all ${usage.limit} messages for today · resets in ${resetsIn(usage.resetsAt)}`
-                  : `${usage.remaining} of ${usage.limit} messages left today · resets in ${resetsIn(usage.resetsAt)}`}
+                  ? (narrow ? `All ${usage.limit} used · resets in ${resetsIn(usage.resetsAt)}` : `You've used all ${usage.limit} messages for today · resets in ${resetsIn(usage.resetsAt)}`)
+                  : (narrow ? `${usage.remaining} of ${usage.limit} left · resets in ${resetsIn(usage.resetsAt)}` : `${usage.remaining} of ${usage.limit} messages left today · resets in ${resetsIn(usage.resetsAt)}`)}
                 {user?.plan === 'pro' && usage.remaining <= 5 && (
                   <> · <Link href="/settings?tab=billing" className="underline" style={{ color: 'var(--color-primary)' }}>Elite gets 50/day</Link></>
                 )}
               </span>
-            ) : <span />}
+            ) : <span className="hidden sm:inline" />}
             <span className="hidden sm:inline" style={{ color: 'var(--color-text-muted)' }}>Cofre can make mistakes. Changes always need your confirmation first.</span>
-            <span className="sm:hidden" style={{ color: 'var(--color-text-muted)' }}>Cofre can make mistakes.</span>
+            <span className="sm:hidden w-full text-center" style={{ color: 'var(--color-text-muted)' }}>Cofre can make mistakes.</span>
           </div>
         </div>
 
