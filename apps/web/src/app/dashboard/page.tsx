@@ -228,7 +228,7 @@ export default function DashboardPage() {
                 <span className="text-[11.5px] sm:text-[12.5px] font-semibold uppercase px-1 min-w-24 sm:min-w-28 text-center tracking-[0.08em] sm:tracking-[0.12em]">{monthLabel(month)}</span>
                 <button onClick={() => setMonth(nextMonth)} disabled={isCurrentMonth} aria-label="Next month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-default" style={{ color: 'var(--color-text-secondary)' }}>›</button>
               </div>
-              <Link href="/budgets"
+              <Link href="/reports"
                 className={`hidden sm:inline-flex ${pill} hover:brightness-125`}
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
                 View Reports
@@ -237,7 +237,7 @@ export default function DashboardPage() {
                 Add Transaction
               </Link>
               {/* Phone-only icon buttons: same destinations, one row with the month picker. */}
-              <Link href="/budgets" aria-label="View reports" title="View reports"
+              <Link href="/reports" aria-label="View reports" title="View reports"
                 className="sm:hidden w-10 h-10 rounded-full flex items-center justify-center"
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>

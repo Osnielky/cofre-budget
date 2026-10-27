@@ -47,8 +47,10 @@ plus extras: bank accounts, Plaid, CSV import, projects, debts) are not listed.
 - **Export data** — small/medium. Endpoint to dump transactions (+ budgets/debts)
   as CSV/JSON + a download button.
 - **Savings goals** — medium. New module + page; mirrors the Debts/Projects pattern.
-- **Spending reports** — medium. Dedicated reports page (by category, by month,
-  trends). Today only the dashboard chart exists; "View Reports" links to Budgets.
+- ~~**Spending reports**~~ — shipped 2026-10-27 as `/reports` (spec
+  `docs/superpowers/specs/2026-10-27-reports-page-design.md`). Follow-ups: saved
+  report presets, PDF export, scheduled email reports, comparing two arbitrary
+  periods, `?account=` filter.
 - **Weekly safe-to-spend number** — medium. Calc (income − bills − budgeted/spent,
   ÷ weeks left) surfaced on the dashboard. Partly depends on Bills existing.
 - **Bills / reminders** — medium/large. Recurring-bill model + due dates;
@@ -187,9 +189,10 @@ credit-card expertise, projects, debts and Gmail receipts.
 
 1. **Data export** — small. CSV/JSON of transactions, budgets, accounts, debts
    from Settings → Account. Table-stakes trust feature; also a landing claim.
-2. **Reports page** — medium. Spending by category over any range, month-over-
-   month trends, income vs expenses, merchant totals, net worth over time.
-   "View reports" on the dashboard still points at Budgets.
+2. ~~**Reports page**~~ — shipped 2026-10-27 (`/reports`): money-flow Sankey,
+   insights, pace line, categories with drill-down, merchants, cash flow, net
+   worth, CSV export. Data export (item 1) is partly covered by its export menu;
+   a Settings-level "export everything" (accounts, budgets, debts) is still open.
 3. **Recurring calendar + upcoming bills** — small/medium. Month calendar of
    expected charges (from recurring rules + detection) and an "Upcoming this
    week" strip on the dashboard. Data already exists.

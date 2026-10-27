@@ -15,6 +15,7 @@ const NAV = [
   { label: 'Ask Cofre',    href: '/ask-cofre',    icon: AskCofreIcon },
   { label: 'Goals',        href: '/goals',        icon: GoalsIcon },
   { label: 'Transactions', href: '/transactions', icon: TransactionsIcon },
+  { label: 'Reports',      href: '/reports',      icon: ReportsNavIcon },
   { label: 'Budgets',      href: '/budgets',      icon: BudgetsIcon },
   { label: 'Projects',     href: '/projects',     icon: ProjectsIcon },
   { label: 'Debts',        href: '/debts',        icon: DebtsIcon },
@@ -324,6 +325,14 @@ function TransactionsIcon() {
   return (
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 6h18M3 12h18M3 18h12"/>
+    </svg>
+  );
+}
+
+function ReportsNavIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>
     </svg>
   );
 }
