@@ -31,9 +31,10 @@ common=(package.json package-lock.json nx.json tsconfig.base.json deploy/cloudbu
 if command -v sha256sum >/dev/null 2>&1; then SUM=(sha256sum); else SUM=(shasum -a 256); fi
 
 {
+  # POSIX `!` rather than GNU `-not`: this also runs in the busybox `bash` image.
   find "$app" -type f \
-    -not -path '*/node_modules/*' -not -path '*/.next/*' -not -path '*/dist/*' \
-    -not -name '*.test.ts' -not -name '*.test.tsx' -not -name '*.tsbuildinfo' -not -name '.DS_Store' \
+    ! -path '*/node_modules/*' ! -path '*/.next/*' ! -path '*/dist/*' \
+    ! -name '*.test.ts' ! -name '*.test.tsx' ! -name '*.tsbuildinfo' ! -name '.DS_Store' \
     | LC_ALL=C sort
   printf '%s\n' "${common[@]}"
 } | tr '\n' '\0' | xargs -0 "${SUM[@]}" | "${SUM[@]}" | cut -c1-16

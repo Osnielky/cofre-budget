@@ -43,12 +43,13 @@ to `dev`. Steps, and what runs in parallel:
 ```
  push to dev
      │
+     ├─ hash       src-hash.sh api|web → /workspace/.hash-{api,web}   (seconds)
      ├─ verify     npm install → test:api → test:dashboard       ┐
-     ├─ build-api  hash sources → skip if image exists → build  ├─ in parallel
-     └─ build-web  hash sources → skip if image exists → build  ┘
+     ├─ build-api  read hash → skip if image exists → build      ├─ in parallel
+     └─ build-web  read hash → skip if image exists → build      ┘
                                   │
-                                  ▼ (all three done, tests green)
-                              deploy      deploy/ci-deploy.sh
+                                  ▼ (all done, tests green)
+                              deploy      deploy/ci-deploy.sh (reads the same hash files)
                                   ├─ cofre-api  (skipped if unchanged) ┐ parallel
                                   └─ cofre-web  (skipped if unchanged) ┘
 ```
@@ -59,6 +60,13 @@ to `dev`. Steps, and what runs in parallel:
 image: the app's own folder (minus tests), the root `package*.json`, `nx.json`,
 `tsconfig.base.json` and the two pipeline files. The two apps import nothing
 from each other, so the hashes are independent.
+
+The hash is computed **once, in the first step**, and written to
+`/workspace/.hash-api` / `.hash-web` for every later step to read. It must not
+be recomputed later: the workspace is shared, and `verify`'s `npm install`
+rewrites `package-lock.json` (generated on macOS, npm on Linux adds its
+platform-specific optional packages). The first run of this pipeline did
+recompute it in the deploy step and failed with "image … not found".
 
 - The build step tags the image `src-<hash>`. If that tag already exists in
   Artifact Registry the sources are identical to an earlier build, so the step

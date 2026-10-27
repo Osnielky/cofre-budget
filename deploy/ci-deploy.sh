@@ -33,9 +33,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# The build steps leave their hash in /workspace/.hash-<app>; use it so the deploy
-# names exactly the tag that was built (or found) in this run. Computing it again
-# here is only the fallback for running the script outside Cloud Build.
+# The pipeline's first step wrote each hash to /workspace/.hash-<app> before the
+# workspace was touched; using it guarantees the deploy names exactly the tag the
+# build steps built or found. Never recompute inside Cloud Build — by now
+# `verify`'s npm install has rewritten package-lock.json and the hash would
+# differ (the first run of this pipeline failed exactly that way). Computing
+# here is only the fallback for running the script by hand outside Cloud Build.
 hash_for() { if [ -s "/workspace/.hash-$1" ]; then cat "/workspace/.hash-$1"; else bash deploy/src-hash.sh "$1"; fi; }
 API_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/api:src-$(hash_for api)"
 WEB_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/web:src-$(hash_for web)"

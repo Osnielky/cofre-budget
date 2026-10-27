@@ -46,6 +46,26 @@ substitutions:
   _API_PROXY_URL: https://cofre-api-193134215805.us-central1.run.app
 
 steps:
+  # ── Hash the sources ONCE, before anything else runs. The workspace is shared
+  # by every step and `verify`'s npm install rewrites package-lock.json (the
+  # lockfile is generated on macOS; npm on Linux adds its platform-specific
+  # optional packages), so a hash taken later would name a tag that was never
+  # built — that is exactly what broke the first run of this pipeline. The
+  # build and deploy steps all read these two files instead of recomputing. ──
+  - id: hash
+    # Same image as the build steps (GNU find/coreutils + bash, proven on the
+    # first run) — it is pulled once per worker, so this adds only seconds.
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    waitFor: ['-']
+    args:
+      - -c
+      - |
+        set -e
+        bash deploy/src-hash.sh api > /workspace/.hash-api
+        bash deploy/src-hash.sh web > /workspace/.hash-web
+        echo "api src-$$(cat /workspace/.hash-api)  web src-$$(cat /workspace/.hash-web)"
+
   # ── Gate: unit tests must pass before anything is deployed. Runs in parallel
   # with the image builds below (nothing they produce depends on test results) —
   # only `deploy` waits on this. Lint is NOT run here: it could never fail the
@@ -68,8 +88,8 @@ steps:
         npm run test:dashboard
 
   # ── Build images (parallel with each other AND with `verify` above) ──
-  # Each image is tagged `src-<hash>` where the hash covers every file that
-  # goes into it (deploy/src-hash.sh). If that tag already exists in Artifact
+  # Each image is tagged `src-<hash>` where the hash (from the `hash` step)
+  # covers every file that goes into it. If that tag already exists in Artifact
   # Registry the sources are identical to a previous build, so the step exits
   # without building — a web-only push never rebuilds the API and vice versa.
   # When it does build, it pulls the previous :latest and builds with
@@ -79,14 +99,13 @@ steps:
   - id: build-api
     name: gcr.io/cloud-builders/docker
     entrypoint: bash
-    waitFor: ['-']
+    waitFor: ['hash']
     args:
       - -c
       - |
         set -e
         IMG=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api
-        HASH=$$(bash deploy/src-hash.sh api)
-        echo "$$HASH" > /workspace/.hash-api   # handed to ci-deploy.sh so both steps use one hash
+        HASH=$$(cat /workspace/.hash-api)
         if docker manifest inspect "$$IMG:src-$$HASH" >/dev/null 2>&1; then
           echo "api: sources unchanged (src-$$HASH already in the registry) — build skipped"
           exit 0
@@ -104,14 +123,13 @@ steps:
   - id: build-web
     name: gcr.io/cloud-builders/docker
     entrypoint: bash
-    waitFor: ['-']
+    waitFor: ['hash']
     args:
       - -c
       - |
         set -e
         IMG=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web
-        HASH=$$(bash deploy/src-hash.sh web)
-        echo "$$HASH" > /workspace/.hash-web   # handed to ci-deploy.sh so both steps use one hash
+        HASH=$$(cat /workspace/.hash-web)
         if docker manifest inspect "$$IMG:src-$$HASH" >/dev/null 2>&1; then
           echo "web: sources unchanged (src-$$HASH already in the registry) — build skipped"
           exit 0
