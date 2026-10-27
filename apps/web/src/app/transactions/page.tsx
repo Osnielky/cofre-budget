@@ -199,6 +199,10 @@ export default function TransactionsPage() {
   const narrow = useNarrowScreen();
   const filtersActive = !!search || accountFilter !== 'all' || categoryFilter !== 'all' || sortMode !== 'date-desc';
   const clearFilters = () => { setSearch(''); setAccountFilter('all'); setCategoryFilter('all'); setSortMode('date-desc'); };
+  /* Phones: sort / account / category / group-by live in a bottom sheet behind one
+     "Filters" button beside the search box; the badge counts the non-default ones. */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersBadge = (sortMode !== 'date-desc' ? 1 : 0) + (accountFilter !== 'all' ? 1 : 0) + (categoryFilter !== 'all' ? 1 : 0);
   const [openPickerId, setOpenPickerId] = useState<string | null>(null);
   const [pickerPos, setPickerPos]       = useState<PickerPos | null>(null);
   const [updatingId, setUpdatingId]     = useState<string | null>(null);
@@ -995,6 +999,41 @@ export default function TransactionsPage() {
     setSelectedTx((prev) => prev?.id === txId ? { ...prev, note } : prev);
   }
 
+  /* The sort / account / category selects, rendered once in the desktop filter row
+     (`phone` false: compact, prefixed labels) and once in the phone Filters sheet
+     (`phone` true: full-width, labelled by a caption so the options stay short). */
+  const filterSelects = (phone: boolean) => {
+    const cls = phone
+      ? 'w-full px-3 py-2.5 text-sm font-medium rounded-xl outline-none cursor-pointer truncate'
+      : 'px-3 py-2 text-xs font-semibold rounded-xl outline-none cursor-pointer truncate';
+    const style = { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: phone ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' };
+    return (
+      <>
+        <select value={sortMode} onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
+          aria-label="Sort transactions" className={cls} style={style}>
+          <option value="date-desc">{phone ? 'Newest first' : 'Sort: Date (newest)'}</option>
+          <option value="date-asc">{phone ? 'Oldest first' : 'Sort: Date (oldest)'}</option>
+          <option value="amount-desc">{phone ? 'Amount: high → low' : 'Sort: Amount (high → low)'}</option>
+          <option value="amount-asc">{phone ? 'Amount: low → high' : 'Sort: Amount (low → high)'}</option>
+        </select>
+        <select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}
+          aria-label="Filter by account" className={`${cls} ${phone ? '' : 'max-w-52'}`} style={style}>
+          <option value="all">{phone ? 'All accounts' : 'Account: All accounts'}</option>
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>{a.bankName} · {a.accountName}</option>
+          ))}
+        </select>
+        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
+          aria-label="Filter by category" className={`${cls} ${phone ? '' : 'max-w-48'}`} style={style}>
+          <option value="all">{phone ? 'All categories' : 'Category: All'}</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+          ))}
+        </select>
+      </>
+    );
+  };
+
   /* ════════════════════════════════════════════════════════════ */
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -1330,8 +1369,8 @@ export default function TransactionsPage() {
           />
 
           {/* ── Search + filters ── */}
-          {/* Phones: search (with the clear button) on one row, then the three selects share the
-              next row with short labels. From sm everything sits on one wrapping row. */}
+          {/* Phones: search + a "Filters" button (opens the bottom sheet with sort / account /
+              category / group-by). From sm the three selects sit on the same wrapping row. */}
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 sm:min-w-44">
               <div className="relative flex-1 min-w-0">
@@ -1342,43 +1381,21 @@ export default function TransactionsPage() {
                   className="w-full pl-9 pr-3 py-2 text-sm outline-none rounded-xl"
                   style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
               </div>
-              {filtersActive && (
-                <button
-                  onClick={clearFilters}
-                  className="sm:hidden w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors hover:bg-[var(--color-elevated)]"
-                  style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
-                  title="Clear search, sort and filters" aria-label="Clear search, sort and filters">
-                  <SlidersIcon />
-                </button>
-              )}
+              <button type="button" onClick={() => setFiltersOpen(true)}
+                className="sm:hidden relative flex items-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold shrink-0"
+                style={filtersBadge > 0
+                  ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)', color: 'var(--color-primary)' }
+                  : { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+                aria-label={filtersBadge > 0 ? `Filters, ${filtersBadge} active` : 'Filters'}>
+                <SlidersIcon />
+                Filters
+                {filtersBadge > 0 && (
+                  <span className="min-w-4 h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
+                    style={{ background: 'var(--color-primary)', color: 'white' }}>{filtersBadge}</span>
+                )}
+              </button>
             </div>
-            <select value={sortMode} onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
-              aria-label="Sort transactions"
-              className="flex-1 sm:flex-initial min-w-0 px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-semibold rounded-xl outline-none cursor-pointer truncate"
-              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-              <option value="date-desc">{narrow ? 'Newest first' : 'Sort: Date (newest)'}</option>
-              <option value="date-asc">{narrow ? 'Oldest first' : 'Sort: Date (oldest)'}</option>
-              <option value="amount-desc">{narrow ? 'Amount: high → low' : 'Sort: Amount (high → low)'}</option>
-              <option value="amount-asc">{narrow ? 'Amount: low → high' : 'Sort: Amount (low → high)'}</option>
-            </select>
-            <select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}
-              aria-label="Filter by account"
-              className="flex-1 sm:flex-initial min-w-0 px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-semibold rounded-xl outline-none cursor-pointer sm:max-w-52 truncate"
-              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-              <option value="all">{narrow ? 'Any account' : 'Account: All accounts'}</option>
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.bankName} · {a.accountName}</option>
-              ))}
-            </select>
-            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
-              aria-label="Filter by category"
-              className="flex-1 sm:flex-initial min-w-0 px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-semibold rounded-xl outline-none cursor-pointer sm:max-w-48 truncate"
-              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-              <option value="all">{narrow ? 'Any category' : 'Category: All'}</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-              ))}
-            </select>
+            <span className="hidden sm:contents">{filterSelects(false)}</span>
             {filtersActive && (
               <button
                 onClick={clearFilters}
@@ -1401,18 +1418,24 @@ export default function TransactionsPage() {
                   { id: 'expense',   label: 'Expenses',  count: transactions.filter((t) => Number(t.amount) < 0).length },
                   { id: 'income',    label: 'Income',    count: transactions.filter((t) => Number(t.amount) >= 0).length },
                   { id: 'recurring', label: 'Recurring', count: transactions.filter(isRecurringTx).length },
-                ] as { id: Filter; label: string; count: number }[]).map((f) => (
+                  /* Phones: the uncategorized pill joins this row as an amber tab (the pill
+                     itself and the group-by control are desktop-only there). */
+                  { id: 'uncategorized', label: 'Uncategorized', count: uncategorizedCount, phoneOnly: true, amber: uncategorizedCount > 0 },
+                ] as { id: Filter; label: string; count: number; phoneOnly?: boolean; amber?: boolean }[]).map((f) => (
                   <button key={f.id} onClick={() => setFilter(f.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 whitespace-nowrap"
+                    className={`${f.phoneOnly ? 'sm:hidden' : ''} flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 whitespace-nowrap`}
                     style={filter === f.id
-                      ? { background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
-                      : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
+                      ? (f.amber
+                        ? { background: 'color-mix(in srgb, var(--color-amber) 18%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 45%, transparent)' }
+                        : { background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' })
+                      : { color: f.amber ? 'var(--color-amber)' : 'var(--color-text-secondary)', border: '1px solid transparent' }}>
+                    {f.amber && <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-amber)' }} />}
                     {f.label}
                     <span className="opacity-50">{f.count}</span>
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="hidden sm:flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>Group by</span>
                 <div role="radiogroup" aria-label="Group transactions by" className="flex gap-1 p-1 rounded-xl max-w-full overflow-x-auto"
                   style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', scrollbarWidth: 'none' }}>
@@ -1431,7 +1454,7 @@ export default function TransactionsPage() {
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="hidden sm:flex items-center gap-2 flex-wrap">
               <button onClick={() => setFilter('uncategorized')}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:brightness-110"
                 style={{
@@ -1451,7 +1474,7 @@ export default function TransactionsPage() {
               {groups.length > 1 && (
                 <button
                   onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(groups.map((g) => g.id)))}
-                  className="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)]"
+                  className="hidden sm:inline-block text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)]"
                   style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
                   {allCollapsed ? '↓ Expand all' : '↑ Collapse all'}
                 </button>
@@ -3091,6 +3114,66 @@ export default function TransactionsPage() {
           currentMonth={insightsMonth}
         />
       </div>
+
+      {/* ── Phone Filters sheet: sort / account / category / group-by / collapse ── */}
+      {filtersOpen && createPortal(
+        <div
+          className="sm:hidden fixed inset-0 z-50 flex items-end"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onMouseDown={(e) => { if (e.target === e.currentTarget) setFiltersOpen(false); }}>
+          <div className="w-full rounded-t-2xl flex flex-col gap-4 p-4 pb-6 overflow-y-auto"
+            role="dialog" aria-label="Filters"
+            style={{ maxHeight: '85dvh', background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+            <div className="flex items-center justify-between">
+              <p className="text-base font-bold">Filters</p>
+              <div className="flex items-center gap-2">
+                {filtersActive && (
+                  <button type="button" onClick={clearFilters}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                    style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
+                    Clear
+                  </button>
+                )}
+                <button type="button" onClick={() => setFiltersOpen(false)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg"
+                  style={{ background: 'color-mix(in srgb, var(--color-primary) 20%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }}>
+                  Done
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 [&>select]:w-full">
+              {filterSelects(true)}
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Group by</p>
+              <div role="radiogroup" aria-label="Group transactions by" className="grid grid-cols-[1fr_1.7fr_1fr] gap-1 p-1 rounded-xl"
+                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
+                {GROUP_BY_OPTIONS.map((o) => {
+                  const on = groupBy === o.value;
+                  return (
+                    <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => setGroupBy(o.value)}
+                      className="px-2 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer truncate"
+                      style={on
+                        ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
+                        : { color: 'var(--color-text-muted)', border: '1px solid transparent' }}>
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {groups.length > 1 && (
+              <button type="button"
+                onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(groups.map((g) => g.id)))}
+                className="text-xs font-semibold px-3 py-2.5 rounded-xl"
+                style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
+                {allCollapsed ? '↓ Expand all groups' : '↑ Collapse all groups'}
+              </button>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ── Bottom sheet (below xl, where the insights column is hidden) ── */}
       {selectedTx && createPortal(
