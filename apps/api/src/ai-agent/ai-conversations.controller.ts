@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PlanGuard } from '../auth/guards/plan.guard';
 import { RequiresPlan } from '../auth/decorators/require-plan.decorator';
@@ -30,5 +30,17 @@ export class AiConversationsController {
   @Get(':id/messages')
   messages(@Param('id') id: string, @Request() req: any) {
     return this.service.findMessages(id, req.user.id);
+  }
+
+  /** Clear the whole history. */
+  @Delete()
+  async removeAll(@Request() req: any) {
+    return { deleted: await this.service.removeAll(req.user.id) };
+  }
+
+  @Delete(':id')
+  async remove(@Param('id') id: string, @Request() req: any) {
+    await this.service.remove(id, req.user.id);
+    return { ok: true };
   }
 }

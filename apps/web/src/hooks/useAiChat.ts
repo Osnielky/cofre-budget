@@ -110,6 +110,23 @@ export function useAiChat() {
     await loadMessages(id);
   }, [loadMessages]);
 
+  /** Delete one conversation. If it was open, the chat resets to an empty state. */
+  const deleteConversation = useCallback(async (id: string) => {
+    const res = await fetch(`${API}/ai/conversations/${id}`, { method: 'DELETE', credentials: 'include' });
+    if (!res.ok) return false;
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+    if (activeId === id) { setActiveId(null); setMessages([]); }
+    return true;
+  }, [activeId]);
+
+  /** Delete every conversation and start fresh. */
+  const clearConversations = useCallback(async () => {
+    const res = await fetch(`${API}/ai/conversations`, { method: 'DELETE', credentials: 'include' });
+    if (!res.ok) return false;
+    setConversations([]); setActiveId(null); setMessages([]);
+    return true;
+  }, []);
+
   const sendMessage = useCallback(async (content: string, month?: string) => {
     let conversationId = activeId;
     if (!conversationId) conversationId = await startNewConversation();
@@ -186,6 +203,7 @@ export function useAiChat() {
 
   return {
     conversations, activeId, setActiveId: switchConversation, startNewConversation,
+    deleteConversation, clearConversations,
     messages, loading, sending, sendMessage,
     confirmAction, rejectAction, undoAction,
     recentActions, reloadRecent,

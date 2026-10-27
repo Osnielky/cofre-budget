@@ -52,10 +52,11 @@ function UserAvatar({ name }: { name?: string | null }) {
 
 export default function AskCofrePage() {
   const {
-    conversations, activeId, setActiveId, startNewConversation,
+    conversations, activeId, setActiveId, startNewConversation, deleteConversation, clearConversations,
     messages, loading, sending, sendMessage,
     confirmAction, rejectAction, usage,
   } = useAiChat();
+  const [confirmClear, setConfirmClear] = useState(false);
   const outOfMessages = usage != null && usage.remaining <= 0;
   const { user } = useUser();
   const [input, setInput] = useState('');
@@ -143,16 +144,37 @@ export default function AskCofrePage() {
           </div>
 
           {showHistory && (
-            <div className="flex flex-col gap-1 p-2 rounded-xl max-h-40 overflow-y-auto"
+            <div className="flex flex-col gap-1 p-2 rounded-xl max-h-56 overflow-y-auto"
               style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               {conversations.length === 0 && <p className="text-xs px-2 py-1" style={{ color: 'var(--color-text-muted)' }}>No conversations yet.</p>}
               {conversations.map((c) => (
-                <button key={c.id} onClick={() => { setActiveId(c.id); setShowHistory(false); }}
-                  className="text-left text-xs px-2 py-1.5 rounded-lg cursor-pointer truncate"
+                <div key={c.id} className="flex items-center gap-1 rounded-lg min-w-0"
                   style={{ background: c.id === activeId ? 'var(--color-surface)' : 'transparent' }}>
-                  {c.title ?? 'New conversation'}
-                </button>
+                  <button onClick={() => { setActiveId(c.id); setShowHistory(false); }}
+                    className="flex-1 min-w-0 text-left text-xs px-2 py-1.5 cursor-pointer truncate">
+                    {c.title ?? 'New conversation'}
+                  </button>
+                  <button onClick={() => deleteConversation(c.id)} aria-label={`Delete conversation ${c.title ?? ''}`.trim()} title="Delete"
+                    className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 cursor-pointer hover:bg-red-500/15"
+                    style={{ color: 'var(--color-text-muted)' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6" /></svg>
+                  </button>
+                </div>
               ))}
+              {conversations.length > 0 && (
+                <div className="flex items-center justify-end gap-2 px-2 pt-1 mt-1" style={{ borderTop: '1px solid var(--color-border)' }}>
+                  {confirmClear ? (
+                    <>
+                      <span className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>Delete all {conversations.length} conversation{conversations.length === 1 ? '' : 's'}?</span>
+                      <button onClick={async () => { await clearConversations(); setConfirmClear(false); setShowHistory(false); }}
+                        className="text-[11px] font-semibold px-2 py-1 rounded-md cursor-pointer" style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>Delete all</button>
+                      <button onClick={() => setConfirmClear(false)} className="text-[11px] px-2 py-1 rounded-md cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>Cancel</button>
+                    </>
+                  ) : (
+                    <button onClick={() => setConfirmClear(true)} className="text-[11px] font-semibold px-2 py-1 rounded-md cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>Clear history</button>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

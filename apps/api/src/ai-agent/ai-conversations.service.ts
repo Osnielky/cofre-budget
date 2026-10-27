@@ -24,6 +24,18 @@ export class AiConversationsService {
     return this.conversations.find({ where: { userId }, order: { updatedAt: 'DESC' } });
   }
 
+  /** Delete one conversation; its messages and pending proposals go with it (FK cascade). */
+  async remove(conversationId: string, userId: string): Promise<void> {
+    await this.owned(conversationId, userId);
+    await this.conversations.delete({ id: conversationId, userId });
+  }
+
+  /** Delete every conversation the user has. Returns how many were removed. */
+  async removeAll(userId: string): Promise<number> {
+    const result = await this.conversations.delete({ userId });
+    return result.affected ?? 0;
+  }
+
   async owned(conversationId: string, userId: string): Promise<AiConversation> {
     const conversation = await this.conversations.findOneBy({ id: conversationId });
     if (!conversation) throw new NotFoundException();
