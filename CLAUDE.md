@@ -55,6 +55,17 @@ The baseline migration skips itself on databases `synchronize` already built
 `apps/api/tsconfig.app.json` excludes `*.test.ts` — test files must stay out of the
 webpack bundle.
 
+## Deployment
+
+Push to `dev` → Cloud Build (`deploy/cloudbuild.yaml`) → two Cloud Run services
+(`cofre-web`, `cofre-api`) + Cloud SQL. Each image is tagged `src-<hash>` from
+`deploy/src-hash.sh` (the app folder minus tests + root config), so a push only
+rebuilds the image whose inputs changed, and `deploy/ci-deploy.sh` only redeploys
+a service whose image or deploy config (`cfg` label) differs — API and web deploy
+in parallel. If you add a file outside `apps/<app>` that the build reads, add it to
+the hash script's `common` list or the change ships without a rebuild. Full
+picture, commands and the machine-type trade-off: `docs/deployment.md`.
+
 ## Environment
 
 `.env` lives at the repo root and is not committed. Required variables:
