@@ -10,7 +10,7 @@ import { money, compact, Empty } from './ui';
    to "Saved" (surplus). A deficit appears as a "Savings & credit" source. Node
    colours are the categories' own; links take their source node's colour. */
 
-interface NodeRenderProps { x: number; y: number; width: number; height: number; index: number; payload: { name: string; color?: string; value?: number; kind?: string }; containerWidth?: number }
+interface NodeRenderProps { x: number; y: number; width: number; height: number; index: number; payload: { name: string; color?: string; value?: number; kind?: string } }
 interface LinkRenderProps { sourceX: number; targetX: number; sourceY: number; targetY: number; sourceControlX: number; targetControlX: number; linkWidth: number; index: number; payload: { source: { color?: string }; target: { color?: string }; value: number } }
 
 export default function MoneyFlowChart({ flow, height }: { flow: MoneyFlow; height?: number }) {
@@ -32,8 +32,10 @@ export default function MoneyFlowChart({ flow, height }: { flow: MoneyFlow; heig
   };
 
   const Node = (props: NodeRenderProps) => {
-    const { x, y, width, height: hh, payload, containerWidth = 800 } = props;
-    const leftSide = x < containerWidth / 2;
+    const { x, y, width, height: hh, payload } = props;
+    /* Side by role, not by x: recharts does not hand the container width to a
+       custom node, and a pixel guess breaks at phone widths. */
+    const leftSide = payload.kind === 'income' || payload.kind === 'deficit';
     const isHub = payload.kind === 'hub';
     const label = `${payload.name}`;
     const value = compact(payload.value ?? 0);
