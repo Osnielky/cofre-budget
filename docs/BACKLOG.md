@@ -176,3 +176,39 @@ limits them today, and what was done:
 - **Pricing** — Stripe charges in USD and accepts international cards; fine for
   now. Local prices (EUR, INR) are a Stripe Prices change plus `PLAN_PRICES`
   per currency, later.
+
+## Monarch gap list (2026-10-27)
+
+What Monarch Money offers that Cofre does not, from monarchmoney.com/features
+and 2026 reviews, in the order worth closing them. Cofre already matches
+Monarch on bank sync, category budgets with rollover, rules, recurring
+detection, net worth, goals (Road to $1M) and beats it on AI (Ask Cofre),
+credit-card expertise, projects, debts and Gmail receipts.
+
+1. **Data export** — small. CSV/JSON of transactions, budgets, accounts, debts
+   from Settings → Account. Table-stakes trust feature; also a landing claim.
+2. **Reports page** — medium. Spending by category over any range, month-over-
+   month trends, income vs expenses, merchant totals, net worth over time.
+   "View reports" on the dashboard still points at Budgets.
+3. **Recurring calendar + upcoming bills** — small/medium. Month calendar of
+   expected charges (from recurring rules + detection) and an "Upcoming this
+   week" strip on the dashboard. Data already exists.
+4. **Savings goals** — medium. Named goals funded from an account with a target
+   and date; progress from balances/transfers; separate from the $1M ladder.
+5. **Alerts / notifications** — medium. Budget overspend, large transaction,
+   bill due, sync broken. Email first (MailService), in-app bell second (it is
+   a placeholder today). Scheduled ones need Cloud Scheduler.
+6. **Light theme** — small. Every registry theme is dark; add one light entry.
+7. **Two-factor auth** — small/medium. TOTP on password accounts.
+8. **Household sharing** — large. Invite a partner to one budget, personal /
+   partner / shared views, advisor read-only access.
+9. **Investment holdings** — large. Per-holding positions, allocation and
+   performance via the Plaid Investments product (needs dashboard approval);
+   today only balances are tracked.
+10. **Native mobile apps** — large. Cheap bridge first: PWA install prompt +
+    web push (manifest already ships). Native wrappers (Capacitor) later.
+11. **Flex budgeting** — medium. Monarch's second method: fixed / flexible /
+    non-monthly buckets instead of per-category lines.
+12. **Transaction tags** — small. Free-form tags beside categories; filter by tag.
+Not worth copying: Zillow/vehicle auto-valuation (no public API; manual asset
+accounts already cover it), Amazon order matching.
