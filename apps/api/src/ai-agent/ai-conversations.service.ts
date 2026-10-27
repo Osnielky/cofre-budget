@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, LessThan, Repository } from 'typeorm';
 import { AiConversation } from './ai-conversation.entity';
 import { AiMessage, AiMessageWidget } from './ai-message.entity';
 import { AiPendingAction } from './ai-pending-action.entity';
@@ -9,36 +9,55 @@ import { startOfUtcDay } from './ai-usage';
 const TITLE_MAX_LEN = 60;
 
 @Injectable()
-export class AiConversationsService {
+export class AiConversationsService implements OnModuleInit {
   constructor(
     @InjectRepository(AiConversation) private conversations: Repository<AiConversation>,
     @InjectRepository(AiMessage) private messages: Repository<AiMessage>,
     @InjectRepository(AiPendingAction) private actions: Repository<AiPendingAction>,
   ) {}
 
+  async onModuleInit() {
+    await this.purgeDeleted().catch(() => undefined);
+  }
+
   create(userId: string): Promise<AiConversation> {
     return this.conversations.save(this.conversations.create({ userId }));
   }
 
   findAllByUser(userId: string): Promise<AiConversation[]> {
-    return this.conversations.find({ where: { userId }, order: { updatedAt: 'DESC' } });
+    return this.conversations.find({ where: { userId, deletedAt: IsNull() }, order: { updatedAt: 'DESC' } });
   }
 
-  /** Delete one conversation; its messages and pending proposals go with it (FK cascade). */
+  /**
+   * Soft-delete one conversation. It disappears from the list and can no longer be
+   * opened, but its user messages still count toward today's cap — a hard delete
+   * would let anyone reset the daily limit by clearing their history.
+   */
   async remove(conversationId: string, userId: string): Promise<void> {
     await this.owned(conversationId, userId);
-    await this.conversations.delete({ id: conversationId, userId });
+    await this.conversations.update({ id: conversationId, userId }, { deletedAt: new Date() });
   }
 
-  /** Delete every conversation the user has. Returns how many were removed. */
+  /** Soft-delete every conversation the user has. Returns how many were removed. */
   async removeAll(userId: string): Promise<number> {
-    const result = await this.conversations.delete({ userId });
+    const result = await this.conversations.update({ userId, deletedAt: IsNull() }, { deletedAt: new Date() });
+    return result.affected ?? 0;
+  }
+
+  /**
+   * Hard-delete conversations soft-deleted before yesterday (UTC). By then their
+   * messages cannot be inside today's usage window, so nothing is lost by purging;
+   * messages and pending proposals follow by FK cascade. Runs at boot.
+   */
+  async purgeDeleted(): Promise<number> {
+    const cutoff = new Date(startOfUtcDay(new Date()).getTime() - 24 * 60 * 60 * 1000);
+    const result = await this.conversations.delete({ deletedAt: LessThan(cutoff) });
     return result.affected ?? 0;
   }
 
   async owned(conversationId: string, userId: string): Promise<AiConversation> {
     const conversation = await this.conversations.findOneBy({ id: conversationId });
-    if (!conversation) throw new NotFoundException();
+    if (!conversation || conversation.deletedAt) throw new NotFoundException();
     if (conversation.userId !== userId) throw new ForbiddenException();
     return conversation;
   }
@@ -94,6 +113,7 @@ export class AiConversationsService {
 
   async countUserMessagesToday(userId: string): Promise<number> {
     // Limits reset at midnight UTC (see ai-usage.ts), whatever the server's zone.
+    // Deliberately counts soft-deleted conversations too (no deletedAt filter).
     const startOfDay = startOfUtcDay(new Date());
     return this.messages.createQueryBuilder('m')
       .innerJoin(AiConversation, 'c', 'c.id = m."conversationId"')

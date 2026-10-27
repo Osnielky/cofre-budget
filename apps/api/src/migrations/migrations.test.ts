@@ -82,6 +82,7 @@ describe.skipIf(!hasDb)('database migrations', { timeout: 30_000 }, () => {
     // Columns added by post-baseline migrations likewise.
     await synced.query(`ALTER TABLE "${SYNCED}"."users" DROP COLUMN "lastSeenAt"`);
     await synced.query(`ALTER TABLE "${SYNCED}"."users" DROP COLUMN "isDemo"`);
+    await synced.query(`ALTER TABLE "${SYNCED}"."ai_conversations" DROP COLUMN "deletedAt"`);
     await synced.query(`INSERT INTO "${SYNCED}"."users" ("email", "name") VALUES ('owner@cofre.dev', 'Owner')`);
     await synced.destroy();
 
