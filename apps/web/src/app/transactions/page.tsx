@@ -1684,8 +1684,10 @@ export default function TransactionsPage() {
                         const canUnsplit = !tx.debtId && !txIsTransfer && !!tx.parentId;
                         /* Everything else moved into the cluster, so the ⋮ now has
                            content only for a rule-categorized row. Without this it
-                           would open an empty popover on most rows. */
-                        const hasRowMenu = !!tx.categorizedByRuleId;
+                           would open an empty popover on most rows. On phones the
+                           cluster collapses into the ⋮, which then lists split / edit /
+                           delete too, so there it opens whenever any action exists. */
+                        const hasRowMenu = !!tx.categorizedByRuleId || (narrow && (canSplit || canUnsplit || canEdit || canDelete));
 
                         return (
                           <div key={tx.id} className="relative group cursor-pointer"
@@ -1701,9 +1703,10 @@ export default function TransactionsPage() {
                               if ((e.target as HTMLElement).closest('button,input,textarea,select,[role="button"]')) return;
                               setSelectedTx((prev) => prev?.id === tx.id ? null : tx);
                             }}>
-                            {/* Phones: two lines — icon · name · amount, then the category picker and
-                                actions on their own line. From sm the row is a single line. */}
-                            <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 px-4 py-3">
+                            {/* Phones: a two-line ledger row — icon · name · amount, then the
+                                category pill (and any one-tap suggestion) with a single ⋮ at the
+                                right edge. From sm the row is a single line with the full cluster. */}
+                            <div className="flex flex-wrap sm:flex-nowrap items-center gap-x-2.5 sm:gap-x-3 gap-y-1.5 sm:gap-y-2 px-3 sm:px-4 py-2.5 sm:py-3">
 
                               {/* Category icon chip (direction color fallback) */}
                               {(() => {
@@ -1712,7 +1715,7 @@ export default function TransactionsPage() {
                                   : needsCategory ? 'var(--color-amber)'
                                   : cat?.color || (isIncome ? 'var(--color-green)' : 'var(--color-orange)');
                                 return (
-                                  <span className="w-9 h-9 rounded-xl flex items-center justify-center text-[15px] shrink-0"
+                                  <span className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center text-[15px] shrink-0"
                                     style={{
                                       background: `color-mix(in srgb, ${chipColor} ${needsCategory ? 8 : 14}%, transparent)`,
                                       border: `1px ${needsCategory ? 'dashed' : 'solid'} color-mix(in srgb, ${chipColor} ${needsCategory ? 45 : 30}%, transparent)`,
@@ -1730,14 +1733,17 @@ export default function TransactionsPage() {
                                 {tx.note && (
                                   <p className="text-[11px] truncate leading-snug" style={{ color: 'var(--color-text-muted)' }}>{tx.note}</p>
                                 )}
-                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                {/* Badges. The source (PLAID / MANUAL) and the transfer-direction badge are
+                                    desktop-only: on phones the category pill already names the transfer and
+                                    the source adds little, so the row stays two lines when nothing is flagged. */}
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap empty:hidden">
                                   {tx.parentId ? (
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
                                       style={{ background: 'color-mix(in srgb, var(--color-primary) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 28%, transparent)', color: 'var(--color-primary)' }}>
                                       ✂ Split
                                     </span>
                                   ) : (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase"
+                                    <span className="hidden sm:inline text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase"
                                       style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
                                       {tx.source}
                                     </span>
@@ -1780,7 +1786,7 @@ export default function TransactionsPage() {
                                     );
                                   })() : null}
                                   {tx.categoryRef?.type === 'transfer' && (
-                                    <span className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                                    <span className="hidden sm:flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
                                       style={{ background: 'rgba(107,107,138,0.15)', border: '1px solid rgba(107,107,138,0.30)', color: '#9B9BB8' }}>
                                       <span>
                                         {Number(tx.amount) >= 0
@@ -1795,7 +1801,7 @@ export default function TransactionsPage() {
 
                           {/* Picker, suggestions and actions: a second full-width line on phones
                               (indented under the name), inline (display: contents) from sm. */}
-                          <div className="order-4 sm:order-none basis-full sm:basis-auto sm:contents flex flex-wrap items-center gap-2 pl-12 sm:pl-0 min-w-0">
+                          <div className="order-4 sm:order-none basis-full sm:basis-auto sm:contents flex flex-nowrap sm:flex-wrap items-center gap-2 pl-10.5 sm:pl-0 min-w-0">
 
                           {/* ── Category suggestion ── */}
                           {(() => {
@@ -1863,8 +1869,8 @@ export default function TransactionsPage() {
                             );
                           })()}
 
-                          {/* Category picker */}
-                          <div className="relative shrink-0">
+                          {/* Category picker (on phones it may shrink and truncate so the ⋮ stays on the line) */}
+                          <div className="relative shrink sm:shrink-0 min-w-0">
                             <button
                               onMouseDown={(e) => { if (isOpen) e.stopPropagation(); }}
                               onClick={(e) => {
@@ -1876,7 +1882,7 @@ export default function TransactionsPage() {
                                 setPickerSearch('');
                               }}
                               disabled={updatingId === tx.id}
-                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:brightness-110 disabled:opacity-40"
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all hover:brightness-110 disabled:opacity-40 max-w-full [&>span]:truncate [&>span:first-child]:shrink-0"
                               style={(() => {
                                 if (tx.debtId) return { background: 'color-mix(in srgb, var(--color-card-violet) 18%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 35%, transparent)', color: 'var(--color-card-violet)' };
                                 if (tx.projectId) {
@@ -2391,14 +2397,16 @@ export default function TransactionsPage() {
                               a dense ledger stays quiet; `row-actions` makes it
                               permanently visible on touch, where nothing hovers.
                               It always occupies its space, so rows never reflow. */}
-                          <div className={`relative shrink-0 items-center gap-0.5 p-0.5 rounded-lg row-actions opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ${
+                          {/* Phones: only the ⋮ shows (pushed to the right edge) and the menu
+                              carries split / edit / delete; from sm the full icon cluster. */}
+                          <div className={`relative shrink-0 items-center gap-0.5 p-0.5 rounded-lg row-actions opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-auto sm:ml-0 ${
                               canSplit || canUnsplit || canEdit || canDelete || hasRowMenu ? 'flex' : 'hidden'
                             }`}
                             style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
 
                             {canSplit && (
                               <button onClick={() => { setSplitTx(tx); setRowMenuTxId(null); }}
-                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                                className="hidden sm:flex w-6 h-6 rounded-md items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
                                 style={{ color: 'var(--color-text-muted)' }}
                                 title="Split into multiple categories" aria-label="Split into multiple categories">
                                 <ScissorsIcon />
@@ -2407,7 +2415,7 @@ export default function TransactionsPage() {
 
                             {canUnsplit && (
                               <button onClick={() => { unsplitTransaction(tx); setRowMenuTxId(null); }}
-                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                                className="hidden sm:flex w-6 h-6 rounded-md items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
                                 style={{ color: 'var(--color-text-muted)' }}
                                 title="Unsplit — recombine into one transaction" aria-label="Unsplit — recombine into one transaction">
                                 <UnsplitIcon />
@@ -2416,7 +2424,7 @@ export default function TransactionsPage() {
 
                             {canEdit && (
                               <button onClick={() => { openEditModal(tx); setRowMenuTxId(null); }}
-                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
+                                className="hidden sm:flex w-6 h-6 rounded-md items-center justify-center transition-colors hover:bg-[var(--color-surface)]"
                                 style={{ color: 'var(--color-text-muted)' }}
                                 title="Edit transaction" aria-label="Edit transaction">
                                 <PencilIcon />
@@ -2432,7 +2440,7 @@ export default function TransactionsPage() {
                                   setRowMenuTxId(tx.id);
                                   setDeleteConfirmId(tx.id);
                                 }}
-                                className="w-6 h-6 rounded-md flex items-center justify-center transition-colors hover:bg-[color-mix(in_srgb,var(--color-rose)_18%,transparent)]"
+                                className="hidden sm:flex w-6 h-6 rounded-md items-center justify-center transition-colors hover:bg-[color-mix(in_srgb,var(--color-rose)_18%,transparent)]"
                                 style={{ color: 'var(--color-rose)' }}
                                 title="Delete transaction" aria-label="Delete transaction">
                                 <TrashIcon />
@@ -2488,7 +2496,39 @@ export default function TransactionsPage() {
                                 ) : (
                                   <>
                                     {/* Split, unsplit, edit and delete live in the row's
-                                        icon cluster; what stays here is the long tail. */}
+                                        icon cluster from sm; on phones the cluster is just
+                                        this ⋮, so they are listed here instead. */}
+                                    {narrow && canSplit && (
+                                      <button onClick={() => { setSplitTx(tx); setRowMenuTxId(null); }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
+                                        style={{ color: 'var(--color-text-secondary)' }}>
+                                        <ScissorsIcon /> Split into categories
+                                      </button>
+                                    )}
+                                    {narrow && canUnsplit && (
+                                      <button onClick={() => { unsplitTransaction(tx); setRowMenuTxId(null); }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
+                                        style={{ color: 'var(--color-text-secondary)' }}>
+                                        <UnsplitIcon /> Unsplit
+                                      </button>
+                                    )}
+                                    {narrow && canEdit && (
+                                      <button onClick={() => { openEditModal(tx); setRowMenuTxId(null); }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-[var(--color-elevated)]"
+                                        style={{ color: 'var(--color-text-secondary)' }}>
+                                        <PencilIcon /> Edit
+                                      </button>
+                                    )}
+                                    {narrow && canDelete && (
+                                      <button onClick={() => setDeleteConfirmId(tx.id)}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-red-500/20"
+                                        style={{ color: 'var(--color-rose)' }}>
+                                        <TrashIcon /> Delete
+                                      </button>
+                                    )}
+                                    {narrow && (canSplit || canUnsplit || canEdit || canDelete) && tx.categorizedByRuleId && (
+                                      <div style={{ borderTop: '1px solid var(--color-border)' }} />
+                                    )}
                                     {tx.categorizedByRuleId && (
                                       <>
                                         <button onClick={() => uncategorizeOne(tx)}
@@ -2512,7 +2552,7 @@ export default function TransactionsPage() {
                           </div>
 
                           {/* Amount */}
-                          <p className="text-sm font-bold tabular-nums w-[4.75rem] sm:w-24 text-right shrink-0 order-3 sm:order-last"
+                          <p className="text-sm font-bold tabular-nums w-auto sm:w-24 text-right shrink-0 order-3 sm:order-last"
                             style={{ color: txIsTransfer ? 'var(--color-text-muted)' : isIncome ? 'var(--color-green)' : 'var(--color-text-primary)' }}>
                             {formatAmount(amount)}
                           </p>
@@ -2528,11 +2568,11 @@ export default function TransactionsPage() {
                           const fromAcc  = Number(tx.amount) < 0 ? tx.bankAccount : cpAcc;
                           const toAcc    = Number(tx.amount) < 0 ? cpAcc : tx.bankAccount;
                           return (
-                            <div className="mx-4 mb-3 flex items-stretch gap-0 rounded-xl overflow-hidden"
+                            <div className="mx-3 sm:mx-4 mb-2.5 sm:mb-3 flex items-stretch gap-0 rounded-xl overflow-hidden"
                               style={{ background: 'rgba(107,107,138,0.07)', border: '1px solid rgba(107,107,138,0.18)' }}>
                               {/* Left accent */}
                               <div className="w-0.5 shrink-0" style={{ background: 'linear-gradient(to bottom, #6B6B8A55, #6B6B8A22)' }} />
-                              <div className="flex items-center gap-3 px-3 py-2.5 flex-1 min-w-0">
+                              <div className="flex items-center gap-2.5 sm:gap-3 px-3 py-2 sm:py-2.5 flex-1 min-w-0">
                                 {/* Link icon */}
                                 <div className="w-6 h-6 rounded-lg shrink-0 flex items-center justify-center"
                                   style={{ background: 'rgba(107,107,138,0.20)' }}>
