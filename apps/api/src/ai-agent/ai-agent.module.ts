@@ -13,6 +13,9 @@ import { NetWorthGoalModule } from '../net-worth-goal/net-worth-goal.module';
 import { BankAccountsModule } from '../bank-accounts/bank-accounts.module';
 import { DebtsModule } from '../debts/debts.module';
 import { CardsModule } from '../cards/cards.module';
+import { ProjectsModule } from '../projects/projects.module';
+import { Project } from '../projects/project.entity';
+import { Debt } from '../debts/debt.entity';
 import { AiReadToolsService } from './ai-read-tools.service';
 import { Category } from '../categories/category.entity';
 import { AiProposeToolsService } from './ai-propose-tools.service';
@@ -23,8 +26,8 @@ import { AiChatController } from './ai-chat.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AiConversation, AiMessage, AiPendingAction, Transaction, Category]),
-    TransactionsModule, CategoriesModule, BudgetsModule, NetWorthGoalModule, BankAccountsModule, DebtsModule, CardsModule,
+    TypeOrmModule.forFeature([AiConversation, AiMessage, AiPendingAction, Transaction, Category, Project, Debt]),
+    TransactionsModule, CategoriesModule, BudgetsModule, NetWorthGoalModule, BankAccountsModule, DebtsModule, CardsModule, ProjectsModule,
   ],
   providers: [AiConversationsService, AiReadToolsService, AiProposeToolsService, AiActionsService, AiChatService],
   controllers: [AiConversationsController, AiActionsController, AiChatController],

@@ -14,7 +14,9 @@ const SYSTEM_PROMPT = `You are Cofre's personal finance coach. Your job is to he
 
 Credit cards: get_credit_cards gives each card's APRs, limit, utilization, statement, minimum payment, due date and the user's card goals; get_transactions returns each transaction's account and can filter by accountId, so you can compare spending per card. Use only the numbers these tools return — never invent an APR, limit, fee or reward rate. When a card lists something under "missing", say so and ask the user for it (or point them to the Credit Cards page). You do not have any card's rewards program or fees, so don't claim one card earns more on a category unless the user tells you the rewards terms. Keeping each card and the total under 30% utilization helps credit scores; paying the highest-APR balance first minimizes interest.
 
-You can also propose changes: categorizing transactions, creating a category, setting a budget, or setting the net-worth goal's target date. You never make these changes directly — calling a propose_* tool only creates a pending proposal that the user must explicitly confirm in the UI. Say so plainly ("I've proposed..."), never claim to have made a change yourself. If you want to propose more than one change, do them one at a time across separate turns rather than multiple propose-tool calls in a single reply.
+Projects and debts: besides budget categories, the user files some transactions under a PROJECT (a side venture, flip, trading account or small business — get_projects lists each one with the categories it accepts and whether it is closed) or against a DEBT (money lent to or owed to a specific person — get_debts). A project row is categorized by its project, not by a budget category, and a debt payment is categorized by the debt, so neither counts as uncategorized. Before you categorize anything, call get_projects and get_debts: if a merchant or person plainly matches an active project (for example a prop-firm or trading fee for a "Trading" project, parts for a car flip, a tenant's rent for a property) propose propose_link_to_project with the matching project category instead of a budget category; if a deposit comes from someone who owes the user money, or a payment goes to someone the user owes, propose propose_link_to_debt instead of calling it income or spending. Only suggest a brand-new budget category when no project, debt or existing category fits.
+
+You can also propose changes: categorizing transactions, creating a category, setting a budget, linking transactions to a project, recording transactions as debt payments, or setting the net-worth goal's target date. You never make these changes directly — calling a propose_* tool only creates a pending proposal that the user must explicitly confirm in the UI. Say so plainly ("I've proposed..."), never claim to have made a change yourself. If you want to propose more than one change, do them one at a time across separate turns rather than multiple propose-tool calls in a single reply.
 
 There is no tool for moving money, paying bills, or anything outside what's listed above — don't imply you can.
 
@@ -53,7 +55,7 @@ export class AiChatService {
     const tools = [
       betaTool({
         name: 'get_transactions',
-        description: 'List the user\'s transactions (each with the account it was on), optionally filtered by date range, category, merchant, account, or uncategorized-only.',
+        description: 'List the user\'s transactions (each with its account, and its projectId / projectCategory / debtId when it is filed under a project or a debt), optionally filtered by date range, category, merchant, account, or uncategorized-only (rows linked to a project or a debt are not uncategorized).',
         inputSchema: {
           type: 'object',
           properties: {
@@ -108,6 +110,12 @@ export class AiChatService {
         run: async () => JSON.stringify(await this.readTools.getDebts(userId)),
       }),
       betaTool({
+        name: 'get_projects',
+        description: 'List the user\'s projects (side ventures, flips, trading accounts, businesses) with their totals and the project categories each accepts. Closed projects are flagged and cannot take new transactions.',
+        inputSchema: { type: 'object', properties: {} },
+        run: async () => JSON.stringify(await this.readTools.getProjects(userId)),
+      }),
+      betaTool({
         name: 'get_savings_trend',
         description: 'Get the last 6 months of net savings, a projection for the current month, and the 6-month average. Use this when the user asks how much they are saving or whether their saving pace changed.',
         inputSchema: { type: 'object', properties: {} },
@@ -132,7 +140,7 @@ export class AiChatService {
       }),
       betaTool({
         name: 'propose_categorize_transactions',
-        description: 'Propose categorizing one or more transactions as a given category. Requires user confirmation — does not change anything by itself.',
+        description: 'Propose categorizing one or more transactions as a given budget category. Not for rows that belong to a project or a debt — use propose_link_to_project / propose_link_to_debt for those. Requires user confirmation — does not change anything by itself.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -143,6 +151,41 @@ export class AiChatService {
         },
         run: async (args) => {
           const result = await this.proposeTools.proposeCategorizeTransactions(userId, conversationId, args as any);
+          createdActionId = result.actionId;
+          return `Proposal created (id=${result.actionId}): ${result.summary}`;
+        },
+      }),
+      betaTool({
+        name: 'propose_link_to_project',
+        description: 'Propose filing one or more transactions under an active project, optionally with one of that project\'s categories (ids from get_projects). Requires user confirmation.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            transactionIds: { type: 'array', items: { type: 'string' } },
+            projectId: { type: 'string' },
+            projectCategoryId: { type: ['string', 'null'], description: 'One of the project\'s category ids, or null for the project itself' },
+          },
+          required: ['transactionIds', 'projectId'],
+        },
+        run: async (args) => {
+          const result = await this.proposeTools.proposeLinkToProject(userId, conversationId, args as any);
+          createdActionId = result.actionId;
+          return `Proposal created (id=${result.actionId}): ${result.summary}`;
+        },
+      }),
+      betaTool({
+        name: 'propose_link_to_debt',
+        description: 'Propose recording one or more transactions as payments on a debt (id from get_debts): a deposit from someone who owes the user, or a payment to someone the user owes. Requires user confirmation.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            transactionIds: { type: 'array', items: { type: 'string' } },
+            debtId: { type: 'string' },
+          },
+          required: ['transactionIds', 'debtId'],
+        },
+        run: async (args) => {
+          const result = await this.proposeTools.proposeLinkToDebt(userId, conversationId, args as any);
           createdActionId = result.actionId;
           return `Proposal created (id=${result.actionId}): ${result.summary}`;
         },

@@ -9,8 +9,11 @@ import { TransactionsService } from '../transactions/transactions.service';
 import { CategoriesService } from '../categories/categories.service';
 import { BudgetsService } from '../budgets/budgets.service';
 import { NetWorthGoalService } from '../net-worth-goal/net-worth-goal.service';
+import { ProjectsService } from '../projects/projects.service';
 
 interface CategorizeTransactionsPayload { transactionIds: string[]; categoryId: string }
+interface LinkToProjectPayload { transactionIds: string[]; projectId: string; projectCategoryId: string | null }
+interface LinkToDebtPayload { transactionIds: string[]; debtId: string }
 interface CreateCategoryPayload { name: string; type: string; wantNeed: 'want' | 'need' | null; icon: string; color: string }
 interface SetBudgetPayload { categoryId: string; month: string; amount: number }
 interface SetNetWorthTargetDatePayload { targetDate: string | null }
@@ -26,6 +29,7 @@ export class AiActionsService {
     private categories: CategoriesService,
     private budgets: BudgetsService,
     private netWorthGoal: NetWorthGoalService,
+    private projects: ProjectsService,
   ) {}
 
   private async owned(actionId: string, userId: string): Promise<AiPendingAction> {
@@ -55,6 +59,34 @@ export class AiActionsService {
       }
       action.undoPayload = { transactions: undoEntries };
       resultText = `Categorized ${applied} of ${payload.transactionIds.length} transaction${payload.transactionIds.length === 1 ? '' : 's'}.`;
+    } else if (action.type === 'link_to_project') {
+      const payload = action.payload as unknown as LinkToProjectPayload;
+      const undoEntries: NonNullable<AiPendingAction['undoPayload']>['transactions'] = [];
+      let applied = 0;
+      for (const transactionId of payload.transactionIds) {
+        const before = await this.txRepo.findOneBy({ id: transactionId, userId });
+        if (!before || before.debtId) continue; // vanished or became a debt payment since the proposal
+        undoEntries.push({
+          transactionId, previousCategoryId: before.categoryId ?? null,
+          previousProjectId: before.projectId ?? null, previousProjectCategoryId: before.projectCategoryId ?? null,
+        });
+        await this.projects.linkTransaction(payload.projectId, transactionId, userId, payload.projectCategoryId ?? undefined);
+        // Project rows carry no budget category (same as the Transactions page's link flow).
+        if (before.categoryId) await this.transactions.updateCategory(transactionId, userId, null);
+        applied++;
+      }
+      action.undoPayload = { transactions: undoEntries };
+      resultText = `Linked ${applied} of ${payload.transactionIds.length} transaction${payload.transactionIds.length === 1 ? '' : 's'} to the project.`;
+    } else if (action.type === 'link_to_debt') {
+      const payload = action.payload as unknown as LinkToDebtPayload;
+      let applied = 0;
+      for (const transactionId of payload.transactionIds) {
+        const before = await this.txRepo.findOneBy({ id: transactionId, userId });
+        if (!before || before.debtId) continue; // vanished or already recorded against a debt
+        await this.transactions.updateDebt(transactionId, userId, payload.debtId); // clears the category and records the payment
+        applied++;
+      }
+      resultText = `Recorded ${applied} of ${payload.transactionIds.length} transaction${payload.transactionIds.length === 1 ? '' : 's'} on the debt.`;
     } else if (action.type === 'create_category') {
       const payload = action.payload as unknown as CreateCategoryPayload;
       const created = await this.categories.create(userId, payload);
@@ -85,13 +117,33 @@ export class AiActionsService {
 
   async undo(actionId: string, userId: string): Promise<{ reverted: number; skipped: number }> {
     const action = await this.owned(actionId, userId);
-    if (action.type !== 'categorize_transactions') throw new BadRequestException('Only categorization changes can be undone.');
+    if (action.type !== 'categorize_transactions' && action.type !== 'link_to_project') {
+      throw new BadRequestException(action.type === 'link_to_debt'
+        ? 'A debt payment is undone from the Debts page, where its payment record lives.'
+        : 'Only categorization changes can be undone.');
+    }
     if (action.status !== 'confirmed') throw new BadRequestException('Only a confirmed action can be undone.');
     if (action.undoneAt) throw new BadRequestException('This action was already undone.');
 
-    const payload = action.payload as unknown as CategorizeTransactionsPayload;
     const undoPayload = action.undoPayload!;
     let reverted = 0, skipped = 0;
+
+    if (action.type === 'link_to_project') {
+      const payload = action.payload as unknown as LinkToProjectPayload;
+      for (const entry of undoPayload.transactions) {
+        const current = await this.txRepo.findOneBy({ id: entry.transactionId, userId });
+        if (!current || current.projectId !== payload.projectId) { skipped++; continue; } // relinked since — don't clobber
+        if (entry.previousProjectId) await this.projects.linkTransaction(entry.previousProjectId, entry.transactionId, userId, entry.previousProjectCategoryId ?? undefined);
+        else await this.projects.unlinkTransaction(entry.transactionId, userId);
+        if (entry.previousCategoryId) await this.transactions.updateCategory(entry.transactionId, userId, entry.previousCategoryId);
+        reverted++;
+      }
+      action.undoneAt = new Date();
+      await this.actions.save(action);
+      return { reverted, skipped };
+    }
+
+    const payload = action.payload as unknown as CategorizeTransactionsPayload;
     for (const entry of undoPayload.transactions) {
       const current = await this.txRepo.findOneBy({ id: entry.transactionId, userId });
       if (!current || current.categoryId !== payload.categoryId) { skipped++; continue; } // changed since — don't clobber

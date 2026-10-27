@@ -8,10 +8,18 @@ export type AiPendingActionType =
   | 'categorize_transactions'
   | 'create_category'
   | 'set_budget'
-  | 'set_net_worth_target_date';
+  | 'set_net_worth_target_date'
+  | 'link_to_project'
+  | 'link_to_debt';
 
 export interface AiUndoPayload {
-  transactions: { transactionId: string; previousCategoryId: string | null }[];
+  transactions: {
+    transactionId: string;
+    previousCategoryId: string | null;
+    /* link_to_project only: what the row pointed at before the link. */
+    previousProjectId?: string | null;
+    previousProjectCategoryId?: string | null;
+  }[];
 }
 
 @Entity('ai_pending_actions')

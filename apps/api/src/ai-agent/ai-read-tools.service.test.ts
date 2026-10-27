@@ -27,9 +27,9 @@ describe('AiReadToolsService', () => {
 
   // Real constructor order: (txRepo, transactions, categories, budgets, netWorthGoal,
   // bankAccounts, debts, creditCards). Only what each test touches is real.
-  function makeService(creditCards: any = {}) {
+  function makeService(creditCards: any = {}, projects: any = {}) {
     return new AiReadToolsService(
-      ds.getRepository(Transaction), {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, creditCards,
+      ds.getRepository(Transaction), {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, creditCards, projects as any,
     );
   }
 
@@ -52,6 +52,33 @@ describe('AiReadToolsService', () => {
     expect(byName.Chevron).toMatchObject({ accountId: grey.id, account: 'GREY BOA' });
     expect(byName.Publix).toMatchObject({ accountId: red.id, account: 'RED BOA' });
     expect(byName['Cash gift']).toMatchObject({ accountId: null, account: null });
+  });
+
+  it('exposes project and debt links, and keeps linked rows out of the uncategorized list', async () => {
+    const pcats = ds.getRepository(ProjectCategory);
+    const fees = await pcats.save(pcats.create({ userId: 'u1', projectType: 'trading', type: 'expense', name: 'Platform fees' }));
+    const tx = ds.getRepository(Transaction);
+    await tx.save(tx.create({ userId: 'u1', name: 'TOPSTEP', amount: -85, date: '2026-10-08', projectId: 'proj-1', projectCategoryId: fees.id }));
+    await tx.save(tx.create({ userId: 'u1', name: 'Zelle from Osmany', amount: 1900, date: '2026-10-09', debtId: 'debt-1' }));
+
+    const all = await makeService().getTransactions('u1', {});
+    const byName = Object.fromEntries(all.map((r) => [r.name, r]));
+    expect(byName.TOPSTEP).toMatchObject({ projectId: 'proj-1', projectCategory: 'Platform fees', categoryId: null, debtId: null });
+    expect(byName['Zelle from Osmany']).toMatchObject({ debtId: 'debt-1', projectId: null });
+
+    const uncat = await makeService().getTransactions('u1', { uncategorizedOnly: true });
+    expect(uncat.map((r) => r.name).sort()).toEqual(['Cash gift', 'Chevron', 'Publix']);
+  });
+
+  it('lists projects with the categories they accept and flags closed ones', async () => {
+    const findAllByUser = async () => [
+      { id: 'p1', name: 'Trading', type: 'trading', icon: '📈', status: 'active', expenses: 340, income: 991, txCount: 5,
+        categories: [{ id: 'c1', name: 'Platform fees', type: 'expense', description: null }] },
+      { id: 'p2', name: 'Civic flip', type: 'vehicle', icon: '🚗', status: 'sold', expenses: 0, income: 0, txCount: 0, categories: [] },
+    ];
+    const rows = await makeService({}, { findAllByUser }).getProjects('u1');
+    expect(rows[0]).toMatchObject({ id: 'p1', closed: false, categories: [{ id: 'c1', name: 'Platform fees' }] });
+    expect(rows[1]).toMatchObject({ id: 'p2', closed: true });
   });
 
   it('filters by account', async () => {

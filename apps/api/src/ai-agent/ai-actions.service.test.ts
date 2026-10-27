@@ -54,16 +54,18 @@ function makeService(
   actionsRepo: ReturnType<typeof makeFakeRepo<AiPendingAction>>,
   conversationsRepo: ReturnType<typeof makeFakeRepo<AiConversation>>,
   updateCategory: ReturnType<typeof vi.fn>,
+  extra: { updateDebt?: ReturnType<typeof vi.fn>; projects?: Record<string, ReturnType<typeof vi.fn>> } = {},
 ) {
   return new AiActionsService(
     actionsRepo as any,
     conversationsRepo as any,
     ds.getRepository(Transaction),
     ds.getRepository(Category),
-    { updateCategory } as any,
+    { updateCategory, updateDebt: extra.updateDebt ?? vi.fn() } as any,
     {} as any,
     {} as any,
     {} as any,
+    (extra.projects ?? {}) as any,
   );
 }
 
@@ -164,5 +166,105 @@ describe('AiActionsService.confirm — categorize_transactions', () => {
 
     expect(updateCategory).not.toHaveBeenCalled();
     expect(resultText).toBe('Categorized 0 of 1 transaction.');
+  });
+});
+
+describe('AiActionsService — link_to_project / link_to_debt', () => {
+  let ds: Awaited<ReturnType<typeof makeDataSource>>;
+  let actionsRepo: ReturnType<typeof makeFakeRepo<AiPendingAction>>;
+  let conversationsRepo: ReturnType<typeof makeFakeRepo<AiConversation>>;
+  let userId: string;
+  let conversationId: string;
+  let categoryId: string;
+
+  beforeEach(async () => {
+    ds = await makeDataSource();
+    actionsRepo = makeFakeRepo<AiPendingAction>();
+    conversationsRepo = makeFakeRepo<AiConversation>();
+    const user = await ds.getRepository(User).save(ds.getRepository(User).create({ email: 'b@example.com' }));
+    userId = user.id;
+    const category = await ds.getRepository(Category).save(ds.getRepository(Category).create({ userId, name: 'Shopping', type: 'expense', icon: '🛍️', color: '#000' }));
+    categoryId = category.id;
+    conversationId = (await conversationsRepo.save(conversationsRepo.create({ userId } as any))).id;
+  });
+
+  const makeTx = (overrides: Partial<Transaction> = {}) =>
+    ds.getRepository(Transaction).save(ds.getRepository(Transaction).create({ userId, amount: -85, name: 'TOPSTEP', date: '2026-10-05', ...overrides }));
+
+  it('confirm links each row to the project, clears its budget category and snapshots the previous state for undo', async () => {
+    const tx = await makeTx({ categoryId });
+    const action = await actionsRepo.save(actionsRepo.create({
+      conversationId, type: 'link_to_project', payload: { transactionIds: [tx.id], projectId: 'proj-1', projectCategoryId: 'pcat-1' }, status: 'pending',
+    } as any));
+    const updateCategory = vi.fn().mockResolvedValue({});
+    const linkTransaction = vi.fn().mockResolvedValue(undefined);
+    const service = makeService(ds, actionsRepo, conversationsRepo, updateCategory, { projects: { linkTransaction } });
+
+    const { resultText, action: resolved } = await service.confirm(action.id, userId);
+
+    expect(linkTransaction).toHaveBeenCalledWith('proj-1', tx.id, userId, 'pcat-1');
+    expect(updateCategory).toHaveBeenCalledWith(tx.id, userId, null);
+    expect(resultText).toBe('Linked 1 of 1 transaction to the project.');
+    expect(resolved.undoPayload!.transactions).toEqual([{ transactionId: tx.id, previousCategoryId: categoryId, previousProjectId: null, previousProjectCategoryId: null }]);
+  });
+
+  it('confirm skips a row that became a debt payment since the proposal', async () => {
+    const tx = await makeTx({ debtId: 'debt-9' });
+    const action = await actionsRepo.save(actionsRepo.create({
+      conversationId, type: 'link_to_project', payload: { transactionIds: [tx.id], projectId: 'proj-1', projectCategoryId: null }, status: 'pending',
+    } as any));
+    const linkTransaction = vi.fn();
+    const service = makeService(ds, actionsRepo, conversationsRepo, vi.fn(), { projects: { linkTransaction } });
+    const { resultText } = await service.confirm(action.id, userId);
+    expect(linkTransaction).not.toHaveBeenCalled();
+    expect(resultText).toBe('Linked 0 of 1 transaction to the project.');
+  });
+
+  it('undo of a project link unlinks the row and restores its old category, but leaves a row that was relinked elsewhere', async () => {
+    const tx = await makeTx({ categoryId });
+    const moved = await makeTx({ name: 'Amazon' });
+    const action = await actionsRepo.save(actionsRepo.create({
+      conversationId, type: 'link_to_project', status: 'confirmed',
+      payload: { transactionIds: [tx.id, moved.id], projectId: 'proj-1', projectCategoryId: null },
+      undoPayload: { transactions: [
+        { transactionId: tx.id, previousCategoryId: categoryId, previousProjectId: null, previousProjectCategoryId: null },
+        { transactionId: moved.id, previousCategoryId: null, previousProjectId: null, previousProjectCategoryId: null },
+      ] },
+    } as any));
+    await ds.getRepository(Transaction).update(tx.id, { projectId: 'proj-1', categoryId: null });
+    await ds.getRepository(Transaction).update(moved.id, { projectId: 'proj-2' }); // user moved it to another project since
+    const updateCategory = vi.fn().mockResolvedValue({});
+    const unlinkTransaction = vi.fn().mockResolvedValue(undefined);
+    const service = makeService(ds, actionsRepo, conversationsRepo, updateCategory, { projects: { unlinkTransaction, linkTransaction: vi.fn() } });
+
+    const result = await service.undo(action.id, userId);
+
+    expect(result).toEqual({ reverted: 1, skipped: 1 });
+    expect(unlinkTransaction).toHaveBeenCalledWith(tx.id, userId);
+    expect(updateCategory).toHaveBeenCalledWith(tx.id, userId, categoryId);
+  });
+
+  it('confirm records a debt payment through the transactions service and skips rows already on a debt', async () => {
+    const fresh = await makeTx({ name: 'Zelle from Osmany', amount: 1900 });
+    const taken = await makeTx({ name: 'Old repayment', amount: 500, debtId: 'debt-1' });
+    const action = await actionsRepo.save(actionsRepo.create({
+      conversationId, type: 'link_to_debt', payload: { transactionIds: [fresh.id, taken.id], debtId: 'debt-1' }, status: 'pending',
+    } as any));
+    const updateDebt = vi.fn().mockResolvedValue({});
+    const service = makeService(ds, actionsRepo, conversationsRepo, vi.fn(), { updateDebt });
+
+    const { resultText } = await service.confirm(action.id, userId);
+
+    expect(updateDebt).toHaveBeenCalledTimes(1);
+    expect(updateDebt).toHaveBeenCalledWith(fresh.id, userId, 'debt-1');
+    expect(resultText).toBe('Recorded 1 of 2 transactions on the debt.');
+  });
+
+  it('refuses to undo a debt link and points at the Debts page', async () => {
+    const action = await actionsRepo.save(actionsRepo.create({
+      conversationId, type: 'link_to_debt', status: 'confirmed', payload: { transactionIds: [], debtId: 'debt-1' },
+    } as any));
+    const service = makeService(ds, actionsRepo, conversationsRepo, vi.fn());
+    await expect(service.undo(action.id, userId)).rejects.toThrow(/Debts page/);
   });
 });

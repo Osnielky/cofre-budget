@@ -10,5 +10,6 @@ import { ProjectsController } from './projects.controller';
   imports: [TypeOrmModule.forFeature([Project, ProjectCategory, Transaction])],
   controllers: [ProjectsController],
   providers: [ProjectsService],
+  exports: [ProjectsService],
 })
 export class ProjectsModule {}

@@ -12,6 +12,7 @@ import { TRACKING_TYPES } from '../bank-accounts/account-types';
 import { computeSavingsTrend } from './ai-savings-trend.math';
 import { computeSafeToSpend } from './ai-safe-to-spend.math';
 import type { SavingsTrendWidgetData, SafeToSpendWidgetData } from './ai-message.entity';
+import { ProjectsService } from '../projects/projects.service';
 import { CreditCardsService } from '../cards/credit-cards.service';
 import { summarizeCreditCards, type AiCreditCardsSummary } from './ai-credit-cards.summary';
 
@@ -41,12 +42,14 @@ export class AiReadToolsService {
     private bankAccounts: BankAccountsService,
     private debts: DebtsService,
     private creditCards: CreditCardsService,
+    private projects: ProjectsService,
   ) {}
 
   async getTransactions(userId: string, args: GetTransactionsArgs) {
     const qb = this.txRepo.createQueryBuilder('tx')
       .leftJoinAndSelect('tx.categoryRef', 'categoryRef')
       .leftJoinAndSelect('tx.bankAccount', 'bankAccount')
+      .leftJoinAndSelect('tx.projectCategoryRef', 'projectCategoryRef')
       .where('tx.userId = :userId', { userId })
       .andWhere('tx.isSplitParent = false')
       .orderBy('tx.date', 'DESC')
@@ -57,7 +60,9 @@ export class AiReadToolsService {
     if (args.categoryId) qb.andWhere('tx.categoryId = :categoryId', { categoryId: args.categoryId });
     // Tracking accounts (investment, mortgage, other assets/liabilities) are net-worth only;
     // their internal movements never need a category, so don't offer them for review.
-    if (args.uncategorizedOnly) qb.andWhere('tx.categoryId IS NULL AND (bankAccount.accountType IS NULL OR bankAccount.accountType NOT IN (:...tracking))', { tracking: ['investment', 'mortgage', 'other_asset', 'other_liability'] });
+    // A row linked to a project or a debt is categorized by that link (the app's own
+    // convention: such rows carry categoryId = null), so it is not "uncategorized".
+    if (args.uncategorizedOnly) qb.andWhere('tx.categoryId IS NULL AND tx.projectId IS NULL AND tx.debtId IS NULL AND (bankAccount.accountType IS NULL OR bankAccount.accountType NOT IN (:...tracking))', { tracking: ['investment', 'mortgage', 'other_asset', 'other_liability'] });
     if (args.accountId) qb.andWhere('tx.bankAccountId = :accountId', { accountId: args.accountId });
     if (args.merchant) qb.andWhere('(tx.merchantName ILIKE :m OR tx.name ILIKE :m)', { m: `%${args.merchant}%` });
 
@@ -66,6 +71,19 @@ export class AiReadToolsService {
       id: t.id, date: t.date, name: t.name, merchantName: t.merchantName ?? null,
       amount: Number(t.amount), categoryId: t.categoryId ?? null, category: t.categoryRef?.name ?? null,
       accountId: t.bankAccountId ?? null, account: t.bankAccount?.accountName ?? null,
+      projectId: t.projectId ?? null, projectCategory: t.projectCategoryRef?.name ?? null,
+      debtId: t.debtId ?? null,
+    }));
+  }
+
+  /** Projects (side ventures, flips, businesses) with the categories each one accepts. */
+  async getProjects(userId: string) {
+    const rows = await this.projects.findAllByUser(userId);
+    return rows.map((p) => ({
+      id: p.id, name: p.name, type: p.type, icon: p.icon, status: p.status,
+      closed: p.status !== 'active',
+      expenses: p.expenses, income: p.income, transactionCount: p.txCount,
+      categories: p.categories.map((c) => ({ id: c.id, name: c.name, type: c.type, description: c.description ?? null })),
     }));
   }
 
