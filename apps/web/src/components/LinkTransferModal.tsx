@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import AccountTypeIcon from './AccountTypeIcon';
 import LinkIcon from './LinkIcon';
@@ -220,6 +220,27 @@ export default function LinkTransferModal({
     [accounts, tx.bankAccountId],
   );
 
+  /* The cash tab is one click too: with a single cash account it is pre-selected
+     the moment the tab opens, like the suggested match is. */
+  useEffect(() => {
+    if (tab === 'cash' && !chosenTx && !chosenAccountId && cashAccounts.length === 1) {
+      setChosenAccountId(cashAccounts[0].id);
+    }
+  }, [tab, chosenTx, chosenAccountId, cashAccounts]);
+
+  /* An ATM withdrawal with no counterpart has nothing to pair with, so open on
+     the cash tab instead of a "no matches" message that points there. Only
+     while the user is still on the default tab with nothing chosen. */
+  const cashWithdrawal = looksLikeCashWithdrawal(tx);
+  const autoJumped = useRef(false);
+  useEffect(() => {
+    if (autoJumped.current || matchesLoading) return;
+    autoJumped.current = true; // decide once; never pull the user back after they switch tabs
+    if (tab === 'suggested' && matches.length === 0 && cashWithdrawal && cashAccounts.length > 0 && !chosenTx) {
+      setTab('cash');
+    }
+  }, [matchesLoading, tab, matches.length, cashWithdrawal, cashAccounts.length, chosenTx]);
+
   const results = useMemo(
     () => (pool ? searchCandidates(tx, pool, query) as TransferTx[] : []),
     [pool, tx, query],
@@ -267,7 +288,6 @@ export default function LinkTransferModal({
 
   /* The cash tab is named for the direction of this transaction: an ATM
      withdrawal lands in cash, a cash deposit comes out of it. */
-  const cashWithdrawal = looksLikeCashWithdrawal(tx);
   const TABS: { id: Tab; label: string }[] = [
     { id: 'suggested', label: 'Suggested match' },
     { id: 'find', label: 'Find a transaction' },
@@ -522,7 +542,11 @@ export default function LinkTransferModal({
             className="flex items-center gap-2 px-6 py-2.5 text-sm font-bold text-white rounded-xl hover:brightness-110 disabled:opacity-40 transition-all"
             style={{ background: hasSelection ? 'var(--color-violet)' : '#6B6B8A' }}>
             <LinkIcon size={15} color="#fff" />
-            {linking ? 'Linking…' : hasSelection ? 'Link transactions' : 'Choose a transaction'}
+            {linking ? 'Linking…'
+              : chosenAccount ? `Link to ${chosenAccount.accountName}`
+              : hasSelection ? 'Link transactions'
+              : tab === 'cash' ? 'Choose a cash account'
+              : 'Choose a transaction'}
           </button>
         </div>
       </div>
