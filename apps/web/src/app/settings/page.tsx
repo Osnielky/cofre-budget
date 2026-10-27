@@ -247,6 +247,8 @@ function SettingsPageInner() {
   const [deleteTxCount, setDeleteTxCount] = useState<number | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [importAccount, setImportAccount] = useState<BankAccount | null>(null);
+  /* Phones: the account whose action chips are open (the row is a toggle). */
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [linkMode, setLinkMode] = useState<'connect' | 'reconnect'>('connect');
@@ -910,46 +912,132 @@ function SettingsPageInner() {
                   </p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2">
+                <>
+                {/* ── Phones: one card per bank — header (logo, name, status, sync), then a slim
+                    row per account that expands on tap to show its actions. ── */}
+                <div className="sm:hidden flex flex-col gap-3">
+                  {Array.from(accounts.reduce((m, a) => {
+                    const list = m.get(a.bankName); if (list) list.push(a); else m.set(a.bankName, [a]); return m;
+                  }, new Map<string, BankAccount[]>())).map(([bankName, list]) => {
+                    const first = list[0];
+                    const color = first.color || (TYPE_META[first.accountType] ?? TYPE_META.checking).accent;
+                    const connected = list.filter((a) => a.provider === 'plaid');
+                    const broken = connected.find((a) => a.plaidStatus === 'error');
+                    const syncable = connected.filter((a) => a.plaidItemId && a.plaidStatus !== 'error');
+                    const syncingGroup = list.some((a) => a.id === syncingId);
+                    const statusColor = broken ? 'var(--color-rose)' : connected.length ? 'var(--color-green)' : 'var(--color-text-muted)';
+                    return (
+                      <div key={bankName} className="rounded-2xl overflow-hidden"
+                        style={{ background: 'var(--color-elevated)', border: `1px solid ${color}28`, borderLeft: `3px solid ${color}` }}>
+                        <div className="flex items-center gap-3 px-3 py-2.5" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                          <AccountVisual account={first} color={color} compact />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{bankName}</p>
+                            <p className="text-[10.5px] font-semibold flex items-center gap-1.5" style={{ color: statusColor }}>
+                              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'currentColor' }} />
+                              {list.length} account{list.length === 1 ? '' : 's'} · {broken ? 'Needs reconnect' : connected.length ? 'Synced' : 'Manual'}
+                            </p>
+                          </div>
+                          {broken ? (
+                            <button onClick={() => openReconnect(broken)} disabled={connecting}
+                              className="px-2.5 h-8 rounded-lg text-[11px] font-semibold disabled:opacity-40"
+                              style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>
+                              Reconnect
+                            </button>
+                          ) : syncable.length > 0 && (
+                            <button disabled={syncingGroup} aria-label={`Sync ${bankName} now`} title="Sync now"
+                              onClick={async () => {
+                                const seen = new Set<string>();
+                                for (const a of syncable) { if (seen.has(a.plaidItemId!)) continue; seen.add(a.plaidItemId!); await handleSync(a); }
+                              }}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-40"
+                              style={{ color: syncingGroup ? 'var(--color-text-muted)' : 'var(--color-green)', border: '1px solid var(--color-border)' }}>
+                              <SyncIcon spinning={syncingGroup} />
+                            </button>
+                          )}
+                        </div>
+                        {list.map((account, i) => {
+                          const meta = TYPE_META[account.accountType as AccountType] ?? TYPE_META.checking;
+                          const balance = Number(account.balance);
+                          const owed = isLiability(account.accountType) && balance > 0;
+                          const open = expandedId === account.id;
+                          const isConnected = account.provider === 'plaid';
+                          const isCash = account.accountType === 'cash';
+                          const unsetCash = isCash && balance === 0 && (account.txCount ?? 0) === 0;
+                          const chip = 'flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-semibold disabled:opacity-40';
+                          return (
+                            <div key={account.id} style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : undefined}>
+                              <button type="button" onClick={() => setExpandedId(open ? null : account.id)} aria-expanded={open}
+                                className="w-full flex items-center gap-3 px-3 py-2.5 text-left">
+                                <span className="w-1 h-8 rounded-full shrink-0" style={{ background: meta.accent }} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-[13px] truncate" style={{ color: 'var(--color-text-primary)' }}>{account.accountName}</p>
+                                  <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                                    {meta.label}{account.last4 ? ` ···${account.last4}` : ''}{account.currency !== 'USD' ? ` · ${account.currency}` : ''}
+                                    {isConnected && account.plaidStatus === 'error' && <span style={{ color: 'var(--color-rose)' }}> · Needs reconnect</span>}
+                                    {!isConnected && !isCash && connected.length > 0 && ' · Manual'}
+                                  </p>
+                                  {unsetCash && (
+                                    <p className="text-[10.5px] font-semibold mt-0.5" style={{ color: 'var(--color-amber)' }}>Set how much cash you have → tap, then Edit</p>
+                                  )}
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="font-black text-sm tabular-nums" style={{ color: owed ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>
+                                    {owed ? '−' : ''}{account.currency === 'USD' ? '$' : `${account.currency} `}{Math.abs(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </p>
+                                  {owed && <p className="text-[10px] font-semibold" style={{ color: 'color-mix(in srgb, var(--color-rose) 60%, transparent)' }}>owed</p>}
+                                </div>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+                                  className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} style={{ color: 'var(--color-text-muted)' }}>
+                                  <path d="M6 9l6 6 6-6" />
+                                </svg>
+                              </button>
+                              {open && (
+                                <div className="flex flex-wrap gap-2 px-3 pb-3">
+                                  <button onClick={() => openEdit(account)} className={chip}
+                                    style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}><EditIcon /> Edit</button>
+                                  <button onClick={() => setImportAccount(account)} className={chip}
+                                    style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}><UploadIcon /> Import CSV</button>
+                                  {isConnected && (account.plaidStatus === 'error' ? (
+                                    <button onClick={() => openReconnect(account)} disabled={connecting} className={chip}
+                                      style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>Reconnect</button>
+                                  ) : (
+                                    <button onClick={() => handleSync(account)} disabled={syncingId === account.id} className={chip}
+                                      style={{ color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 35%, transparent)' }}>
+                                      <SyncIcon spinning={syncingId === account.id} /> Sync now
+                                    </button>
+                                  ))}
+                                  <button onClick={() => openDeleteConfirm(account)} disabled={deletingId === account.id} className={`${chip} ml-auto`}
+                                    style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>
+                                    {deletingId === account.id ? '…' : <><TrashIcon /> Remove</>}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* ── Desktop: one full card per account. ── */}
+                <div className="hidden sm:flex flex-col gap-2">
                   {accounts.map((account) => {
                     const meta       = TYPE_META[account.accountType as AccountType] ?? TYPE_META.checking;
                     const color      = account.color || meta.accent;
                     const balance    = Number(account.balance);
                     const isDebt     = isLiability(account.accountType);
                     const isConnected = account.provider === 'plaid';
-                    const bankMeta   = BANKS.find((b) => b.name === account.bankName);
                     const isCash     = account.accountType === 'cash';
 
                     return (
                       <div key={account.id}
-                        className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-2 sm:gap-4 px-3 sm:px-4 py-3 sm:py-3.5 rounded-2xl transition-all hover:brightness-110"
+                        className="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all hover:brightness-110"
                         style={{ background: 'var(--color-elevated)', border: `1px solid ${color}28`, borderLeft: `3px solid ${color}` }}>
 
                         {/* Mini card visual */}
-                        <div className="shrink-0 w-14 h-10 rounded-xl flex flex-col items-center justify-center relative overflow-hidden"
-                          style={{ background: `linear-gradient(135deg, ${color}55 0%, ${color}22 100%)`, border: `1px solid ${color}44` }}>
-                          {isCash ? (
-                            <span className="text-xl">💵</span>
-                          ) : bankMeta ? (
-                            <img src={`https://logo.clearbit.com/${bankMeta.domain}`}
-                              alt={account.bankName} width={28} height={28}
-                              style={{ objectFit: 'contain', borderRadius: 4, background: 'white', padding: 2 }}
-                              onError={(e) => {
-                                const img = e.currentTarget;
-                                img.src = `https://www.google.com/s2/favicons?domain=${bankMeta.domain}&sz=64`;
-                                img.style.background = 'transparent';
-                                img.style.padding = '0';
-                              }} />
-                          ) : (
-                            <AccountTypeIcon type={account.accountType} size={22} />
-                          )}
-                          {account.last4 && (
-                            <span className="text-[8px] font-bold tracking-widest leading-none mt-0.5"
-                              style={{ color: 'var(--color-text-secondary)' }}>
-                              ···{account.last4}
-                            </span>
-                          )}
-                        </div>
+                        <AccountVisual account={account} color={color} />
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
@@ -994,11 +1082,10 @@ function SettingsPageInner() {
                           )}
                         </div>
 
-                        {/* Balance + actions: their own row on phones (indented under the
-                            name), inline cells from sm up via display: contents. */}
-                        <div className="basis-full sm:basis-auto sm:contents flex items-center justify-between gap-2 pl-[4.25rem]">
+                        {/* Balance + actions (this card is desktop-only; phones use the grouped list above). */}
+                        <div className="contents">
                         <div className="text-right shrink-0">
-                          <p className="font-black text-sm sm:text-base tabular-nums"
+                          <p className="font-black text-base tabular-nums"
                             style={{ color: isDebt && balance > 0 ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>
                             {isDebt && balance > 0 ? '−' : ''}{account.currency} {Math.abs(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </p>
@@ -1046,6 +1133,7 @@ function SettingsPageInner() {
                     );
                   })}
                 </div>
+                </>
               )}
             </></div>
           )}
@@ -1232,6 +1320,38 @@ export default function SettingsPage() {
     <Suspense fallback={null}>
       <SettingsPageInner />
     </Suspense>
+  );
+}
+
+/** The bank logo (or cash / type icon) tile; `compact` is the smaller phone-header size without the last-4. */
+function AccountVisual({ account, color, compact = false }: { account: BankAccount; color: string; compact?: boolean }) {
+  const bankMeta = BANKS.find((b) => b.name === account.bankName);
+  const isCash = account.accountType === 'cash';
+  return (
+    <div className={`shrink-0 ${compact ? 'w-10 h-9' : 'w-14 h-10'} rounded-xl flex flex-col items-center justify-center relative overflow-hidden`}
+      style={{ background: `linear-gradient(135deg, ${color}55 0%, ${color}22 100%)`, border: `1px solid ${color}44` }}>
+      {isCash ? (
+        <span className={compact ? 'text-base' : 'text-xl'}>💵</span>
+      ) : bankMeta ? (
+        // eslint-disable-next-line @next/next/no-img-element -- third-party logo lookup by domain
+        <img src={`https://logo.clearbit.com/${bankMeta.domain}`}
+          alt={account.bankName} width={compact ? 22 : 28} height={compact ? 22 : 28}
+          style={{ objectFit: 'contain', borderRadius: 4, background: 'white', padding: 2 }}
+          onError={(e) => {
+            const img = e.currentTarget;
+            img.src = `https://www.google.com/s2/favicons?domain=${bankMeta.domain}&sz=64`;
+            img.style.background = 'transparent';
+            img.style.padding = '0';
+          }} />
+      ) : (
+        <AccountTypeIcon type={account.accountType} size={compact ? 18 : 22} />
+      )}
+      {!compact && account.last4 && (
+        <span className="text-[8px] font-bold tracking-widest leading-none mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+          ···{account.last4}
+        </span>
+      )}
+    </div>
   );
 }
 
