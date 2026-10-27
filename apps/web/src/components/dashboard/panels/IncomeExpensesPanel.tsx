@@ -61,12 +61,15 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
   const empty = !loading && income === 0 && expenses === 0;
 
   const perMo = (v: number) => `avg ${money(+(v / months).toFixed(2))}/mo`;
+  /* `phone` = Tailwind order class below sm, where Net leads as a full-width hero and
+     income sits beside expenses (personal row, then project row). From sm the DOM
+     order (income → expenses → net) is restored by `sm:order-none`. */
   const tiles = [
-    { label: 'Total Income',           value: revPersonal, color: tc.green,  icon: I_TRENDUP },
-    { label: 'Total Project Income',   value: revProject,  color: tc.greenSoft, icon: I_BRIEFCASE },
-    { label: 'Total Expenses',         value: expPersonal, color: tc.rose,      icon: I_WALLET },
-    { label: 'Total Project Expenses', value: expProject,  color: tc.roseSoft,  icon: I_FOLDER },
-    { label: 'Net Total',              value: net,         color: tc.violet, icon: I_CHART },
+    { label: 'Total Income',           value: revPersonal, color: tc.green,     icon: I_TRENDUP,   phone: 'order-1' },
+    { label: 'Total Project Income',   value: revProject,  color: tc.greenSoft, icon: I_BRIEFCASE, phone: 'order-3' },
+    { label: 'Total Expenses',         value: expPersonal, color: tc.rose,      icon: I_WALLET,    phone: 'order-2' },
+    { label: 'Total Project Expenses', value: expProject,  color: tc.roseSoft,  icon: I_FOLDER,    phone: 'order-4' },
+    { label: 'Net Total',              value: net,         color: tc.violet,    icon: I_CHART,     phone: 'order-first', hero: true },
   ];
 
   /* Insight strip: superlative months, derived from the same series. */
@@ -77,11 +80,11 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
   const hiExpenseIdx = data.length ? argmax((m) => m.expPersonal + m.expProject) : 0;
   const bestNetIdx   = data.length ? argmax((m) => m.net) : 0;
   const highlights = data.length ? [
-    { label: 'Highest Income Month',  color: tc.green,  icon: I_BARS_UP,
+    { label: 'Highest Income Month',  short: 'Highest income',  color: tc.green,  icon: I_BARS_UP,
       text: `${monthFull(hiIncomeIdx)} – ${money(data[hiIncomeIdx].revPersonal + data[hiIncomeIdx].revProject)}` },
-    { label: 'Highest Expense Month', color: tc.rose,   icon: I_BARS_DN,
+    { label: 'Highest Expense Month', short: 'Highest expense', color: tc.rose,   icon: I_BARS_DN,
       text: `${monthFull(hiExpenseIdx)} – ${money(data[hiExpenseIdx].expPersonal + data[hiExpenseIdx].expProject)}` },
-    { label: 'Best Net Month',        color: tc.violet, icon: I_TRENDUP,
+    { label: 'Best Net Month',        short: 'Best net',        color: tc.violet, icon: I_TRENDUP,
       text: `${monthFull(bestNetIdx)} – ${money(data[bestNetIdx].net)}` },
   ] : [];
 
@@ -89,15 +92,30 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
     <Panel colSpan={2} loading={loading}
       title={<><span style={{ color: tc.green }}>Income</span> vs <span style={{ color: tc.rose }}>Expenses</span></>}
       subtitle={`${new Date().getFullYear()} · year to date`}
-      legend={<Legend items={[
-        { label: 'Income', color: tc.green }, { label: 'Project income', color: tc.greenSoft },
-        { label: 'Expenses', color: tc.rose }, { label: 'Project expenses', color: tc.roseSoft },
-        { label: 'Net', color: tc.violet, line: true },
-      ]} />}>
+      legend={
+        /* The five-item legend wraps to two lines on phones; there the tiles below carry the
+           colours and a three-item legend sits beside the axis label instead. */
+        <span className="hidden sm:block">
+          <Legend items={[
+            { label: 'Income', color: tc.green }, { label: 'Project income', color: tc.greenSoft },
+            { label: 'Expenses', color: tc.rose }, { label: 'Project expenses', color: tc.roseSoft },
+            { label: 'Net', color: tc.violet, line: true },
+          ]} />
+        </span>
+      }>
       {empty ? <PanelEmpty message="No cash-flow activity this year yet." /> : (
         <>
-          <p className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>Amount (USD)</p>
-          <ResponsiveContainer width="100%" height={230}>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>Amount (USD)</p>
+            <span className="sm:hidden">
+              <Legend items={[
+                { label: 'Income', color: tc.green }, { label: 'Expenses', color: tc.rose },
+                { label: 'Net', color: tc.violet, line: true },
+              ]} />
+            </span>
+          </div>
+          <div className="h-50 sm:h-57.5 -ml-2 sm:ml-0">
+          <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} barCategoryGap="24%" barGap={2}>
               <defs>
                 <linearGradient id="ivxNetFade" x1="0" y1="0" x2="0" y2="1">
@@ -134,17 +152,21 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
                 activeDot={{ r: 5, fill: tc.violet, stroke: tc.elevated, strokeWidth: 2 }} />
             </ComposedChart>
           </ResponsiveContainer>
+          </div>
 
           {/* ── Series totals ── */}
-          {/* Phones: two tiles per row (no chip) instead of five stacked; from sm the chips return and auto-fit decides. */}
+          {/* Phones: Net is a full-width hero tile (with its chip), then income | expenses and
+              project income | project expenses two-up without chips. From sm the chips return,
+              the DOM order holds and auto-fit decides how many fit per row. */}
           <div className="grid gap-2 sm:gap-2.5 [--tile-min:120px] sm:[--tile-min:178px]" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(var(--tile-min), 1fr))' }}>
             {tiles.map((t) => (
-              <div key={t.label} className="flex items-center gap-3 rounded-xl py-2 sm:py-2.5 px-3 min-w-0"
+              <div key={t.label}
+                className={`flex items-center gap-3 rounded-xl py-2 sm:py-2.5 px-3 min-w-0 ${t.phone} sm:order-none ${t.hero ? 'col-span-2 sm:col-span-1' : ''}`}
                 style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${t.color} 4%, transparent)` }}>
-                <span className="hidden sm:block"><Chip color={t.color} d={t.icon} /></span>
+                <span className={`${t.hero ? 'block' : 'hidden'} sm:block`}><Chip color={t.color} d={t.icon} /></span>
                 <div className="min-w-0">
                   <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-secondary)' }}>{t.label}</p>
-                  <p className="text-[14px] font-bold tabular-nums" style={{ color: t.color }}>{money(t.value)}</p>
+                  <p className={`${t.hero ? 'text-[19px]' : 'text-[14px]'} sm:text-[14px] font-bold tabular-nums`} style={{ color: t.color }}>{money(t.value)}</p>
                   <p className="text-[9.5px] truncate" style={{ color: 'var(--color-text-muted)' }}>{perMo(t.value)}</p>
                 </div>
               </div>
@@ -152,7 +174,9 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
           </div>
 
           {/* ── Insight strip ── */}
-          <div className="flex flex-wrap items-stretch gap-x-5 gap-y-2.5 rounded-xl py-2.5 px-3.5"
+          {/* Phones: the sentence, then one line per highlight (dot · label · value right-aligned).
+              From sm: chips with the label stacked over the value, separated by a left rule. */}
+          <div className="flex flex-wrap items-stretch gap-x-5 gap-y-2 sm:gap-y-2.5 rounded-xl py-2.5 px-3 sm:px-3.5"
             style={{ border: 'var(--glass-border)', background: 'color-mix(in srgb, var(--color-elevated) 55%, transparent)' }}>
             <div className="flex items-center gap-3 min-w-0 flex-1 basis-64">
               <Chip color={tc.violet} d={I_BULB} size={32} />
@@ -164,13 +188,17 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
                 </p>
               </div>
             </div>
-            {highlights.map((h) => (
-              <div key={h.label} className="flex items-center gap-2.5 min-w-0 pl-5"
-                style={{ borderLeft: '1px solid var(--color-border)' }}>
-                <Chip color={h.color} d={h.icon} size={32} />
-                <div className="min-w-0">
-                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-secondary)' }}>{h.label}</p>
-                  <p className="text-[12px] font-bold tabular-nums truncate" style={{ color: h.color }}>{h.text}</p>
+            {highlights.map((h, i) => (
+              <div key={h.label}
+                className={`flex items-center gap-2.5 min-w-0 w-full sm:w-auto sm:pl-5 sm:border-l ${i === 0 ? 'pt-2 border-t sm:pt-0 sm:border-t-0' : ''}`}
+                style={{ borderColor: 'var(--color-border)' }}>
+                <span className="hidden sm:block"><Chip color={h.color} d={h.icon} size={32} /></span>
+                <span aria-hidden="true" className="sm:hidden w-1.5 h-1.5 rounded-full shrink-0" style={{ background: h.color }} />
+                <div className="min-w-0 flex-1 flex items-center justify-between gap-3 sm:block">
+                  <p className="text-[10.5px] sm:text-[10px] truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                    <span className="sm:hidden">{h.short}</span><span className="hidden sm:inline">{h.label}</span>
+                  </p>
+                  <p className="text-[12px] font-bold tabular-nums truncate shrink-0 sm:shrink" style={{ color: h.color }}>{h.text}</p>
                 </div>
               </div>
             ))}

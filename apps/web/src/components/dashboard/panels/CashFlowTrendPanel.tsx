@@ -63,10 +63,11 @@ export default function CashFlowTrendPanel({ data, loading }: { data: TrendPoint
   const deltaPct = (cur: number, old: number) =>
     prev.length > 0 && old !== 0 ? +(((cur - old) / Math.abs(old)) * 100).toFixed(1) : null;
 
+  /* On phones Net leads as a full-width hero (`order-first`) above income | expenses. */
   const stats = [
-    { label: 'Average Income',   cur: avg(visible, (p) => p.income),   old: avg(prev, (p) => p.income),   color: tc.green,  icon: I_UP,    inverse: false },
-    { label: 'Average Expenses', cur: avg(visible, (p) => p.expenses), old: avg(prev, (p) => p.expenses), color: tc.orange, icon: I_DOWN,  inverse: true },
-    { label: 'Average Net',      cur: avg(visible, (p) => p.net),      old: avg(prev, (p) => p.net),      color: tc.violet, icon: I_PULSE, inverse: false },
+    { label: 'Average Income',   cur: avg(visible, (p) => p.income),   old: avg(prev, (p) => p.income),   color: tc.green,  icon: I_UP,    inverse: false, hero: false },
+    { label: 'Average Expenses', cur: avg(visible, (p) => p.expenses), old: avg(prev, (p) => p.expenses), color: tc.orange, icon: I_DOWN,  inverse: true,  hero: false },
+    { label: 'Average Net',      cur: avg(visible, (p) => p.net),      old: avg(prev, (p) => p.net),      color: tc.violet, icon: I_PULSE, inverse: false, hero: true },
   ].map((s) => ({ ...s, delta: deltaPct(s.cur, s.old) }));
 
   /* Footer superlatives — month names resolved from the YTD series position. */
@@ -82,7 +83,8 @@ export default function CashFlowTrendPanel({ data, loading }: { data: TrendPoint
   return (
     <Panel colSpan={2} title="Cash-Flow Trend" subtitle={range === 'YTD' ? 'Year to date' : `Last ${visible.length} months`} loading={loading}
       legend={
-        <div className="flex items-center gap-3 flex-wrap justify-end">
+        /* Phones: pills left, legend right on one line under the title; from sm both sit right. */
+        <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto justify-between sm:justify-end">
           <div className="flex items-center gap-0.5 p-0.5 rounded-lg" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
             {RANGES.map((r) => (
               <button key={r.id} onClick={() => setRange(r.id)}
@@ -104,17 +106,19 @@ export default function CashFlowTrendPanel({ data, loading }: { data: TrendPoint
       {empty ? <PanelEmpty message="No activity in this window." /> : (
         <div className="flex flex-col gap-3 flex-1">
           {/* Averages */}
-          {/* Phones: two tiles per row (no chip); from sm the chips return and auto-fit decides. */}
+          {/* Phones: Net is a full-width hero tile (with its chip) over income | expenses without
+              chips; from sm the chips return, DOM order holds and auto-fit decides. */}
           <div className="grid gap-2 sm:gap-2.5 [--tile-min:120px] sm:[--tile-min:170px]" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(var(--tile-min), 1fr))' }}>
             {stats.map((s) => {
               const good = s.delta == null ? true : (s.inverse ? s.delta < 0 : s.delta > 0);
               return (
-                <div key={s.label} className="flex items-center gap-3 rounded-xl py-2 sm:py-2.5 px-3 min-w-0"
+                <div key={s.label}
+                  className={`flex items-center gap-3 rounded-xl py-2 sm:py-2.5 px-3 min-w-0 ${s.hero ? 'order-first sm:order-none col-span-2 sm:col-span-1' : ''}`}
                   style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${s.color} 4%, transparent)` }}>
-                  <span className="hidden sm:block"><Chip color={s.color} d={s.icon} /></span>
+                  <span className={`${s.hero ? 'block' : 'hidden'} sm:block`}><Chip color={s.color} d={s.icon} /></span>
                   <div className="min-w-0">
                     <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-secondary)' }}>{s.label}</p>
-                    <p className="text-[14px] font-bold tabular-nums" style={{ color: s.color }}>{money(+s.cur.toFixed(2))}</p>
+                    <p className={`${s.hero ? 'text-[19px]' : 'text-[14px]'} sm:text-[14px] font-bold tabular-nums`} style={{ color: s.color }}>{money(+s.cur.toFixed(2))}</p>
                     {s.delta != null ? (
                       <p className="text-[9.5px] truncate" style={{ color: 'var(--color-text-muted)' }}>
                         vs previous {prev.length} mo{' '}
@@ -161,41 +165,31 @@ export default function CashFlowTrendPanel({ data, loading }: { data: TrendPoint
           </div>
 
           {/* Superlatives */}
-          <div className="flex flex-wrap items-stretch gap-x-5 gap-y-2.5 rounded-xl py-2.5 px-3.5 mt-auto"
+          {/* Phones: one line each (dot · label · value right-aligned). From sm: chips with the
+              label stacked over the value, the second and third separated by a left rule. */}
+          <div className="flex flex-wrap items-stretch gap-x-5 gap-y-2 sm:gap-y-2.5 rounded-xl py-2.5 px-3 sm:px-3.5 mt-auto"
             style={{ border: 'var(--glass-border)', background: 'color-mix(in srgb, var(--color-elevated) 55%, transparent)' }}>
-            {bestNet && (
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Chip color={tc.green} d={I_TROPHY} size={30} />
-                <div className="min-w-0">
-                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-secondary)' }}>Best net month</p>
-                  <p className="text-[12px] font-bold tabular-nums truncate" style={{ color: tc.green }}>
-                    {fullName(bestNet)} · {money(bestNet.net)}
+            {[
+              bestNet && { label: 'Best net month', short: 'Best net', color: tc.green, icon: I_TROPHY,
+                text: <>{fullName(bestNet)} · {money(bestNet.net)}</> },
+              hiExp && { label: 'Highest expense month', short: 'Highest expense', color: tc.orange, icon: I_UP,
+                text: <>{fullName(hiExp)} · {money(hiExp.expenses)}</> },
+              savingsRate != null && { label: 'Savings rate (avg)', short: 'Savings rate', color: tc.violet, icon: I_PCT,
+                text: <>{savingsRate}% <span className="font-normal" style={{ color: 'var(--color-text-muted)' }}>of income</span></> },
+            ].filter((h): h is Exclude<typeof h, false | undefined | null> => Boolean(h)).map((h, i) => (
+              <div key={h.label}
+                className={`flex items-center gap-2.5 min-w-0 w-full sm:w-auto ${i > 0 ? 'sm:pl-5 sm:border-l' : ''}`}
+                style={{ borderColor: 'var(--color-border)' }}>
+                <span className="hidden sm:block"><Chip color={h.color} d={h.icon} size={30} /></span>
+                <span aria-hidden="true" className="sm:hidden w-1.5 h-1.5 rounded-full shrink-0" style={{ background: h.color }} />
+                <div className="min-w-0 flex-1 flex items-center justify-between gap-3 sm:block">
+                  <p className="text-[10.5px] sm:text-[10px] truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                    <span className="sm:hidden">{h.short}</span><span className="hidden sm:inline">{h.label}</span>
                   </p>
+                  <p className="text-[12px] font-bold tabular-nums truncate shrink-0 sm:shrink" style={{ color: h.color }}>{h.text}</p>
                 </div>
               </div>
-            )}
-            {hiExp && (
-              <div className="flex items-center gap-2.5 min-w-0 pl-5" style={{ borderLeft: '1px solid var(--color-border)' }}>
-                <Chip color={tc.orange} d={I_UP} size={30} />
-                <div className="min-w-0">
-                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-secondary)' }}>Highest expense month</p>
-                  <p className="text-[12px] font-bold tabular-nums truncate" style={{ color: tc.orange }}>
-                    {fullName(hiExp)} · {money(hiExp.expenses)}
-                  </p>
-                </div>
-              </div>
-            )}
-            {savingsRate != null && (
-              <div className="flex items-center gap-2.5 min-w-0 pl-5" style={{ borderLeft: '1px solid var(--color-border)' }}>
-                <Chip color={tc.violet} d={I_PCT} size={30} />
-                <div className="min-w-0">
-                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-secondary)' }}>Savings rate (avg)</p>
-                  <p className="text-[12px] font-bold tabular-nums truncate" style={{ color: tc.violet }}>
-                    {savingsRate}% <span className="font-normal" style={{ color: 'var(--color-text-muted)' }}>of income</span>
-                  </p>
-                </div>
-              </div>
-            )}
+            ))}
           </div>
         </div>
       )}
