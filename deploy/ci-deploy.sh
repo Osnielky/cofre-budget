@@ -33,8 +33,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-API_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/api:src-$(deploy/src-hash.sh api)"
-WEB_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/web:src-$(deploy/src-hash.sh web)"
+# The build steps leave their hash in /workspace/.hash-<app>; use it so the deploy
+# names exactly the tag that was built (or found) in this run. Computing it again
+# here is only the fallback for running the script outside Cloud Build.
+hash_for() { if [ -s "/workspace/.hash-$1" ]; then cat "/workspace/.hash-$1"; else bash deploy/src-hash.sh "$1"; fi; }
+API_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/api:src-$(hash_for api)"
+WEB_IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO}/web:src-$(hash_for web)"
 # Deploy config fingerprint: any change to this script or the pipeline (env vars,
 # secrets, memory, substitutions) forces a redeploy even when the image is the same.
 CFG="$(cat deploy/ci-deploy.sh deploy/cloudbuild.yaml | sha256sum | cut -c1-12)"

@@ -85,7 +85,8 @@ steps:
       - |
         set -e
         IMG=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/api
-        HASH=$$(deploy/src-hash.sh api)
+        HASH=$$(bash deploy/src-hash.sh api)
+        echo "$$HASH" > /workspace/.hash-api   # handed to ci-deploy.sh so both steps use one hash
         if docker manifest inspect "$$IMG:src-$$HASH" >/dev/null 2>&1; then
           echo "api: sources unchanged (src-$$HASH already in the registry) — build skipped"
           exit 0
@@ -109,7 +110,8 @@ steps:
       - |
         set -e
         IMG=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web
-        HASH=$$(deploy/src-hash.sh web)
+        HASH=$$(bash deploy/src-hash.sh web)
+        echo "$$HASH" > /workspace/.hash-web   # handed to ci-deploy.sh so both steps use one hash
         if docker manifest inspect "$$IMG:src-$$HASH" >/dev/null 2>&1; then
           echo "web: sources unchanged (src-$$HASH already in the registry) — build skipped"
           exit 0
