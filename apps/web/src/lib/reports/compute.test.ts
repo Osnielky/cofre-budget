@@ -171,4 +171,12 @@ describe('toCsv', () => {
     expect(csv).toContain('"Whole ""Foods"", Inc",12.5');
     expect(csv.endsWith('\r\n')).toBe(true);
   });
+  it('neutralises spreadsheet formulas in text cells but leaves negative numbers numeric', () => {
+    const cols = [{ header: 'Name', value: (r: { n: string; v: number }) => r.n }, { header: 'Amount', value: (r: { n: string; v: number }) => r.v }];
+    const csv = toCsv(cols, [{ n: '=HYPERLINK("http://evil")', v: -42.5 }, { n: '+1-800-CALL', v: 1 }, { n: '@user', v: 2 }, { n: '-SUM(A1)', v: 3 }]);
+    expect(csv).toContain(`"'=HYPERLINK(""http://evil"")",-42.5`);
+    expect(csv).toContain(`'+1-800-CALL,1`);
+    expect(csv).toContain(`'@user,2`);
+    expect(csv).toContain(`'-SUM(A1),3`);
+  });
 });

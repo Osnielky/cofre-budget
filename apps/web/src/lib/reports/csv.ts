@@ -3,7 +3,12 @@ export interface CsvColumn<T> { header: string; value: (row: T) => string | numb
 
 function cell(v: string | number | null | undefined): string {
   if (v == null) return '';
-  const s = typeof v === 'number' ? String(v) : v;
+  if (typeof v === 'number') return String(v);
+  /* Formula injection: merchant names and notes come from bank feeds and CSV
+     imports, so a value like "=HYPERLINK(...)" or "-2+3|cmd" would run when
+     the export opens in Excel/Sheets. A leading apostrophe makes spreadsheets
+     treat the cell as text; numbers above are never prefixed. */
+  const s = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
