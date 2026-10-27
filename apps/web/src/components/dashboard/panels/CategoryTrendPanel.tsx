@@ -3,6 +3,7 @@
 import { useId } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine, LabelList } from 'recharts';
 import { useThemeColors } from '@/components/ThemeProvider';
+import { useNarrowScreen } from '@/hooks/useNarrowScreen';
 import Panel, { PanelEmpty } from '../Panel';
 import { makeChartTheme } from '../chartTheme';
 import type { CategoryMonth, TrendGroup } from '@/lib/dashboard/derive';
@@ -65,6 +66,9 @@ export default function CategoryTrendPanel({ kind, groups, selectedId, onSelect,
   const tc = useThemeColors();
   const th = makeChartTheme(tc);
   const gid = useId().replace(/:/g, '');
+  /* Phones: no line pills right of the plot (the legend names both lines and the tiles
+     carry the numbers), so the bars get the full width; the legend uses short labels. */
+  const narrow = useNarrowScreen();
   const group = groups.find((g) => g.options.some((o) => o.id === selectedId));
   const selected = group?.options.find((o) => o.id === selectedId);
   const project = group?.project ?? null;
@@ -187,14 +191,16 @@ export default function CategoryTrendPanel({ kind, groups, selectedId, onSelect,
 
   const lineText = budgetAmt != null ? `${lineName} ${short(budgetAmt)}` : null;
   const avgText = avg > 0 ? `Avg ${short(avg)}` : null;
-  // Reserve just enough room right of the plot for the widest pill.
-  const rightRoom = Math.max(0, ...[lineText, avgText].filter((t): t is string => !!t).map((t) => pillWidth(t) + 10));
+  // Reserve just enough room right of the plot for the widest pill (none on phones).
+  const rightRoom = narrow ? 0 : Math.max(0, ...[lineText, avgText].filter((t): t is string => !!t).map((t) => pillWidth(t) + 10));
 
   const legend = [
     { key: 'bar', text: income ? 'Received' : 'Spent', swatch: <span className="block w-2.5 h-2.5 rounded-full" style={{ background: barColor }} /> },
     ...(!income ? [{ key: 'hot', text: budgetAmt != null ? 'Over budget' : 'Peak', swatch: <span className="block w-2.5 h-2.5 rounded-full" style={{ background: tc.rose }} /> }] : []),
-    { key: 'line', text: budgetAmt != null ? `${lineName} ${whole(budgetAmt)}` : `No ${lineName.toLowerCase()} set`, swatch: <span className="block w-4" style={{ borderTop: `2px dashed ${budgetAmt != null ? tc.amber : tc.border}` }} /> },
-    { key: 'avg', text: avg > 0 ? `Avg ${money(avg)}` : 'Avg needs a full month', swatch: <span className="block w-4" style={{ borderTop: `2px dashed ${tc.sky}` }} /> },
+    { key: 'line', swatch: <span className="block w-4" style={{ borderTop: `2px dashed ${budgetAmt != null ? tc.amber : tc.border}` }} />,
+      text: budgetAmt != null ? (narrow ? `${lineName} ${short(budgetAmt)}` : `${lineName} ${whole(budgetAmt)}`) : `No ${lineName.toLowerCase()} set` },
+    { key: 'avg', swatch: <span className="block w-4" style={{ borderTop: `2px dashed ${tc.sky}` }} />,
+      text: avg > 0 ? (narrow ? `Avg ${short(avg)}` : `Avg ${money(avg)}`) : narrow ? 'Avg: n/a' : 'Avg needs a full month' },
     { key: 'none', text: income ? 'No income' : 'No spending', swatch: <span className="block w-2 h-2 rounded-full" style={{ background: tc.textMuted }} /> },
   ];
 
@@ -202,9 +208,9 @@ export default function CategoryTrendPanel({ kind, groups, selectedId, onSelect,
     <Panel colSpan={2} title={title} subtitle={subtitle} legend={picker || undefined} loading={loading}>
       {groups.length === 0 ? <PanelEmpty message={income ? 'No income this year yet.' : 'No spending this year yet.'} /> : (
         <div className="@container flex flex-col gap-3 flex-1">
-          <div className="grid grid-cols-2 @md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 @md:grid-cols-4 gap-1.5 sm:gap-2">
             {stats.map((s) => (
-              <div key={s.label} className="rounded-xl px-2.5 py-2 flex items-center gap-2.5 min-w-0"
+              <div key={s.label} className="rounded-xl px-2.5 py-1.5 sm:py-2 flex items-center gap-2.5 min-w-0"
                 style={{ border: `1px solid color-mix(in srgb, ${s.color} 28%, transparent)`, background: `color-mix(in srgb, ${s.color} 6%, transparent)` }}>
                 <span className="hidden @3xl:inline-flex"><Chip color={s.color} d={s.icon} size={32} /></span>
                 <div className="min-w-0">
@@ -216,9 +222,9 @@ export default function CategoryTrendPanel({ kind, groups, selectedId, onSelect,
             ))}
           </div>
 
-          <div className="flex-1 min-h-52">
+          <div className="flex-1 min-h-44 sm:min-h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} margin={{ top: 30, right: Math.max(8, rightRoom), left: -6, bottom: 0 }}>
+              <BarChart data={data} margin={{ top: narrow ? 26 : 30, right: narrow ? 4 : Math.max(8, rightRoom), left: narrow ? -10 : -6, bottom: 0 }}>
                 <defs>
                   <linearGradient id={`${gid}-ok`} x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={barColor} stopOpacity={0.95} />
@@ -238,17 +244,17 @@ export default function CategoryTrendPanel({ kind, groups, selectedId, onSelect,
                 </Bar>
                 {budgetAmt != null && (
                   <ReferenceLine y={budgetAmt} stroke={tc.amber} strokeWidth={1.5} strokeDasharray="7 5" ifOverflow="extendDomain"
-                    label={<LinePill text={lineText ?? ''} color={tc.amber} />} />
+                    label={narrow ? undefined : <LinePill text={lineText ?? ''} color={tc.amber} />} />
                 )}
                 {avg > 0 && (
                   <ReferenceLine y={avg} stroke={tc.sky} strokeWidth={1.5} strokeDasharray="7 5"
-                    label={<LinePill text={avgText ?? ''} color={tc.sky} below />} />
+                    label={narrow ? undefined : <LinePill text={avgText ?? ''} color={tc.sky} below />} />
                 )}
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+          <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1 sm:gap-y-1.5 text-[10.5px] sm:text-[11px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
             {legend.map((l) => (
               <span key={l.key} className="inline-flex items-center gap-1.5">{l.swatch}{l.text}</span>
             ))}
