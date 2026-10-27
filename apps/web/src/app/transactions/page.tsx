@@ -29,6 +29,7 @@ import { isClosed, closureKind, selectableProjects } from '@/lib/projects/closur
 import LinkTransferModal from '@/components/LinkTransferModal';
 import StatStrip from './StatStrip';
 import CategoryChooser from '@/components/transactions/CategoryChooser';
+import { useNarrowScreen } from '@/hooks/useNarrowScreen';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -195,6 +196,9 @@ export default function TransactionsPage() {
     try { localStorage.setItem('cofre:txGroupBy', g); } catch { /* ignore */ }
   }
   const [search, setSearch]             = useState('');
+  const narrow = useNarrowScreen();
+  const filtersActive = !!search || accountFilter !== 'all' || categoryFilter !== 'all' || sortMode !== 'date-desc';
+  const clearFilters = () => { setSearch(''); setAccountFilter('all'); setCategoryFilter('all'); setSortMode('date-desc'); };
   const [openPickerId, setOpenPickerId] = useState<string | null>(null);
   const [pickerPos, setPickerPos]       = useState<PickerPos | null>(null);
   const [updatingId, setUpdatingId]     = useState<string | null>(null);
@@ -1003,47 +1007,51 @@ export default function TransactionsPage() {
           style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
 
           {/* Title + actions */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-x-6 gap-y-3 flex-wrap">
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
-                <p className="text-sm mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Track, review and organize your money</p>
+          {/* Phones: title and the action icons share the first row, the month selector takes
+              the whole second row. From sm: title + selector left, actions right. */}
+          <div className="flex items-center gap-x-3 sm:gap-x-6 gap-y-3 flex-wrap">
+              <div className="order-1 min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Transactions</h1>
+                <p className="text-sm mt-0.5 hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>Track, review and organize your money</p>
               </div>
               {/* ── Date range selector ── */}
-              <div className="flex items-center gap-3 flex-wrap">
+              <div className="order-3 sm:order-2 w-full sm:w-auto sm:mr-auto flex items-center gap-2 sm:gap-3 flex-wrap">
                 {rangeMode === 'month' ? (
-                  <div className="flex items-center gap-1 p-1 rounded-xl"
+                  <div className="flex items-center justify-between sm:justify-start gap-1 p-1 rounded-xl flex-1 sm:flex-initial"
                     style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                    <button onClick={() => setMonth(prevMonth(month))}
+                    <button onClick={() => setMonth(prevMonth(month))} aria-label="Previous month"
                       className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] text-lg leading-none"
                       style={{ color: 'var(--color-text-secondary)' }}>‹</button>
                     <span className="px-3 text-sm font-semibold min-w-36 text-center">{monthLabel(month)}</span>
-                    <button onClick={() => setMonth(nextMonth(month))}
+                    <button onClick={() => setMonth(nextMonth(month))} aria-label="Next month"
                       className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] text-lg leading-none"
                       style={{ color: 'var(--color-text-secondary)' }}>›</button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
-                      className="px-3 py-1.5 text-sm rounded-xl outline-none"
+                  <div className="flex items-center gap-2 flex-1 sm:flex-initial min-w-0">
+                    <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} aria-label="From date"
+                      className="px-2 sm:px-3 py-1.5 text-sm rounded-xl outline-none min-w-0 flex-1 sm:flex-initial"
                       style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
                     <span style={{ color: 'var(--color-text-muted)' }}>→</span>
-                    <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
-                      className="px-3 py-1.5 text-sm rounded-xl outline-none"
+                    <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} aria-label="To date"
+                      className="px-2 sm:px-3 py-1.5 text-sm rounded-xl outline-none min-w-0 flex-1 sm:flex-initial"
                       style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
                   </div>
                 )}
                 <button onClick={() => setRangeMode((m) => m === 'month' ? 'custom' : 'month')}
-                  className="text-xs px-3 py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)]"
+                  aria-label={rangeMode === 'month' ? 'Pick a custom date range' : 'Back to month view'}
+                  title={rangeMode === 'month' ? 'Custom range' : 'Month view'}
+                  className="text-xs px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)] shrink-0"
                   style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
-                  {rangeMode === 'month' ? '📅 Custom range' : '← Month view'}
+                  {rangeMode === 'month'
+                    ? <>📅<span className="hidden sm:inline"> Custom range</span></>
+                    : <>←<span className="hidden sm:inline"> Month view</span></>}
                 </button>
 
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {/* Notifications */}
-              <div className="relative" ref={notifRef}>
+            <div className="order-2 sm:order-3 flex items-center gap-2 ml-auto sm:ml-0">
+              {/* Notifications (hidden on phones — nothing to show there yet) */}
+              <div className="relative hidden sm:block" ref={notifRef}>
                 <button onClick={() => setNotifOpen((v) => !v)}
                   className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
                   style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
@@ -1062,22 +1070,23 @@ export default function TransactionsPage() {
                   </div>
                 )}
               </div>
-              {/* Avatar */}
-              <Avatar name={user?.name} email={user?.email} src={user?.avatarUrl} size={32} rounded={12} />
+              {/* Avatar (the phone drawer already shows the account) */}
+              <span className="hidden sm:block"><Avatar name={user?.name} email={user?.email} src={user?.avatarUrl} size={32} rounded={12} /></span>
               {/* New manual transaction */}
               <button onClick={() => { setManualTxError(''); setShowManualTx(true); }}
                 className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
                 style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 28%, transparent)', color: 'var(--color-green)' }}>
                 <PlusIcon /> New
               </button>
-              {/* Import CSV */}
+              {/* Import CSV (icon-only on phones) */}
               <div className="relative" ref={importBtnRef}>
                 <button onClick={() => { setShowImportPicker((v) => !v); setShowAddAccForm(false); setAddAccError(''); }}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
+                  aria-label="Import transactions from CSV" title="Import CSV"
+                  className="flex items-center gap-2 px-2.5 sm:px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
                   style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 28%, transparent)', color: 'var(--color-primary)' }}>
                   <UploadIcon />
                   <span className="hidden lg:inline">Import Transactions (CSV)</span>
-                  <span className="lg:hidden">Import CSV</span>
+                  <span className="hidden sm:inline lg:hidden">Import CSV</span>
                 </button>
                 {showImportPicker && (
                   <div className="absolute right-0 top-full mt-2 z-30 rounded-2xl overflow-hidden"
@@ -1296,15 +1305,15 @@ export default function TransactionsPage() {
                 )}
               </div>
 
-              {/* Sync (Plaid only) */}
+              {/* Sync (Plaid only; icon-only on phones) */}
               {hasPlaid && (
-                <button onClick={syncAll} disabled={syncing}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110 disabled:opacity-50"
+                <button onClick={syncAll} disabled={syncing} aria-label={syncing ? 'Syncing bank accounts' : 'Sync bank accounts'} title="Sync Plaid"
+                  className="flex items-center gap-2 px-2.5 sm:px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110 disabled:opacity-50"
                   style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 25%, transparent)', color: 'var(--color-green)' }}>
                   <span style={{ display: 'inline-block', animation: syncing ? 'spin 1s linear infinite' : 'none' }}>
                     <SyncIcon />
                   </span>
-                  {syncing ? 'Syncing…' : 'Sync Plaid'}
+                  <span className="hidden sm:inline">{syncing ? 'Syncing…' : 'Sync Plaid'}</span>
                 </button>
               )}
             </div>
@@ -1321,48 +1330,61 @@ export default function TransactionsPage() {
           />
 
           {/* ── Search + filters ── */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="relative flex-1 min-w-44">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                style={{ color: 'var(--color-text-muted)' }}><SearchIcon /></span>
-              <input value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search merchants or notes"
-                className="w-full pl-9 pr-3 py-2 text-sm outline-none rounded-xl"
-                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
+          {/* Phones: search (with the clear button) on one row, then the three selects share the
+              next row with short labels. From sm everything sits on one wrapping row. */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="flex items-center gap-2 w-full sm:w-auto sm:flex-1 sm:min-w-44">
+              <div className="relative flex-1 min-w-0">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                  style={{ color: 'var(--color-text-muted)' }}><SearchIcon /></span>
+                <input value={search} onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search merchants or notes"
+                  className="w-full pl-9 pr-3 py-2 text-sm outline-none rounded-xl"
+                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
+              </div>
+              {filtersActive && (
+                <button
+                  onClick={clearFilters}
+                  className="sm:hidden w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors hover:bg-[var(--color-elevated)]"
+                  style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
+                  title="Clear search, sort and filters" aria-label="Clear search, sort and filters">
+                  <SlidersIcon />
+                </button>
+              )}
             </div>
             <select value={sortMode} onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
               aria-label="Sort transactions"
-              className="px-3 py-2 text-xs font-semibold rounded-xl outline-none cursor-pointer"
+              className="flex-1 sm:flex-initial min-w-0 px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-semibold rounded-xl outline-none cursor-pointer truncate"
               style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-              <option value="date-desc">Sort: Date (newest)</option>
-              <option value="date-asc">Sort: Date (oldest)</option>
-              <option value="amount-desc">Sort: Amount (high → low)</option>
-              <option value="amount-asc">Sort: Amount (low → high)</option>
+              <option value="date-desc">{narrow ? 'Newest first' : 'Sort: Date (newest)'}</option>
+              <option value="date-asc">{narrow ? 'Oldest first' : 'Sort: Date (oldest)'}</option>
+              <option value="amount-desc">{narrow ? 'Amount: high → low' : 'Sort: Amount (high → low)'}</option>
+              <option value="amount-asc">{narrow ? 'Amount: low → high' : 'Sort: Amount (low → high)'}</option>
             </select>
             <select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)}
               aria-label="Filter by account"
-              className="px-3 py-2 text-xs font-semibold rounded-xl outline-none cursor-pointer max-w-52 truncate"
+              className="flex-1 sm:flex-initial min-w-0 px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-semibold rounded-xl outline-none cursor-pointer sm:max-w-52 truncate"
               style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-              <option value="all">Account: All accounts</option>
+              <option value="all">{narrow ? 'Any account' : 'Account: All accounts'}</option>
               {accounts.map((a) => (
                 <option key={a.id} value={a.id}>{a.bankName} · {a.accountName}</option>
               ))}
             </select>
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}
               aria-label="Filter by category"
-              className="px-3 py-2 text-xs font-semibold rounded-xl outline-none cursor-pointer max-w-48 truncate"
+              className="flex-1 sm:flex-initial min-w-0 px-2 sm:px-3 py-2 text-[11px] sm:text-xs font-semibold rounded-xl outline-none cursor-pointer sm:max-w-48 truncate"
               style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-              <option value="all">Category: All</option>
+              <option value="all">{narrow ? 'Any category' : 'Category: All'}</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
               ))}
             </select>
-            {(search || accountFilter !== 'all' || categoryFilter !== 'all' || sortMode !== 'date-desc') && (
+            {filtersActive && (
               <button
-                onClick={() => { setSearch(''); setAccountFilter('all'); setCategoryFilter('all'); setSortMode('date-desc'); }}
-                className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
+                onClick={clearFilters}
+                className="hidden sm:flex w-9 h-9 rounded-xl items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
                 style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
-                title="Clear search, sort and filters">
+                title="Clear search, sort and filters" aria-label="Clear search, sort and filters">
                 <SlidersIcon />
               </button>
             )}
@@ -1420,8 +1442,9 @@ export default function TransactionsPage() {
                 }}>
                 {uncategorizedCount > 0 ? '● ' : '✓ '}{uncategorizedCount} uncategorized
               </button>
+              {/* The All tab already shows the count on phones. */}
               <button onClick={() => setFilter('all')}
-                className="px-3 py-1.5 rounded-xl text-xs font-semibold"
+                className="hidden sm:inline-flex px-3 py-1.5 rounded-xl text-xs font-semibold"
                 style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
                 {transactions.length} total
               </button>

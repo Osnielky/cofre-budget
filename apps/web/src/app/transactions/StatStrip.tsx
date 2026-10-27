@@ -93,17 +93,19 @@ export default function StatStrip({ transactions, prev, recurringNow, recurringP
   ];
 
   return (
-    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+    /* Phones: a 2×2 grid of compact tiles (accent dot, label, value, delta — no icon chip or
+       sparkline) instead of four full-width cards; from sm the cards auto-fit at ≥220px. */
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:[grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
       {cards.map((c) => {
         const up = (c.delta ?? 0) > 0;
         const deltaColor = c.delta == null || c.delta === 0
           ? 'var(--color-text-muted)'
           : (up === c.goodWhenUp ? 'var(--color-green)' : 'var(--color-rose)');
         return (
-          <div key={c.label} className="flex items-center justify-between gap-3 rounded-2xl py-4 px-4 min-w-0"
+          <div key={c.label} className="flex items-center justify-between gap-3 rounded-xl sm:rounded-2xl py-2.5 px-3 sm:py-4 sm:px-4 min-w-0"
             style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${c.color} 5%, var(--color-surface))` }}>
             <div className="flex items-center gap-3 min-w-0">
-              <span className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+              <span className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center shrink-0"
                 style={{
                   color: c.color,
                   background: `color-mix(in srgb, ${c.color} 14%, transparent)`,
@@ -112,22 +114,24 @@ export default function StatStrip({ transactions, prev, recurringNow, recurringP
                 <MiniIcon d={c.icon} />
               </span>
               <div className="min-w-0">
-                <p className="text-xs flex items-center gap-1" style={{ color: 'var(--color-text-secondary)' }}>
+                <p className="text-[11px] sm:text-xs flex items-center gap-1.5 truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                  <span aria-hidden="true" className="sm:hidden w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.color }} />
                   {c.label}
                 </p>
-                <p className="text-lg font-bold tabular-nums truncate">{loading ? '—' : c.value}</p>
+                <p className="text-[15px] sm:text-lg font-bold tabular-nums truncate">{loading ? '—' : c.value}</p>
                 {!loading && c.delta != null && (
-                  <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                  <p className="text-[10.5px] sm:text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
                     <span className="font-bold" style={{ color: deltaColor }}>
                       {c.delta === 0 ? '—' : `${up ? '↑' : '↓'} ${Math.abs(c.delta)}%`}
                     </span>{' '}
-                    vs {prevLabel}
+                    <span className="hidden sm:inline">vs {prevLabel}</span>
+                    <span className="sm:hidden">vs prev.</span>
                   </p>
                 )}
               </div>
             </div>
             {!loading && hasPrev && (
-              <Sparkline prev={c.prevValue} current={c.curValue} color={c.color} />
+              <span className="hidden sm:block"><Sparkline prev={c.prevValue} current={c.curValue} color={c.color} /></span>
             )}
           </div>
         );
