@@ -96,6 +96,11 @@ PLAID_COUNTRY_CODES        # comma-separated Plaid country codes Link offers ins
 PLAID_WEBHOOK_URL          # e.g. https://<host>/api/plaid/webhook — enables automatic sync
 PLAID_OAUTH_REDIRECT_URI   # e.g. https://<host>/settings/plaid-oauth-redirect — must also be
                             # registered in the Plaid dashboard's Allowed redirect URIs
+PLAID_SWEEP_SECRET         # optional. Enables POST /api/plaid/sweep (header x-sweep-secret) so Cloud
+                            # Scheduler can resync every active Plaid item not synced in 24 h even when
+                            # Cloud Run is scaled to zero. The same sweep also runs 30 s after boot and
+                            # hourly while an instance is awake (plaid/plaid-sweep.service.ts);
+                            # PLAID_SWEEP_DISABLED=true turns the in-process timer off
 PROXY_SHARED_SECRET        # optional locally; set on BOTH Cloud Run services. The web
                             # middleware forwards the client IP to the API with it so rate
                             # limits are per client, not per web-service address

@@ -105,6 +105,31 @@ the image. The API and web deploys run concurrently; output lines are prefixed
 - **Tests always run** for both apps. They are the gate and are cheap relative
   to a build.
 
+## Keeping bank data fresh when nobody is looking
+
+Automatic Plaid sync is webhook-driven (`POST /api/plaid/webhook`). As a floor under
+that, `PlaidSweepService` resyncs every active item whose last sync is older than
+24 hours: 30 s after boot and then hourly, but only while an instance is awake, and
+`cofre-api` scales to zero. To guarantee the daily floor, point Cloud Scheduler at
+`POST /api/plaid/sweep` with the `x-sweep-secret` header. The route 404s until
+`PLAID_SWEEP_SECRET` is set.
+
+```bash
+# 1. Create the secret and mount it (add PLAID_SWEEP_SECRET=PLAID_SWEEP_SECRET:latest
+#    to the API's --set-secrets list in deploy/ci-deploy.sh on the next deploy)
+openssl rand -hex 32 | gcloud secrets create PLAID_SWEEP_SECRET --data-file=-
+
+# 2. Nightly at 05:30 UTC, after most US banks have posted the previous day
+gcloud scheduler jobs create http plaid-sweep \
+  --schedule="30 5 * * *" --time-zone="Etc/UTC" \
+  --uri="https://<api-host>/api/plaid/sweep" --http-method=POST \
+  --headers="x-sweep-secret=$(gcloud secrets versions access latest --secret=PLAID_SWEEP_SECRET)" \
+  --attempt-deadline=600s --location=<region>
+```
+
+The response is `{ stale, synced, failed, skipped }`; `failed` > 0 for the same item
+on consecutive nights means its token is bad and the user should see Reconnect.
+
 ## Operating it
 
 ```bash

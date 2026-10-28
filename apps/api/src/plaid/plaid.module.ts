@@ -8,13 +8,15 @@ import { PlaidService } from './plaid.service';
 import { PlaidController } from './plaid.controller';
 import { PlaidWebhookController } from './plaid-webhook.controller';
 import { PlaidWebhookVerifierService } from './plaid-webhook-verifier.service';
+import { PlaidSweepService } from './plaid-sweep.service';
+import { PlaidSweepController } from './plaid-sweep.controller';
 import { CategorizationRulesModule } from '../categorization-rules/categorization-rules.module';
 import { CardsModule } from '../cards/cards.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([PlaidItem, BankAccount, Transaction, User]), CategorizationRulesModule, CardsModule],
-  providers: [PlaidService, PlaidWebhookVerifierService],
-  controllers: [PlaidController, PlaidWebhookController],
+  providers: [PlaidService, PlaidWebhookVerifierService, PlaidSweepService],
+  controllers: [PlaidController, PlaidWebhookController, PlaidSweepController],
   exports: [PlaidService],
 })
 export class PlaidModule {}
