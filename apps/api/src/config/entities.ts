@@ -23,5 +23,7 @@ import { CardProfile } from '../cards/card-profile.entity';
 import { PageView } from '../analytics/page-view.entity';
 import { SupportTicket } from '../support/support-ticket.entity';
 import { SupportScreenshot } from '../support/support-screenshot.entity';
+import { TransactionTombstone } from '../transactions/transaction-tombstone.entity';
 
-export const ENTITIES = [User, BankAccount, PlaidItem, Transaction, RecurringRule, Category, Budget, Project, ProjectCategory, Debt, DebtPayment, ConnectedApp, Receipt, CategorizationRule, AiConversation, AiMessage, AiPendingAction, Subscription, NetWorthSnapshot, CreditCardDetail, CardProfile, PageView, SupportTicket, SupportScreenshot];
+export const ENTITIES = [User, BankAccount, PlaidItem, Transaction, RecurringRule, Category, Budget, Project, ProjectCategory, Debt, DebtPayment, ConnectedApp, Receipt, CategorizationRule, AiConversation, AiMessage, AiPendingAction, Subscription, NetWorthSnapshot, CreditCardDetail, CardProfile, PageView, SupportTicket, SupportScreenshot,
+  TransactionTombstone];

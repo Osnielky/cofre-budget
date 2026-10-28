@@ -78,6 +78,7 @@ describe.skipIf(!hasDb)('database migrations', { timeout: 30_000 }, () => {
     await synced.query(`DROP TABLE "${SYNCED}"."page_views"`);
     await synced.query(`DROP TABLE "${SYNCED}"."support_screenshots"`);
     await synced.query(`DROP TABLE "${SYNCED}"."support_tickets"`);
+    await synced.query(`DROP TABLE "${SYNCED}"."transaction_tombstones"`);
     // page_views (dropped above) is recreated by its own migration with the VisitorProfile columns.
     // Columns added by post-baseline migrations likewise.
     await synced.query(`ALTER TABLE "${SYNCED}"."users" DROP COLUMN "lastSeenAt"`);

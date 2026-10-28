@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { PlaidItem } from './plaid-item.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { TransactionTombstone } from '../transactions/transaction-tombstone.entity';
 import { User } from '../users/user.entity';
 import { Category } from '../categories/category.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
@@ -15,7 +16,7 @@ async function makeDataSource() {
     // Transaction has @ManyToOne relations to Category, ProjectCategory, and
     // CategorizationRule — TypeORM requires every entity referenced by a relation
     // to be registered in the DataSource, even though this test never touches them.
-    entities: [PlaidItem, BankAccount, Transaction, User, Category, ProjectCategory, CategorizationRule],
+    entities: [PlaidItem, BankAccount, Transaction, TransactionTombstone, User, Category, ProjectCategory, CategorizationRule],
     synchronize: true,
   });
   await ds.initialize();
@@ -40,7 +41,7 @@ describe('PlaidService institution cap', () => {
   });
 
   // Matches PlaidService's real constructor order: (config, itemRepo, accountRepo,
-  // txRepo, userRepo, rulesService, creditCards) — read plaid.service.ts:50-56 before touching this.
+  // txRepo, userRepo, rulesService, creditCards, tombstones) — read plaid.service.ts:50-56 before touching this.
   function makeService(fakeClient: any) {
     const service = new PlaidService(
       fakeConfig({ PLAID_ENV: 'sandbox', JWT_SECRET: 'test-secret-at-least-this-long' }),
@@ -50,6 +51,7 @@ describe('PlaidService institution cap', () => {
       ds.getRepository(User),
       { matchNewTransaction: async () => null } as any, // CategorizationRulesService stub
       { applyPlaidReport: async () => undefined } as any, // CreditCardsService stub
+      ds.getRepository(TransactionTombstone),
     );
     (service as any).client = fakeClient;
     return service;

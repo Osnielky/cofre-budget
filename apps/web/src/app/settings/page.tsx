@@ -252,6 +252,7 @@ function SettingsPageInner() {
   const [deleteTxToo, setDeleteTxToo] = useState(false);
   const [deleteTxCount, setDeleteTxCount] = useState<number | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [resyncNotice, setResyncNotice] = useState('');
   const [importAccount, setImportAccount] = useState<BankAccount | null>(null);
   /* Phones: the account whose action chips are open (the row is a toggle). */
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -543,6 +544,31 @@ function SettingsPageInner() {
     } finally { setSyncingId(null); }
   }
 
+  /* Full re-download of one bank's history from Plaid (cursor reset). Rows already
+     present are updated in place, so the only visible effect is what was missing. */
+  async function handleResync(account: BankAccount, bankName: string) {
+    if (!account.plaidItemId) return;
+    setSyncingId(account.id);
+    setResyncNotice('');
+    try {
+      const res = await fetch(`${API}/plaid/resync/${account.plaidItemId}`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(typeof body?.message === 'string' ? body.message : `Could not re-download ${bankName}. Try again in a moment.`);
+        return;
+      }
+      const counts = await res.json() as { added: number; modified: number; removed: number };
+      setResyncNotice(
+        counts.added > 0
+          ? `${bankName}: ${counts.added} missing transaction${counts.added === 1 ? '' : 's'} brought back (${counts.modified} already here).`
+          : `${bankName}: Plaid has nothing this account is missing. ${counts.modified} transaction${counts.modified === 1 ? '' : 's'} checked.`,
+      );
+      const list = await fetch(`${API}/bank-accounts`, { credentials: 'include' });
+      const data = await list.json();
+      setAccounts(Array.isArray(data) ? data : []);
+    } finally { setSyncingId(null); }
+  }
+
   /* One group per bank, shared by the phone list and the desktop grid. */
   const bankGroups = useMemo(() => {
     const m = new Map<string, BankAccount[]>();
@@ -704,6 +730,15 @@ function SettingsPageInner() {
                     className="text-xs font-semibold shrink-0" style={{ color: 'var(--color-text-muted)' }}>
                     ✕
                   </button>
+                </div>
+              )}
+
+              {resyncNotice && (
+                <div className="px-4 py-3 rounded-xl flex items-center gap-3 text-sm" role="status"
+                  style={{ background: 'color-mix(in srgb, var(--color-green) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 25%, transparent)' }}>
+                  <span aria-hidden="true">✓</span>
+                  <p className="flex-1" style={{ color: 'var(--color-text-primary)' }}>{resyncNotice}</p>
+                  <button onClick={() => setResyncNotice('')} aria-label="Dismiss" className="text-xs font-semibold shrink-0" style={{ color: 'var(--color-text-muted)' }}>✕</button>
                 </div>
               )}
 
@@ -1049,6 +1084,14 @@ function SettingsPageInner() {
                               <SyncIcon spinning={syncingGroup} />
                             </button>
                           )}
+                          {!broken && syncable.length > 0 && (
+                            <button disabled={syncingGroup} aria-label={`Re-download ${bankName} history`} title="Re-download full history from Plaid"
+                              onClick={() => handleResync(syncable[0], bankName)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-40"
+                              style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
+                              <HistoryIcon />
+                            </button>
+                          )}
                         </div>
                         {list.map((account, i) => {
                           const meta = TYPE_META[account.accountType as AccountType] ?? TYPE_META.checking;
@@ -1160,6 +1203,14 @@ function SettingsPageInner() {
                               className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-40 transition-colors hover:bg-[color-mix(in_srgb,var(--color-green)_12%,transparent)]"
                               style={{ color: syncingGroup ? 'var(--color-text-muted)' : 'var(--color-green)', border: '1px solid var(--color-border)' }}>
                               <SyncIcon spinning={syncingGroup} />
+                            </button>
+                          )}
+                          {!broken && syncable.length > 0 && (
+                            <button disabled={syncingGroup} aria-label={`Re-download ${bankName} history`} title="Re-download full history from Plaid"
+                              onClick={() => handleResync(syncable[0], bankName)}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-40 transition-colors hover:bg-[var(--color-elevated)]"
+                              style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
+                              <HistoryIcon />
                             </button>
                           )}
                         </div>
@@ -1483,6 +1534,14 @@ function SyncIcon({ spinning }: { spinning: boolean }) {
       style={{ animation: spinning ? 'spin 1s linear infinite' : 'none' }}>
       <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
       <path d="M21 3v5h-5"/>
+    </svg>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 3-6.7" /><path d="M3 4v5h5" /><path d="M12 8v4l3 2" />
     </svg>
   );
 }

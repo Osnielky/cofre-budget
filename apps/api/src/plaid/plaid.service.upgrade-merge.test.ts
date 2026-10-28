@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { PlaidItem } from './plaid-item.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { TransactionTombstone } from '../transactions/transaction-tombstone.entity';
 import { User } from '../users/user.entity';
 import { Category } from '../categories/category.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
@@ -35,6 +36,7 @@ function makeService(sync: { added: unknown[]; removed?: unknown[] }) {
     ds.getRepository(User),
     { getActiveRules: async () => [], matchRule: () => null } as any,
     { applyPlaidReport: async () => undefined } as any, // CreditCardsService stub
+    ds.getRepository(TransactionTombstone),
   );
   const accounts = [
     { account_id: 'plaid-chk', name: 'TOTAL CHECKING', mask: '7682', subtype: 'checking', balances: { current: 4516.7, iso_currency_code: 'USD' } },
@@ -55,7 +57,7 @@ const txsOf = (accountId: string) =>
 beforeEach(async () => {
   ds = new DataSource({
     type: 'better-sqlite3', database: ':memory:', dropSchema: true, synchronize: true,
-    entities: [PlaidItem, BankAccount, Transaction, User, Category, ProjectCategory, CategorizationRule],
+    entities: [PlaidItem, BankAccount, Transaction, TransactionTombstone, User, Category, ProjectCategory, CategorizationRule],
   });
   await ds.initialize();
   await ds.getRepository(User).save({ id: USER, email: 'upgrader@x.dev', plan: 'pro' });

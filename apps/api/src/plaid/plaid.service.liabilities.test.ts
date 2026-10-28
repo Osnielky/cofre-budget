@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { PlaidItem } from './plaid-item.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { TransactionTombstone } from '../transactions/transaction-tombstone.entity';
 import { User } from '../users/user.entity';
 import { Category } from '../categories/category.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
@@ -18,7 +19,7 @@ const SECRET = 'test-secret-at-least-this-long';
 async function makeDataSource() {
   const ds = new DataSource({
     type: 'better-sqlite3', database: ':memory:', dropSchema: true,
-    entities: [PlaidItem, BankAccount, Transaction, User, Category, ProjectCategory, CategorizationRule, CreditCardDetail, CardProfile],
+    entities: [PlaidItem, BankAccount, Transaction, TransactionTombstone, User, Category, ProjectCategory, CategorizationRule, CreditCardDetail, CardProfile],
     synchronize: true,
   });
   await ds.initialize();
@@ -57,7 +58,7 @@ describe('PlaidService liabilities', () => {
     await accounts.save(accounts.create({ userId: 'user-1', bankName: 'Capital One', accountName: 'Checking', accountType: 'checking', balance: 100, provider: 'plaid', plaidItemId: item.id, plaidAccountId: 'p-chk' }));
   });
 
-  // Real constructor order: (config, itemRepo, accountRepo, txRepo, userRepo, rulesService, creditCards).
+  // Real constructor order: (config, itemRepo, accountRepo, txRepo, userRepo, rulesService, creditCards, tombstones).
   function makeService(client: any, env: Record<string, string> = {}) {
     const creditCards = new CreditCardsService(
       ds.getRepository(CreditCardDetail), ds.getRepository(CardProfile), ds.getRepository(BankAccount), ds.getRepository(PlaidItem),
@@ -67,6 +68,7 @@ describe('PlaidService liabilities', () => {
       ds.getRepository(PlaidItem), ds.getRepository(BankAccount), ds.getRepository(Transaction), ds.getRepository(User),
       { getActiveRules: async () => [], matchRule: () => null } as any,
       creditCards,
+      ds.getRepository(TransactionTombstone),
     );
     (service as any).client = client;
     return service;

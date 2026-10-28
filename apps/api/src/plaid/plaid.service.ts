@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
@@ -13,6 +13,7 @@ import { PlaidItem } from './plaid-item.entity';
 import { parsePlaidCountries } from './plaid-countries';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { TransactionTombstone } from '../transactions/transaction-tombstone.entity';
 import { User } from '../users/user.entity';
 import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.util';
 import { CategorizationRulesService } from '../categorization-rules/categorization-rules.service';
@@ -45,6 +46,9 @@ export interface ExchangeDecision {
   cutoverDate?: string;
 }
 
+/** What one /transactions/sync pass did. */
+export interface SyncCounts { added: number; modified: number; removed: number }
+
 /** Linked institutions (Plaid items) a plan may hold. Plaid bills per connected
  *  account per month, so the cap is what keeps each tier's cost under its price;
  *  plans missing here (free) never reach this check — PlanGuard stops them first. */
@@ -65,6 +69,7 @@ export class PlaidService {
     @InjectRepository(User) private userRepo: Repository<User>,
     private rulesService: CategorizationRulesService,
     private creditCards: CreditCardsService,
+    @InjectRepository(TransactionTombstone) private tombstones: Repository<TransactionTombstone>,
   ) {
     const secret = this.config.get<string>('JWT_SECRET');
     if (!secret) throw new Error('JWT_SECRET is required for PlaidService token encryption');
@@ -106,6 +111,9 @@ export class PlaidService {
         user_id: plaidUserId,
         client_name: 'Cofre Budget',
         products: [Products.Transactions],
+        /* Plaid's default pull is 90 days; ask for the maximum so a new link (or a
+           re-link after a lost history) brings back two years where the bank has it. */
+        transactions: { days_requested: 730 },
         /* Best effort: banks without Liabilities still link; cards there get manual entry.
            Gated because Plaid rejects link tokens that name a product the client isn't
            approved for — set PLAID_LIABILITIES_ENABLED=true once Plaid approves it. */
@@ -289,6 +297,32 @@ export class PlaidService {
     await this.syncLiabilities(item, accessToken);
   }
 
+  /** Re-download everything Plaid still holds for the item (its full history window,
+   *  not just changes since the cursor) and refresh balances. Rows already present
+   *  are matched by Plaid's transaction id and updated, never duplicated. Used by
+   *  "Re-download history" in Settings when a bank's rows went missing. */
+  async resyncItemFromScratch(itemId: string, userId: string): Promise<SyncCounts> {
+    const item = await this.itemRepo
+      .createQueryBuilder('item')
+      .addSelect('item.accessToken')
+      .where('item.id = :itemId AND item.userId = :userId', { itemId, userId })
+      .getOne();
+    if (!item) throw new NotFoundException();
+    if (this.syncsInFlight.has(item.itemId)) throw new ConflictException('A sync is already running for this bank.');
+    item.cursor = null;
+    const accessToken = decryptToken(item.accessToken, this.encKey);
+    const counts = await this.runSync(item, accessToken);
+    const balanceRes = await timed('plaid', 'accountsBalanceGet', () => this.client.accountsBalanceGet({ access_token: accessToken }));
+    for (const pa of balanceRes.data.accounts) {
+      const account = await this.accountRepo.findOneBy({ plaidAccountId: pa.account_id });
+      if (account) {
+        account.balance = pa.balances.current ?? account.balance;
+        await this.accountRepo.save(account);
+      }
+    }
+    return counts;
+  }
+
   /* Looked up by Plaid's item_id (not our PlaidItem.id) — this is what webhook
      payloads carry, with no authenticated user in the request. */
   async syncByExternalItemId(externalItemId: string): Promise<void> {
@@ -382,10 +416,11 @@ export class PlaidService {
     item: PlaidItem,
     accessToken: string,
     cutoverDates?: Map<string, string>,
-  ): Promise<void> {
+  ): Promise<SyncCounts> {
+    const counts: SyncCounts = { added: 0, modified: 0, removed: 0 };
     if (this.syncsInFlight.has(item.itemId)) {
       this.logger.warn(`Sync already in flight for item ${item.itemId} — skipping this trigger`);
-      return;
+      return counts;
     }
     this.syncsInFlight.add(item.itemId);
 
@@ -450,6 +485,7 @@ export class PlaidService {
               }
             }
             await this.txRepo.save(existing);
+            counts.modified++;
             continue;
           }
 
@@ -475,20 +511,30 @@ export class PlaidService {
               categorizedByRuleId: matchedRule?.id ?? undefined,
             }),
           );
+          counts.added++;
         }
 
         for (const rt of res.data.removed) {
           // Only ever a transaction Plaid itself created — never the user's own entries.
           const victim = await this.txRepo.findOneBy({ externalId: rt.transaction_id, userId: item.userId, source: 'plaid' });
           if (victim) {
+            /* Plaid's removed[] usually means a pending transaction posted under a new id,
+               but an institution migration can retract an account's whole history at
+               once. Every row goes to transaction_tombstones first, so a retraction is
+               reversible instead of a silent loss (2026-10-28: a Schwab account lost
+               every month this way). */
             /* A split parent's children have no externalId of their own — Plaid never
                references them directly, so they'd otherwise be orphaned (and still
                counted, since totals exclude only the parent) when the parent transaction
-               is removed (e.g. a pending transaction that posted under a new id). */
+               is removed. */
             if (victim.isSplitParent) {
+              const children = await this.txRepo.findBy({ parentId: victim.id, userId: item.userId });
+              await this.tombstones.save(children.map((c) => this.tombstone(c, 'plaid_removed_child')));
               await this.txRepo.delete({ parentId: victim.id, userId: item.userId });
             }
+            await this.tombstones.save(this.tombstone(victim, 'plaid_removed'));
             await this.txRepo.delete({ id: victim.id });
+            counts.removed++;
           }
         }
 
@@ -506,6 +552,19 @@ export class PlaidService {
     } finally {
       this.syncsInFlight.delete(item.itemId);
     }
+    return counts;
+  }
+
+  private tombstone(tx: Transaction, reason: string): TransactionTombstone {
+    const { bankAccount, categoryRef, transferAccount, projectCategoryRef, categorizedByRule, ...payload } = tx as any;
+    return this.tombstones.create({
+      userId: tx.userId,
+      transactionId: tx.id,
+      bankAccountId: tx.bankAccountId ?? null,
+      externalId: tx.externalId ?? null,
+      reason,
+      payload,
+    });
   }
 
   findItemsByUser(userId: string): Promise<PlaidItem[]> {

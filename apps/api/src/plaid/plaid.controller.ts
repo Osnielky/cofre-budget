@@ -45,6 +45,12 @@ export class PlaidController {
     return this.service.syncItem(itemId, req.user.id);
   }
 
+  /** Re-download the item's full history from Plaid (cursor reset); returns the counts. */
+  @Post('resync/:itemId')
+  resync(@Param('itemId') itemId: string, @Request() req: any) {
+    return this.service.resyncItemFromScratch(itemId, req.user.id);
+  }
+
   @Post('reconnect-token/:itemId')
   async createReconnectLinkToken(@Param('itemId') itemId: string, @Request() req: any) {
     const linkToken = await this.service.createReconnectLinkToken(req.user.id, itemId);

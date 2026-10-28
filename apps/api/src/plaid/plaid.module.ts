@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PlaidItem } from './plaid-item.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { TransactionTombstone } from '../transactions/transaction-tombstone.entity';
 import { User } from '../users/user.entity';
 import { PlaidService } from './plaid.service';
 import { PlaidController } from './plaid.controller';
@@ -14,7 +15,7 @@ import { CategorizationRulesModule } from '../categorization-rules/categorizatio
 import { CardsModule } from '../cards/cards.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([PlaidItem, BankAccount, Transaction, User]), CategorizationRulesModule, CardsModule],
+  imports: [TypeOrmModule.forFeature([PlaidItem, BankAccount, Transaction, TransactionTombstone, User]), CategorizationRulesModule, CardsModule],
   providers: [PlaidService, PlaidWebhookVerifierService, PlaidSweepService],
   controllers: [PlaidController, PlaidWebhookController, PlaidSweepController],
   exports: [PlaidService],
