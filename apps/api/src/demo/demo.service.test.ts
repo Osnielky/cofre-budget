@@ -55,7 +55,12 @@ async function rowsOwnedBy(userId: string): Promise<Record<string, number>> {
   };
 }
 
-describe('DemoService visitors', () => {
+/* Every test here writes the full demo year (≈900 transactions) at least once, and
+   the owner tests twice. On Cloud Build's 2-vCPU pool that takes 4–6 s, past vitest's
+   5 s default (a deploy failed on exactly that on 2026-10-28), so the cap is per-suite. */
+const SEED_TIMEOUT = 60_000;
+
+describe('DemoService visitors', { timeout: SEED_TIMEOUT }, () => {
   it('startVisitor creates a Pro sandbox user full of data', async () => {
     const user = await service.startVisitor(NOW);
     expect(user.isDemo).toBe(true);
@@ -117,7 +122,7 @@ describe('DemoService visitors', () => {
   });
 });
 
-describe('DemoService owner (Rockefeller)', () => {
+describe('DemoService owner (Rockefeller)', { timeout: SEED_TIMEOUT }, () => {
   it('ensureOwner creates the account once with the demo password and a Pro plan', async () => {
     const first = await service.ensureOwner(NOW);
     const second = await service.ensureOwner(NOW);
