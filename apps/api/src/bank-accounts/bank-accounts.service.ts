@@ -34,7 +34,7 @@ export class BankAccountsService {
     return this.txRepo.count({ where: { bankAccountId: id } });
   }
 
-  async findAllByUser(userId: string): Promise<(BankAccount & { txCount: number; plaidStatus: string | null })[]> {
+  async findAllByUser(userId: string): Promise<(BankAccount & { txCount: number; plaidStatus: string | null; investmentsStatus: string | null })[]> {
     let accounts = await this.repo.find({ where: { userId }, order: { createdAt: 'ASC' } });
     // First visit, no accounts at all: start them off with a cash account. Only
     // when the list is empty, so a deleted cash account stays deleted as long as
@@ -55,11 +55,14 @@ export class BankAccountsService {
 
     const plaidItems = await this.plaidItemRepo.find({ where: { userId } });
     const statusByPlaidItemId = new Map(plaidItems.map((p) => [p.id, p.status]));
+    const investmentsByPlaidItemId = new Map(plaidItems.map((p) => [p.id, p.investmentsStatus ?? null]));
 
     return accounts.map((a) => ({
       ...a,
       txCount: byId.get(a.id) ?? 0,
       plaidStatus: a.plaidItemId ? statusByPlaidItemId.get(a.plaidItemId) ?? null : null,
+      /* Only meaningful on investment accounts; null until the first Investments attempt. */
+      investmentsStatus: a.plaidItemId && a.accountType === 'investment' ? investmentsByPlaidItemId.get(a.plaidItemId) ?? null : null,
     }));
   }
 

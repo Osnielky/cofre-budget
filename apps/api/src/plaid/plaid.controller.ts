@@ -73,4 +73,15 @@ export class PlaidController {
     await this.service.completeLiabilitiesConsent(itemId, req.user.id);
     return { ok: true };
   }
+
+  @Post('investments-token/:itemId')
+  async createInvestmentsLinkToken(@Param('itemId') itemId: string, @Request() req: any) {
+    const linkToken = await this.service.createInvestmentsLinkToken(req.user.id, itemId);
+    return { link_token: linkToken };
+  }
+
+  @Post('investments/:itemId/complete')
+  completeInvestmentsConsent(@Param('itemId') itemId: string, @Request() req: any) {
+    return this.service.completeInvestmentsConsent(itemId, req.user.id);
+  }
 }

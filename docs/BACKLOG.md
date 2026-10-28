@@ -179,6 +179,19 @@ limits them today, and what was done:
   now. Local prices (EUR, INR) are a Stripe Prices change plus `PLAN_PRICES`
   per currency, later.
 
+## Plaid Investments follow-ups (2026-10-28)
+
+Spec: [docs/superpowers/specs/2026-10-28-plaid-investments-design.md](superpowers/specs/2026-10-28-plaid-investments-design.md).
+Built behind `PLAID_INVESTMENTS_ENABLED`; needs Plaid dashboard approval first.
+
+- Holdings and cost basis from `/investments/holdings/get` for the Goals page
+  (allocation donut, performance) and Ask Cofre.
+- Gate Investments to Elite once the Plaid per-account fee is confirmed; the
+  2026-10-28 pricing model assumes it sits there.
+- Auto-link a brokerage deposit/withdrawal to its checking-side transfer (same
+  amount, ±3 days) so the transfer-kind dialog is pre-filled.
+- A restore action for `transaction_tombstones` (admin or Settings) instead of SQL.
+
 ## Monarch gap list (2026-10-27)
 
 What Monarch Money offers that Cofre does not, from monarchmoney.com/features

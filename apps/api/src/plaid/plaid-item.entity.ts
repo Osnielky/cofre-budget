@@ -45,6 +45,16 @@ export class PlaidItem {
   @Column({ type: 'varchar', nullable: true })
   errorCode: string | null;
 
+  /* Plaid Investments (brokerage / IRA / 401k activity). Null until the first attempt;
+     then 'synced' | 'not_consented' | 'pending' | 'unsupported' (investments.mapper.ts). */
+  @Column({ type: 'varchar', nullable: true })
+  investmentsStatus: string | null;
+
+  /* Last end date requested from /investments/transactions/get; the next pull starts
+     two weeks before it. Null = ask for the full 24 months. */
+  @Column({ type: 'date', nullable: true })
+  investmentsSyncedThrough: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

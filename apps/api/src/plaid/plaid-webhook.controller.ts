@@ -44,6 +44,8 @@ export class PlaidWebhookController {
       await this.service.markItemStatus(itemId, 'error', webhookCode);
     } else if (webhookType === 'LIABILITIES' && webhookCode === 'DEFAULT_UPDATE') {
       await this.service.syncLiabilitiesByExternalItemId(itemId);
+    } else if (webhookType === 'INVESTMENTS_TRANSACTIONS' && webhookCode === 'DEFAULT_UPDATE') {
+      await this.service.syncInvestmentsByExternalItemId(itemId);
     } else {
       this.logger.log(`No handler for ${webhookType}/${webhookCode} — acknowledging without action`);
     }

@@ -19,6 +19,7 @@ import { deriveKey, encryptToken, decryptToken } from '../common/token-crypto.ut
 import { CategorizationRulesService } from '../categorization-rules/categorization-rules.service';
 import { timed } from '../common/logging/timed';
 import { CreditCardsService } from '../cards/credit-cards.service';
+import { investmentsErrorStatus, investmentsWindow, mapInvestmentTransaction, PlaidInvestmentTx, PlaidSecurityLite } from './investments.mapper';
 import { mapPlaidCard, liabilitiesErrorStatus } from '../cards/liabilities.mapper';
 import type { LiabilitiesStatus } from '../cards/card-types';
 
@@ -91,6 +92,20 @@ export class PlaidService {
      `user_id` (from /user/create) to linkTokenCreate — the legacy `user: {client_user_id}`
      field alone is rejected with a 400 for these accounts. Cached on the User row since
      it's a persistent identity, not per-Item. */
+  /* Products a new link may add on top of Transactions. Each is gated because Plaid
+     rejects link tokens naming a product the client is not approved for, which would
+     break bank linking for everyone. */
+  private optionalProducts(): Products[] {
+    const list: Products[] = [];
+    if (this.config.get<string>('PLAID_LIABILITIES_ENABLED') === 'true') list.push(Products.Liabilities);
+    if (this.investmentsEnabled()) list.push(Products.Investments);
+    return list;
+  }
+
+  private investmentsEnabled(): boolean {
+    return this.config.get<string>('PLAID_INVESTMENTS_ENABLED') === 'true';
+  }
+
   private async getOrCreatePlaidUserId(userId: string): Promise<string> {
     const user = await this.userRepo.findOneBy({ id: userId });
     if (!user) throw new NotFoundException('User not found');
@@ -117,9 +132,7 @@ export class PlaidService {
         /* Best effort: banks without Liabilities still link; cards there get manual entry.
            Gated because Plaid rejects link tokens that name a product the client isn't
            approved for — set PLAID_LIABILITIES_ENABLED=true once Plaid approves it. */
-        ...(this.config.get<string>('PLAID_LIABILITIES_ENABLED') === 'true'
-          ? { optional_products: [Products.Liabilities] }
-          : {}),
+        ...(this.optionalProducts().length > 0 ? { optional_products: this.optionalProducts() } : {}),
         country_codes: parsePlaidCountries(this.config.get<string>('PLAID_COUNTRY_CODES')),
         language: 'en',
         ...(webhook ? { webhook } : {}),
@@ -269,6 +282,7 @@ export class PlaidService {
 
     await this.runSync(item, accessToken, cutoverDates.size > 0 ? cutoverDates : undefined);
     await this.syncLiabilities(item, accessToken);
+    await this.syncInvestments(item, accessToken);
     return accounts;
   }
 
@@ -295,6 +309,7 @@ export class PlaidService {
       }
     }
     await this.syncLiabilities(item, accessToken);
+    await this.syncInvestments(item, accessToken);
   }
 
   /** Re-download everything Plaid still holds for the item (its full history window,
@@ -310,6 +325,7 @@ export class PlaidService {
     if (!item) throw new NotFoundException();
     if (this.syncsInFlight.has(item.itemId)) throw new ConflictException('A sync is already running for this bank.');
     item.cursor = null;
+    item.investmentsSyncedThrough = null;
     const accessToken = decryptToken(item.accessToken, this.encKey);
     const counts = await this.runSync(item, accessToken);
     const balanceRes = await timed('plaid', 'accountsBalanceGet', () => this.client.accountsBalanceGet({ access_token: accessToken }));
@@ -384,6 +400,120 @@ export class PlaidService {
     }
   }
 
+  /* Brokerage / IRA / 401k activity from /investments/transactions/get, which is the only
+     place Plaid serves it (the Transactions feed skips investment accounts). Runs only
+     when PLAID_INVESTMENTS_ENABLED is on and the item holds at least one investment
+     account, so banks without one never cost an Investments call. Never throws: an
+     Investments problem must not fail the sync that triggered it. Rows are keyed by
+     Plaid's investment_transaction_id in externalId and updated in place; a "cancel"
+     entry removes the row it cancels (tombstoned) and is not stored itself. */
+  async syncInvestments(item: PlaidItem, accessToken: string): Promise<void> {
+    if (!this.investmentsEnabled()) return;
+    try {
+      const accounts = await this.accountRepo.find({ where: { plaidItemId: item.id, accountType: 'investment' } });
+      if (accounts.length === 0) return;
+      if (item.investmentsStatus === 'unsupported') return;
+      const byPlaidId = new Map(accounts.map((a) => [a.plaidAccountId, a]));
+      const { start, end } = investmentsWindow(item.investmentsSyncedThrough);
+
+      const txs: PlaidInvestmentTx[] = [];
+      const securities = new Map<string, PlaidSecurityLite>();
+      let offset = 0;
+      try {
+        for (;;) {
+          const res = await timed('plaid', 'investmentsTransactionsGet', () => this.client.investmentsTransactionsGet({
+            access_token: accessToken, start_date: start, end_date: end,
+            options: { account_ids: accounts.map((a) => a.plaidAccountId), count: 500, offset },
+          }));
+          for (const sec of res.data.securities) securities.set(sec.security_id, { security_id: sec.security_id, name: sec.name, ticker_symbol: sec.ticker_symbol });
+          txs.push(...(res.data.investment_transactions as unknown as PlaidInvestmentTx[]));
+          offset += res.data.investment_transactions.length;
+          if (offset >= res.data.total_investment_transactions || res.data.investment_transactions.length === 0) break;
+        }
+      } catch (err) {
+        const code: string | undefined = (err as any)?.response?.data?.error_code;
+        const status = investmentsErrorStatus(code);
+        if (!status) throw err;
+        this.logger.log(`Investments unavailable for item ${item.itemId}: ${code}`);
+        await this.itemRepo.update(item.id, { investmentsStatus: status });
+        return;
+      }
+
+      for (const it of txs) {
+        const account = byPlaidId.get(it.account_id);
+        if (!account) continue;
+        if (it.cancel_transaction_id) {
+          const victim = await this.txRepo.findOneBy({ externalId: it.cancel_transaction_id, userId: item.userId, source: 'plaid' });
+          if (victim) {
+            await this.tombstones.save(this.tombstone(victim, 'plaid_cancelled'));
+            await this.txRepo.delete({ id: victim.id });
+          }
+          continue;
+        }
+        const mapped = mapInvestmentTransaction(it, securities);
+        const existing = await this.txRepo.findOneBy({ externalId: mapped.externalId, userId: item.userId });
+        if (existing) {
+          existing.amount = mapped.amount;
+          existing.name = mapped.name;
+          existing.date = mapped.date;
+          existing.plaidCategory = mapped.plaidCategory;
+          await this.txRepo.save(existing);
+          continue;
+        }
+        await this.txRepo.save(this.txRepo.create({
+          userId: item.userId,
+          bankAccountId: account.id,
+          externalId: mapped.externalId,
+          source: 'plaid',
+          amount: mapped.amount,
+          name: mapped.name,
+          merchantName: null,
+          plaidCategory: mapped.plaidCategory,
+          date: mapped.date,
+          pending: false,
+          note: mapped.note,
+        }));
+      }
+      await this.itemRepo.update(item.id, { investmentsStatus: 'synced', investmentsSyncedThrough: end });
+      if (txs.length > 0) this.logger.log(`Investments sync for item ${item.itemId}: ${txs.length} transactions in ${start}..${end}`);
+    } catch (err) {
+      const code = (err as any)?.response?.data?.error_code ?? (err as Error)?.message;
+      this.logger.error(`Investments sync failed for item ${item.itemId}: ${code}`);
+    }
+  }
+
+  async syncInvestmentsByExternalItemId(externalItemId: string): Promise<void> {
+    const item = await this.itemRepo
+      .createQueryBuilder('item')
+      .addSelect('item.accessToken')
+      .where('item.itemId = :externalItemId', { externalItemId })
+      .getOne();
+    if (!item) return;
+    await this.syncInvestments(item, decryptToken(item.accessToken, this.encKey));
+  }
+
+  /* Update mode that asks the user to consent to Investments on an Item linked before
+     Cofre requested it. Plaid bills Investments per connected investment account from then on. */
+  createInvestmentsLinkToken(userId: string, plaidItemId: string): Promise<string> {
+    if (!this.investmentsEnabled()) throw new ForbiddenException({ message: 'Investment activity is not enabled yet.', code: 'INVESTMENTS_DISABLED' });
+    return this.updateModeLinkToken(userId, plaidItemId, { additional_consented_products: [Products.Investments] }, 'investments');
+  }
+
+  async completeInvestmentsConsent(plaidItemId: string, userId: string): Promise<{ status: string | null }> {
+    const item = await this.itemRepo
+      .createQueryBuilder('item')
+      .addSelect('item.accessToken')
+      .where('item.id = :plaidItemId AND item.userId = :userId', { plaidItemId, userId })
+      .getOne();
+    if (!item) throw new NotFoundException('Bank connection not found');
+    item.investmentsStatus = null;
+    item.investmentsSyncedThrough = null;
+    await this.itemRepo.save(item);
+    await this.syncInvestments(item, decryptToken(item.accessToken, this.encKey));
+    const refreshed = await this.itemRepo.findOneBy({ id: plaidItemId });
+    return { status: refreshed?.investmentsStatus ?? null };
+  }
+
   async syncLiabilitiesByExternalItemId(externalItemId: string): Promise<void> {
     const item = await this.itemRepo
       .createQueryBuilder('item')
@@ -392,6 +522,7 @@ export class PlaidService {
       .getOne();
     if (!item) return;
     await this.syncLiabilities(item, decryptToken(item.accessToken, this.encKey));
+    await this.syncInvestments(item, decryptToken(item.accessToken, this.encKey));
   }
 
   /* Cursor-based sync via /transactions/sync — pages through everything new since
@@ -615,6 +746,7 @@ export class PlaidService {
       .getOne();
     if (!item) throw new NotFoundException('Bank connection not found');
     await this.syncLiabilities(item, decryptToken(item.accessToken, this.encKey));
+    await this.syncInvestments(item, decryptToken(item.accessToken, this.encKey));
   }
 
   private async updateModeLinkToken(
@@ -668,6 +800,7 @@ export class PlaidService {
     const accessToken = decryptToken(item.accessToken, this.encKey);
     await this.runSync(item, accessToken);
     await this.syncLiabilities(item, accessToken);
+    await this.syncInvestments(item, accessToken);
 
     const refreshed = await this.itemRepo.findOneBy({ id: plaidItemId });
     return { status: refreshed?.status ?? item.status, errorCode: refreshed?.errorCode ?? null };

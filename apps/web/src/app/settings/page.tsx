@@ -39,6 +39,8 @@ interface BankAccount {
   provider: string;
   plaidItemId: string | null;
   plaidStatus?: string | null;
+  /** Investment accounts only: null (never tried) | 'synced' | 'not_consented' | 'pending' | 'unsupported'. */
+  investmentsStatus?: string | null;
   last4?: string | null;
   txCount?: number;
 }
@@ -258,7 +260,7 @@ function SettingsPageInner() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
-  const [linkMode, setLinkMode] = useState<'connect' | 'reconnect'>('connect');
+  const [linkMode, setLinkMode] = useState<'connect' | 'reconnect' | 'investments'>('connect');
   const [reconnectItemId, setReconnectItemId] = useState<string | null>(null);
   const [mergeReview, setMergeReview] = useState<PreviewExchangeResult | null>(null);
   const [error, setError] = useState('');
@@ -377,10 +379,46 @@ function SettingsPageInner() {
     }
   };
 
+  /* Plaid update mode that adds Investments consent to a bank linked before Cofre
+     asked for it; the completion call runs the first activity pull. */
+  const openInvestments = async (account: BankAccount) => {
+    if (!account.plaidItemId) return;
+    setConnecting(true);
+    setLinkMode('investments');
+    setReconnectItemId(account.plaidItemId);
+    setError('');
+    try {
+      const res = await fetch(`${API}/plaid/investments-token/${account.plaidItemId}`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(typeof body?.message === 'string' ? body.message : '');
+      }
+      const { link_token } = await res.json();
+      sessionStorage.setItem('plaidLinkToken', link_token);
+      sessionStorage.setItem('plaidLinkMode', 'investments');
+      sessionStorage.setItem('plaidReconnectItemId', account.plaidItemId);
+      setLinkToken(link_token);
+    } catch (err) {
+      setError((err instanceof Error && err.message) || 'Could not open your bank for investment activity.');
+      setConnecting(false);
+    }
+  };
+
   const onPlaidSuccess = useCallback(async (publicToken: string, metadata: any) => {
     setConnecting(true);
     try {
-      if (linkMode === 'reconnect' && reconnectItemId) {
+      if (linkMode === 'investments' && reconnectItemId) {
+        const completeRes = await fetch(`${API}/plaid/investments/${reconnectItemId}/complete`, { method: 'POST', credentials: 'include' });
+        const body = completeRes.ok ? await completeRes.json().catch(() => null) : null;
+        const res = await fetch(`${API}/bank-accounts`, { credentials: 'include' });
+        const data = await res.json();
+        setAccounts(Array.isArray(data) ? data : []);
+        setResyncNotice(
+          body?.status === 'synced' ? 'Investment activity is on. Trades, dividends and transfers now sync with the rest of the bank.'
+          : body?.status === 'pending' ? 'Investment activity is on. Plaid is still preparing the history; it arrives with the next sync.'
+          : 'Investment activity was not enabled. Try again, or check that you ticked the investment account in your bank\'s consent screen.',
+        );
+      } else if (linkMode === 'reconnect' && reconnectItemId) {
         const completeRes = await fetch(`${API}/plaid/reconnect/${reconnectItemId}/complete`, { method: 'POST', credentials: 'include' });
         if (!completeRes.ok) throw new Error();
         const { status } = await completeRes.json();
@@ -1117,6 +1155,7 @@ function SettingsPageInner() {
                                   {unsetCash && (
                                     <p className="text-[10.5px] font-semibold mt-0.5" style={{ color: 'var(--color-amber)' }}>Set how much cash you have → tap, then Edit</p>
                                   )}
+                                  <InvestmentsHint account={account} connecting={connecting} onEnable={() => openInvestments(account)} compact />
                                 </div>
                                 <div className="text-right shrink-0">
                                   <p className="font-black text-sm tabular-nums" style={{ color: owed ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>
@@ -1244,6 +1283,7 @@ function SettingsPageInner() {
                                       Set how much cash you have →
                                     </button>
                                   )}
+                                  <InvestmentsHint account={account} connecting={connecting} onEnable={() => openInvestments(account)} />
                                 </div>
                                 <div className="text-right shrink-0">
                                   <p className="font-black text-[15px] tabular-nums" style={{ color: owed ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>
@@ -1536,6 +1576,27 @@ function SyncIcon({ spinning }: { spinning: boolean }) {
       <path d="M21 3v5h-5"/>
     </svg>
   );
+}
+
+/** What an investment account's activity feed is doing, with the one-tap consent
+ *  when the bank was linked before Cofre asked for Investments. Nothing is shown
+ *  while the account is syncing fine or has never been tried. */
+function InvestmentsHint({ account, connecting, onEnable, compact = false }: { account: BankAccount; connecting: boolean; onEnable: () => void; compact?: boolean }) {
+  if (account.accountType !== 'investment' || account.provider !== 'plaid') return null;
+  const status = account.investmentsStatus ?? null;
+  const size = compact ? 'text-[10.5px]' : 'text-[11px]';
+  if (status === 'not_consented') {
+    return (
+      <button type="button" onClick={(e) => { e.stopPropagation(); onEnable(); }} disabled={connecting}
+        className={`mt-1 ${size} font-semibold px-2 py-0.5 rounded-full cursor-pointer disabled:opacity-50`}
+        style={{ background: 'color-mix(in srgb, var(--color-amber) 14%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 35%, transparent)' }}>
+        Enable investment activity →
+      </button>
+    );
+  }
+  if (status === 'pending') return <p className={`${size} mt-0.5`} style={{ color: 'var(--color-text-muted)' }}>Plaid is preparing trades and dividends; they arrive with the next sync.</p>;
+  if (status === 'unsupported') return <p className={`${size} mt-0.5`} style={{ color: 'var(--color-text-muted)' }}>This bank does not share investment activity; the balance still syncs.</p>;
+  return null;
 }
 
 function HistoryIcon() {

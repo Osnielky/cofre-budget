@@ -50,6 +50,13 @@ export default function PlaidOAuthRedirectPage() {
         router.replace('/cards');
         return;
       }
+      if (mode === 'investments') {
+        const itemId = sessionStorage.getItem('plaidReconnectItemId');
+        if (itemId) await fetch(`${API}/plaid/investments/${itemId}/complete`, { method: 'POST', credentials: 'include' }).catch(() => null);
+        clearHandoffState();
+        router.replace('/settings');
+        return;
+      }
       if (mode === 'reconnect') {
         const itemId = sessionStorage.getItem('plaidReconnectItemId');
         if (itemId) {
