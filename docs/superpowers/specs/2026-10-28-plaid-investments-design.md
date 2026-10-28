@@ -66,10 +66,14 @@ works. The OAuth redirect page handles `plaidLinkMode = 'investments'` like
 
 ### Cost
 
-Plaid bills Investments per connected investment account per month, on top of
-Transactions. The pricing model of 2026-10-28 puts that cost in Elite's math; the
-feature is not plan-gated in code because the account cap already bounds it, and the
-owner's own account is on Pro.
+Plaid's Add Products page (2026-10-28, pay-as-you-go): **$0.35 per Item per month for
+Investments Transactions** and $0.18 per Item per month for Holdings. Cofre calls only
+the transactions endpoint, so a linked brokerage Item costs $0.35 a month on top of
+Transactions, per bank login rather than per account. The 2026-10-28 pricing model had
+assumed a per-account fee; at $0.35 per Item it fits inside Pro's $2 margin for one or
+two brokerages, so Investments is not plan-gated in code. Approval requested the same
+day under "Personal budgeting and financial advice"; status in the dashboard:
+Requested.
 
 ## Rollout
 

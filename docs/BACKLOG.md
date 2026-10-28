@@ -186,8 +186,10 @@ Built behind `PLAID_INVESTMENTS_ENABLED`; needs Plaid dashboard approval first.
 
 - Holdings and cost basis from `/investments/holdings/get` for the Goals page
   (allocation donut, performance) and Ask Cofre.
-- Gate Investments to Elite once the Plaid per-account fee is confirmed; the
-  2026-10-28 pricing model assumes it sits there.
+- Revisit plan gating once real usage shows how many brokerages a Pro user links:
+  Plaid's confirmed fee is $0.35 per Item per month (Investments Transactions), per
+  bank login, so one or two fit inside Pro's $2 margin and Elite gating is not needed
+  yet.
 - Auto-link a brokerage deposit/withdrawal to its checking-side transfer (same
   amount, ±3 days) so the transfer-kind dialog is pre-filled.
 - A restore action for `transaction_tombstones` (admin or Settings) instead of SQL.
