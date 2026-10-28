@@ -9,7 +9,7 @@ import { User } from '../users/user.entity';
 import { Category } from '../categories/category.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
 import { CategorizationRule } from '../categorization-rules/categorization-rule.entity';
-import { PlaidService } from './plaid.service';
+import { PlaidService, MAX_REMOVALS_PER_SYNC } from './plaid.service';
 import { encryptToken, deriveKey } from '../common/token-crypto.util';
 
 const SECRET = 'test-secret-at-least-this-long';
@@ -97,6 +97,37 @@ describe('Plaid removed[] keeps a tombstone', () => {
     await service.syncItem(item.id, 'user-1');
     expect(await txRepo.count()).toBe(1);
     expect(await ds.getRepository(TransactionTombstone).count()).toBe(0);
+  });
+});
+
+describe('mass removal guard', () => {
+  it('keeps every row when one sync asks to remove more than the limit, and says so', async () => {
+    const { item, account } = await seedItem();
+    const txRepo = ds.getRepository(Transaction);
+    const n = MAX_REMOVALS_PER_SYNC + 1;
+    for (let i = 0; i < n; i++) {
+      await txRepo.save(txRepo.create({ userId: 'user-1', bankAccountId: account.id, externalId: `plaid-tx-${i}`, source: 'plaid', amount: -10, name: `ROW ${i}`, date: '2026-09-02', pending: false }));
+    }
+    const service = makeService({ removed: Array.from({ length: n }, (_, i) => ({ transaction_id: `plaid-tx-${i}` })) });
+
+    const counts = await service.resyncItemFromScratch(item.id, 'user-1');
+
+    expect(await txRepo.count()).toBe(n);
+    expect(await ds.getRepository(TransactionTombstone).count()).toBe(0);
+    expect(counts).toMatchObject({ removed: 0, removalsRefused: n });
+  });
+
+  it('still removes a normal handful', async () => {
+    const { item, account } = await seedItem();
+    const txRepo = ds.getRepository(Transaction);
+    for (let i = 0; i < 3; i++) {
+      await txRepo.save(txRepo.create({ userId: 'user-1', bankAccountId: account.id, externalId: `plaid-tx-${i}`, source: 'plaid', amount: -10, name: `ROW ${i}`, date: '2026-09-02', pending: false }));
+    }
+    const service = makeService({ removed: [{ transaction_id: 'plaid-tx-0' }, { transaction_id: 'plaid-tx-1' }] });
+    const counts = await service.resyncItemFromScratch(item.id, 'user-1');
+    expect(await txRepo.count()).toBe(1);
+    expect(counts).toMatchObject({ removed: 2 });
+    expect(counts.removalsRefused).toBeUndefined();
   });
 });
 

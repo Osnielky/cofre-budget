@@ -48,12 +48,19 @@ export interface ExchangeDecision {
 }
 
 /** What one /transactions/sync pass did. */
-export interface SyncCounts { added: number; modified: number; removed: number }
+export interface SyncCounts { added: number; modified: number; removed: number; /** Removals a page asked for beyond MAX_REMOVALS_PER_SYNC; the rows were kept. */ removalsRefused?: number }
 
 /** Linked institutions (Plaid items) a plan may hold. Plaid bills per connected
  *  account per month, so the cap is what keeps each tier's cost under its price;
  *  plans missing here (free) never reach this check — PlanGuard stops them first. */
 export const INSTITUTION_CAPS: Record<string, number> = { pro: 4, elite: 10 };
+
+/** Most rows one sync may delete on Plaid's say-so. A normal removed[] carries one or
+ *  two entries (a pending charge that posted under a new id). Anything past this looks
+ *  like an institution migration retracting an account's history, so the rows stay,
+ *  the sync logs an error, and a person decides (2026-10-28: a Schwab account lost
+ *  every month before this guard existed). */
+export const MAX_REMOVALS_PER_SYNC = 10;
 
 @Injectable()
 export class PlaidService {
@@ -645,7 +652,12 @@ export class PlaidService {
           counts.added++;
         }
 
-        for (const rt of res.data.removed) {
+        if (res.data.removed.length > MAX_REMOVALS_PER_SYNC) {
+          this.logger.error(
+            `Refusing to delete ${res.data.removed.length} transactions Plaid reported removed for item ${item.itemId} (limit ${MAX_REMOVALS_PER_SYNC}); kept them for review`,
+          );
+          counts.removalsRefused = (counts.removalsRefused ?? 0) + res.data.removed.length;
+        } else for (const rt of res.data.removed) {
           // Only ever a transaction Plaid itself created — never the user's own entries.
           const victim = await this.txRepo.findOneBy({ externalId: rt.transaction_id, userId: item.userId, source: 'plaid' });
           if (victim) {
