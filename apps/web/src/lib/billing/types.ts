@@ -32,7 +32,7 @@ export const PAID_FEATURES: Record<'pro' | 'elite', { title: string; detail: str
   elite: [
     { title: 'Everything in Pro', detail: 'All Basic and Pro features', icon: 'base' },
     { title: 'Automatic bank sync', detail: 'Transactions import on their own with Plaid (US banks)', icon: 'sync' },
-    { title: 'Unlimited linked institutions', detail: 'Connect every bank, card and loan', icon: 'bank' },
-    { title: 'Ask Cofre AI assistant', detail: '50 messages a day', icon: 'ai' },
+    { title: 'Up to 10 linked institutions', detail: 'Every bank, card and loan that matters', icon: 'bank' },
+    { title: 'Ask Cofre AI assistant', detail: '400 messages a month', icon: 'ai' },
   ],
 };

@@ -45,6 +45,11 @@ export interface ExchangeDecision {
   cutoverDate?: string;
 }
 
+/** Linked institutions (Plaid items) a plan may hold. Plaid bills per connected
+ *  account per month, so the cap is what keeps each tier's cost under its price;
+ *  plans missing here (free) never reach this check — PlanGuard stops them first. */
+export const INSTITUTION_CAPS: Record<string, number> = { pro: 4, elite: 10 };
+
 @Injectable()
 export class PlaidService {
   private readonly client: PlaidApi;
@@ -138,12 +143,15 @@ export class PlaidService {
 
     let item = await this.itemRepo.findOneBy({ itemId: item_id });
     if (!item) {
-      if (plan === 'pro') {
+      const cap = INSTITUTION_CAPS[plan];
+      if (cap != null) {
         const count = await this.itemRepo.count({ where: { userId } });
-        if (count >= 4) {
+        if (count >= cap) {
           await timed('plaid', 'itemRemove', () => this.client.itemRemove({ access_token }));
           throw new ForbiddenException({
-            message: 'Pro is limited to 4 linked institutions — upgrade to Elite for unlimited.',
+            message: plan === 'elite'
+              ? `Elite is limited to ${cap} linked institutions. Remove one in Settings → Bank Accounts to connect another.`
+              : `Pro is limited to ${cap} linked institutions — upgrade to Elite for up to ${INSTITUTION_CAPS.elite}.`,
             code: 'INSTITUTION_LIMIT_REACHED',
           });
         }

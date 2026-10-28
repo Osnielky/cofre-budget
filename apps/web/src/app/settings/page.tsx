@@ -20,7 +20,7 @@ import BillingTab from '@/components/BillingTab';
 import { useTheme } from '@/components/ThemeProvider';
 import { THEMES } from '@/lib/theme';
 import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
-import { connectBankError } from '@/lib/connect-bank-error';
+import { connectBankError, InstitutionLimitError } from '@/lib/connect-bank-error';
 import MyTicketsList from '@/components/support/MyTicketsList';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -393,7 +393,7 @@ function SettingsPageInner() {
         if (!res.ok) {
           const body = await res.json().catch(() => null);
           if (body?.code === 'INSTITUTION_LIMIT_REACHED') {
-            throw new Error('INSTITUTION_LIMIT_REACHED');
+            throw new InstitutionLimitError(body.message);
           }
           throw new Error();
         }
@@ -420,8 +420,8 @@ function SettingsPageInner() {
         }
       }
     } catch (err) {
-      if (err instanceof Error && err.message === 'INSTITUTION_LIMIT_REACHED') {
-        setError('Pro is limited to 4 linked institutions — upgrade to Elite in Settings → Billing for unlimited.');
+      if (err instanceof InstitutionLimitError) {
+        setError(err.message);
       } else {
         setError(linkMode === 'reconnect' ? 'Reconnected, but refresh failed. Try syncing manually.' : 'Bank connected but account import failed. Try syncing manually.');
       }

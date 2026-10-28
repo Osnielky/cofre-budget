@@ -4,7 +4,6 @@ import { In, IsNull, LessThan, Repository } from 'typeorm';
 import { AiConversation } from './ai-conversation.entity';
 import { AiMessage, AiMessageWidget } from './ai-message.entity';
 import { AiPendingAction } from './ai-pending-action.entity';
-import { startOfUtcDay } from './ai-usage';
 
 const TITLE_MAX_LEN = 60;
 
@@ -30,8 +29,8 @@ export class AiConversationsService implements OnModuleInit {
 
   /**
    * Soft-delete one conversation. It disappears from the list and can no longer be
-   * opened, but its user messages still count toward today's cap — a hard delete
-   * would let anyone reset the daily limit by clearing their history.
+   * opened, but its user messages still count toward the plan's message cap — a
+   * hard delete would let anyone reset the limit by clearing their history.
    */
   async remove(conversationId: string, userId: string): Promise<void> {
     await this.owned(conversationId, userId);
@@ -50,7 +49,10 @@ export class AiConversationsService implements OnModuleInit {
    * messages and pending proposals follow by FK cascade. Runs at boot.
    */
   async purgeDeleted(): Promise<number> {
-    const cutoff = new Date(startOfUtcDay(new Date()).getTime() - 24 * 60 * 60 * 1000);
+    // A conversation deleted before the previous UTC month began cannot hold a
+    // message inside any plan's current window (Elite counts the whole month).
+    const now = new Date();
+    const cutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
     const result = await this.conversations.delete({ deletedAt: LessThan(cutoff) });
     return result.affected ?? 0;
   }
@@ -111,15 +113,15 @@ export class AiConversationsService implements OnModuleInit {
     return this.messages.save(this.messages.create({ conversationId, role: 'assistant', text, widget }));
   }
 
-  async countUserMessagesToday(userId: string): Promise<number> {
-    // Limits reset at midnight UTC (see ai-usage.ts), whatever the server's zone.
-    // Deliberately counts soft-deleted conversations too (no deletedAt filter).
-    const startOfDay = startOfUtcDay(new Date());
+  /** User messages sent since `since` — the plan's window start from
+   *  usageWindowStart() (UTC midnight for Pro, the 1st of the month for Elite).
+   *  Deliberately counts soft-deleted conversations too (no deletedAt filter). */
+  async countUserMessagesSince(userId: string, since: Date): Promise<number> {
     return this.messages.createQueryBuilder('m')
       .innerJoin(AiConversation, 'c', 'c.id = m."conversationId"')
       .where('c."userId" = :userId', { userId })
       .andWhere("m.role = 'user'")
-      .andWhere('m."createdAt" >= :startOfDay', { startOfDay })
+      .andWhere('m."createdAt" >= :since', { since })
       .getCount();
   }
 }

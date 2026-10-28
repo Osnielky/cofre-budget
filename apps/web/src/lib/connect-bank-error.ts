@@ -2,6 +2,16 @@
  * What to tell the user when POST /plaid/link-token fails. The API answers 403
  * with a code for plan gates; anything else is a connection problem.
  */
+/** Thrown when the API refuses a new bank because the plan's institution cap is
+ *  full. The API's message names the plan and the cap (Pro: upgrade to Elite;
+ *  Elite: remove one first), so the UI shows it as-is. */
+export class InstitutionLimitError extends Error {
+  constructor(message?: unknown) {
+    super(typeof message === 'string' && message ? message : 'You have reached the bank limit for your plan.');
+    this.name = 'InstitutionLimitError';
+  }
+}
+
 export function connectBankError(status: number, body: unknown): { message: string; upgrade: boolean } {
   const { code, message } = (body && typeof body === 'object' ? body : {}) as { code?: string; message?: string };
   if (status === 403 && code === 'PLAN_UPGRADE_REQUIRED') {

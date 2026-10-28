@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { usePlaidLink } from 'react-plaid-link';
 import Sidebar from '@/components/Sidebar';
 import type { PreviewExchangeResult } from '@/components/PlaidMergeReviewModal';
+import { InstitutionLimitError } from '@/lib/connect-bank-error';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -67,7 +68,7 @@ export default function PlaidOAuthRedirectPage() {
         if (!res.ok) {
           const body = await res.json().catch(() => null);
           if (body?.code === 'INSTITUTION_LIMIT_REACHED') {
-            throw new Error('INSTITUTION_LIMIT_REACHED');
+            throw new InstitutionLimitError(body.message);
           }
           throw new Error();
         }
@@ -94,8 +95,8 @@ export default function PlaidOAuthRedirectPage() {
     } catch (err) {
       clearHandoffState();
       const message =
-        err instanceof Error && err.message === 'INSTITUTION_LIMIT_REACHED'
-          ? 'Pro is limited to 4 linked institutions — upgrade to Elite in Settings → Billing for unlimited.'
+        err instanceof InstitutionLimitError
+          ? err.message
           : mode === 'reconnect'
             ? 'Reconnected, but refresh failed. Try syncing manually.'
             : 'Bank connected but account import failed. Try syncing manually.';

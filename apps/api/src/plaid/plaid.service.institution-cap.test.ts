@@ -93,6 +93,25 @@ describe('PlaidService institution cap', () => {
     ).resolves.toBeDefined();
   });
 
+  it('rejects an 11th institution for an Elite user and releases the Plaid item', async () => {
+    for (let i = 0; i < 10; i++) {
+      await ds.getRepository(PlaidItem).save(ds.getRepository(PlaidItem).create({
+        userId: 'user-1', itemId: `item-${i}`, institutionId: 'inst', institutionName: 'Bank',
+        accessToken: 'enc',
+      }));
+    }
+    const service = makeService({
+      itemPublicTokenExchange: async () => ({ data: { access_token: 'tok', item_id: 'item-new' } }),
+      itemRemove: async () => ({}),
+    });
+
+    await expect(
+      service.previewExchange('user-1', 'public-token', 'inst', 'Bank', 'elite' as any),
+    ).rejects.toThrow(/Elite is limited to 10 linked institutions/i);
+
+    expect(await ds.getRepository(PlaidItem).count({ where: { userId: 'user-1' } })).toBe(10);
+  });
+
   it('allows a Pro user below the cap', async () => {
     const service = makeService({
       itemPublicTokenExchange: async () => ({ data: { access_token: 'tok', item_id: 'item-new' } }),

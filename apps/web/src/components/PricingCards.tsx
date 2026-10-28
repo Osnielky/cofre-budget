@@ -103,8 +103,8 @@ const PLANS: PlanDef[] = [
     features: [
       { icon: 'bank', label: 'Everything in Pro' },
       { icon: 'link', label: 'Automatic bank sync with Plaid (US banks)' },
-      { icon: 'infinity', label: 'Unlimited linked institutions' },
-      { icon: 'sparkle', label: 'Ask Cofre AI assistant · 50 messages/day' },
+      { icon: 'bank', label: 'Up to 10 linked institutions' },
+      { icon: 'sparkle', label: 'Ask Cofre AI assistant · 400 messages/month' },
     ],
   },
 ];

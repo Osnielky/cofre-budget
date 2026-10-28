@@ -10,8 +10,8 @@ describe('connectBankError', () => {
   });
 
   it('passes through the institution-limit message', () => {
-    expect(connectBankError(403, { code: 'INSTITUTION_LIMIT_REACHED', message: 'Pro is limited to 4 linked institutions — upgrade to Elite for unlimited.' }))
-      .toEqual({ upgrade: true, message: 'Pro is limited to 4 linked institutions — upgrade to Elite for unlimited.' });
+    expect(connectBankError(403, { code: 'INSTITUTION_LIMIT_REACHED', message: 'Pro is limited to 4 linked institutions — upgrade to Elite for up to 10.' }))
+      .toEqual({ upgrade: true, message: 'Pro is limited to 4 linked institutions — upgrade to Elite for up to 10.' });
   });
 
   it('tells a demo visitor to create an account rather than upgrade', () => {

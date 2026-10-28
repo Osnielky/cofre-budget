@@ -3,7 +3,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PlanGuard } from '../auth/guards/plan.guard';
 import { RequiresPlan } from '../auth/decorators/require-plan.decorator';
 import { AiConversationsService } from './ai-conversations.service';
-import { messageUsage } from './ai-usage';
+import { messageUsage, usageWindowStart } from './ai-usage';
 
 @UseGuards(JwtAuthGuard, PlanGuard)
 @RequiresPlan('pro', 'elite')
@@ -16,10 +16,13 @@ export class AiConversationsController {
     return this.service.create(req.user.id);
   }
 
-  /** How many Ask Cofre messages the user has left today. */
+  /** How many Ask Cofre messages the user has left in the plan's window (today for Pro, this month for Elite). */
   @Get('usage')
   async usage(@Request() req: any) {
-    return messageUsage(req.user.plan, await this.service.countUserMessagesToday(req.user.id), new Date(), !!req.user.isDemo);
+    const now = new Date();
+    const isDemo = !!req.user.isDemo;
+    const used = await this.service.countUserMessagesSince(req.user.id, usageWindowStart(req.user.plan, now, isDemo));
+    return messageUsage(req.user.plan, used, now, isDemo);
   }
 
   @Get()

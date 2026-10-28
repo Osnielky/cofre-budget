@@ -5,7 +5,7 @@ import { PlanGuard } from '../auth/guards/plan.guard';
 import { RequiresPlan } from '../auth/decorators/require-plan.decorator';
 import { AiChatService } from './ai-chat.service';
 import { AiConversationsService } from './ai-conversations.service';
-import { messageUsage } from './ai-usage';
+import { messageUsage, usageWindowStart } from './ai-usage';
 
 @UseGuards(JwtAuthGuard, PlanGuard)
 @RequiresPlan('pro', 'elite')
@@ -16,6 +16,14 @@ export class AiChatController {
     private conversations: AiConversationsService,
   ) {}
 
+  /** Messages used in the plan's current window (UTC day for Pro, UTC month for Elite). */
+  private async usage(req: any) {
+    const now = new Date();
+    const isDemo = !!req.user.isDemo;
+    const used = await this.conversations.countUserMessagesSince(req.user.id, usageWindowStart(req.user.plan, now, isDemo));
+    return messageUsage(req.user.plan, used, now, isDemo);
+  }
+
   @Post(':id/messages')
   async sendMessage(
     @Param('id') id: string,
@@ -23,11 +31,13 @@ export class AiChatController {
     @Body() body: { content: string; month?: string },
     @Res() res: Response,
   ) {
-    const before = messageUsage(req.user.plan, await this.conversations.countUserMessagesToday(req.user.id), new Date(), !!req.user.isDemo);
+    const before = await this.usage(req);
     if (before.remaining <= 0) {
       throw new ForbiddenException({
-        message: `You've used all ${before.limit} of today's Ask Cofre messages. They reset at midnight UTC.`,
-        code: 'AI_DAILY_LIMIT',
+        message: before.period === 'month'
+          ? `You've used all ${before.limit} of this month's Ask Cofre messages. They reset on the 1st (UTC).`
+          : `You've used all ${before.limit} of today's Ask Cofre messages. They reset at midnight UTC.`,
+        code: 'AI_MESSAGE_LIMIT',
         usage: before,
       });
     }
@@ -49,7 +59,7 @@ export class AiChatController {
         onTextDelta: (text) => res.write(`data: ${JSON.stringify({ type: 'text_delta', text })}\n\n`),
       });
       const message = await this.conversations.appendAssistantMessage(id, result.text, result.widget);
-      const usage = messageUsage(req.user.plan, await this.conversations.countUserMessagesToday(req.user.id), new Date(), !!req.user.isDemo);
+      const usage = await this.usage(req);
       res.write(`data: ${JSON.stringify({ type: 'done', message, usage })}\n\n`);
     } catch (err) {
       res.write(`data: ${JSON.stringify({ type: 'error', message: 'Something went wrong. Please try again.' })}\n\n`);

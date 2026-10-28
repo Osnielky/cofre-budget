@@ -100,7 +100,7 @@ cascades because several entities have none.
 - Gmail: connect / callback / disconnect.
 - Auth: `change-password`, `profile` (PATCH), `resend-verification`.
 - Ask Cofre: not blocked, but `messageUsage` treats a demo user as a **5-message** plan
-  (`dailyMessageLimit('demo')`) so strangers can't run up the Anthropic bill.
+  (`messageLimit('demo')`) so strangers can't run up the Anthropic bill.
 
 Rockefeller is restricted the same way (`isDemoRestricted` = `isDemo` or the owner email): its password is public. Also blocked: debts `send-statement`; `emailReceipt` on debt payments is forced off. Receipts import only works through Gmail, which is already blocked. Ask Cofre keeps the Pro limit for Rockefeller (25/day) so the owner can demo it.
 

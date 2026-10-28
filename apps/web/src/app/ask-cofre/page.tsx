@@ -10,7 +10,7 @@ import ProposalCard from './ProposalCard';
 import SavingsTrendWidget from './SavingsTrendWidget';
 import SafeToSpendWidget from './SafeToSpendWidget';
 import FinancialSnapshotPanel from './FinancialSnapshotPanel';
-import { resetsIn } from '@/lib/ai/usage';
+import { periodLabel, resetsIn } from '@/lib/ai/usage';
 import { AnimatePresence, MessageIn, WidgetIn, Stagger, StaggerItem, ThinkingBubble, AiAvatar, SendButton, ReplyIn } from './motion';
 
 import { useNarrowScreen } from '@/hooks/useNarrowScreen';
@@ -267,7 +267,7 @@ export default function AskCofrePage() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95L10.13 17.1a2 2 0 0 1-2.83-2.83l8.49-8.49"/></svg>
             </button>
             <input value={input} onChange={(e) => setInput(e.target.value)} disabled={outOfMessages}
-              placeholder={outOfMessages ? 'Daily message limit reached' : narrow ? 'Ask anything…' : 'Ask anything, or tell me what to change…'}
+              placeholder={outOfMessages ? 'Message limit reached' : narrow ? 'Ask anything…' : 'Ask anything, or tell me what to change…'}
               className="flex-1 bg-transparent outline-none text-sm px-1 min-w-0" />
             <button type="button" disabled title="Voice input coming soon"
               className="w-8 h-8 rounded-full hidden sm:flex items-center justify-center shrink-0 disabled:opacity-40"
@@ -289,10 +289,10 @@ export default function AskCofrePage() {
               <span className="font-semibold text-right sm:text-left" role="status"
                 style={{ color: outOfMessages ? 'var(--color-rose)' : usage.remaining <= 5 ? 'var(--color-amber)' : 'var(--color-text-secondary)' }}>
                 {outOfMessages
-                  ? (narrow ? `All ${usage.limit} used · resets in ${resetsIn(usage.resetsAt)}` : `You've used all ${usage.limit} messages for today · resets in ${resetsIn(usage.resetsAt)}`)
-                  : (narrow ? `${usage.remaining} of ${usage.limit} left · resets in ${resetsIn(usage.resetsAt)}` : `${usage.remaining} of ${usage.limit} messages left today · resets in ${resetsIn(usage.resetsAt)}`)}
+                  ? (narrow ? `All ${usage.limit} used · resets in ${resetsIn(usage.resetsAt)}` : `You've used all ${usage.limit} messages for ${periodLabel(usage.period)} · resets in ${resetsIn(usage.resetsAt)}`)
+                  : (narrow ? `${usage.remaining} of ${usage.limit} left · resets in ${resetsIn(usage.resetsAt)}` : `${usage.remaining} of ${usage.limit} messages left ${periodLabel(usage.period)} · resets in ${resetsIn(usage.resetsAt)}`)}
                 {user?.plan === 'pro' && usage.remaining <= 5 && (
-                  <> · <Link href="/settings?tab=billing" className="underline" style={{ color: 'var(--color-primary)' }}>Elite gets 50/day</Link></>
+                  <> · <Link href="/settings?tab=billing" className="underline" style={{ color: 'var(--color-primary)' }}>Elite gets 400/month</Link></>
                 )}
               </span>
             ) : <span className="hidden sm:inline" />}
