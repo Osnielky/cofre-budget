@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Fragment, FormEvent, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment, FormEvent, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { usePlaidLink } from 'react-plaid-link';
@@ -125,7 +125,8 @@ const inputStyle: React.CSSProperties = {
   color: 'var(--color-text-primary)',
 };
 
-const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+/** `short` is the label below 2xl, where ten full labels no longer fit beside the sidebar. */
+const TABS: { id: Tab; label: string; short?: string; icon: React.ReactNode }[] = [
   {
     id: 'account',
     label: 'Account',
@@ -156,6 +157,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
     id: 'recurring',
     label: 'Recurring Payments',
+    short: 'Recurring',
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/>
@@ -166,6 +168,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
     id: 'rules',
     label: 'Categorization Rules',
+    short: 'Rules',
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a3 3 0 0 0-6 0Z"/>
@@ -175,6 +178,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
     id: 'projects',
     label: 'Project Categories',
+    short: 'Projects',
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M2 20h20M5 20V8l7-5 7 5v12"/><path d="M9 20v-5h6v5"/>
@@ -211,6 +215,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
     id: 'help',
     label: 'Help & Feedback',
+    short: 'Help',
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/>
@@ -221,6 +226,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
     id: 'data',
     label: 'Data & Privacy',
+    short: 'Data',
     icon: (
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
@@ -537,6 +543,57 @@ function SettingsPageInner() {
     } finally { setSyncingId(null); }
   }
 
+  /* One group per bank, shared by the phone list and the desktop grid. */
+  const bankGroups = useMemo(() => {
+    const m = new Map<string, BankAccount[]>();
+    for (const a of accounts) { const l = m.get(a.bankName); if (l) l.push(a); else m.set(a.bankName, [a]); }
+    return Array.from(m, ([bankName, list]) => {
+      const first = list[0];
+      const color = first.color || (TYPE_META[first.accountType] ?? TYPE_META.checking).accent;
+      const connected = list.filter((a) => a.provider === 'plaid');
+      const broken = connected.find((a) => a.plaidStatus === 'error') ?? null;
+      const syncable = connected.filter((a) => a.plaidItemId && a.plaidStatus !== 'error');
+      return { bankName, list, first, color, connected, broken, syncable };
+    });
+  }, [accounts]);
+
+  /* Summary strip. USD only — a non-USD account is listed but not summed. */
+  const totals = useMemo(() => {
+    let assets = 0, owed = 0;
+    for (const a of accounts) {
+      if (a.currency !== 'USD') continue;
+      const b = Number(a.balance);
+      if (isLiability(a.accountType)) { if (b > 0) owed += b; } else assets += b;
+    }
+    return {
+      assets, owed, net: assets - owed,
+      synced: accounts.filter((a) => a.provider === 'plaid' && a.plaidStatus !== 'error').length,
+      broken: accounts.filter((a) => a.plaidStatus === 'error').length,
+    };
+  }, [accounts]);
+
+  /* Keep the active tab in view on narrow screens where the strip scrolls, and
+     fade whichever edge still has tabs hidden behind it. */
+  const tabStripRef = useRef<HTMLDivElement>(null);
+  const [tabFade, setTabFade] = useState({ left: false, right: false });
+  useEffect(() => {
+    const el = tabStripRef.current;
+    if (!el) return;
+    const measure = () => setTabFade({
+      left: el.scrollLeft > 4,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+    });
+    measure();
+    el.addEventListener('scroll', measure, { passive: true });
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => { el.removeEventListener('scroll', measure); ro.disconnect(); };
+  }, []);
+  useEffect(() => {
+    document.querySelector<HTMLElement>(`[data-settings-tab="${activeTab}"]`)
+      ?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [activeTab]);
+
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
@@ -546,42 +603,62 @@ function SettingsPageInner() {
         {/* top-0, not top-14: <main> already pads for the phone top bar, and a
             scroll container's padding is excluded from the sticky box, so a 56px
             offset here would double up and hide the first rows of every tab. */}
-        <div className="sticky top-0 z-10 px-4 sm:px-6 pt-5 sm:pt-6 pb-3 sm:pb-4"
+        <div className="sticky top-0 z-10 px-4 sm:px-6 pt-4 sm:pt-5"
           style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
-          <h1 className="text-2xl font-bold tracking-tight mb-3 sm:mb-4">Settings</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight mb-2 sm:mb-3">Settings</h1>
 
-          {/* Tab bar */}
-          <div className="overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0" style={{ scrollbarWidth: 'none' }}>
-          <div className="flex gap-1 p-1 rounded-xl w-full min-w-fit" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-            {TABS.map((tab) => (
-              <Fragment key={tab.id}>
-                {tab.id === 'data' && (
-                  <div className="ml-auto self-stretch my-1 w-px shrink-0" style={{ background: 'var(--color-border)' }} />
-                )}
-                <button
-                  onClick={() => tab.id === 'data' ? setShowResetModal(true) : setActiveTab(tab.id)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shrink-0 whitespace-nowrap"
-                  style={tab.id === 'data'
-                    ? { color: 'var(--color-rose)', border: '1px solid rgba(255,80,80,0.28)', background: 'rgba(255,80,80,0.08)' }
-                    : activeTab === tab.id
-                      ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }
-                      : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
-                  {tab.icon}
-                  {tab.label}
-                </button>
-              </Fragment>
-            ))}
-          </div>
-          </div>
+          {/* Tab strip: underline tabs, one row that scrolls sideways when it must
+              (phones, the icon rail) and spreads out when it can. The destructive
+              Delete action sits apart on the right, icon-only below sm. */}
+          <nav aria-label="Settings sections" className="relative -mx-4 sm:-mx-6">
+            {tabFade.left && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-10 z-10" style={{ background: 'linear-gradient(90deg, var(--header-bg), transparent)' }} />}
+            {tabFade.right && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-14 z-10" style={{ background: 'linear-gradient(270deg, var(--header-bg), transparent)' }} />}
+            <div ref={tabStripRef} className="overflow-x-auto px-4 sm:px-6" style={{ scrollbarWidth: 'none' }}>
+              <div className="flex items-stretch gap-0.5 min-w-max">
+                {TABS.map((tab) => {
+                  const active = activeTab === tab.id;
+                  const danger = tab.id === 'data';
+                  return (
+                    <Fragment key={tab.id}>
+                      {danger && <div className="ml-auto w-px self-center h-5 mx-1.5 shrink-0" style={{ background: 'var(--color-border)' }} />}
+                      <button
+                        type="button"
+                        data-settings-tab={tab.id}
+                        aria-current={active ? 'page' : undefined}
+                        aria-label={danger ? tab.label : undefined}
+                        title={danger ? tab.label : undefined}
+                        onClick={() => danger ? setShowResetModal(true) : setActiveTab(tab.id)}
+                        className="relative flex items-center gap-1.5 px-2.5 lg:px-3 pt-1.5 pb-2.5 text-[12.5px] lg:text-[13px] font-semibold whitespace-nowrap rounded-t-lg transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-primary)_5%,transparent)]"
+                        style={{ color: danger ? 'var(--color-rose)' : active ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}>
+                        <span className={active ? '' : 'opacity-75'}>{tab.icon}</span>
+                        {tab.short ? (
+                          <>
+                            <span className="2xl:hidden">{tab.short}</span>
+                            <span className="hidden 2xl:inline">{tab.label}</span>
+                          </>
+                        ) : (
+                          <span className={danger ? 'hidden sm:inline' : ''}>{tab.label}</span>
+                        )}
+                        {active && (
+                          <span aria-hidden="true" className="absolute left-2 right-2 -bottom-px h-[2px] rounded-full"
+                            style={{ background: 'var(--color-primary)', boxShadow: '0 0 10px color-mix(in srgb, var(--color-primary) 70%, transparent)' }} />
+                        )}
+                      </button>
+                    </Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          </nav>
         </div>
 
         <div className="p-4 sm:p-6">
 
           {/* ── BANK ACCOUNTS TAB ── */}
           {activeTab === 'banks' && (
-            <div className="flex flex-col gap-5 max-w-3xl"><>
+            <div className="flex flex-col gap-5"><>
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-sm max-w-2xl" style={{ color: 'var(--color-text-muted)' }}>
                   Connect a US bank for automatic updates, or add accounts manually and import CSV exports from any bank.
                 </p>
                 <div className="flex gap-2 shrink-0">
@@ -630,14 +707,38 @@ function SettingsPageInner() {
                 </div>
               )}
 
-              {/* Plaid info banner */}
-              <div className="px-4 py-3 rounded-xl flex items-start gap-3 text-sm"
-                style={{ background: 'color-mix(in srgb, var(--color-green) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 18%, transparent)' }}>
-                <span className="mt-0.5">🔒</span>
-                <p style={{ color: 'var(--color-text-secondary)' }}>
-                  Bank connections use <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>Plaid</span> — a read-only, bank-grade secure link. Cofre never stores your bank credentials.
-                </p>
-              </div>
+              {/* Summary strip — only once there is something to sum. */}
+              {!loading && accounts.length > 0 && (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Assets', value: money(totals.assets), color: 'var(--color-green)', sub: 'cash, checking, savings, investments' },
+                    { label: 'Owed', value: money(totals.owed), color: 'var(--color-rose)', sub: 'cards, loans, mortgages' },
+                    { label: 'Net', value: money(totals.net), color: totals.net < 0 ? 'var(--color-rose)' : 'var(--color-primary)', sub: 'assets minus what you owe' },
+                    {
+                      label: 'Connections',
+                      value: `${bankGroups.length} bank${bankGroups.length === 1 ? '' : 's'}`,
+                      color: totals.broken ? 'var(--color-rose)' : 'var(--color-text-primary)',
+                      sub: totals.broken
+                        ? `${totals.broken} account${totals.broken === 1 ? '' : 's'} need${totals.broken === 1 ? 's' : ''} reconnect`
+                        : `${totals.synced} synced · ${accounts.length - totals.synced} manual`,
+                    },
+                  ].map((t) => (
+                    <div key={t.label} className="px-4 py-3 rounded-2xl min-w-0" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
+                      <p className="text-[10.5px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-text-muted)' }}>{t.label}</p>
+                      <p className="mt-1 text-lg sm:text-xl font-black tabular-nums truncate" style={{ color: t.color }}>{t.value}</p>
+                      <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{t.sub}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Plaid note */}
+              <p className="text-xs flex items-center gap-2" style={{ color: 'var(--color-text-muted)' }}>
+                <span aria-hidden="true">🔒</span>
+                <span>
+                  Bank connections use <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Plaid</span>, a read-only, bank-grade secure link. Cofre never stores your bank credentials.
+                </span>
+              </p>
 
               {/* Add account modal */}
               {showManualForm && createPortal(
@@ -916,14 +1017,7 @@ function SettingsPageInner() {
                 {/* ── Phones: one card per bank — header (logo, name, status, sync), then a slim
                     row per account that expands on tap to show its actions. ── */}
                 <div className="sm:hidden flex flex-col gap-3">
-                  {Array.from(accounts.reduce((m, a) => {
-                    const list = m.get(a.bankName); if (list) list.push(a); else m.set(a.bankName, [a]); return m;
-                  }, new Map<string, BankAccount[]>())).map(([bankName, list]) => {
-                    const first = list[0];
-                    const color = first.color || (TYPE_META[first.accountType] ?? TYPE_META.checking).accent;
-                    const connected = list.filter((a) => a.provider === 'plaid');
-                    const broken = connected.find((a) => a.plaidStatus === 'error');
-                    const syncable = connected.filter((a) => a.plaidItemId && a.plaidStatus !== 'error');
+                  {bankGroups.map(({ bankName, list, first, color, connected, broken, syncable }) => {
                     const syncingGroup = list.some((a) => a.id === syncingId);
                     const statusColor = broken ? 'var(--color-rose)' : connected.length ? 'var(--color-green)' : 'var(--color-text-muted)';
                     return (
@@ -1021,115 +1115,122 @@ function SettingsPageInner() {
                   })}
                 </div>
 
-                {/* ── Desktop: one full card per account. ── */}
-                <div className="hidden sm:flex flex-col gap-2">
-                  {accounts.map((account) => {
-                    const meta       = TYPE_META[account.accountType as AccountType] ?? TYPE_META.checking;
-                    const color      = account.color || meta.accent;
-                    const balance    = Number(account.balance);
-                    const isDebt     = isLiability(account.accountType);
-                    const isConnected = account.provider === 'plaid';
-                    const isCash     = account.accountType === 'cash';
-
+                {/* ── Desktop: one card per bank in a grid that fills the width —
+                    header (logo, name, status, net, bank-level sync / reconnect), then
+                    a ledger row per account with its actions. ── */}
+                <div className="hidden sm:grid gap-4 grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 items-start">
+                  {bankGroups.map(({ bankName, list, first, color, connected, broken, syncable }) => {
+                    const syncingGroup = list.some((a) => a.id === syncingId);
+                    const allUsd = list.every((a) => a.currency === 'USD');
+                    const groupNet = list.reduce((sum, a) => sum + (isLiability(a.accountType) ? -Number(a.balance) : Number(a.balance)), 0);
+                    const status = broken
+                      ? { label: 'Needs reconnect', color: 'var(--color-rose)' }
+                      : connected.length ? { label: 'Synced', color: 'var(--color-green)' } : { label: 'Manual', color: 'var(--color-text-muted)' };
                     return (
-                      <div key={account.id}
-                        className="flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all hover:brightness-110"
-                        style={{ background: 'var(--color-elevated)', border: `1px solid ${color}28`, borderLeft: `3px solid ${color}` }}>
-
-                        {/* Mini card visual */}
-                        <AccountVisual account={account} color={color} />
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>
-                            {account.accountName}
-                          </p>
-                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                              style={{ background: `${meta.accent}18`, color: meta.accent }}>
-                              {meta.label}
-                            </span>
-                            {isConnected ? (
-                              account.plaidStatus === 'error' ? (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1"
-                                  style={{ background: 'color-mix(in srgb, var(--color-rose) 12%, transparent)', color: 'var(--color-rose)' }}>
-                                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-rose)' }} />
-                                  Needs reconnect
-                                </span>
-                              ) : (
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1"
-                                  style={{ background: 'color-mix(in srgb, var(--color-green) 12%, transparent)', color: 'var(--color-green)' }}>
-                                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-green)' }} />
-                                  Synced
-                                </span>
-                              )
-                            ) : (
-                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                                style={{ background: 'color-mix(in srgb, var(--color-text-muted) 14%, transparent)', color: 'var(--color-text-muted)' }}>
-                                Manual
-                              </span>
-                            )}
+                      <section key={bankName} aria-label={bankName} className="flex flex-col overflow-hidden"
+                        style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
+                        <div className="flex items-center gap-3 px-4 py-3"
+                          style={{ borderBottom: '1px solid var(--color-border)', background: `linear-gradient(90deg, ${color}24, transparent 65%)` }}>
+                          <AccountVisual account={first} color={color} compact />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{bankName}</p>
+                            <p className="text-[11px] font-semibold flex items-center gap-1.5" style={{ color: status.color }}>
+                              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'currentColor' }} />
+                              {list.length} account{list.length === 1 ? '' : 's'} · {status.label}
+                            </p>
                           </div>
-                          <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
-                            {account.bankName}{account.currency !== 'USD' ? ` · ${account.currency}` : ''}
-                          </p>
-                          {isCash && balance === 0 && (account.txCount ?? 0) === 0 && (
-                            <button type="button" onClick={() => openEdit(account)}
-                              className="mt-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full cursor-pointer"
-                              style={{ background: 'color-mix(in srgb, var(--color-amber) 14%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 35%, transparent)' }}>
-                              Set how much cash you have →
+                          {allUsd && list.length > 1 && (
+                            <div className="text-right shrink-0 pr-1">
+                              <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-text-muted)' }}>Net</p>
+                              <p className="font-black text-sm tabular-nums" style={{ color: groupNet < 0 ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>{money(groupNet)}</p>
+                            </div>
+                          )}
+                          {broken ? (
+                            <button onClick={() => openReconnect(broken)} disabled={connecting}
+                              className="px-3 h-8 rounded-lg text-[11px] font-semibold disabled:opacity-40 transition-colors hover:brightness-110"
+                              style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)', background: 'color-mix(in srgb, var(--color-rose) 10%, transparent)' }}>
+                              Reconnect
+                            </button>
+                          ) : syncable.length > 0 && (
+                            <button disabled={syncingGroup} aria-label={`Sync ${bankName} now`} title="Sync now"
+                              onClick={async () => {
+                                const seen = new Set<string>();
+                                for (const a of syncable) { if (seen.has(a.plaidItemId!)) continue; seen.add(a.plaidItemId!); await handleSync(a); }
+                              }}
+                              className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-40 transition-colors hover:bg-[color-mix(in_srgb,var(--color-green)_12%,transparent)]"
+                              style={{ color: syncingGroup ? 'var(--color-text-muted)' : 'var(--color-green)', border: '1px solid var(--color-border)' }}>
+                              <SyncIcon spinning={syncingGroup} />
                             </button>
                           )}
                         </div>
 
-                        {/* Balance + actions (this card is desktop-only; phones use the grouped list above). */}
-                        <div className="contents">
-                        <div className="text-right shrink-0">
-                          <p className="font-black text-base tabular-nums"
-                            style={{ color: isDebt && balance > 0 ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>
-                            {isDebt && balance > 0 ? '−' : ''}{account.currency} {Math.abs(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                          </p>
-                          {isDebt && balance > 0 && (
-                            <p className="text-[10px] font-semibold" style={{ color: 'color-mix(in srgb, var(--color-rose) 60%, transparent)' }}>owed</p>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1 ml-1">
-                          <button onClick={() => openEdit(account)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
-                            title="Edit account" style={{ color: 'var(--color-text-secondary)' }}>
-                            <EditIcon />
-                          </button>
-                          <button onClick={() => setImportAccount(account)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
-                            title="Import CSV" style={{ color: 'var(--color-text-secondary)' }}>
-                            <UploadIcon />
-                          </button>
-                          {isConnected && (
-                            account.plaidStatus === 'error' ? (
-                              <button onClick={() => openReconnect(account)} disabled={connecting}
-                                className="px-2.5 h-8 rounded-lg flex items-center justify-center text-[11px] font-semibold transition-colors disabled:opacity-40"
-                                style={{ color: 'var(--color-rose)' }}
-                                title="Reconnect bank">
-                                Reconnect
-                              </button>
-                            ) : (
-                              <button onClick={() => handleSync(account)} disabled={syncingId === account.id}
-                                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40"
-                                style={{ color: syncingId === account.id ? 'var(--color-text-muted)' : 'var(--color-green)' }}
-                                title="Sync now">
-                                <SyncIcon spinning={syncingId === account.id} />
-                              </button>
-                            )
-                          )}
-                          <button onClick={() => openDeleteConfirm(account)} disabled={deletingId === account.id}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 disabled:opacity-40"
-                            title="Remove account">
-                            {deletingId === account.id ? <span className="text-xs">…</span> : <TrashIcon />}
-                          </button>
-                        </div>
-                        </div>
-                      </div>
+                        <ul className="flex flex-col">
+                          {list.map((account, i) => {
+                            const meta = TYPE_META[account.accountType as AccountType] ?? TYPE_META.checking;
+                            const balance = Number(account.balance);
+                            const owed = isLiability(account.accountType) && balance > 0;
+                            const isConnected = account.provider === 'plaid';
+                            const isCash = account.accountType === 'cash';
+                            const unsetCash = isCash && balance === 0 && (account.txCount ?? 0) === 0;
+                            const iconBtn = 'w-7 h-7 rounded-lg flex items-center justify-center transition-colors disabled:opacity-40';
+                            return (
+                              <li key={account.id} className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-primary)_3%,transparent)]"
+                                style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : undefined}>
+                                <span className="w-1 h-9 rounded-full shrink-0" style={{ background: meta.accent }} />
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-[13px] truncate" style={{ color: 'var(--color-text-primary)' }}>{account.accountName}</p>
+                                  <p className="text-[11px] truncate flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                                    <span className="font-bold" style={{ color: meta.accent }}>{meta.label}</span>
+                                    {account.last4 && <span className="tabular-nums">···{account.last4}</span>}
+                                    {account.currency !== 'USD' && <span>· {account.currency}</span>}
+                                    {isConnected && account.plaidStatus === 'error' && <span style={{ color: 'var(--color-rose)' }}>· Needs reconnect</span>}
+                                    {!isConnected && !isCash && connected.length > 0 && <span>· Manual</span>}
+                                  </p>
+                                  {unsetCash && (
+                                    <button type="button" onClick={() => openEdit(account)}
+                                      className="mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full cursor-pointer"
+                                      style={{ background: 'color-mix(in srgb, var(--color-amber) 14%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 35%, transparent)' }}>
+                                      Set how much cash you have →
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <p className="font-black text-[15px] tabular-nums" style={{ color: owed ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>
+                                    {owed ? '−' : ''}{money(Math.abs(balance), account.currency)}
+                                  </p>
+                                  {owed && <p className="text-[10px] font-semibold leading-none" style={{ color: 'color-mix(in srgb, var(--color-rose) 60%, transparent)' }}>owed</p>}
+                                </div>
+                                <div className="flex items-center gap-0.5 shrink-0 opacity-55 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                                  <button onClick={() => openEdit(account)} className={`${iconBtn} hover:bg-[var(--color-elevated)]`}
+                                    title="Edit account" aria-label={`Edit ${account.accountName}`} style={{ color: 'var(--color-text-secondary)' }}>
+                                    <EditIcon />
+                                  </button>
+                                  <button onClick={() => setImportAccount(account)} className={`${iconBtn} hover:bg-[var(--color-elevated)]`}
+                                    title="Import CSV" aria-label={`Import CSV into ${account.accountName}`} style={{ color: 'var(--color-text-secondary)' }}>
+                                    <UploadIcon />
+                                  </button>
+                                  {isConnected && (account.plaidStatus === 'error' ? (
+                                    <button onClick={() => openReconnect(account)} disabled={connecting}
+                                      className="px-2 h-7 rounded-lg text-[11px] font-semibold disabled:opacity-40" style={{ color: 'var(--color-rose)' }} title="Reconnect bank">
+                                      Reconnect
+                                    </button>
+                                  ) : (
+                                    <button onClick={() => handleSync(account)} disabled={syncingId === account.id} className={`${iconBtn} hover:bg-[var(--color-elevated)]`}
+                                      title="Sync now" aria-label={`Sync ${account.accountName} now`}
+                                      style={{ color: syncingId === account.id ? 'var(--color-text-muted)' : 'var(--color-green)' }}>
+                                      <SyncIcon spinning={syncingId === account.id} />
+                                    </button>
+                                  ))}
+                                  <button onClick={() => openDeleteConfirm(account)} disabled={deletingId === account.id} className={`${iconBtn} hover:bg-red-500/20`}
+                                    title="Remove account" aria-label={`Remove ${account.accountName}`}>
+                                    {deletingId === account.id ? <span className="text-xs">…</span> : <TrashIcon />}
+                                  </button>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </section>
                     );
                   })}
                 </div>
@@ -1400,6 +1501,12 @@ function TrashIcon() {
 
 function CloseIcon() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+}
+
+/** "$1,234.56" / "EUR 1,234.56"; a negative amount gets a true minus sign. */
+function money(amount: number, currency = 'USD'): string {
+  const abs = Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${amount < 0 ? '−' : ''}${currency === 'USD' ? '$' : `${currency} `}${abs}`;
 }
 
 function hexToRgb(hex: string) {
