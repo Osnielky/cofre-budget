@@ -10,6 +10,7 @@ import {
 import Sidebar from '@/components/Sidebar';
 import ProjectCategoryForm, { ProjectCategoryValues } from './ProjectCategoryForm';
 import TradingPerformance from './TradingPerformance';
+import ProjectsOverview, { invalidateTradingHeadline } from './ProjectsOverview';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -71,6 +72,8 @@ interface Project {
   purchaseTxId: string | null;
   /** Trading projects: the investment accounts whose trades feed the Performance section (link order). */
   accounts?: { id: string; bankName: string; accountName: string; accountType: string; provider: string }[];
+  lastActivity?: string | null;
+  monthly?: { month: string; income: number; expenses: number; net: number }[];
   transactions?: Transaction[];
   categories?: ProjectCategory[];
   categoryBreakdown?: CategoryBreakdown[];
@@ -126,6 +129,8 @@ export default function ProjectsPage() {
 
   /* Collapsed categories per project */
   const [collapsedCats, setCollapsedCats] = useState<Record<string, boolean>>({});
+  /* Categories without transactions fold into one chip until asked for. */
+  const [showUnusedCats, setShowUnusedCats] = useState<Record<string, boolean>>({});
   const toggleCats = (id: string) => setCollapsedCats((p) => ({ ...p, [id]: !p[id] }));
 
   /* Category management */
@@ -184,16 +189,12 @@ export default function ProjectsPage() {
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
       setProjects(list);
-      // Open on the first project that's visible by default (still active).
-      const first = list.find((p: Project) => !isClosed(p.status)) ?? list[0];
-      if (first) {
-        setSelectedId((prev) => prev ?? first.id);
-        loadDetail(first.id);
-      }
+      // The overview is the landing; a project opens full-width when picked.
     } finally { setLoading(false); }
   }
 
   async function loadDetail(id: string) {
+    invalidateTradingHeadline(id);
     const res  = await fetch(`${API}/projects/${id}`, { credentials: 'include' });
     const data: Project = await res.json();
     setProjects((prev) => prev.map((p) => (p.id === id ? data : p)));
@@ -499,118 +500,32 @@ export default function ProjectsPage() {
           </button>
         </div>
 
-        {/* ── Two-column body. Below lg it is master/detail: the list fills the
-            screen until a project is picked, then the detail takes over with a
-            back button in its header. ── */}
+        {/* ── One view at a time: the overview (portfolio strip + a card per project)
+            until a project is picked, then its detail takes the whole width with a
+            back bar and a strip of the other projects for one-click switching. ── */}
         <div className="flex flex-1 min-h-0">
 
-          {/* ── Left: project list ── */}
-          <div className={`${selectedId ? 'hidden lg:flex' : 'flex'} w-full lg:w-96 shrink-0 overflow-y-auto flex-col gap-1.5 p-3`}
-            style={{ borderRight: '1px solid var(--color-border)' }}>
+          {!selectedId && (
+            <div className="flex-1 min-w-0 overflow-y-auto">
+              <ProjectsOverview
+                projects={projects}
+                loading={loading}
+                showClosed={showClosed}
+                onToggleClosed={() => setShowClosed((v) => !v)}
+                onOpen={(id) => { setSelectedId(id); const p = projects.find((x) => x.id === id); if (!p?.transactions) loadDetail(id); }}
+                onCreate={openCreate}
+                typeLabel={(t) => PROJECT_TYPES.find((x) => x.value === t)?.label ?? t}
+              />
+            </div>
+          )}
 
-            {loading && <p className="text-xs p-2" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>}
-
-            {!loading && projects.length === 0 && (
-              <div className="flex flex-col items-center gap-3 text-center py-12 px-4">
-                <span className="text-5xl opacity-25">📦</span>
-                <p className="font-semibold text-sm">No projects yet</p>
-                <button onClick={openCreate}
-                  className="mt-1 px-4 py-2 text-xs font-semibold text-white rounded-xl hover:brightness-110"
-                  style={{ background: 'var(--color-card-violet)' }}>
-                  Create first project
-                </button>
-              </div>
-            )}
-
-            {[...projects]
-              // The open project stays listed even when closed, so it doesn't vanish mid-edit.
-              .filter((p) => showClosed || !isClosed(p.status) || p.id === selectedId)
-              .sort((a, b) => Number(isClosed(a.status)) - Number(isClosed(b.status)))
-              .map((p) => {
-              const color      = p.color || '#9B6DFF';
-              const sold       = p.status === 'sold';
-              const closed     = isClosed(p.status);
-              const isSelected = selectedId === p.id;
-              return (
-                <button key={p.id}
-                  onClick={() => { setSelectedId(p.id); if (!p.transactions) loadDetail(p.id); }}
-                  className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all duration-150"
-                  style={{
-                    cursor: 'pointer',
-                    background: isSelected
-                      ? `linear-gradient(135deg, ${color}22 0%, ${color}0a 100%)`
-                      : 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)',
-                    border: isSelected ? `1px solid ${color}55` : '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)',
-                    boxShadow: isSelected ? `0 2px 16px ${color}15` : 'none',
-                    /* Closed projects stay visible but recede — they are history,
-                       not something you are still working on. */
-                    opacity: closed && !isSelected ? 0.55 : 1,
-                  }}>
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0 overflow-hidden"
-                    style={{ background: `${color}25`, border: `1px solid ${color}35` }}>
-                    {p.imageUrl
-                      ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
-                      : p.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{p.name}</p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
-                        style={{ background: `${color}20`, color, border: `1px solid ${color}35` }}>
-                        {PROJECT_TYPES.find((t) => t.value === p.type)?.label ?? p.type}
-                      </span>
-                      <span className="text-[10px] font-semibold"
-                        style={{ color: sold ? 'var(--color-green)' : closed ? 'var(--color-text-muted)' : 'var(--color-amber)' }}>
-                        {sold ? '✓ Sold' : closed ? '■ Terminated' : '● Active'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs font-bold tabular-nums"
-                      style={{ color: sold && p.netGain != null ? (p.netGain >= 0 ? '#4FBF7F' : '#F07A3E') : 'var(--color-text-secondary)' }}>
-                      {sold && p.netGain != null
-                        ? `${p.netGain >= 0 ? '+' : ''}$${Math.abs(p.netGain).toFixed(0)}`
-                        : `$${p.costBasis.toFixed(0)}`}
-                    </p>
-                    <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
-                      {sold && p.netGain != null ? 'net gain' : 'cost basis'}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+          {/* ── Detail (full width) ── */}
+          {selectedId && (
+          <div className="flex-1 min-w-0 overflow-y-auto">
             {(() => {
-              const count = projects.filter((p) => isClosed(p.status)).length;
-              if (count === 0) return null;
-              return (
-                <button type="button" onClick={() => setShowClosed((v) => !v)} aria-pressed={showClosed}
-                  className="mt-1 w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors hover:bg-[color-mix(in_srgb,currentColor_6%,transparent)]"
-                  style={{ border: '1px dashed var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    {showClosed
-                      ? <path d="M17.94 17.94A10 10 0 0 1 12 20c-7 0-10-8-10-8a18 18 0 0 1 5.06-5.94M9.9 4.24A9 9 0 0 1 12 4c7 0 10 8 10 8a18 18 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24M1 1l22 22" />
-                      : <path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8-10-8-10-8Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />}
-                  </svg>
-                  {showClosed ? 'Hide sold & terminated' : `Show sold & terminated (${count})`}
-                </button>
-              );
-            })()}
-          </div>
-
-          {/* ── Right: detail panel ── */}
-          <div className={`${selectedId ? 'block' : 'hidden lg:block'} flex-1 min-w-0 overflow-y-auto`}>
-            {(() => {
-              const sel = selectedId ? projects.find((p) => p.id === selectedId) : null;
-              if (!sel) return (
-                <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-8">
-                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-                    style={{ background: 'rgba(155,109,255,0.10)', border: '1px solid rgba(155,109,255,0.20)' }}>📊</div>
-                  <p className="font-semibold">Select a project</p>
-                  <p className="text-sm max-w-xs" style={{ color: 'var(--color-text-muted)' }}>
-                    Click any project on the left to see its P&amp;L, categories, and linked transactions.
-                  </p>
-                </div>
-              );
+              const sel = projects.find((p) => p.id === selectedId);
+              if (!sel) return null;
+              const others = projects.filter((p) => p.id !== sel.id && (showClosed || !isClosed(p.status)));
 
               const color  = sel.color || '#9B6DFF';
               const closed = isClosed(sel.status);
@@ -619,20 +534,40 @@ export default function ProjectsPage() {
               return (
                 <div className="flex flex-col">
 
+                  {/* ── Back bar + the other projects, one click away ── */}
+                  <div className="flex items-center gap-2 px-3 sm:px-5 py-2 shrink-0 min-w-0"
+                    style={{ borderBottom: '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)', background: 'color-mix(in srgb, var(--color-text-primary) 2%, transparent)' }}>
+                    <button type="button" onClick={() => setSelectedId(null)}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-colors hover:bg-[var(--color-elevated)]"
+                      style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+                      All projects
+                    </button>
+                    {others.length > 0 && (
+                      <div className="flex items-center gap-1.5 overflow-x-auto min-w-0" style={{ scrollbarWidth: 'none' }} aria-label="Other projects">
+                        {others.map((p) => {
+                          const c = p.color || '#9B6DFF';
+                          return (
+                            <button key={p.id} type="button" onClick={() => { setSelectedId(p.id); if (!p.transactions) loadDetail(p.id); }}
+                              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold shrink-0 whitespace-nowrap transition-colors hover:bg-[var(--color-elevated)]"
+                              style={{ color: 'var(--color-text-secondary)', border: '1px solid transparent', opacity: isClosed(p.status) ? 0.6 : 1 }}>
+                              <span className="w-5 h-5 rounded-md flex items-center justify-center text-xs overflow-hidden" style={{ background: `${c}25` }}>
+                                {p.imageUrl ? <img src={p.imageUrl} alt="" className="w-full h-full object-cover" /> : p.icon}
+                              </span>
+                              {p.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
                   {/* ── Compact header ── */}
                   <div className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 shrink-0 flex-wrap sm:flex-nowrap"
                     style={{
                       background: `linear-gradient(135deg, ${color}18 0%, transparent 70%)`,
                       borderBottom: '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)',
                     }}>
-                    {/* Back to the list (phones and tablets only) */}
-                    <button type="button" onClick={() => setSelectedId(null)} aria-label="Back to projects"
-                      className="lg:hidden w-9 h-9 -ml-1 rounded-xl flex items-center justify-center shrink-0 transition-colors hover:bg-[var(--color-elevated)]"
-                      style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <path d="M15 18l-6-6 6-6" />
-                      </svg>
-                    </button>
                     {/* Image / icon box */}
                     <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center text-3xl sm:text-4xl"
                       style={{
@@ -956,9 +891,17 @@ export default function ProjectsPage() {
                       )}
 
                       {!collapsedCats[sel.id] && (
-                        sel.categories && sel.categories.length > 0 ? (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            {(sel.categoryBreakdown ?? []).map((cat) => (
+                        sel.categories && sel.categories.length > 0 ? (() => {
+                          /* Used categories always show; the empty ones fold into one chip so a
+                             project with 12 categories and 4 in use is not a wall of "No transactions". */
+                          const all = sel.categoryBreakdown ?? [];
+                          const used = all.filter((c) => c.txCount > 0);
+                          const unused = all.filter((c) => c.txCount === 0);
+                          const expand = showUnusedCats[sel.id] || used.length === 0 || showCatForm === sel.id;
+                          const shown = expand ? all : used;
+                          return (
+                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 gap-2">
+                            {shown.map((cat) => (
                               <div key={cat.id} className="flex items-center gap-2.5 p-2.5 rounded-xl group relative"
                                 style={{ background: `${cat.color}10`, border: `1px solid ${cat.color}25` }}>
                                 <span className="text-lg shrink-0">{cat.icon}</span>
@@ -974,8 +917,17 @@ export default function ProjectsPage() {
                                 </button>
                               </div>
                             ))}
+                            {unused.length > 0 && used.length > 0 && (
+                              <button type="button" onClick={() => setShowUnusedCats((m) => ({ ...m, [sel.id]: !m[sel.id] }))}
+                                aria-expanded={expand}
+                                className="flex items-center justify-center gap-1.5 p-2.5 rounded-xl text-xs font-semibold transition-colors hover:bg-[color-mix(in_srgb,var(--color-text-primary)_6%,transparent)]"
+                                style={{ border: '1px dashed var(--color-border)', color: 'var(--color-text-muted)' }}>
+                                {expand ? 'Hide unused' : `+${unused.length} unused ${unused.length === 1 ? 'category' : 'categories'}`}
+                              </button>
+                            )}
                           </div>
-                        ) : (
+                          );
+                        })() : (
                           <p className="text-xs py-2" style={{ color: 'var(--color-text-muted)' }}>
                             No categories yet — click "Restore defaults" to add pre-built ones, or add your own.
                           </p>
@@ -1066,6 +1018,7 @@ export default function ProjectsPage() {
               );
             })()}
           </div>
+          )}
 
         </div>
 

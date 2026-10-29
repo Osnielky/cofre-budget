@@ -7,6 +7,7 @@ import { Transaction } from '../transactions/transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { ProjectAccount } from './project-account.entity';
 import { isValidClosure, closedStatusFor } from './closure';
+import { activitySummary, ActivitySummary } from './activity';
 import { pickFields } from '../common/http/pick-fields';
 
 export interface ProjectDto {
@@ -62,6 +63,10 @@ export interface ProjectWithStats extends Project {
   txCount: number;
   /** Investment accounts a trading project follows (link order). */
   accounts: LinkedAccount[];
+  /** Latest linked transaction date, or null. */
+  lastActivity: string | null;
+  /** Net by month for the trailing six months (overview sparklines). */
+  monthly: ActivitySummary['monthly'];
 }
 
 /* Default category seeds per project type */
@@ -217,7 +222,7 @@ export class ProjectsService {
       const costBasis = (p.purchaseTxId ? 0 : Number(p.purchasePrice)) + expenses;
       const netGain  = p.status === 'sold' && p.salePrice != null ? Number(p.salePrice) - costBasis : null;
       const roi      = netGain != null && costBasis > 0 ? (netGain / costBasis) * 100 : null;
-      const stats    = { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length, accounts: linksByProject[p.id] ?? [] };
+      const stats    = { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length, accounts: linksByProject[p.id] ?? [], ...activitySummary(txs) };
       const categories = await getTypeCats(p.type ?? 'other');
       return { ...stats, categories };
     }));
@@ -415,7 +420,7 @@ export class ProjectsService {
       ? Number(p.salePrice) - costBasis
       : null;
     const roi = netGain != null && costBasis > 0 ? (netGain / costBasis) * 100 : null;
-    return { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length, accounts: await this.linkedAccounts(p.id) };
+    return { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length, accounts: await this.linkedAccounts(p.id), ...activitySummary(txs) };
   }
 
   async setPurchaseTx(projectId: string, userId: string, transactionId: string | null): Promise<ProjectWithStats> {
