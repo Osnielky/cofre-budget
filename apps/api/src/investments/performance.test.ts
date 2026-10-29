@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ActivityRow, classifyActivity, computePerformance } from './performance';
+import { ActivityRow, classifyActivity, computePerformance, mergePerformance } from './performance';
 
 function row(over: Partial<ActivityRow>): ActivityRow {
   return { date: '2026-10-01', amount: 0, type: null, subtype: null, symbol: null, securityName: null, quantity: null, price: null, fees: null, name: '', ...over };
@@ -136,6 +136,12 @@ describe('computePerformance', () => {
     expect(p.recentClosed.map((t) => t.date)).toEqual(['2026-10-08', '2026-10-06', '2026-10-04', '2026-10-02']);
   });
 
+  it('a same-day buy and sell is a long round trip whichever order Plaid sends them in', () => {
+    const p = computePerformance([sell('2026-10-03', 'MNQ', 2, 120, 1.2), buy('2026-10-03', 'MNQ', 2, 100, 1.2)]);
+    expect(p.recentClosed[0]).toMatchObject({ side: 'long', quantity: 2, pnl: 37.6 });
+    expect(p.openPositions).toEqual([]);
+  });
+
   it('does not depend on input order', () => {
     const rows = [sell('2026-10-20', 'VTI', 10, 250), buy('2026-10-01', 'VTI', 10, 240)];
     expect(computePerformance(rows).realizedPnl).toBe(100);
@@ -144,3 +150,51 @@ describe('computePerformance', () => {
 });
 
 function cents(n: number) { return Math.round(n * 100) / 100; }
+
+describe('mergePerformance', () => {
+  const schwab = computePerformance([
+    buy('2026-08-05', 'VTI', 6, 250), sell('2026-08-20', 'VTI', 6, 260),   // +60
+    buy('2026-10-12', 'VTI', 10, 240.12),                                   // open 10
+    cash('2026-09-01', 'deposit', 5000), cash('2026-10-15', 'dividend', 45.5),
+  ]);
+  const futures = computePerformance([
+    buy('2026-09-03', 'MNQ', 2, 100, 1), sell('2026-09-03', 'MNQ', 2, 90, 1),   // −22
+    buy('2026-09-10', 'MNQ', 1, 100), sell('2026-09-10', 'MNQ', 1, 130),        // +30
+    buy('2026-10-01', 'VTI', 1, 200),                                           // open 1 (same symbol, other account)
+    row({ date: '2026-09-30', type: 'fee', subtype: 'account fee', amount: -2.5 }),
+    cash('2026-09-01', 'deposit', 1000), cash('2026-09-20', 'withdrawal', -300),
+  ]);
+  const merged = mergePerformance([{ label: 'Schwab', summary: schwab }, { label: 'Futures', summary: futures }]);
+
+  it('adds the totals and re-derives the trade statistics from gross sums', () => {
+    expect(merged).toMatchObject({ rows: 13, from: '2026-08-05', to: '2026-10-15', realizedPnl: 68, income: 45.5, fees: 2.5, contributions: 6000, withdrawals: 300, netContributed: 5700, netResult: 111 });
+    expect(merged.trades).toMatchObject({ total: 8, closed: 3, wins: 2, losses: 1, winRate: 66.7, avgWin: 45, avgLoss: 22, profitFactor: 4.09, grossWin: 90, grossLoss: 22 });
+    expect(merged.trades.largestWin).toMatchObject({ symbol: 'VTI', pnl: 60, account: 'Schwab' });
+    expect(merged.trades.largestLoss).toMatchObject({ symbol: 'MNQ', pnl: -22, account: 'Futures' });
+  });
+
+  it('merges symbols and months across accounts and labels positions and trades', () => {
+    expect(merged.bySymbol.map((s) => [s.symbol, s.realized, s.closedTrades, s.openQuantity, s.costBasis])).toEqual([
+      ['VTI', 60, 1, 11, 2601.2],
+      ['MNQ', 8, 2, 0, 0],
+    ]);
+    expect(merged.bySymbol[0].avgCost).toBe(cents(2601.2 / 11));
+    expect(merged.byMonth).toEqual([
+      { month: '2026-08', realized: 60, income: 0, fees: 0, closedTrades: 1 },
+      { month: '2026-09', realized: 8, income: 0, fees: 2.5, closedTrades: 2 },
+      { month: '2026-10', realized: 0, income: 45.5, fees: 0, closedTrades: 0 },
+    ]);
+    expect(merged.openPositions.map((p) => [p.symbol, p.account, p.quantity])).toEqual([['VTI', 'Schwab', 10], ['VTI', 'Futures', 1]]);
+    expect(merged.recentClosed.map((t) => [t.date, t.account])).toEqual([['2026-09-10', 'Futures'], ['2026-09-03', 'Futures'], ['2026-08-20', 'Schwab']]);
+  });
+
+  it('a single part merges to itself', () => {
+    const one = mergePerformance([{ label: 'Schwab', summary: schwab }]);
+    expect({ ...one, openPositions: [], recentClosed: [], trades: { ...one.trades, largestWin: null, largestLoss: null } })
+      .toEqual({ ...schwab, openPositions: [], recentClosed: [], trades: { ...schwab.trades, largestWin: null, largestLoss: null } });
+  });
+
+  it('merges nothing into an empty summary', () => {
+    expect(mergePerformance([])).toMatchObject({ rows: 0, from: null, to: null, realizedPnl: 0, trades: { closed: 0, winRate: null } });
+  });
+});

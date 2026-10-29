@@ -1,7 +1,7 @@
 # Trading performance — design (phase 1)
 
 Date: 2026-10-29
-Status: built (phase 1: structured trades, performance engine, project ↔ account link)
+Status: built (phase 1: structured trades, performance engine, project ↔ accounts link with per-account and combined views)
 
 ## Problem
 
@@ -41,15 +41,33 @@ analysis is what was missing.
    follow-up). `GET /api/investments/performance?accountId=` (JWT, user scoped)
    returns it; the web only renders.
 
-3. **A trading project links to an account.** `projects.bankAccountId` (nullable;
-   migration `ProjectBankAccount`), settable from the project form on Trading
-   projects, validated to be the user's own `investment` account. A linked project
-   gets a **Performance** section on its detail: KPI tiles (realized P&L, win rate,
-   dividends & interest, fees, net contributed), realized P&L by month (bars), by
-   symbol, open positions and recent closed trades. The project's existing manual
-   side (platform subscriptions, prop-firm evaluations paid from checking) is
-   unchanged, and nothing in the account needs a category: tracking-account rows
-   never did.
+3. **A trading project follows one or more accounts.** A trader may hold a Schwab
+   brokerage, a futures prop-firm account and a Webull margin account at once, so the
+   link is a table, `project_accounts` (projectId, bankAccountId, unique per account:
+   an account feeds at most one project; rows go with the project or the account).
+   The project form on Trading projects shows a checklist of the user's `investment`
+   accounts; the API validates ownership and type and refuses an account another
+   project already follows. `ProjectWithStats.accounts` lists them in link order.
+
+   **Each account is analysed on its own** — lots never cross accounts — and the
+   project shows the combined result: `mergePerformance()` adds totals, re-derives
+   the trade statistics from gross win / loss sums, merges symbols and months, and
+   labels open positions, recent closed trades and the largest win / loss with their
+   account. `GET /api/investments/performance?projectId=` returns `{ project,
+   accounts: [per-account summary], combined }`; `?accountId=` still returns one.
+
+   The project detail's **Performance** section opens on *All accounts* and has a
+   tab per account (each with its realized P&L), then KPI tiles (realized P&L, win
+   rate, dividends & interest, fees, net contributed), realized P&L by month (bars),
+   by symbol, open positions and recent closed trades; in the combined view the
+   positions and trades carry an account label. The project's existing manual side
+   (platform subscriptions, prop-firm evaluations paid from checking) is unchanged,
+   and nothing in the account needs a category: tracking-account rows never did.
+
+   Same-day rows: Plaid gives a date, never a time, so within a day buys are
+   processed before sells (a flat-position round trip has the same P&L either way,
+   and "long" is the right label far more often than "short"); otherwise input order
+   (`createdAt`) is kept.
 
 ## Not in phase 1
 

@@ -69,8 +69,8 @@ interface Project {
   netGain: number | null; roi: number | null; txCount: number;
   imageUrl?: string | null;
   purchaseTxId: string | null;
-  /** Trading projects: the investment account whose trades feed the Performance section. */
-  bankAccountId?: string | null;
+  /** Trading projects: the investment accounts whose trades feed the Performance section (link order). */
+  accounts?: { id: string; bankName: string; accountName: string; accountType: string; provider: string }[];
   transactions?: Transaction[];
   categories?: ProjectCategory[];
   categoryBreakdown?: CategoryBreakdown[];
@@ -139,7 +139,7 @@ export default function ProjectsPage() {
   const [removePurchaseTxError, setRemovePurchaseTxError] = useState<Record<string, string | null>>({});
 
   /* Project form state */
-  const emptyForm = { name: '', type: 'vehicle', icon: '🚗', color: PRESET_COLORS[0], description: '', purchasePrice: '', purchaseDate: '', imageUrl: '', bankAccountId: '' };
+  const emptyForm = { name: '', type: 'vehicle', icon: '🚗', color: PRESET_COLORS[0], description: '', purchasePrice: '', purchaseDate: '', imageUrl: '', bankAccountIds: [] as string[] };
   const [form, setForm] = useState(emptyForm);
   /* Investment accounts a trading project can follow (loaded once the form opens). */
   const [investmentAccounts, setInvestmentAccounts] = useState<{ id: string; bankName: string; accountName: string }[]>([]);
@@ -288,7 +288,7 @@ export default function ProjectsPage() {
       const body = {
         ...form, purchasePrice: parseFloat(form.purchasePrice) || 0, purchaseDate: form.purchaseDate || null,
         /* Only a trading project follows an account; any other type always clears it. */
-        bankAccountId: form.type === 'trading' && form.bankAccountId ? form.bankAccountId : null,
+        bankAccountIds: form.type === 'trading' ? form.bankAccountIds : [],
       };
       const url    = editing ? `${API}/projects/${editing.id}` : `${API}/projects`;
       const method = editing ? 'PATCH' : 'POST';
@@ -459,7 +459,7 @@ export default function ProjectsPage() {
   function openCreate() { setEditing(null); setForm(emptyForm); setShowForm(true); }
   function openEdit(p: Project) {
     setEditing(p);
-    setForm({ name: p.name, type: p.type, icon: p.icon, color: p.color, description: p.description ?? '', purchasePrice: String(p.purchasePrice), purchaseDate: p.purchaseDate ?? '', imageUrl: p.imageUrl ?? '', bankAccountId: p.bankAccountId ?? '' });
+    setForm({ name: p.name, type: p.type, icon: p.icon, color: p.color, description: p.description ?? '', purchasePrice: String(p.purchasePrice), purchaseDate: p.purchaseDate ?? '', imageUrl: p.imageUrl ?? '', bankAccountIds: (p.accounts ?? []).map((a) => a.id) });
     setShowForm(true);
   }
   function closeForm() { setShowForm(false); setEditing(null); setSaving(false); }
@@ -906,8 +906,8 @@ export default function ProjectsPage() {
                     )}
 
                     {/* ── Trading performance (linked brokerage account) ── */}
-                    {sel.type === 'trading' && sel.bankAccountId && (
-                      <TradingPerformance accountId={sel.bankAccountId} />
+                    {sel.type === 'trading' && (sel.accounts?.length ?? 0) > 0 && (
+                      <TradingPerformance projectId={sel.id} />
                     )}
 
                     {/* ── Category breakdown ── */}
@@ -1186,20 +1186,29 @@ export default function ProjectsPage() {
                   )}
                   {form.type === 'trading' && (
                     <div className="flex flex-col gap-2">
-                      <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>Brokerage account</span>
-                      <select value={form.bankAccountId} onChange={(e) => setForm((f) => ({ ...f, bankAccountId: e.target.value }))}
-                        aria-label="Brokerage account this project follows"
-                        className="px-4 py-3 text-sm outline-none rounded-xl w-full transition-all duration-150"
-                        style={{ ...inputStyle, color: form.bankAccountId ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-                        <option value="">Not linked — I record results by hand</option>
-                        {investmentAccounts.map((a) => (
-                          <option key={a.id} value={a.id}>{a.bankName} · {a.accountName}</option>
-                        ))}
-                      </select>
+                      <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                        Brokerage accounts <span className="normal-case tracking-normal font-medium">(optional · pick as many as trade for this project)</span>
+                      </span>
+                      {investmentAccounts.length > 0 && (
+                        <div role="group" aria-label="Brokerage accounts this project follows" className="flex flex-col rounded-xl overflow-hidden" style={inputStyle}>
+                          {investmentAccounts.map((a, i) => {
+                            const on = form.bankAccountIds.includes(a.id);
+                            return (
+                              <label key={a.id} className="flex items-center gap-3 px-4 py-2.5 text-sm cursor-pointer"
+                                style={{ borderTop: i ? '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)' : 'none', color: on ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
+                                <input type="checkbox" checked={on} className="accent-[var(--color-primary)] w-4 h-4"
+                                  onChange={(e) => setForm((f) => ({ ...f, bankAccountIds: e.target.checked ? [...f.bankAccountIds, a.id] : f.bankAccountIds.filter((id) => id !== a.id) }))} />
+                                <span className="font-semibold">{a.bankName}</span>
+                                <span style={{ color: 'var(--color-text-muted)' }}>· {a.accountName}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
                       <p className="text-[10px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
                         {investmentAccounts.length === 0
                           ? 'Connect a brokerage in Settings → Bank Accounts to follow its trades here.'
-                          : 'Its buys, sells, dividends and fees feed a Performance section — realized P&L, win rate, open positions. Nothing to categorize.'}
+                          : 'Each account is analysed on its own and the project adds them up — realized P&L, win rate, open positions. Nothing to categorize.'}
                       </p>
                     </div>
                   )}

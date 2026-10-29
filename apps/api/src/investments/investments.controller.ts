@@ -10,9 +10,11 @@ import { InvestmentsService } from './investments.service';
 export class InvestmentsController {
   constructor(private service: InvestmentsService) {}
 
+  /** `?accountId=` → one account; `?projectId=` → every account the project follows plus the combined result. */
   @Get('performance')
-  performance(@Query('accountId') accountId: string | undefined, @Request() req: any) {
-    if (!accountId) throw new BadRequestException('accountId is required');
-    return this.service.performance(req.user.id, accountId);
+  performance(@Query('accountId') accountId: string | undefined, @Query('projectId') projectId: string | undefined, @Request() req: any) {
+    if (projectId) return this.service.performanceForProject(req.user.id, projectId);
+    if (accountId) return this.service.performance(req.user.id, accountId);
+    throw new BadRequestException('accountId or projectId is required');
   }
 }

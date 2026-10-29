@@ -49,6 +49,8 @@ interface Lot { qty: number; cost: number; date: string }
 export interface ClosedTrade {
   date: string;
   symbol: string;
+  /** Set only on a merged (multi-account) summary: which account the trade was in. */
+  account?: string;
   side: 'long' | 'short';
   quantity: number;
   /** Average entry and exit per unit, fees excluded. */
@@ -73,6 +75,8 @@ export interface SymbolSummary {
 export interface OpenPosition {
   symbol: string;
   name: string | null;
+  /** Set only on a merged (multi-account) summary. */
+  account?: string;
   side: 'long' | 'short';
   quantity: number;
   avgCost: number;
@@ -105,6 +109,9 @@ export interface PerformanceSummary {
     avgWin: number | null;
     avgLoss: number | null;
     profitFactor: number | null;
+    /** Sum of winning / losing closed trades (losses as a positive number); lets summaries merge exactly. */
+    grossWin: number;
+    grossLoss: number;
     largestWin: ClosedTrade | null;
     largestLoss: ClosedTrade | null;
   };
@@ -114,11 +121,17 @@ export interface PerformanceSummary {
   recentClosed: ClosedTrade[];
 }
 
-const cents = (n: number) => Math.round(n * 100) / 100;
+/** 0 for buys and everything else, 1 for sells — the same-day tie-break. */
+const sideRank = (r: ActivityRow) => (Number(r.quantity) || 0) < 0 ? 1 : 0;
+const cents = (n: number) => Math.round(n * 100) / 100 + 0; // + 0 turns -0 into 0
 const sign = (n: number) => (n < 0 ? -1 : 1);
 
 export function computePerformance(input: ActivityRow[]): PerformanceSummary {
-  const rows = [...input].sort((a, b) => a.date.localeCompare(b.date));
+  /* Plaid gives a date, never a time. Same-day rows keep their input order except
+     that buys go before sells: with a flat position the round-trip P&L is the same
+     either way, and "long" is the right label far more often than "short". */
+  const rows = input.map((r, i) => ({ r, i })).sort((a, b) =>
+    a.r.date.localeCompare(b.r.date) || sideRank(a.r) - sideRank(b.r) || a.i - b.i).map((x) => x.r);
   const lots = new Map<string, Lot[]>();
   const names = new Map<string, string | null>();
   const symbolStats = new Map<string, { realized: number; closedTrades: number; wins: number }>();
@@ -261,7 +274,9 @@ export function computePerformance(input: ActivityRow[]): PerformanceSummary {
       winRate: closed.length ? Math.round((wins.length / closed.length) * 1000) / 10 : null,
       avgWin: wins.length ? cents(grossWin / wins.length) : null,
       avgLoss: losses.length ? cents(grossLoss / losses.length) : null,
-      profitFactor: grossLoss > 0 ? Math.round((grossWin / grossLoss) * 100) / 100 : (grossWin > 0 ? null : null),
+      profitFactor: grossLoss > 0 ? Math.round((grossWin / grossLoss) * 100) / 100 : null,
+      grossWin: cents(grossWin),
+      grossLoss: cents(grossLoss),
       largestWin: largest(wins, 'max'),
       largestLoss: largest(losses, 'min'),
     },
@@ -269,5 +284,76 @@ export function computePerformance(input: ActivityRow[]): PerformanceSummary {
     byMonth,
     openPositions,
     recentClosed: [...closed].reverse().slice(0, 20),
+  };
+}
+
+/** One summary for several accounts. Lots never cross accounts, so each account is
+    computed on its own and the results are added: totals sum, trade stats re-derive
+    from the gross sums, symbols and months merge by key, open positions and recent
+    closed trades keep their account label. */
+export function mergePerformance(parts: { label: string; summary: PerformanceSummary }[]): PerformanceSummary {
+  const sums = parts.map((p) => p.summary);
+  const sum = (pick: (s: PerformanceSummary) => number) => cents(sums.reduce((acc, s) => acc + pick(s), 0));
+  const dates = sums.flatMap((s) => [s.from, s.to]).filter((d): d is string => !!d).sort();
+
+  const closed = sums.reduce((n, s) => n + s.trades.closed, 0);
+  const wins = sums.reduce((n, s) => n + s.trades.wins, 0);
+  const losses = sums.reduce((n, s) => n + s.trades.losses, 0);
+  const grossWin = sum((s) => s.trades.grossWin);
+  const grossLoss = sum((s) => s.trades.grossLoss);
+  const withLabel = (t: ClosedTrade | null, label: string) => (t ? { ...t, account: label } : null);
+  const largestWin = parts.map((p) => withLabel(p.summary.trades.largestWin, p.label)).filter((t): t is ClosedTrade & { account: string } => !!t)
+    .reduce<ClosedTrade | null>((best, t) => (!best || t.pnl > best.pnl ? t : best), null);
+  const largestLoss = parts.map((p) => withLabel(p.summary.trades.largestLoss, p.label)).filter((t): t is ClosedTrade & { account: string } => !!t)
+    .reduce<ClosedTrade | null>((best, t) => (!best || t.pnl < best.pnl ? t : best), null);
+
+  const bySymbolMap = new Map<string, SymbolSummary & { costTimesQty: number }>();
+  for (const s of sums) for (const sym of s.bySymbol) {
+    const cur = bySymbolMap.get(sym.symbol) ?? { symbol: sym.symbol, name: sym.name, realized: 0, closedTrades: 0, wins: 0, openQuantity: 0, avgCost: null, costBasis: 0, costTimesQty: 0 };
+    cur.name ??= sym.name;
+    cur.realized += sym.realized; cur.closedTrades += sym.closedTrades; cur.wins += sym.wins;
+    cur.openQuantity += sym.openQuantity; cur.costBasis += sym.costBasis;
+    bySymbolMap.set(sym.symbol, cur);
+  }
+  const bySymbol: SymbolSummary[] = [...bySymbolMap.values()].map(({ costTimesQty: _c, ...sym }) => ({
+    ...sym, realized: cents(sym.realized), costBasis: cents(sym.costBasis), openQuantity: +sym.openQuantity.toFixed(6),
+    avgCost: sym.openQuantity ? cents(sym.costBasis / Math.abs(sym.openQuantity)) : null,
+  })).sort((a, b) => Math.abs(b.realized) - Math.abs(a.realized) || b.costBasis - a.costBasis || a.symbol.localeCompare(b.symbol));
+
+  const byMonthMap = new Map<string, MonthSummary>();
+  for (const s of sums) for (const m of s.byMonth) {
+    const cur = byMonthMap.get(m.month) ?? { month: m.month, realized: 0, income: 0, fees: 0, closedTrades: 0 };
+    cur.realized += m.realized; cur.income += m.income; cur.fees += m.fees; cur.closedTrades += m.closedTrades;
+    byMonthMap.set(m.month, cur);
+  }
+  const byMonth = [...byMonthMap.values()].map((m) => ({ ...m, realized: cents(m.realized), income: cents(m.income), fees: cents(m.fees) }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+
+  const openPositions = parts.flatMap((p) => p.summary.openPositions.map((pos) => ({ ...pos, account: p.label })))
+    .sort((a, b) => b.costBasis - a.costBasis);
+  const recentClosed = parts.flatMap((p) => p.summary.recentClosed.map((t) => ({ ...t, account: p.label })))
+    .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20);
+
+  return {
+    rows: sums.reduce((n, s) => n + s.rows, 0),
+    from: dates[0] ?? null,
+    to: dates[dates.length - 1] ?? null,
+    realizedPnl: sum((s) => s.realizedPnl),
+    fees: sum((s) => s.fees),
+    income: sum((s) => s.income),
+    contributions: sum((s) => s.contributions),
+    withdrawals: sum((s) => s.withdrawals),
+    netContributed: sum((s) => s.netContributed),
+    netResult: sum((s) => s.netResult),
+    trades: {
+      total: sums.reduce((n, s) => n + s.trades.total, 0),
+      closed, wins, losses,
+      winRate: closed ? Math.round((wins / closed) * 1000) / 10 : null,
+      avgWin: wins ? cents(grossWin / wins) : null,
+      avgLoss: losses ? cents(grossLoss / losses) : null,
+      profitFactor: grossLoss > 0 ? Math.round((grossWin / grossLoss) * 100) / 100 : null,
+      grossWin, grossLoss, largestWin, largestLoss,
+    },
+    bySymbol, byMonth, openPositions, recentClosed,
   };
 }

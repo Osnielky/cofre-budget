@@ -8,6 +8,7 @@ import { Transaction } from '../transactions/transaction.entity';
 import { Category } from '../categories/category.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { CategorizationRule } from '../categorization-rules/categorization-rule.entity';
+import { ProjectAccount } from './project-account.entity';
 import { ProjectsService } from './projects.service';
 
 const USER_ID = 'user-1';
@@ -18,7 +19,7 @@ let service: ProjectsService;
 beforeEach(async () => {
   ds = new DataSource({
     type: 'better-sqlite3', database: ':memory:', dropSchema: true,
-    entities: [User, Project, ProjectCategory, Transaction, Category, BankAccount, CategorizationRule],
+    entities: [User, Project, ProjectCategory, ProjectAccount, Transaction, Category, BankAccount, CategorizationRule],
     synchronize: true,
   });
   await ds.initialize();
@@ -29,6 +30,7 @@ beforeEach(async () => {
     ds.getRepository(ProjectCategory),
     ds.getRepository(Transaction),
     ds.getRepository(BankAccount),
+    ds.getRepository(ProjectAccount),
   );
 });
 

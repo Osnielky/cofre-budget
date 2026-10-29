@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Transaction } from '../transactions/transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
-import { ActivityRow, computePerformance, PerformanceSummary } from './performance';
+import { Project } from '../projects/project.entity';
+import { ProjectAccount } from '../projects/project-account.entity';
+import { ActivityRow, computePerformance, mergePerformance, PerformanceSummary } from './performance';
 
 /** One transaction row as the engine reads it. */
 export function toActivityRow(t: Transaction): ActivityRow {
@@ -21,22 +23,58 @@ export function toActivityRow(t: Transaction): ActivityRow {
   };
 }
 
+export interface AccountRef { id: string; bankName: string; accountName: string; accountType: string }
+export type AccountPerformance = PerformanceSummary & { account: AccountRef };
+export interface ProjectPerformance {
+  project: { id: string; name: string };
+  /** One summary per linked account, in link order. */
+  accounts: AccountPerformance[];
+  /** All linked accounts added together (lots never cross accounts). */
+  combined: PerformanceSummary;
+}
+
+const ref = (a: BankAccount): AccountRef => ({ id: a.id, bankName: a.bankName, accountName: a.accountName, accountType: a.accountType });
+
 @Injectable()
 export class InvestmentsService {
   constructor(
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
     @InjectRepository(BankAccount) private accountRepo: Repository<BankAccount>,
+    @InjectRepository(Project) private projectRepo: Repository<Project>,
+    @InjectRepository(ProjectAccount) private linkRepo: Repository<ProjectAccount>,
   ) {}
 
-  /** Performance of one of the caller's accounts over its whole history. */
-  async performance(userId: string, accountId: string): Promise<PerformanceSummary & { account: { id: string; bankName: string; accountName: string; accountType: string } }> {
-    const account = await this.accountRepo.findOne({ where: { id: accountId, userId } });
-    if (!account) throw new NotFoundException('Account not found');
+  private async summarize(userId: string, account: BankAccount): Promise<AccountPerformance> {
     const rows = await this.txRepo.find({
       where: { userId, bankAccountId: account.id, isSplitParent: false },
-      order: { date: 'ASC' },
+      order: { date: 'ASC', createdAt: 'ASC' },
     });
-    const summary = computePerformance(rows.map(toActivityRow));
-    return { ...summary, account: { id: account.id, bankName: account.bankName, accountName: account.accountName, accountType: account.accountType } };
+    return { ...computePerformance(rows.map(toActivityRow)), account: ref(account) };
+  }
+
+  /** Performance of one of the caller's accounts over its whole history. */
+  async performance(userId: string, accountId: string): Promise<AccountPerformance> {
+    const account = await this.accountRepo.findOne({ where: { id: accountId, userId } });
+    if (!account) throw new NotFoundException('Account not found');
+    return this.summarize(userId, account);
+  }
+
+  /** Every account a trading project follows, each on its own, plus the combined result. */
+  async performanceForProject(userId: string, projectId: string): Promise<ProjectPerformance> {
+    const project = await this.projectRepo.findOne({ where: { id: projectId, userId } });
+    if (!project) throw new NotFoundException('Project not found');
+    const links = await this.linkRepo.find({ where: { projectId: project.id, userId }, order: { createdAt: 'ASC' } });
+    const accounts = links.length
+      ? await this.accountRepo.find({ where: { id: In(links.map((l) => l.bankAccountId)), userId } })
+      : [];
+    const ordered = links.map((l) => accounts.find((a) => a.id === l.bankAccountId)).filter((a): a is BankAccount => !!a);
+    const parts: AccountPerformance[] = [];
+    for (const account of ordered) parts.push(await this.summarize(userId, account));
+    const label = (a: AccountRef) => ordered.filter((o) => o.bankName === a.bankName).length > 1 ? `${a.bankName} · ${a.accountName}` : a.bankName;
+    return {
+      project: { id: project.id, name: project.name },
+      accounts: parts,
+      combined: mergePerformance(parts.map((p) => ({ label: label(p.account), summary: p }))),
+    };
   }
 }

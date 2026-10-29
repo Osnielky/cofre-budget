@@ -188,8 +188,9 @@ count, stat and Ask Cofre's default list (`lib/transactions/trades.ts`).
 
 - **Trading performance phase 1 shipped 2026-10-29** (spec
   `2026-10-29-trading-performance-design.md`): structured trade columns, FIFO
-  engine, `GET /investments/performance`, trading project ↔ account link with a
-  Performance section. Next phases, in order:
+  engine, `GET /investments/performance` (per account and per project), trading
+  project ↔ several accounts (`project_accounts`) with a Performance section that
+  shows each account on its own and all of them combined. Next phases, in order:
   1. Broker CSV import with presets (Schwab, Fidelity, Robinhood, IBKR, Tradovate)
      through the existing CSV importer: date, symbol, side, quantity, price, fees.
   2. Plaid Holdings ($0.18 per Item per month; Elite) for current value and

@@ -8,6 +8,7 @@ import { Category } from '../categories/category.entity';
 import { Budget } from '../budgets/budget.entity';
 import { Project } from '../projects/project.entity';
 import { ProjectCategory } from '../projects/project-category.entity';
+import { ProjectAccount } from '../projects/project-account.entity';
 import { Debt } from '../debts/debt.entity';
 import { DebtPayment } from '../debts/debt-payment.entity';
 import { ConnectedApp } from '../connected-apps/connected-app.entity';
@@ -25,5 +26,5 @@ import { SupportTicket } from '../support/support-ticket.entity';
 import { SupportScreenshot } from '../support/support-screenshot.entity';
 import { TransactionTombstone } from '../transactions/transaction-tombstone.entity';
 
-export const ENTITIES = [User, BankAccount, PlaidItem, Transaction, RecurringRule, Category, Budget, Project, ProjectCategory, Debt, DebtPayment, ConnectedApp, Receipt, CategorizationRule, AiConversation, AiMessage, AiPendingAction, Subscription, NetWorthSnapshot, CreditCardDetail, CardProfile, PageView, SupportTicket, SupportScreenshot,
+export const ENTITIES = [User, BankAccount, PlaidItem, Transaction, RecurringRule, Category, Budget, Project, ProjectCategory, ProjectAccount, Debt, DebtPayment, ConnectedApp, Receipt, CategorizationRule, AiConversation, AiMessage, AiPendingAction, Subscription, NetWorthSnapshot, CreditCardDetail, CardProfile, PageView, SupportTicket, SupportScreenshot,
   TransactionTombstone];

@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Project } from './project.entity';
 import { ProjectCategory } from './project-category.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
+import { ProjectAccount } from './project-account.entity';
 import { isValidClosure, closedStatusFor } from './closure';
 import { pickFields } from '../common/http/pick-fields';
 
@@ -20,9 +21,12 @@ export interface ProjectDto {
   status?: string;
   salePrice?: number;
   saleDate?: string;
-  /** Trading projects: the investment account whose trades feed the Performance section. */
-  bankAccountId?: string | null;
+  /** Trading projects: the investment accounts whose trades feed the Performance
+      section. Sending the list replaces the project's links; [] unlinks all. */
+  bankAccountIds?: string[];
 }
+
+export interface LinkedAccount { id: string; bankName: string; accountName: string; accountType: string; provider: string }
 
 export interface ProjectCategoryDto {
   name: string;
@@ -36,7 +40,7 @@ export interface ProjectCategoryDto {
 }
 
 /** Fields a client may set on a project / project category; id, userId, projectType are server-owned. */
-const PROJECT_FIELDS = ['name', 'type', 'icon', 'color', 'description', 'imageUrl', 'purchasePrice', 'purchaseDate', 'status', 'salePrice', 'saleDate', 'bankAccountId'] as const satisfies readonly (keyof ProjectDto)[];
+const PROJECT_FIELDS = ['name', 'type', 'icon', 'color', 'description', 'imageUrl', 'purchasePrice', 'purchaseDate', 'status', 'salePrice', 'saleDate'] as const satisfies readonly (keyof ProjectDto)[];
 const PROJECT_CATEGORY_FIELDS = ['name', 'icon', 'color', 'order', 'type', 'description'] as const satisfies readonly (keyof ProjectCategoryDto)[];
 
 export interface CategoryBreakdown {
@@ -56,6 +60,8 @@ export interface ProjectWithStats extends Project {
   netGain: number | null;
   roi: number | null;
   txCount: number;
+  /** Investment accounts a trading project follows (link order). */
+  accounts: LinkedAccount[];
 }
 
 /* Default category seeds per project type */
@@ -123,14 +129,36 @@ export class ProjectsService {
     @InjectRepository(ProjectCategory) private catRepo: Repository<ProjectCategory>,
     @InjectRepository(Transaction)     private txRepo: Repository<Transaction>,
     @InjectRepository(BankAccount)     private accountRepo: Repository<BankAccount>,
+    @InjectRepository(ProjectAccount)  private linkRepo: Repository<ProjectAccount>,
   ) {}
 
-  /** A project may follow only the owner's own investment account. Null unlinks. */
-  private async assertLinkable(userId: string, dto: Partial<ProjectDto>): Promise<void> {
-    if (dto.bankAccountId === undefined || dto.bankAccountId === null) return;
-    const account = await this.accountRepo.findOne({ where: { id: dto.bankAccountId, userId } });
-    if (!account) throw new BadRequestException('Linked account not found');
-    if (account.accountType !== 'investment') throw new BadRequestException('Only an investment account can feed a trading project');
+  private toLinked(a: BankAccount): LinkedAccount {
+    return { id: a.id, bankName: a.bankName, accountName: a.accountName, accountType: a.accountType, provider: a.provider };
+  }
+
+  /** Investment accounts a project follows, in link order. */
+  async linkedAccounts(projectId: string): Promise<LinkedAccount[]> {
+    const links = await this.linkRepo.find({ where: { projectId }, relations: ['bankAccount'], order: { createdAt: 'ASC' } });
+    return links.filter((l) => l.bankAccount).map((l) => this.toLinked(l.bankAccount));
+  }
+
+  /** Replace a project's account links. Every id must be the owner's own `investment`
+      account and not already followed by another project. */
+  private async replaceLinks(project: Project, userId: string, ids: string[]): Promise<void> {
+    const unique = [...new Set(ids)];
+    if (unique.length > 0) {
+      const accounts = await this.accountRepo.find({ where: { id: In(unique), userId } });
+      if (accounts.length !== unique.length) throw new BadRequestException('Linked account not found');
+      const wrongType = accounts.find((a) => a.accountType !== 'investment');
+      if (wrongType) throw new BadRequestException(`"${wrongType.accountName}" is not an investment account — only brokerage, IRA and futures accounts can feed a trading project`);
+      const taken = await this.linkRepo.find({ where: { bankAccountId: In(unique) } });
+      const other = taken.find((t) => t.projectId !== project.id);
+      if (other) throw new BadRequestException('That account already feeds another project — unlink it there first');
+    }
+    await this.linkRepo.delete({ projectId: project.id });
+    if (unique.length > 0) {
+      await this.linkRepo.save(unique.map((bankAccountId) => this.linkRepo.create({ userId, projectId: project.id, bankAccountId })));
+    }
   }
 
   /* Load categories for a project type, scoped to the user — lazy-seeds defaults on first access */
@@ -167,6 +195,14 @@ export class ProjectsService {
       txByProject[tx.projectId].push(tx);
     }
 
+    // Linked investment accounts, one query for every project
+    const allLinks = await this.linkRepo.find({ where: { projectId: In(projectIds) }, relations: ['bankAccount'], order: { createdAt: 'ASC' } });
+    const linksByProject: Record<string, LinkedAccount[]> = {};
+    for (const l of allLinks) {
+      if (!l.bankAccount) continue;
+      (linksByProject[l.projectId] ??= []).push(this.toLinked(l.bankAccount));
+    }
+
     // Cache type→categories (at most 4-5 distinct types)
     const typeCache: Record<string, ProjectCategory[]> = {};
     const getTypeCats = async (type: string) => {
@@ -181,7 +217,7 @@ export class ProjectsService {
       const costBasis = (p.purchaseTxId ? 0 : Number(p.purchasePrice)) + expenses;
       const netGain  = p.status === 'sold' && p.salePrice != null ? Number(p.salePrice) - costBasis : null;
       const roi      = netGain != null && costBasis > 0 ? (netGain / costBasis) * 100 : null;
-      const stats    = { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length };
+      const stats    = { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length, accounts: linksByProject[p.id] ?? [] };
       const categories = await getTypeCats(p.type ?? 'other');
       return { ...stats, categories };
     }));
@@ -218,19 +254,11 @@ export class ProjectsService {
   }
 
   async create(userId: string, dto: ProjectDto): Promise<ProjectWithStats> {
-    await this.assertLinkable(userId, dto);
     const project = await this.repo.save(this.repo.create({ ...pickFields(dto, PROJECT_FIELDS), userId }));
-    const type    = dto.type ?? 'other';
-
-    /* Only seed defaults if this type has no categories yet for this user */
-    const existing = await this.catRepo.countBy({ userId, projectType: type });
-    if (existing === 0) {
-      const seeds = DEFAULT_CATEGORIES[type] ?? DEFAULT_CATEGORIES.other;
-      await this.catRepo.save(
-        seeds.map((s, i) => this.catRepo.create({ userId, projectType: type, name: s.name, icon: s.icon, color: s.color, type: s.type, order: i })),
-      );
+    if (dto.bankAccountIds) {
+      try { await this.replaceLinks(project, userId, dto.bankAccountIds); }
+      catch (err) { await this.repo.remove(project); throw err; }
     }
-
     return this.withStats(project);
   }
 
@@ -257,7 +285,7 @@ export class ProjectsService {
       }
     }
 
-    await this.assertLinkable(userId, dto);
+    if (dto.bankAccountIds) await this.replaceLinks(project, userId, dto.bankAccountIds);
     Object.assign(project, pickFields(dto, PROJECT_FIELDS));
     await this.repo.save(project);
     return this.withStats(project);
@@ -387,7 +415,7 @@ export class ProjectsService {
       ? Number(p.salePrice) - costBasis
       : null;
     const roi = netGain != null && costBasis > 0 ? (netGain / costBasis) * 100 : null;
-    return { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length };
+    return { ...p, expenses, income, costBasis, netGain, roi, txCount: txs.length, accounts: await this.linkedAccounts(p.id) };
   }
 
   async setPurchaseTx(projectId: string, userId: string, transactionId: string | null): Promise<ProjectWithStats> {
