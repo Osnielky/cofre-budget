@@ -421,7 +421,17 @@ export class PlaidService {
       if (accounts.length === 0) return;
       if (item.investmentsStatus === 'unsupported') return;
       const byPlaidId = new Map(accounts.map((a) => [a.plaidAccountId, a]));
-      const { start, end } = investmentsWindow(item.investmentsSyncedThrough);
+      /* Rows synced before the structured trade columns existed have no symbol; the
+         performance engine then counts those trades as plain cash. One full-window
+         pull rewrites them (the upsert refreshes the columns), so the data heals on
+         the next sync without anyone pressing "Re-download full history". */
+      const unfilled = await this.txRepo.createQueryBuilder('tx')
+        .where('tx.bankAccountId IN (:...ids)', { ids: accounts.map((a) => a.id) })
+        .andWhere("tx.source = 'plaid'").andWhere('tx.symbol IS NULL')
+        .andWhere("(tx.plaidCategory LIKE 'buy,%' OR tx.plaidCategory LIKE 'sell,%')")
+        .getCount();
+      if (unfilled > 0) this.logger.log(`Investments backfill for item ${item.itemId}: ${unfilled} trades without a symbol — pulling the full window`);
+      const { start, end } = investmentsWindow(unfilled > 0 ? null : item.investmentsSyncedThrough);
 
       const txs: PlaidInvestmentTx[] = [];
       const securities = new Map<string, PlaidSecurityLite>();

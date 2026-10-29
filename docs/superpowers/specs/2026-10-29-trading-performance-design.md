@@ -20,8 +20,10 @@ analysis is what was missing.
    fallback, ≤ 32), `securityName`, `quantity` (signed, Plaid's convention:
    positive buys, negative sells), `price`, `fees`. `plaidCategory = [type, subtype]`
    keeps the Plaid type. `investments.mapper.ts` fills them; the sync writes them on
-   insert and update, so "Re-download full history" backfills rows synced before.
-   The note stays as the human line.
+   insert and update. Rows synced before the columns existed have no symbol, and the
+   engine would count those trades as plain cash; so `syncInvestments` pulls the full
+   730-day window whenever an account still has buy / sell rows without a symbol, and
+   one ordinary Sync heals them. The note stays as the human line.
 
 2. **One engine, server side, pure.** `investments/performance.ts` turns an account's
    rows into a `PerformanceSummary`. Lots are matched **FIFO** per symbol; a sell

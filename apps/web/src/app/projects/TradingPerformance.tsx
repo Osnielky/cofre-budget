@@ -42,10 +42,11 @@ const panel: React.CSSProperties = {
   borderRadius: 'var(--radius-card)',
 };
 
-export default function TradingPerformance({ projectId }: { projectId: string }) {
+export default function TradingPerformance({ projectId, onEdit }: { projectId: string; onEdit?: () => void }) {
   const [data, setData] = useState<ProjectPerformance | null>(null);
   const [error, setError] = useState<string | null>(null);
-  /* 'all' = every linked account added together; otherwise one account's own result. */
+  /* 'all' = every linked account added together; otherwise one account's own result.
+     With a single account there is nothing to add up, so that account is the view. */
   const [view, setView] = useState<string>('all');
 
   useEffect(() => {
@@ -53,7 +54,7 @@ export default function TradingPerformance({ projectId }: { projectId: string })
     setData(null); setError(null); setView('all');
     fetch(`${API}/investments/performance?projectId=${encodeURIComponent(projectId)}`, { credentials: 'include' })
       .then(async (r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json() as Promise<ProjectPerformance>; })
-      .then((d) => { if (!cancelled) setData(d); })
+      .then((d) => { if (!cancelled) { setData(d); setView(d.accounts.length === 1 ? d.accounts[0].account.id : 'all'); } })
       .catch(() => { if (!cancelled) setError('Could not load performance'); });
     return () => { cancelled = true; };
   }, [projectId]);
@@ -86,11 +87,11 @@ export default function TradingPerformance({ projectId }: { projectId: string })
         <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{t.total} trade{t.total === 1 ? '' : 's'} · {t.closed} closed</span>
       </div>
 
-      {/* Account switcher: the project total, then each account on its own */}
-      {multi && (
-        <div role="tablist" aria-label="Account" className="flex gap-1 p-1 rounded-xl max-w-full overflow-x-auto self-start"
+      {/* Account switcher: the project total (when there is more than one account), then each account on its own */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div role="tablist" aria-label="Account" className="flex gap-1 p-1 rounded-xl max-w-full overflow-x-auto"
           style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', scrollbarWidth: 'none' }}>
-          {[{ id: 'all', name: 'All accounts', pnl: data.combined.realizedPnl }, ...data.accounts.map((a) => ({ id: a.account.id, name: label(a.account), pnl: a.realizedPnl }))].map((tab) => {
+          {[...(multi ? [{ id: 'all', name: 'All accounts', pnl: data.combined.realizedPnl }] : []), ...data.accounts.map((a) => ({ id: a.account.id, name: label(a.account), pnl: a.realizedPnl }))].map((tab) => {
             const on = view === tab.id;
             return (
               <button key={tab.id} role="tab" aria-selected={on} onClick={() => setView(tab.id)}
@@ -104,6 +105,19 @@ export default function TradingPerformance({ projectId }: { projectId: string })
             );
           })}
         </div>
+        {onEdit && (
+          <button type="button" onClick={onEdit} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg hover:brightness-110"
+            style={{ color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>
+            + Add account
+          </button>
+        )}
+      </div>
+
+      {/* Trades without a symbol: rows synced before the trade columns existed. The next sync fills them in. */}
+      {t.total > 0 && current.bySymbol.length === 0 && current.openPositions.length === 0 && (
+        <p className="text-xs px-4 py-3" style={{ ...panel, color: 'var(--color-amber)', borderColor: 'color-mix(in srgb, var(--color-amber) 35%, transparent)' }}>
+          These trades have no symbol or quantity yet, so they only count as cash. Press <strong>Sync</strong> on this bank in Settings → Bank Accounts and the next pull fills them in.
+        </p>
       )}
 
       {noTrades ? (

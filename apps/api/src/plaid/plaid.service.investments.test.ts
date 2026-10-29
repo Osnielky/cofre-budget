@@ -105,6 +105,21 @@ describe('syncInvestments', () => {
     expect([rows[0].symbol, Number(rows[0].quantity), Number(rows[0].price)]).toEqual(['VTI', 1, 100]);
   });
 
+  it('pulls the full window again when trades synced before the trade columns existed lack a symbol', async () => {
+    const { item, inv } = await seed({ investmentsStatus: 'synced', syncedThrough: '2026-10-20' });
+    const txRepo = ds.getRepository(Transaction);
+    await txRepo.save(txRepo.create({ userId: 'user-1', bankAccountId: inv!.id, externalId: 'i-old', source: 'plaid', amount: -100, name: 'BUY', date: '2026-03-01', pending: false, plaidCategory: ['buy', 'buy'] }));
+    const calls: any[] = [];
+    await makeService({ calls, pages: [{ txs: [itx('i-old', { date: '2026-03-01', quantity: 1, price: 100 })] }] }).syncInvestments(item, 'tok');
+    const twoYearsAgo = new Date(Date.now() - 730 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    expect(calls[0].start_date).toBe(twoYearsAgo);
+    const after = await txRepo.findOneByOrFail({ externalId: 'i-old' });
+    expect([after.symbol, Number(after.quantity)]).toEqual(['VTI', 1]);
+    // Filled now, so the next sync is back to the short overlap window.
+    await makeService({ calls, pages: [{ txs: [] }] }).syncInvestments(item, 'tok');
+    expect(calls[1].start_date > twoYearsAgo).toBe(true);
+  });
+
   it('a cancel entry removes the row it cancels, with a tombstone, and is not stored itself', async () => {
     const { item, inv } = await seed();
     const txRepo = ds.getRepository(Transaction);

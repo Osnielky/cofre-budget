@@ -907,7 +907,7 @@ export default function ProjectsPage() {
 
                     {/* ── Trading performance (linked brokerage account) ── */}
                     {sel.type === 'trading' && (sel.accounts?.length ?? 0) > 0 && (
-                      <TradingPerformance projectId={sel.id} />
+                      <TradingPerformance projectId={sel.id} onEdit={() => openEdit(sel)} />
                     )}
 
                     {/* ── Category breakdown ── */}
