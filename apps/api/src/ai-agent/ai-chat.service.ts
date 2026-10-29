@@ -55,7 +55,7 @@ export class AiChatService {
     const tools = [
       betaTool({
         name: 'get_transactions',
-        description: 'List the user\'s transactions (each with its account, and its projectId / projectCategory / debtId when it is filed under a project or a debt), optionally filtered by date range, category, merchant, account, or uncategorized-only (rows linked to a project or a debt are not uncategorized).',
+        description: 'List the user\'s transactions (each with its account, and its projectId / projectCategory / debtId when it is filed under a project or a debt), optionally filtered by date range, category, merchant, account, or uncategorized-only (rows linked to a project or a debt are not uncategorized). Brokerage buys and sells are left out unless includeTrades is true — they move money between cash and holdings inside an investment account and are never income, spending or something to categorize; deposits, dividends and interest on the same account are always included.',
         inputSchema: {
           type: 'object',
           properties: {
@@ -65,6 +65,7 @@ export class AiChatService {
             uncategorizedOnly: { type: 'boolean' },
             merchant: { type: 'string', description: 'Case-insensitive substring match on merchant or transaction name' },
             accountId: { type: 'string', description: 'Only this account (id from get_accounts or get_credit_cards)' },
+            includeTrades: { type: 'boolean', description: 'Also return brokerage buys and sells (each tagged with `trade`), e.g. when the user asks what they bought or sold' },
             limit: { type: 'number', description: 'Max results, default 100, capped at 500' },
           },
         },

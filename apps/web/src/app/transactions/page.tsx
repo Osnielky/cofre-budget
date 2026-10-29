@@ -25,6 +25,7 @@ import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
 import { buildRecurringMap, normalize } from './recurring';
 import { pickProjectSuggestion } from '@/lib/transactions/suggestions';
 import { groupTransactions, GROUP_BY_OPTIONS, type GroupBy, type GroupKind } from '@/lib/transactions/grouping';
+import { splitTrades, summarizeTrades } from '@/lib/transactions/trades';
 import { isClosed, closureKind, selectableProjects } from '@/lib/projects/closure';
 import LinkTransferModal from '@/components/LinkTransferModal';
 import StatStrip from './StatStrip';
@@ -101,10 +102,12 @@ interface Transaction {
   receiptId: string | null;
   categorizedByRuleId: string | null;
   categorizedByRule: { id: string; matchValue: string } | null;
+  /** Plaid's `[type, subtype]`; `buy` / `sell` marks a brokerage trade (lib/transactions/trades.ts). */
+  plaidCategory?: string[] | null;
 }
 interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid'; direction: 'lent' | 'owed' }
 
-type Filter    = 'all' | 'uncategorized' | 'expense' | 'income' | 'recurring';
+type Filter    = 'all' | 'uncategorized' | 'expense' | 'income' | 'recurring' | 'trades';
 type RangeMode = 'month' | 'custom';
 
 /* Non-bank group accents. Hex (not CSS vars) because the group header appends
@@ -935,13 +938,24 @@ export default function TransactionsPage() {
      internal movements of a tracking account (investment, mortgage…), which are
      net-worth only and never need one. */
   const needsCategory = (t: Transaction) => !t.categoryId && !t.projectId && !isTransfer(t) && !isTrackingAccount(t.bankAccount?.accountType ?? '');
-  const uncategorizedCount = transactions.filter((t) => needsCategory(t)).length;
+  /* Brokerage buys and sells live on their own Trades tab: they move money between
+     the cash and the holdings of one investment account, so every other tab, count,
+     stat and insight reads `ledger` (everything but trades). Cash activity on the
+     same account — deposits, dividends, interest, fees — stays in the ledger. */
+  const { ledger, trades } = useMemo(() => splitTrades(transactions), [transactions]);
+  const prevLedger = useMemo(() => splitTrades(prevTransactions).ledger, [prevTransactions]);
+  const tradeSummary = useMemo(() => summarizeTrades(trades), [trades]);
+  /* The stat strip is cash flow, the same rule the dashboard uses: a tracking
+     account's rows (investment, mortgage…) are net-worth only and never income
+     or spending, however the row is signed. */
+  const cashFlowRows = (rows: Transaction[]) => rows.filter((t) => !isTrackingAccount(t.bankAccount?.accountType ?? ''));
+  const uncategorizedCount = ledger.filter((t) => needsCategory(t)).length;
   /* Current + previous window: gives buildRecurringMap the ≥2 months it needs
      to detect repeats even inside a one-month view. Declared before `visible`,
      which calls isRecurringTx during the same render pass. */
   const recurringMap = useMemo(
-    () => buildRecurringMap([...transactions, ...prevTransactions].filter((t) => Number(t.amount) < 0)),
-    [transactions, prevTransactions]
+    () => buildRecurringMap([...ledger, ...prevLedger].filter((t) => Number(t.amount) < 0)),
+    [ledger, prevLedger]
   );
   const statMonth = rangeMode === 'month' ? month : (from ? from.slice(0, 7) : currentMonth());
   const prevStatMonth = prevRange ? prevRange.from.slice(0, 7) : '';
@@ -953,7 +967,7 @@ export default function TransactionsPage() {
   const recurringPrevTotal = prevStatMonth ? recurringTotalIn(prevStatMonth) : 0;
 
   const isRecurringTx = (t: Transaction) => Number(t.amount) < 0 && recurringMap.has(normalize(t.name));
-  const visible = transactions.filter((t) => {
+  const visible = (filter === 'trades' ? trades : ledger).filter((t) => {
     if (filter === 'uncategorized' && !needsCategory(t)) return false;
     if (filter === 'expense'       && (Number(t.amount) >= 0 || isNonSpending(t))) return false;
     if (filter === 'income'        && (Number(t.amount) < 0  || isNonSpending(t))) return false;
@@ -1360,8 +1374,8 @@ export default function TransactionsPage() {
 
           {/* ── Stat strip ── */}
           <StatStrip
-            transactions={transactions}
-            prev={prevTransactions}
+            transactions={cashFlowRows(ledger)}
+            prev={cashFlowRows(prevLedger)}
             recurringNow={recurringNowTotal}
             recurringPrev={recurringPrevTotal}
             prevLabel={prevRange?.label ?? 'prior period'}
@@ -1414,10 +1428,12 @@ export default function TransactionsPage() {
               <div className="flex gap-1 p-1 rounded-xl max-w-full overflow-x-auto"
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', scrollbarWidth: 'none' }}>
                 {([
-                  { id: 'all',       label: 'All',       count: transactions.length },
-                  { id: 'expense',   label: 'Expenses',  count: transactions.filter((t) => Number(t.amount) < 0).length },
-                  { id: 'income',    label: 'Income',    count: transactions.filter((t) => Number(t.amount) >= 0).length },
-                  { id: 'recurring', label: 'Recurring', count: transactions.filter(isRecurringTx).length },
+                  { id: 'all',       label: 'All',       count: ledger.length },
+                  { id: 'expense',   label: 'Expenses',  count: ledger.filter((t) => Number(t.amount) < 0).length },
+                  { id: 'income',    label: 'Income',    count: ledger.filter((t) => Number(t.amount) >= 0).length },
+                  { id: 'recurring', label: 'Recurring', count: ledger.filter(isRecurringTx).length },
+                  /* Brokerage buys / sells, only once an investment account has some. */
+                  ...(trades.length > 0 ? [{ id: 'trades' as Filter, label: 'Trades', count: trades.length }] : []),
                   /* Phones: the uncategorized pill joins this row as an amber tab (the pill
                      itself and the group-by control are desktop-only there). */
                   { id: 'uncategorized', label: 'Uncategorized', count: uncategorizedCount, phoneOnly: true, amber: uncategorizedCount > 0 },
@@ -1469,7 +1485,7 @@ export default function TransactionsPage() {
               <button onClick={() => setFilter('all')}
                 className="hidden sm:inline-flex px-3 py-1.5 rounded-xl text-xs font-semibold"
                 style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
-                {transactions.length} total
+                {ledger.length} total
               </button>
               {groups.length > 1 && (
                 <button
@@ -1485,6 +1501,21 @@ export default function TransactionsPage() {
 
         {/* ── Transaction list ── */}
         <div className="px-3 sm:px-6 py-4 sm:py-5 flex flex-col gap-4">
+          {filter === 'trades' && !loading && (
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-xs"
+              style={{ ...glass, borderRadius: 'var(--radius-card)', color: 'var(--color-text-secondary)' }}
+              data-testid="trades-summary">
+              <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                {tradeSummary.count} trade{tradeSummary.count === 1 ? '' : 's'}
+              </span>
+              <span>Bought <strong style={{ color: 'var(--color-text-primary)' }}>${tradeSummary.bought.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+              <span>Sold <strong style={{ color: 'var(--color-text-primary)' }}>${tradeSummary.sold.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+              <span>Net to cash <strong style={{ color: tradeSummary.net >= 0 ? 'var(--color-green)' : 'var(--color-text-primary)' }}>{formatAmount(tradeSummary.net)}</strong></span>
+              <span className="basis-full sm:basis-auto sm:ml-auto" style={{ color: 'var(--color-text-muted)' }}>
+                Buys and sells move money between cash and holdings inside the account — nothing to categorize. Deposits, dividends and interest stay in All.
+              </span>
+            </div>
+          )}
 
           {loading ? (
             <p className="py-16 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading transactions…</p>
@@ -1496,7 +1527,9 @@ export default function TransactionsPage() {
               <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
                 {filter === 'uncategorized'
                   ? '✅ All transactions in this period are categorized!'
-                  : 'Import a CSV or connect a bank account to get started.'}
+                  : filter === 'trades'
+                    ? 'No buys or sells in this period.'
+                    : 'Import a CSV or connect a bank account to get started.'}
               </p>
               {filter !== 'all' && (
                 <button onClick={() => setFilter('all')}
@@ -3104,9 +3137,9 @@ export default function TransactionsPage() {
         <InsightsPanel
           selectedTx={selectedTx}
           onClose={() => setSelectedTx(null)}
-          transactions={transactions}
+          transactions={ledger}
           recurringMap={recurringMap}
-          prevTransactions={prevTransactions}
+          prevTransactions={prevLedger}
           projects={projects}
           subscriptions={subscriptions}
           onSubscriptionChange={handleSubscriptionChange}
@@ -3186,9 +3219,9 @@ export default function TransactionsPage() {
             <InsightsPanel
               selectedTx={selectedTx}
               onClose={() => setSelectedTx(null)}
-              transactions={transactions}
+              transactions={ledger}
               recurringMap={recurringMap}
-              prevTransactions={prevTransactions}
+              prevTransactions={prevLedger}
               projects={projects}
               subscriptions={subscriptions}
               onSubscriptionChange={handleSubscriptionChange}

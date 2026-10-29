@@ -81,6 +81,28 @@ describe('AiReadToolsService', () => {
     expect(rows[1]).toMatchObject({ id: 'p2', closed: true });
   });
 
+  it('keeps brokerage trades out unless asked, and tags them when included', async () => {
+    const accounts = ds.getRepository(BankAccount);
+    const schwab = await accounts.save(accounts.create({ userId: 'u1', bankName: 'Charles Schwab', accountName: 'Individual', accountType: 'investment', balance: 37799.53 }));
+    const tx = ds.getRepository(Transaction);
+    await tx.save(tx.create({ userId: 'u1', bankAccountId: schwab.id, name: 'BUY VTI', amount: -2401.2, date: '2026-10-12', plaidCategory: ['buy', 'buy'] }));
+    await tx.save(tx.create({ userId: 'u1', bankAccountId: schwab.id, name: 'SOFI - SOLDTOOPEN', amount: 168.55, date: '2026-10-29', plaidCategory: ['sell', 'sell short'] }));
+    await tx.save(tx.create({ userId: 'u1', bankAccountId: schwab.id, name: 'DIVIDEND VTI', amount: 45.5, date: '2026-10-15', plaidCategory: ['cash', 'dividend'] }));
+    await tx.save(tx.create({ userId: 'u1', bankAccountId: schwab.id, name: 'TRANSFER FROM CHECKING', amount: 1000, date: '2026-10-01', plaidCategory: ['transfer', 'deposit'] }));
+
+    const names = (rows: { name: string }[]) => rows.map((r) => r.name).sort();
+    expect(names(await makeService().getTransactions('u1', { accountId: schwab.id })))
+      .toEqual(['DIVIDEND VTI', 'TRANSFER FROM CHECKING']);
+    const all = await makeService().getTransactions('u1', { accountId: schwab.id, includeTrades: true });
+    expect(names(all)).toEqual(['BUY VTI', 'DIVIDEND VTI', 'SOFI - SOLDTOOPEN', 'TRANSFER FROM CHECKING']);
+    const byName = Object.fromEntries(all.map((r) => [r.name, r as any]));
+    expect(byName['BUY VTI'].trade).toBe('buy');
+    expect(byName['SOFI - SOLDTOOPEN'].trade).toBe('sell (sell short)');
+    expect(byName['DIVIDEND VTI'].trade).toBeUndefined();
+    // Ordinary Plaid categories never look like a trade.
+    expect(names(await makeService().getTransactions('u1', {}))).toContain('Chevron');
+  });
+
   it('filters by account', async () => {
     const rows = await makeService().getTransactions('u1', { accountId: red.id });
     expect(rows.map((r) => r.name)).toEqual(['Publix']);

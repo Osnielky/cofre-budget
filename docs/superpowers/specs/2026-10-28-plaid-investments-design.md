@@ -74,6 +74,31 @@ assumed a per-account fee; at $0.35 per Item it fits inside Pro's $2 margin for 
 two brokerages, so Investments is not plan-gated in code. Approval requested the same
 day under "Personal budgeting and financial advice" and granted 2026-10-29.
 
+### Trades stay out of the ledger (2026-10-29)
+
+The first real pull brought 187 Schwab rows, most of them buys and sells. A trade moves
+money between the cash and the holdings of one account: it is neither income nor
+spending, never needs a category and would bury the deposits, dividends and interest
+the user does want to link or categorize. So:
+
+- `lib/transactions/trades.ts` (`isTrade`, `splitTrades`, `summarizeTrades`, tested):
+  a row is a trade when `plaidCategory[0]` is `buy` or `sell`. Plaid's Transactions
+  taxonomy never uses those top-level values, so the type alone is enough.
+- Transactions page: a **Trades** tab appears once the period holds a trade. All /
+  Expenses / Income / Recurring / Uncategorized, the "N total" pill, the stat strip
+  and the insights column read the ledger (everything but trades). The Trades tab
+  shows a summary line (count, bought, sold, net to cash) above the usual bank / day
+  groups, with the note "nothing to categorize".
+- The stat strip also drops every tracking-account row (the dashboard's cash-flow
+  rule), so a brokerage deposit no longer counts as income there.
+- Ask Cofre `get_transactions` leaves trades out unless `includeTrades: true`, and
+  tags each included one with `trade: "sell (sell short)"`. SQL mirror of the rule:
+  `NOT_A_TRADE_SQL` in `ai-read-tools.service.ts` (null-safe: rows without a Plaid
+  category are never trades).
+
+Cash activity (`cash`, `transfer`, `fee` types) stays in the ledger on purpose: a
+deposit is the receiving side of a checking transfer, a dividend is investment income.
+
 ## Rollout
 
 1. Request Investments in the Plaid dashboard (Products). Until approved, a link token

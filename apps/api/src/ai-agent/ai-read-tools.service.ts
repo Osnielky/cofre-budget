@@ -23,8 +23,16 @@ export interface GetTransactionsArgs {
   uncategorizedOnly?: boolean;
   merchant?: string;
   accountId?: string;
+  /** Also return brokerage buys / sells. Off by default: a trade moves money between the
+      cash and the holdings of one investment account, so it is neither income nor spending. */
+  includeTrades?: boolean;
   limit?: number;
 }
+
+/** Plaid Investments rows carry `plaidCategory = [type, subtype]`; `buy` / `sell` is a trade
+    (same rule as the web's lib/transactions/trades.ts). The column is a simple-array, i.e. a
+    comma-joined string, so the type is the text before the first comma. */
+export const NOT_A_TRADE_SQL = "(tx.plaidCategory IS NULL OR NOT (tx.plaidCategory LIKE 'buy,%' OR tx.plaidCategory LIKE 'sell,%' OR tx.plaidCategory IN ('buy', 'sell')))";
 
 function currentMonthKey(): string {
   const now = new Date();
@@ -64,6 +72,7 @@ export class AiReadToolsService {
     // convention: such rows carry categoryId = null), so it is not "uncategorized".
     if (args.uncategorizedOnly) qb.andWhere('tx.categoryId IS NULL AND tx.projectId IS NULL AND tx.debtId IS NULL AND (bankAccount.accountType IS NULL OR bankAccount.accountType NOT IN (:...tracking))', { tracking: ['investment', 'mortgage', 'other_asset', 'other_liability'] });
     if (args.accountId) qb.andWhere('tx.bankAccountId = :accountId', { accountId: args.accountId });
+    if (!args.includeTrades) qb.andWhere(NOT_A_TRADE_SQL);
     if (args.merchant) qb.andWhere('(tx.merchantName ILIKE :m OR tx.name ILIKE :m)', { m: `%${args.merchant}%` });
 
     const rows = await qb.getMany();
@@ -73,6 +82,7 @@ export class AiReadToolsService {
       accountId: t.bankAccountId ?? null, account: t.bankAccount?.accountName ?? null,
       projectId: t.projectId ?? null, projectCategory: t.projectCategoryRef?.name ?? null,
       debtId: t.debtId ?? null,
+      ...(t.plaidCategory?.length && ['buy', 'sell'].includes(t.plaidCategory[0]) ? { trade: `${t.plaidCategory[0]}${t.plaidCategory[1] && t.plaidCategory[1] !== t.plaidCategory[0] ? ` (${t.plaidCategory[1]})` : ''}` } : {}),
     }));
   }
 

@@ -182,8 +182,13 @@ limits them today, and what was done:
 ## Plaid Investments follow-ups (2026-10-28)
 
 Spec: [docs/superpowers/specs/2026-10-28-plaid-investments-design.md](superpowers/specs/2026-10-28-plaid-investments-design.md).
-Built behind `PLAID_INVESTMENTS_ENABLED`; needs Plaid dashboard approval first.
+Live since 2026-10-29 (Plaid approved; `PLAID_INVESTMENTS_ENABLED=true`). Trades
+(buy / sell) sit on the Transactions page's **Trades** tab, out of every other tab,
+count, stat and Ask Cofre's default list (`lib/transactions/trades.ts`).
 
+- An Investments page: the Trades tab is the holding place. Once holdings land
+  (next item) move trades there with positions, cost basis and realized gains per
+  ticker; the Transactions page keeps only cash activity.
 - Holdings and cost basis from `/investments/holdings/get` for the Goals page
   (allocation donut, performance) and Ask Cofre.
 - Revisit plan gating once real usage shows how many brokerages a Pro user links:
