@@ -71,6 +71,14 @@ export interface MappedInvestmentTx {
   date: string;
   plaidCategory: string[];
   note: string | null;
+  /** Ticker, or the security name when it has none; null for pure cash rows. */
+  symbol: string | null;
+  securityName: string | null;
+  /** Plaid's sign: positive buys, negative sells; null when Plaid sends 0 / nothing. */
+  quantity: number | null;
+  /** Per-unit price; derived from amount ÷ quantity when Plaid sends 0. */
+  price: number | null;
+  fees: number | null;
 }
 
 function capitalize(s: string): string {
@@ -94,6 +102,8 @@ export function mapInvestmentTransaction(it: PlaidInvestmentTx, securities: Map<
   }
   if (it.fees) parts.push(`fee ${money(it.fees)}`);
   const fallbackName = label ? `${subtype} ${label}` : subtype;
+  const quantity = it.quantity ? it.quantity : null;
+  const price = it.price ? it.price : (quantity && it.amount ? +(Math.abs(it.amount) / Math.abs(quantity)).toFixed(6) : null);
   return {
     externalId: it.investment_transaction_id,
     amount: -it.amount,
@@ -101,5 +111,10 @@ export function mapInvestmentTransaction(it: PlaidInvestmentTx, securities: Map<
     date: it.date,
     plaidCategory: [it.type, it.subtype].filter(Boolean),
     note: parts.join(' · ').slice(0, 500),
+    symbol: label ? label.slice(0, 32) : null,
+    securityName: security?.name ? security.name.slice(0, 120) : null,
+    quantity,
+    price,
+    fees: it.fees ? it.fees : null,
   };
 }

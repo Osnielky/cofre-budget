@@ -28,6 +28,7 @@ beforeEach(async () => {
     ds.getRepository(Project),
     ds.getRepository(ProjectCategory),
     ds.getRepository(Transaction),
+    ds.getRepository(BankAccount),
   );
 });
 

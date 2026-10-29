@@ -58,6 +58,12 @@ export class Project {
   @Column({ type: 'uuid', nullable: true })
   purchaseTxId: string | null;
 
+  /* A trading project can follow one of the user's investment accounts: its trades
+     feed the Performance section (investments/performance.ts). Validated on write to
+     be the owner's own `investment` account. */
+  @Column({ type: 'uuid', nullable: true })
+  bankAccountId: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

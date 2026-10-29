@@ -9,6 +9,7 @@ import {
 } from 'recharts';
 import Sidebar from '@/components/Sidebar';
 import ProjectCategoryForm, { ProjectCategoryValues } from './ProjectCategoryForm';
+import TradingPerformance from './TradingPerformance';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -68,6 +69,8 @@ interface Project {
   netGain: number | null; roi: number | null; txCount: number;
   imageUrl?: string | null;
   purchaseTxId: string | null;
+  /** Trading projects: the investment account whose trades feed the Performance section. */
+  bankAccountId?: string | null;
   transactions?: Transaction[];
   categories?: ProjectCategory[];
   categoryBreakdown?: CategoryBreakdown[];
@@ -136,8 +139,18 @@ export default function ProjectsPage() {
   const [removePurchaseTxError, setRemovePurchaseTxError] = useState<Record<string, string | null>>({});
 
   /* Project form state */
-  const emptyForm = { name: '', type: 'vehicle', icon: '🚗', color: PRESET_COLORS[0], description: '', purchasePrice: '', purchaseDate: '', imageUrl: '' };
+  const emptyForm = { name: '', type: 'vehicle', icon: '🚗', color: PRESET_COLORS[0], description: '', purchasePrice: '', purchaseDate: '', imageUrl: '', bankAccountId: '' };
   const [form, setForm] = useState(emptyForm);
+  /* Investment accounts a trading project can follow (loaded once the form opens). */
+  const [investmentAccounts, setInvestmentAccounts] = useState<{ id: string; bankName: string; accountName: string }[]>([]);
+  useEffect(() => {
+    if (!showForm) return;
+    fetch(`${API}/bank-accounts`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: { id: string; bankName: string; accountName: string; accountType: string }[]) =>
+        setInvestmentAccounts(list.filter((a) => a.accountType === 'investment').map(({ id, bankName, accountName }) => ({ id, bankName, accountName }))))
+      .catch(() => setInvestmentAccounts([]));
+  }, [showForm]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
 
@@ -272,7 +285,11 @@ export default function ProjectsPage() {
   async function handleSave(e: React.FormEvent) {
     e.preventDefault(); setSaving(true);
     try {
-      const body = { ...form, purchasePrice: parseFloat(form.purchasePrice) || 0, purchaseDate: form.purchaseDate || null };
+      const body = {
+        ...form, purchasePrice: parseFloat(form.purchasePrice) || 0, purchaseDate: form.purchaseDate || null,
+        /* Only a trading project follows an account; any other type always clears it. */
+        bankAccountId: form.type === 'trading' && form.bankAccountId ? form.bankAccountId : null,
+      };
       const url    = editing ? `${API}/projects/${editing.id}` : `${API}/projects`;
       const method = editing ? 'PATCH' : 'POST';
       const res = await fetch(url, {
@@ -442,7 +459,7 @@ export default function ProjectsPage() {
   function openCreate() { setEditing(null); setForm(emptyForm); setShowForm(true); }
   function openEdit(p: Project) {
     setEditing(p);
-    setForm({ name: p.name, type: p.type, icon: p.icon, color: p.color, description: p.description ?? '', purchasePrice: String(p.purchasePrice), purchaseDate: p.purchaseDate ?? '', imageUrl: p.imageUrl ?? '' });
+    setForm({ name: p.name, type: p.type, icon: p.icon, color: p.color, description: p.description ?? '', purchasePrice: String(p.purchasePrice), purchaseDate: p.purchaseDate ?? '', imageUrl: p.imageUrl ?? '', bankAccountId: p.bankAccountId ?? '' });
     setShowForm(true);
   }
   function closeForm() { setShowForm(false); setEditing(null); setSaving(false); }
@@ -888,6 +905,11 @@ export default function ProjectsPage() {
                       </div>
                     )}
 
+                    {/* ── Trading performance (linked brokerage account) ── */}
+                    {sel.type === 'trading' && sel.bankAccountId && (
+                      <TradingPerformance accountId={sel.bankAccountId} />
+                    )}
+
                     {/* ── Category breakdown ── */}
                     <div className="flex flex-col gap-2">
                       {/* Toggle bar */}
@@ -1159,6 +1181,25 @@ export default function ProjectsPage() {
                         Use this project exclusively for your trading activity — profits, losses,
                         commissions, platform fees and payouts. Your everyday income and expenses
                         stay in the regular budget.
+                      </p>
+                    </div>
+                  )}
+                  {form.type === 'trading' && (
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>Brokerage account</span>
+                      <select value={form.bankAccountId} onChange={(e) => setForm((f) => ({ ...f, bankAccountId: e.target.value }))}
+                        aria-label="Brokerage account this project follows"
+                        className="px-4 py-3 text-sm outline-none rounded-xl w-full transition-all duration-150"
+                        style={{ ...inputStyle, color: form.bankAccountId ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                        <option value="">Not linked — I record results by hand</option>
+                        {investmentAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>{a.bankName} · {a.accountName}</option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+                        {investmentAccounts.length === 0
+                          ? 'Connect a brokerage in Settings → Bank Accounts to follow its trades here.'
+                          : 'Its buys, sells, dividends and fees feed a Performance section — realized P&L, win rate, open positions. Nothing to categorize.'}
                       </p>
                     </div>
                   )}

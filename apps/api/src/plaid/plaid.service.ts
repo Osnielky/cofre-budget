@@ -464,6 +464,11 @@ export class PlaidService {
           existing.name = mapped.name;
           existing.date = mapped.date;
           existing.plaidCategory = mapped.plaidCategory;
+          existing.symbol = mapped.symbol;
+          existing.securityName = mapped.securityName;
+          existing.quantity = mapped.quantity;
+          existing.price = mapped.price;
+          existing.fees = mapped.fees;
           await this.txRepo.save(existing);
           continue;
         }
@@ -479,6 +484,11 @@ export class PlaidService {
           date: mapped.date,
           pending: false,
           note: mapped.note,
+          symbol: mapped.symbol,
+          securityName: mapped.securityName,
+          quantity: mapped.quantity,
+          price: mapped.price,
+          fees: mapped.fees,
         }));
       }
       await this.itemRepo.update(item.id, { investmentsStatus: 'synced', investmentsSyncedThrough: end });

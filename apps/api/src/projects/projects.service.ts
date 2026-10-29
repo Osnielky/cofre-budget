@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Project } from './project.entity';
 import { ProjectCategory } from './project-category.entity';
 import { Transaction } from '../transactions/transaction.entity';
+import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { isValidClosure, closedStatusFor } from './closure';
 import { pickFields } from '../common/http/pick-fields';
 
@@ -19,6 +20,8 @@ export interface ProjectDto {
   status?: string;
   salePrice?: number;
   saleDate?: string;
+  /** Trading projects: the investment account whose trades feed the Performance section. */
+  bankAccountId?: string | null;
 }
 
 export interface ProjectCategoryDto {
@@ -33,7 +36,7 @@ export interface ProjectCategoryDto {
 }
 
 /** Fields a client may set on a project / project category; id, userId, projectType are server-owned. */
-const PROJECT_FIELDS = ['name', 'type', 'icon', 'color', 'description', 'imageUrl', 'purchasePrice', 'purchaseDate', 'status', 'salePrice', 'saleDate'] as const satisfies readonly (keyof ProjectDto)[];
+const PROJECT_FIELDS = ['name', 'type', 'icon', 'color', 'description', 'imageUrl', 'purchasePrice', 'purchaseDate', 'status', 'salePrice', 'saleDate', 'bankAccountId'] as const satisfies readonly (keyof ProjectDto)[];
 const PROJECT_CATEGORY_FIELDS = ['name', 'icon', 'color', 'order', 'type', 'description'] as const satisfies readonly (keyof ProjectCategoryDto)[];
 
 export interface CategoryBreakdown {
@@ -119,7 +122,16 @@ export class ProjectsService {
     @InjectRepository(Project)         private repo: Repository<Project>,
     @InjectRepository(ProjectCategory) private catRepo: Repository<ProjectCategory>,
     @InjectRepository(Transaction)     private txRepo: Repository<Transaction>,
+    @InjectRepository(BankAccount)     private accountRepo: Repository<BankAccount>,
   ) {}
+
+  /** A project may follow only the owner's own investment account. Null unlinks. */
+  private async assertLinkable(userId: string, dto: Partial<ProjectDto>): Promise<void> {
+    if (dto.bankAccountId === undefined || dto.bankAccountId === null) return;
+    const account = await this.accountRepo.findOne({ where: { id: dto.bankAccountId, userId } });
+    if (!account) throw new BadRequestException('Linked account not found');
+    if (account.accountType !== 'investment') throw new BadRequestException('Only an investment account can feed a trading project');
+  }
 
   /* Load categories for a project type, scoped to the user — lazy-seeds defaults on first access */
   async loadTypeCategories(userId: string, projectType: string): Promise<ProjectCategory[]> {
@@ -206,6 +218,7 @@ export class ProjectsService {
   }
 
   async create(userId: string, dto: ProjectDto): Promise<ProjectWithStats> {
+    await this.assertLinkable(userId, dto);
     const project = await this.repo.save(this.repo.create({ ...pickFields(dto, PROJECT_FIELDS), userId }));
     const type    = dto.type ?? 'other';
 
@@ -244,6 +257,7 @@ export class ProjectsService {
       }
     }
 
+    await this.assertLinkable(userId, dto);
     Object.assign(project, pickFields(dto, PROJECT_FIELDS));
     await this.repo.save(project);
     return this.withStats(project);

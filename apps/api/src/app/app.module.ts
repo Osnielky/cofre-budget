@@ -15,6 +15,7 @@ import { BudgetsModule } from '../budgets/budgets.module';
 import { ProjectsModule } from '../projects/projects.module';
 import { DebtsModule } from '../debts/debts.module';
 import { CardsModule } from '../cards/cards.module';
+import { InvestmentsModule } from '../investments/investments.module';
 import { DataResetModule } from '../data-reset/data-reset.module';
 import { GmailModule } from '../gmail/gmail.module';
 import { ReceiptsModule } from '../receipts/receipts.module';
@@ -48,6 +49,7 @@ import { HealthController } from '../health/health.controller';
     ProjectsModule,
     DebtsModule,
     CardsModule,
+    InvestmentsModule,
     DataResetModule,
     GmailModule,
     ReceiptsModule,

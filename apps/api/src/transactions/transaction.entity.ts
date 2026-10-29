@@ -96,9 +96,29 @@ export class Transaction {
   @Column({ type: 'uuid', nullable: true })
   assetId: string | null;
 
-  /* Plaid's category hierarchy, e.g. ["Food and Drink", "Restaurants"] */
+  /* Plaid's category hierarchy, e.g. ["Food and Drink", "Restaurants"]; for a Plaid
+     Investments row it is [type, subtype], e.g. ["buy", "buy"] or ["cash", "dividend"]. */
   @Column({ type: 'simple-array', nullable: true })
   plaidCategory: string[];
+
+  /* Brokerage activity (Plaid Investments, later broker CSVs). Null on every other row.
+     `quantity` keeps Plaid's sign: positive for buys, negative for sells. The
+     performance engine (investments/performance.ts) reads these; the note keeps the
+     human line ("Buy · 10 × VTI @ $240.12"). */
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  symbol: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  securityName: string | null;
+
+  @Column({ type: 'decimal', precision: 18, scale: 6, nullable: true })
+  quantity: number | null;
+
+  @Column({ type: 'decimal', precision: 18, scale: 6, nullable: true })
+  price: number | null;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  fees: number | null;
 
   @Column({ type: 'date' })
   date: string;

@@ -79,6 +79,10 @@ describe('syncInvestments', () => {
       ['i-buy', inv!.id, -2401.2, 'BUY VTI', 'plaid', 'Buy · 10 × VTI @ $240.12', ['buy', 'buy']],
       ['i-div', inv!.id, 45.5, 'DIVIDEND VTI', 'plaid', 'Dividend · VTI', ['cash', 'dividend']],
     ]);
+    expect(rows.map((r) => [r.symbol, r.securityName, r.quantity == null ? null : Number(r.quantity), r.price == null ? null : Number(r.price), r.fees])).toEqual([
+      ['VTI', 'Vanguard Total Stock Market ETF', 10, 240.12, null],
+      ['VTI', 'Vanguard Total Stock Market ETF', null, null, null],
+    ]);
     const after = await ds.getRepository(PlaidItem).findOneByOrFail({ id: item.id });
     expect(after.investmentsStatus).toBe('synced');
     expect(after.investmentsSyncedThrough).toBe(new Date().toISOString().slice(0, 10));
@@ -97,6 +101,8 @@ describe('syncInvestments', () => {
     const rows = await txRepo.find();
     expect(rows).toHaveLength(1);
     expect([Number(rows[0].amount), rows[0].name, rows[0].note]).toEqual([-2401.85, 'BUY VTI (adjusted)', 'my own note']);
+    // The structured columns are refreshed on update — this is how a re-download backfills rows synced before they existed.
+    expect([rows[0].symbol, Number(rows[0].quantity), Number(rows[0].price)]).toEqual(['VTI', 1, 100]);
   });
 
   it('a cancel entry removes the row it cancels, with a tombstone, and is not stored itself', async () => {

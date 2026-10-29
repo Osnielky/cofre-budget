@@ -186,9 +186,22 @@ Live since 2026-10-29 (Plaid approved; `PLAID_INVESTMENTS_ENABLED=true`). Trades
 (buy / sell) sit on the Transactions page's **Trades** tab, out of every other tab,
 count, stat and Ask Cofre's default list (`lib/transactions/trades.ts`).
 
+- **Trading performance phase 1 shipped 2026-10-29** (spec
+  `2026-10-29-trading-performance-design.md`): structured trade columns, FIFO
+  engine, `GET /investments/performance`, trading project ↔ account link with a
+  Performance section. Next phases, in order:
+  1. Broker CSV import with presets (Schwab, Fidelity, Robinhood, IBKR, Tradovate)
+     through the existing CSV importer: date, symbol, side, quantity, price, fees.
+  2. Plaid Holdings ($0.18 per Item per month; Elite) for current value and
+     unrealized P&L on open positions; equity curve.
+  3. Options and futures (contract multipliers), and importing the broker's own
+     realized-gain report to reconcile lot methods other than FIFO.
+  4. Roll the engine's net result into the trading project's closure P&L, and give
+     Ask Cofre a `get_trading_performance` tool.
 - An Investments page: the Trades tab is the holding place. Once holdings land
-  (next item) move trades there with positions, cost basis and realized gains per
-  ticker; the Transactions page keeps only cash activity.
+  move trades there with positions, cost basis and realized gains per ticker for
+  investors who do not want a project; the Transactions page keeps only cash
+  activity.
 - Holdings and cost basis from `/investments/holdings/get` for the Goals page
   (allocation donut, performance) and Ask Cofre.
 - Revisit plan gating once real usage shows how many brokerages a Pro user links:

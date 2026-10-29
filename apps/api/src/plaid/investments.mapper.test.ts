@@ -26,7 +26,17 @@ describe('mapInvestmentTransaction', () => {
     expect(row).toEqual({
       externalId: 'itx-1', amount: -2401.85, name: 'BUY VANGUARD TOTAL STOCK', date: '2026-10-12',
       plaidCategory: ['buy', 'buy'], note: 'Buy · 10 × VTI @ $240.12 · fee $0.65',
+      symbol: 'VTI', securityName: 'Vanguard Total Stock Market ETF', quantity: 10, price: 240.12, fees: 0.65,
     });
+  });
+
+  it('keeps the sell sign on quantity, derives a missing price from the cash amount, and nulls empty fields', () => {
+    const sell = mapInvestmentTransaction(tx({ type: 'sell', subtype: 'sell short', amount: -168.6, quantity: -10, price: 0, fees: 0, security_id: 'sec-vti', name: 'SOFI - SOLDTOOPEN' }), securities);
+    expect(sell).toMatchObject({ symbol: 'VTI', quantity: -10, price: 16.86, fees: null });
+    const div = mapInvestmentTransaction(tx({ type: 'cash', subtype: 'dividend', amount: -3, security_id: 'sec-vti' }), securities);
+    expect(div).toMatchObject({ symbol: 'VTI', quantity: null, price: null, fees: null });
+    const deposit = mapInvestmentTransaction(tx({ type: 'cash', subtype: 'deposit', amount: -1000 }), securities);
+    expect(deposit).toMatchObject({ symbol: null, securityName: null, quantity: null, price: null });
   });
 
   it('builds a name from the subtype and security when Plaid sends none', () => {
