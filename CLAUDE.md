@@ -99,7 +99,8 @@ PLAID_OAUTH_REDIRECT_URI   # e.g. https://<host>/settings/plaid-oauth-redirect â
 PLAID_INVESTMENTS_ENABLED  # 'true' adds Investments (brokerage / IRA / 401k activity) as an optional product
                             # on new links and lets existing banks consent to it from Settings. Keep 'false'
                             # until Plaid approves Investments for the client â€” an unapproved product breaks
-                            # link-token creation. Billed per connected investment account per month.
+                            # link-token creation. $0.35 per Item per month. Set in deploy/ci-deploy.sh
+                            # (true since Plaid approved Investments 2026-10-29)
 PLAID_SWEEP_SECRET         # optional. Enables POST /api/plaid/sweep (header x-sweep-secret) so Cloud
                             # Scheduler can resync every active Plaid item not synced in 24 h even when
                             # Cloud Run is scaled to zero. The same sweep also runs 30 s after boot and

@@ -1,7 +1,7 @@
 # Plaid Investments — design
 
 Date: 2026-10-28
-Status: built (same day); waits on Plaid approving Investments for the client before `PLAID_INVESTMENTS_ENABLED=true`
+Status: live — Plaid approved Investments 2026-10-29; `PLAID_INVESTMENTS_ENABLED=true` in `deploy/ci-deploy.sh` since then
 
 ## Problem
 
@@ -72,8 +72,7 @@ the transactions endpoint, so a linked brokerage Item costs $0.35 a month on top
 Transactions, per bank login rather than per account. The 2026-10-28 pricing model had
 assumed a per-account fee; at $0.35 per Item it fits inside Pro's $2 margin for one or
 two brokerages, so Investments is not plan-gated in code. Approval requested the same
-day under "Personal budgeting and financial advice"; status in the dashboard:
-Requested.
+day under "Personal budgeting and financial advice" and granted 2026-10-29.
 
 ## Rollout
 
