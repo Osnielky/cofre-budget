@@ -309,9 +309,22 @@ export class ProjectsService {
     if (!project || project.userId !== userId) throw new ForbiddenException();
     const tx = await this.txRepo.findOneBy({ id: txId, userId });
     if (!tx) throw new NotFoundException();
+    /* A row on an account the project follows, or a transfer to / from one, is already
+       in the project's Performance (deposits, cash-outs, trades). Filing it under a
+       project category would count the same money twice. */
+    const followed = await this.followedAccountFor(projectId, tx);
+    if (followed) throw new BadRequestException(`${project.name} already follows ${followed.bankName} · ${followed.accountName} — this money is counted in its Performance`);
     tx.projectId = projectId;
     if (projectCategoryId !== undefined) tx.projectCategoryId = projectCategoryId || null;
     await this.txRepo.save(tx);
+  }
+
+  /** The followed account a transaction sits on or moves money to / from, if any. */
+  private async followedAccountFor(projectId: string, tx: Pick<Transaction, 'bankAccountId' | 'transferAccountId'>): Promise<BankAccount | null> {
+    const ids = [tx.bankAccountId, tx.transferAccountId].filter((id): id is string => !!id);
+    if (ids.length === 0) return null;
+    const link = await this.linkRepo.findOne({ where: { projectId, bankAccountId: In(ids) }, relations: ['bankAccount'] });
+    return link?.bankAccount ?? null;
   }
 
   async unlinkTransaction(txId: string, userId: string): Promise<void> {

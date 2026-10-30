@@ -96,6 +96,18 @@ describe('computePerformance', () => {
     expect(p.byMonth).toEqual([
       { month: '2026-10', realized: -10, income: 45.9, fees: 15, closedTrades: 1 },
     ]);
+    // Deposits and withdrawals are listed by date, newest first, as positive amounts.
+    expect(p.cashFlows).toEqual([
+      { date: '2026-09-15', kind: 'withdrawal', amount: 1000, name: '' },
+      { date: '2026-09-01', kind: 'contribution', amount: 5000, name: '' },
+    ]);
+  });
+
+  it('keeps the latest 20 cash movements', () => {
+    const p = computePerformance(Array.from({ length: 25 }, (_, i) => cash(`2026-01-${String(i + 1).padStart(2, '0')}`, 'deposit', 100 + i)));
+    expect(p.cashFlows).toHaveLength(20);
+    expect(p.cashFlows[0]).toMatchObject({ date: '2026-01-25', amount: 124 });
+    expect(p.contributions).toBe(25 * 100 + 300);
   });
 
   it('security transfers move lots without realizing, and splits reprice them', () => {
@@ -186,12 +198,17 @@ describe('mergePerformance', () => {
     ]);
     expect(merged.openPositions.map((p) => [p.symbol, p.account, p.quantity])).toEqual([['VTI', 'Schwab', 10], ['VTI', 'Futures', 1]]);
     expect(merged.recentClosed.map((t) => [t.date, t.account])).toEqual([['2026-09-10', 'Futures'], ['2026-09-03', 'Futures'], ['2026-08-20', 'Schwab']]);
+    expect(merged.cashFlows.map((f) => [f.date, f.kind, f.amount, f.account])).toEqual([
+      ['2026-09-20', 'withdrawal', 300, 'Futures'],
+      ['2026-09-01', 'contribution', 5000, 'Schwab'],
+      ['2026-09-01', 'contribution', 1000, 'Futures'],
+    ]);
   });
 
   it('a single part merges to itself', () => {
     const one = mergePerformance([{ label: 'Schwab', summary: schwab }]);
-    expect({ ...one, openPositions: [], recentClosed: [], trades: { ...one.trades, largestWin: null, largestLoss: null } })
-      .toEqual({ ...schwab, openPositions: [], recentClosed: [], trades: { ...schwab.trades, largestWin: null, largestLoss: null } });
+    expect({ ...one, openPositions: [], recentClosed: [], cashFlows: [], trades: { ...one.trades, largestWin: null, largestLoss: null } })
+      .toEqual({ ...schwab, openPositions: [], recentClosed: [], cashFlows: [], trades: { ...schwab.trades, largestWin: null, largestLoss: null } });
   });
 
   it('merges nothing into an empty summary', () => {

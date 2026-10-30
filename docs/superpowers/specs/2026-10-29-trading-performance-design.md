@@ -71,6 +71,34 @@ analysis is what was missing.
    and "long" is the right label far more often than "short"); otherwise input order
    (`createdAt`) is kept.
 
+## Deposits, cash-outs and the project categories (2026-10-30)
+
+The owner moved $900 from Schwab to checking, linked it in the transfer dialog as
+"Gains from investing", and expected to see it under the trading project — that is
+how the pre-Plaid trading project worked (link the payout to a *Payouts & profits*
+category). With a followed account the project already has the money: the
+Investments feed carries every deposit and withdrawal, and the profit is in the
+closed trades. Filing the arrival under a project category would count it twice.
+
+- **`cashFlows`** on `PerformanceSummary`: every contribution / withdrawal row
+  (`date`, `kind`, positive `amount`, `name`), newest first, capped at 20; merged
+  summaries label each with its account. The Performance section replaces the
+  single *Net contributed* tile with **Deposited** (net in the account as the
+  sub-line) and **Cashed out** (date of the last one), and adds a **Deposits &
+  cash-outs** panel ("your own money moving — not profit, not a cost").
+- **Guard.** `ProjectsService.linkTransaction` rejects (400) a transaction that
+  sits on an account the project follows, or whose `transferAccountId` is one, with
+  a message naming the project and account. The Transactions picker mirrors it
+  (`lib/projects/followed.ts` → `followedAccountFor`): the project's row in the
+  Projects list carries an *already tracked* tag, the drill-down shows "Already in
+  this project" with the explanation instead of its categories, and the one-click
+  project suggestion never offers that project. A project that does **not** follow
+  the account (a prop firm paying to checking) still takes the row — that is what
+  the categories are for.
+- The transfer kind still decides what the budget sees: *Putting money into savings*
+  / *Taking money out of savings* / *Gains from investing*. Rule of thumb for the
+  owner: money marked as gains should stay below the project's realized P&L.
+
 ## Not in phase 1
 
 - Unrealized P&L / current value (Plaid Holdings, $0.18 per Item per month; Elite).

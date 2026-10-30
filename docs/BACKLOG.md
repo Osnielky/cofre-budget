@@ -210,7 +210,10 @@ count, stat and Ask Cofre's default list (`lib/transactions/trades.ts`).
   bank login, so one or two fit inside Pro's $2 margin and Elite gating is not needed
   yet.
 - Auto-link a brokerage deposit/withdrawal to its checking-side transfer (same
-  amount, ±3 days) so the transfer-kind dialog is pre-filled.
+  amount, ±3 days) so the transfer-kind dialog is pre-filled. (2026-10-30: the
+  Performance section now lists deposits and cash-outs and the picker refuses to
+  file a followed account's money under a project category — the auto-link is the
+  remaining manual step for a weekly recurring deposit.)
 - A restore action for `transaction_tombstones` (admin or Settings) instead of SQL.
 
 ## Monarch gap list (2026-10-27)

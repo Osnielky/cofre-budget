@@ -75,6 +75,26 @@ describe('project ↔ investment accounts', () => {
     expect(await ds.getRepository(ProjectAccount).count()).toBe(0);
   });
 
+  it('refuses to file a transaction on a followed account, or a transfer to / from one, under the project', async () => {
+    const project = await service.create('u1', { name: 'Trading', type: 'trading', bankAccountIds: [schwab.id] });
+    const txs = ds.getRepository(Transaction);
+    const mk = (over: Partial<Transaction>) => txs.save(txs.create({ userId: 'u1', name: 'x', amount: 900, date: '2026-10-20', source: 'manual', ...over }));
+    const onSchwab = await mk({ bankAccountId: schwab.id, amount: -900 });
+    const arrival = await mk({ bankAccountId: checking.id, transferAccountId: schwab.id });
+    const unrelated = await mk({ bankAccountId: checking.id, name: 'Apex payout' });
+
+    await expect(service.linkTransaction(project.id, onSchwab.id, 'u1')).rejects.toThrow(/already follows Charles Schwab · Individual/);
+    await expect(service.linkTransaction(project.id, arrival.id, 'u1')).rejects.toBeInstanceOf(BadRequestException);
+    await service.linkTransaction(project.id, unrelated.id, 'u1');
+    expect((await txs.findOneBy({ id: unrelated.id }))!.projectId).toBe(project.id);
+    expect((await txs.findOneBy({ id: arrival.id }))!.projectId).toBeNull();
+
+    // Another project (not following Schwab) may still take the arrival — e.g. a prop-firm payout model.
+    const other = await service.create('u1', { name: 'Other', type: 'trading' });
+    await service.linkTransaction(other.id, arrival.id, 'u1');
+    expect((await txs.findOneBy({ id: arrival.id }))!.projectId).toBe(other.id);
+  });
+
   it('findOne carries the accounts too', async () => {
     const created = await service.create('u1', { name: 'Trading', type: 'trading', bankAccountIds: [futures.id] });
     expect(ids((await service.findOne(created.id, 'u1')).accounts)).toEqual([futures.id]);

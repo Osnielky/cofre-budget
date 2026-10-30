@@ -13,11 +13,13 @@ interface ClosedTrade { date: string; symbol: string; account?: string; side: 'l
 interface SymbolSummary { symbol: string; name: string | null; realized: number; closedTrades: number; wins: number; openQuantity: number; avgCost: number | null; costBasis: number }
 interface OpenPosition { symbol: string; name: string | null; account?: string; side: 'long' | 'short'; quantity: number; avgCost: number; costBasis: number; since: string }
 interface MonthSummary { month: string; realized: number; income: number; fees: number; closedTrades: number }
+interface CashFlow { date: string; kind: 'contribution' | 'withdrawal'; amount: number; name: string; account?: string }
 export interface Performance {
   rows: number; from: string | null; to: string | null;
   realizedPnl: number; fees: number; income: number; contributions: number; withdrawals: number; netContributed: number; netResult: number;
   trades: { total: number; closed: number; wins: number; losses: number; winRate: number | null; avgWin: number | null; avgLoss: number | null; profitFactor: number | null; largestWin: ClosedTrade | null; largestLoss: ClosedTrade | null };
   bySymbol: SymbolSummary[]; byMonth: MonthSummary[]; openPositions: OpenPosition[]; recentClosed: ClosedTrade[];
+  cashFlows?: CashFlow[];
 }
 interface AccountRef { id: string; bankName: string; accountName: string; accountType: string }
 export interface ProjectPerformance {
@@ -72,6 +74,8 @@ export default function TradingPerformance({ projectId, onEdit }: { projectId: s
     ? (multi ? `${data.accounts.length} accounts combined` : (data.accounts[0] ? `${data.accounts[0].account.bankName} · ${data.accounts[0].account.accountName}` : 'No accounts'))
     : (() => { const a = data.accounts.find((x) => x.account.id === view)?.account; return a ? `${a.bankName} · ${a.accountName}` : ''; })();
   const showAccountTag = view === 'all' && multi;
+  const cashFlows = current.cashFlows ?? [];
+  const lastCashOut = cashFlows.find((f) => f.kind === 'withdrawal') ?? null;
 
   return (
     <section className="flex flex-col gap-4" data-testid="trading-performance">
@@ -127,13 +131,14 @@ export default function TradingPerformance({ projectId, onEdit }: { projectId: s
       ) : (
         <>
           {/* KPI tiles */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
               { label: 'Realized P&L', value: money(current.realizedPnl, true), clr: pnlColor(current.realizedPnl), sub: `${t.wins}W · ${t.losses}L` },
               { label: 'Win rate', value: t.winRate == null ? '—' : `${t.winRate}%`, clr: 'var(--color-text-primary)', sub: t.profitFactor == null ? (t.closed ? 'no losses yet' : 'no closed trades') : `profit factor ${t.profitFactor}` },
               { label: 'Dividends & interest', value: money(current.income, true), clr: pnlColor(current.income), sub: 'income' },
               { label: 'Fees', value: current.fees ? `-${money(current.fees)}` : '$0.00', clr: current.fees ? 'var(--color-rose)' : 'var(--color-text-secondary)', sub: 'account & management' },
-              { label: 'Net contributed', value: money(current.netContributed), clr: 'var(--color-text-primary)', sub: `${money(current.contributions)} in · ${money(current.withdrawals)} out` },
+              { label: 'Deposited', value: money(current.contributions), clr: 'var(--color-text-primary)', sub: `net in account ${money(current.netContributed, true)}` },
+              { label: 'Cashed out', value: money(current.withdrawals), clr: current.withdrawals ? 'var(--color-card-sky)' : 'var(--color-text-secondary)', sub: lastCashOut ? `last ${dateLabel(lastCashOut.date)}` : 'nothing taken out yet' },
             ].map((k) => (
               <div key={k.label} className="p-3" style={panel}>
                 <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{k.label}</p>
@@ -201,6 +206,35 @@ export default function TradingPerformance({ projectId, onEdit }: { projectId: s
               <p className="text-[10px] mt-2" style={{ color: 'var(--color-text-muted)' }}>Current value needs live prices — coming with Plaid Holdings.</p>
             </div>
           </div>
+
+          {/* Deposits & cash-outs: the owner's money moving in and out — never part of P&L */}
+          {cashFlows.length > 0 && (
+            <div className="p-3 sm:p-4 min-w-0" style={panel} data-testid="cash-flows">
+              <div className="flex items-baseline justify-between gap-3 mb-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Deposits & cash-outs</p>
+                <p className="text-[10px] hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>Your own money moving — not profit, not a cost</p>
+              </div>
+              <ul className="flex flex-col divide-y" style={{ borderColor: 'var(--color-border)' }}>
+                {cashFlows.slice(0, 10).map((f, i) => {
+                  const out = f.kind === 'withdrawal';
+                  return (
+                    <li key={`${f.date}-${i}`} className="flex items-center gap-3 py-2 text-xs">
+                      <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-bold shrink-0"
+                        style={{ background: `color-mix(in srgb, ${out ? 'var(--color-card-sky)' : 'var(--color-green)'} 16%, transparent)`, color: out ? 'var(--color-card-sky)' : 'var(--color-green)' }}>
+                        {out ? '↑' : '↓'}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{out ? 'Cashed out' : 'Deposited'}{showAccountTag && f.account ? ` · ${f.account}` : ''}</p>
+                        <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{dateLabel(f.date)}{f.name ? ` · ${f.name}` : ''}</p>
+                      </div>
+                      <span className="font-bold tabular-nums shrink-0" style={{ color: out ? 'var(--color-card-sky)' : 'var(--color-green)' }}>{out ? '-' : '+'}{money(f.amount)}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+              {cashFlows.length > 10 && <p className="text-[10px] mt-2" style={{ color: 'var(--color-text-muted)' }}>Showing the last 10 of {cashFlows.length}.</p>}
+            </div>
+          )}
 
           {/* Recent closed trades */}
           {current.recentClosed.length > 0 && (

@@ -23,6 +23,7 @@ import type { TransferKind } from '@/lib/transactions/transferKind';
 const SplitTransactionModal = dynamic(() => import('@/components/SplitTransactionModal'), { ssr: false });
 import { InsightsPanel, SubscriptionStore } from './InsightsPanel';
 import { buildRecurringMap, normalize } from './recurring';
+import { followedAccountFor } from '@/lib/projects/followed';
 import { pickProjectSuggestion } from '@/lib/transactions/suggestions';
 import { groupTransactions, GROUP_BY_OPTIONS, type GroupBy, type GroupKind } from '@/lib/transactions/grouping';
 import { splitTrades, summarizeTrades } from '@/lib/transactions/trades';
@@ -84,7 +85,7 @@ function placePicker(rect: DOMRect): PickerPos {
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null; last4?: string | null }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
-interface Project { id: string; name: string; icon: string; color: string; status: string; type?: string; imageUrl?: string | null; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[] }
+interface Project { id: string; name: string; icon: string; color: string; status: string; type?: string; imageUrl?: string | null; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[]; accounts?: { id: string; bankName: string; accountName: string }[] }
 interface TransferMatch { id: string; name: string; amount: number; date: string; bankAccount: BankAccount | null }
 interface Transaction {
   id: string; name: string; merchantName: string | null; amount: number; date: string; source: string; pending: boolean;
@@ -1908,7 +1909,7 @@ export default function TransactionsPage() {
                             /* openProjects, not projects: a closed project must not be
                                offered as a one-click suggestion either. */
                             const proj = openProjects.find((p) => p.id === ph.projectId);
-                            if (!proj) return null;
+                            if (!proj || followedAccountFor(proj, tx)) return null;
                             return (
                               <button
                                 onClick={() => linkToProject(tx.id, ph.projectId, ph.projectCategoryId)}
@@ -2263,6 +2264,7 @@ export default function TransactionsPage() {
                                         {openProjects.map((proj) => {
                                           const c = proj.color || '#9B6DFF';
                                           const linked = tx.projectId === proj.id;
+                                          const follows = followedAccountFor(proj, tx);
                                           return (
                                             <button key={proj.id}
                                               onClick={() => setPickerProjectDrill(proj.id)}
@@ -2273,6 +2275,8 @@ export default function TransactionsPage() {
                                                 style={{ color: linked ? c : 'var(--color-text-primary)' }}>
                                                 {proj.name}
                                               </span>
+                                              {follows && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" title={`Follows ${follows.bankName} · ${follows.accountName}`}
+                                                style={{ background: 'color-mix(in srgb, var(--color-text-muted) 14%, transparent)', color: 'var(--color-text-muted)' }}>already tracked</span>}
                                               {linked && <span className="text-[10px] shrink-0" style={{ color: c }}>✓</span>}
                                               <span className="text-[10px] shrink-0" style={{ color: 'var(--color-text-muted)' }}>▶</span>
                                             </button>
@@ -2316,8 +2320,20 @@ export default function TransactionsPage() {
                                             </button>
                                           )}
                                         </div>
+                                        {/* Money the project already tracks through a followed account */}
+                                        {(() => { const f = proj ? followedAccountFor(proj, tx) : null; return f ? (
+                                          <div className="px-3 py-3 flex flex-col gap-1.5" data-testid="project-follows-account">
+                                            <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>Already in this project</p>
+                                            <p className="text-[11px] leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                                              {proj.name} follows <strong>{f.bankName} · {f.accountName}</strong>, so this {tx.transferAccountId && tx.bankAccountId !== f.id ? 'transfer' : 'activity'} already shows in its Performance — deposits, cash-outs and trades. Filing it under a project category would count it twice.
+                                            </p>
+                                            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                                              {tx.transferAccountId ? 'Pick what the transfer means from the ⇄ link instead: moving money into savings, taking it out, or gains from investing.' : 'Link it as a transfer from the ⇄ icon to tell the budget what it means.'}
+                                            </p>
+                                          </div>
+                                        ) : null; })()}
                                         {/* Purchase prompt — shown when user clicked the initial purchase flow */}
-                                        {pickerShowPurchasePrompt ? (
+                                        {proj && followedAccountFor(proj, tx) ? null : pickerShowPurchasePrompt ? (
                                           <div className="px-3 py-3 flex flex-col gap-3">
                                             <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>
                                               How should we record this?

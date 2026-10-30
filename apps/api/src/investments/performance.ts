@@ -86,6 +86,18 @@ export interface OpenPosition {
 
 export interface MonthSummary { month: string; realized: number; income: number; fees: number; closedTrades: number }
 
+/** One deposit into or withdrawal out of the account's cash — the money the owner
+    moved, as opposed to what trading made. */
+export interface CashFlow {
+  date: string;
+  kind: 'contribution' | 'withdrawal';
+  /** Always positive; `kind` carries the direction. */
+  amount: number;
+  name: string;
+  /** Set only on a merged (multi-account) summary. */
+  account?: string;
+}
+
 export interface PerformanceSummary {
   rows: number;
   from: string | null;
@@ -119,6 +131,8 @@ export interface PerformanceSummary {
   byMonth: MonthSummary[];
   openPositions: OpenPosition[];
   recentClosed: ClosedTrade[];
+  /** Deposits and withdrawals, most recent first, capped at 20. */
+  cashFlows: CashFlow[];
 }
 
 /** 0 for buys and everything else, 1 for sells — the same-day tie-break. */
@@ -137,6 +151,7 @@ export function computePerformance(input: ActivityRow[]): PerformanceSummary {
   const symbolStats = new Map<string, { realized: number; closedTrades: number; wins: number }>();
   const months = new Map<string, MonthSummary>();
   const closed: ClosedTrade[] = [];
+  const cashFlows: CashFlow[] = [];
   let realizedPnl = 0, fees = 0, income = 0, contributions = 0, withdrawals = 0, tradeRows = 0;
 
   const month = (date: string) => {
@@ -154,8 +169,11 @@ export function computePerformance(input: ActivityRow[]): PerformanceSummary {
   for (const row of rows) {
     const kind = classifyActivity(row);
     const amt = Number(row.amount) || 0;
-    if (kind === 'contribution') { contributions += Math.abs(amt); continue; }
-    if (kind === 'withdrawal') { withdrawals += Math.abs(amt); continue; }
+    if (kind === 'contribution' || kind === 'withdrawal') {
+      if (kind === 'contribution') contributions += Math.abs(amt); else withdrawals += Math.abs(amt);
+      cashFlows.push({ date: row.date, kind, amount: cents(Math.abs(amt)), name: row.name });
+      continue;
+    }
     if (kind === 'income') { income += amt; month(row.date).income += amt; continue; }
     if (kind === 'fee') { const f = Math.abs(amt); fees += f; month(row.date).fees += f; continue; }
     if (kind === 'other') continue;
@@ -284,6 +302,7 @@ export function computePerformance(input: ActivityRow[]): PerformanceSummary {
     byMonth,
     openPositions,
     recentClosed: [...closed].reverse().slice(0, 20),
+    cashFlows: cashFlows.reverse().slice(0, 20),
   };
 }
 
@@ -333,6 +352,8 @@ export function mergePerformance(parts: { label: string; summary: PerformanceSum
     .sort((a, b) => b.costBasis - a.costBasis);
   const recentClosed = parts.flatMap((p) => p.summary.recentClosed.map((t) => ({ ...t, account: p.label })))
     .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20);
+  const cashFlows = parts.flatMap((p) => p.summary.cashFlows.map((f) => ({ ...f, account: p.label })))
+    .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20);
 
   return {
     rows: sums.reduce((n, s) => n + s.rows, 0),
@@ -354,6 +375,6 @@ export function mergePerformance(parts: { label: string; summary: PerformanceSum
       profitFactor: grossLoss > 0 ? Math.round((grossWin / grossLoss) * 100) / 100 : null,
       grossWin, grossLoss, largestWin, largestLoss,
     },
-    bySymbol, byMonth, openPositions, recentClosed,
+    bySymbol, byMonth, openPositions, recentClosed, cashFlows,
   };
 }
