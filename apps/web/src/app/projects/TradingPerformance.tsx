@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useNarrowScreen } from '@/hooks/useNarrowScreen';
+import { monthLabel, monthSeries, monthStats, monthWindow, shortMoney } from '@/lib/investments/monthly';
 
 /* Performance section of a trading project linked to an investment account.
    Every number comes from GET /api/investments/performance (the API's FIFO
@@ -34,7 +36,6 @@ const money = (n: number, signed = false) => {
   return n < 0 ? `-$${abs}` : `+$${abs}`;
 };
 const pnlColor = (n: number) => (n > 0 ? 'var(--color-green)' : n < 0 ? 'var(--color-rose)' : 'var(--color-text-secondary)');
-const monthLabel = (m: string) => new Date(`${m}-15T12:00:00`).toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
 const dateLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const qty = (n: number) => Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 4 });
 
@@ -156,13 +157,8 @@ export default function TradingPerformance({ projectId, onEdit }: { projectId: s
             {t.largestLoss && <span>Worst <strong style={{ color: 'var(--color-rose)' }}>{t.largestLoss.symbol} {money(t.largestLoss.pnl, true)}</strong>{showAccountTag && t.largestLoss.account ? ` · ${t.largestLoss.account}` : ''}</span>}
           </div>
 
-          {/* Realized by month */}
-          {current.byMonth.length > 0 && (
-            <div className="p-3 sm:p-4" style={panel}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--color-text-muted)' }}>Realized P&L by month</p>
-              <MonthBars months={current.byMonth.slice(-12)} />
-            </div>
-          )}
+          {/* Realized by month: continuous timeline, cumulative curve, summary figures */}
+          {current.byMonth.length > 0 && <MonthlyPanel months={current.byMonth} />}
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {/* By symbol */}
@@ -275,28 +271,119 @@ function Empty({ children }: { children: React.ReactNode }) {
   return <p className="text-xs py-3" style={{ color: 'var(--color-text-muted)' }}>{children}</p>;
 }
 
-/* Simple diverging bars: positive months rise above the axis, negative ones hang below. */
-function MonthBars({ months }: { months: MonthSummary[] }) {
-  const max = Math.max(1, ...months.map((m) => Math.abs(m.realized)));
-  const H = 72;
+/* Month-by-month realized P&L. Bars are each month's result (green up, rose down,
+   labelled), the line is the cumulative total since the first month of history, and
+   the column beside it carries the figures a trader asks for first. Months the
+   engine skipped are filled in so the timeline is continuous. */
+function MonthlyPanel({ months }: { months: MonthSummary[] }) {
+  const narrow = useNarrowScreen();
+  const series = monthSeries(months);
+  /* Phones draw six months; the figures always read the last twelve so they do not change with the screen. */
+  const window = monthWindow(series, narrow ? 6 : 12);
+  const stats = monthStats(monthWindow(series, 12), series);
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
+    ro.observe(el);
+    setWidth(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+
+  /* Geometry. Positive and negative regions share the plot height in proportion
+     to the largest month on each side, so a losing month is not squeezed to a sliver. */
+  const n = window.length;
+  /* P is the plot; each side keeps TXT px for its value labels (above a green bar,
+     below a red one) so labels never run into the axis text. */
+  const P = 170, TXT = 14, AXIS = 30;
+  const posMax = Math.max(0, ...window.map((m) => m.realized));
+  const negMax = Math.max(0, ...window.map((m) => -m.realized));
+  const span = posMax + negMax || 1;
+  const posH = negMax === 0 ? P : posMax === 0 ? 0 : Math.max(40, Math.round((P * posMax) / span));
+  const negH = P - posH;
+  const y0 = posH;
+  const slot = n ? width / n : 0;
+  const barW = Math.max(6, Math.min(48, Math.round(slot * 0.56)));
+  const showValues = slot >= 46;
+  const cx = (i: number) => slot * i + slot / 2;
+  const barH = (v: number) => (v >= 0 ? (posMax ? (v / posMax) * Math.max(0, posH - TXT) : 0) : (negMax ? (-v / negMax) * Math.max(0, negH - TXT) : 0));
+  const cum = window.map((m) => m.cumulative);
+  const cMin = Math.min(0, ...cum), cMax = Math.max(0, ...cum);
+  /* The curve has its own scale (it is usually far larger than any single month) and stays inside the plot. */
+  const cy = (v: number) => 10 + (cMax === cMin ? (P - 24) / 2 : ((cMax - v) / (cMax - cMin)) * (P - 24));
+  const H = P + AXIS;
+  const lastBarTop = n ? (window[n - 1].realized >= 0 ? y0 - barH(window[n - 1].realized) - 4 : y0 + barH(window[n - 1].realized) + 11) : 0;
+  const showCumLabel = n > 1 && Math.abs(cy(cum[n - 1]) - lastBarTop) > 16;
+  const line = cum.map((v, i) => `${i ? 'L' : 'M'} ${cx(i).toFixed(1)} ${cy(v).toFixed(1)}`).join(' ');
+  const cumColor = 'var(--color-card-sky)';
+
+  const figure = (label: string, value: string, sub: string, clr = 'var(--color-text-primary)') => (
+    <div key={label} className="min-w-0">
+      <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
+      <p className="text-sm font-bold tabular-nums truncate" style={{ color: clr }}>{value}</p>
+      <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{sub}</p>
+    </div>
+  );
+
   return (
-    <div className="flex items-end justify-center gap-1.5 sm:gap-3" style={{ height: H * 2 + 24 }}>
-      {months.map((m) => {
-        const h = Math.max(2, Math.round((Math.abs(m.realized) / max) * H));
-        const pos = m.realized >= 0;
-        return (
-          <div key={m.month} className="flex-1 min-w-0 flex flex-col items-center" style={{ maxWidth: 72 }} title={`${monthLabel(m.month)}: ${money(m.realized, true)} · ${m.closedTrades} closed`}>
-            <div className="w-full flex flex-col justify-end" style={{ height: H }}>
-              {pos && <div className="w-full rounded-t" style={{ height: h, background: 'var(--color-green)', opacity: 0.85 }} />}
-            </div>
-            <div className="w-full" style={{ height: 1, background: 'var(--color-border)' }} />
-            <div className="w-full flex flex-col justify-start" style={{ height: H }}>
-              {!pos && <div className="w-full rounded-b" style={{ height: h, background: 'var(--color-rose)', opacity: 0.85 }} />}
-            </div>
-            <span className="text-[9px] mt-1 truncate w-full text-center" style={{ color: 'var(--color-text-muted)' }}>{monthLabel(m.month)}</span>
-          </div>
-        );
-      })}
+    <div className="p-3 sm:p-4" style={panel} data-testid="monthly-panel">
+      <div className="flex items-baseline justify-between gap-3 flex-wrap mb-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Realized P&L by month</p>
+        <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+          <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--color-green)' }} />month</span>
+          <span className="flex items-center gap-1"><span className="inline-block w-4 rounded-full" style={{ height: 2, background: cumColor }} />cumulative</span>
+          <span>{n} month{n === 1 ? '' : 's'}</span>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px] items-start">
+        <div ref={ref} className="min-w-0 relative" style={{ height: H }}>
+          {width > 0 && (
+            <svg width={width} height={H} className="block overflow-visible" aria-hidden="true">
+              {/* zero axis */}
+              <line x1={0} x2={width} y1={y0} y2={y0} stroke="var(--color-border)" strokeWidth="1" />
+              {window.map((m, i) => {
+                const h = Math.max(m.realized === 0 ? 0 : 2, Math.round(barH(m.realized)));
+                const pos = m.realized >= 0;
+                const x = cx(i) - barW / 2;
+                const y = pos ? y0 - h : y0;
+                return (
+                  <g key={m.month}>
+                    <title>{`${monthLabel(m.month)}: ${money(m.realized, true)} · ${m.closedTrades} closed · cumulative ${money(m.cumulative, true)}`}</title>
+                    {h > 0 && <rect x={x} y={y} width={barW} height={h} rx={3} fill={pos ? 'var(--color-green)' : 'var(--color-rose)'} opacity={0.85} />}
+                    {showValues && m.active && m.realized !== 0 && (
+                      <text x={cx(i)} y={pos ? y - 4 : y0 + h + 11} textAnchor="middle" fontSize="10" fontWeight="600" fill={pos ? 'var(--color-green)' : 'var(--color-rose)'}>{shortMoney(m.realized)}</text>
+                    )}
+                    <text x={cx(i)} y={P + 14} textAnchor="middle" fontSize="9" fill={m.active ? 'var(--color-text-secondary)' : 'var(--color-text-muted)'}>{monthLabel(m.month)}</text>
+                    {m.active && slot >= 34 && (
+                      <text x={cx(i)} y={P + 25} textAnchor="middle" fontSize="9" fill="var(--color-text-muted)">{m.closedTrades ? `${m.closedTrades} closed` : '—'}</text>
+                    )}
+                  </g>
+                );
+              })}
+              {n > 1 && (
+                <>
+                  <path d={line} fill="none" stroke={cumColor} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" opacity={0.95} />
+                  {cum.map((v, i) => <circle key={i} cx={cx(i)} cy={cy(v)} r={i === n - 1 ? 3.5 : 2} fill={cumColor} />)}
+                  {showCumLabel && <text x={cx(n - 1)} y={cy(cum[n - 1]) - 7} textAnchor={n > 2 ? 'end' : 'middle'} fontSize="10" fontWeight="700" fill={cumColor}>{shortMoney(cum[n - 1])}</text>}
+                </>
+              )}
+            </svg>
+          )}
+        </div>
+
+        {/* Figures */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-2 gap-x-4 gap-y-3 xl:border-l xl:pl-4" style={{ borderColor: 'var(--color-border)' }}>
+          {stats.best && figure('Best month', money(stats.best.realized, true), `${monthLabel(stats.best.month)} · ${stats.best.closedTrades} closed`, pnlColor(stats.best.realized))}
+          {stats.worst && figure('Worst month', money(stats.worst.realized, true), `${monthLabel(stats.worst.month)} · ${stats.worst.closedTrades} closed`, pnlColor(stats.worst.realized))}
+          {figure('Green months', `${stats.greenMonths} of ${stats.activeMonths}`, stats.activeMonths ? `${Math.round((stats.greenMonths / stats.activeMonths) * 100)}% · last 12 months` : 'no activity yet')}
+          {stats.avgMonth != null && figure('Average month', money(stats.avgMonth, true), 'over active months', pnlColor(stats.avgMonth))}
+          {stats.year && figure(`${stats.year.year} so far`, money(stats.year.realized, true), `${stats.year.closedTrades} closed this year`, pnlColor(stats.year.realized))}
+          {figure('All time', money(stats.allTime, true), series.length ? `since ${monthLabel(series[0].month)}` : '', pnlColor(stats.allTime))}
+        </div>
+      </div>
     </div>
   );
 }

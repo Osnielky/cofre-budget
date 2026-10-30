@@ -5,7 +5,8 @@ export default defineConfig({
   // Next's tsconfig keeps JSX as-is for its own compiler; tests need it transformed.
   oxc: { jsx: { runtime: 'automatic' } },
   test: {
-    include: ['src/lib/admin/**/*.test.ts', 'src/lib/dashboard/**/*.test.ts', 'src/lib/receipts/**/*.test.ts', 'src/lib/budgets/**/*.test.ts', 'src/lib/transactions/**/*.test.ts', 'src/lib/import/**/*.test.ts', 'src/lib/projects/**/*.test.ts', 'src/lib/avatar.test.ts', 'src/lib/session-token.test.ts', 'src/lib/proxy-headers.test.ts', 'src/lib/web-vitals.test.ts', 'src/lib/report-body.test.ts', 'src/lib/security-headers.test.ts', 'src/lib/connect-bank-error.test.ts', 'src/lib/canonical-host.test.ts', 'src/lib/goals/**/*.test.ts', 'src/lib/debts/**/*.test.ts', 'src/lib/route-access.test.ts', 'src/lib/seo.test.ts', 'src/lib/ai/**/*.test.ts', 'src/lib/billing/**/*.test.ts', 'src/lib/cards/**/*.test.ts', 'src/lib/tools/**/*.test.ts', 'src/lib/marketing/**/*.test.ts', 'src/lib/reports/**/*.test.ts', 'src/components/ChatMarkdown.test.tsx'],
+    include: ['src/lib/admin/**/*.test.ts', 'src/lib/dashboard/**/*.test.ts', 'src/lib/receipts/**/*.test.ts', 'src/lib/budgets/**/*.test.ts', 'src/lib/transactions/**/*.test.ts', 'src/lib/import/**/*.test.ts', 'src/lib/projects/**/*.test.ts',
+      'src/lib/investments/**/*.test.ts', 'src/lib/avatar.test.ts', 'src/lib/session-token.test.ts', 'src/lib/proxy-headers.test.ts', 'src/lib/web-vitals.test.ts', 'src/lib/report-body.test.ts', 'src/lib/security-headers.test.ts', 'src/lib/connect-bank-error.test.ts', 'src/lib/canonical-host.test.ts', 'src/lib/goals/**/*.test.ts', 'src/lib/debts/**/*.test.ts', 'src/lib/route-access.test.ts', 'src/lib/seo.test.ts', 'src/lib/ai/**/*.test.ts', 'src/lib/billing/**/*.test.ts', 'src/lib/cards/**/*.test.ts', 'src/lib/tools/**/*.test.ts', 'src/lib/marketing/**/*.test.ts', 'src/lib/reports/**/*.test.ts', 'src/components/ChatMarkdown.test.tsx'],
     environment: 'node',
   },
   resolve: {
