@@ -166,12 +166,37 @@ export class AnalyticsService implements OnApplicationBootstrap {
     const refRows = await qb().select('v."referrerHost"', 'host').addSelect('COUNT(*)', 'visits')
       .andWhere('v."date" >= :from AND v."referrerHost" IS NOT NULL', { from: d30 }).groupBy('v."referrerHost"').orderBy('visits', 'DESC').addOrderBy('v."referrerHost"', 'ASC').limit(10).getRawMany();
 
+    /* Entry views with and without a referrer; how many pages each visitor-day saw; and
+       when the views happened. The per-visitor and per-hour work is done in JS — the
+       rows are few (a small app's month) and hour extraction differs between Postgres
+       and the sqlite test database. */
+    const [entryRows, perVisitor, stampRows] = await Promise.all([
+      qb().select('CASE WHEN v."referrerHost" IS NULL THEN 0 ELSE 1 END', 'referred').addSelect('COUNT(*)', 'n')
+        .andWhere('v."date" >= :from AND v."entry" = :t', { from: d30 }).groupBy('referred').getRawMany(),
+      qb().select('v."date" || v."visitorHash"', 'k').addSelect('COUNT(*)', 'n')
+        .andWhere('v."date" >= :from', { from: d30 }).groupBy('v."date" || v."visitorHash"').getRawMany(),
+      qb().select('v."createdAt"', 'at').andWhere('v."date" >= :from', { from: d30 }).getRawMany(),
+    ]);
+    const entries = { direct: 0, referred: 0 };
+    for (const r of entryRows) { if (truthy(r.referred)) entries.referred += num(r.n); else entries.direct += num(r.n); }
+    const visitorDays = perVisitor.length;
+    const singlePage = perVisitor.filter((r) => num(r.n) === 1).length;
+    const avgPages = visitorDays ? Math.round((perVisitor.reduce((s, r) => s + num(r.n), 0) / visitorDays) * 10) / 10 : 0;
+    const activity = new Array<number>(168).fill(0);
+    for (const r of stampRows) {
+      const d = new Date(timestampMs(r.at));
+      if (!Number.isNaN(d.getTime())) activity[d.getUTCDay() * 24 + d.getUTCHours()] += 1;
+    }
+
     return {
       visits: { today: wToday.visits, d7: w7.visits, d30: w30.visits },
       visitors: { today: wToday.visitors, d7: w7.visitors, d30: w30.visitors },
       daily,
       topPages: pageRows.map((r) => ({ path: String(r.path), visits: num(r.visits), visitors: num(r.visitors) })),
       topReferrers: refRows.map((r) => ({ host: String(r.host), visits: num(r.visits) })),
+      entries,
+      engagement: { visitorDays, singlePage, avgPages },
+      activity,
     };
   }
 

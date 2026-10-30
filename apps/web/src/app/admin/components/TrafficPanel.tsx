@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { useThemeColors } from '@/components/ThemeProvider';
 import Panel, { PanelEmpty, Legend } from '@/components/dashboard/Panel';
 import { makeChartTheme } from '@/components/dashboard/chartTheme';
 import { useAdminTraffic } from '@/hooks/useAdmin';
 import { relativeTime } from '@/lib/admin/format';
 import type { Counted, ProspectVisit, TrafficSegment } from '@/lib/admin/types';
+import { busiest, classifyReferrer, engagementHint, funnelSteps, hourLabel, localActivity, movingAverage, pageKind, PAGE_KIND_LABEL, REFERRER_KIND_LABEL, weekOverWeek, WEEKDAYS, type ReferrerKind } from '@/lib/admin/traffic';
 import { Row } from './AdminStatTiles';
 
 const glass: React.CSSProperties = {
@@ -49,10 +50,12 @@ export default function TrafficPanel({ refreshKey }: { refreshKey: number }) {
   if (!t) return <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading traffic…</p>;
 
   const s: TrafficSegment = t.segments[segment];
+  const wow = weekOverWeek(s.daily);
+  const wowText = wow.deltaPct == null ? `${s.visits.d7} views · none the week before` : `${s.visits.d7} views · ${wow.deltaPct >= 0 ? '▲' : '▼'} ${Math.abs(wow.deltaPct)}% vs last week (${wow.lastWeek})`;
   const tiles = segment === 'prospects'
     ? [
       { label: 'Prospects today', value: s.visitors.today, sub: `${s.visits.today} page views` },
-      { label: 'Prospects (7 days)', value: s.visitors.d7, sub: `${s.visits.d7} page views` },
+      { label: 'Prospects (7 days)', value: s.visitors.d7, sub: wowText },
       { label: 'Prospects (30 days)', value: s.visitors.d30, sub: `${s.visits.d30} page views` },
       { label: 'Demo starts (30 days)', value: t.funnel.demoStarts, sub: `${t.funnel.landingVisitors} landing visitors` },
       { label: 'Signups (30 days)', value: t.funnel.signups, sub: `vs ${t.funnel.landingVisitors.toLocaleString()} landing visitors` },
@@ -60,13 +63,16 @@ export default function TrafficPanel({ refreshKey }: { refreshKey: number }) {
     ]
     : [
       { label: 'Customers today', value: s.visitors.today, sub: `${s.visits.today} page views` },
-      { label: 'Customers (7 days)', value: s.visitors.d7, sub: `${s.visits.d7} page views` },
+      { label: 'Customers (7 days)', value: s.visitors.d7, sub: wowText },
       { label: 'Customers (30 days)', value: s.visitors.d30, sub: `${s.visits.d30} page views` },
       { label: 'All visitors (30 days)', value: t.visitors.d30, sub: `${t.visits.d30} page views` },
       { label: 'Signups (30 days)', value: t.funnel.signups, sub: 'new real accounts' },
       { label: 'Paying customers', value: t.funnel.paying, sub: `active or past due · ${t.funnel.trialStarts} trials started this month` },
     ];
-  const chart = s.daily.map((d) => ({ ...d, label: day(d.date) }));
+  const avg = movingAverage(s.daily.map((d) => d.visitors));
+  const chart = s.daily.map((d, i) => ({ ...d, label: day(d.date), avg: avg[i] }));
+  const steps = funnelSteps(t.funnel);
+  const local = localActivity(s.activity ?? [], -new Date().getTimezoneOffset() / 60);
   const total30 = t.split.anonymous + t.split.signedIn + t.split.demo;
   const p = t.prospects.profile;
 
@@ -93,7 +99,7 @@ export default function TrafficPanel({ refreshKey }: { refreshKey: number }) {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
         {tiles.map((x) => (
           <div key={x.label} className="card-lift rounded-2xl p-5 min-w-0" style={glass}>
             <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>{x.label}</p>
@@ -105,46 +111,69 @@ export default function TrafficPanel({ refreshKey }: { refreshKey: number }) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
         <div className="md:col-span-2 min-w-0 flex flex-col [&>*]:flex-1">
-          <Panel title={`${SEGMENT_LABEL[segment]} per day`} subtitle="Last 30 days" legend={<Legend items={[{ label: 'Visitors', color: tc.sky }, { label: 'Page views', color: tc.violet }]} />}>
+          <Panel title={`${SEGMENT_LABEL[segment]} per day`}
+            subtitle={`Last 30 days · this week ${wow.thisWeek} visitors${wow.deltaPct == null ? '' : `, ${wow.deltaPct >= 0 ? 'up' : 'down'} ${Math.abs(wow.deltaPct)}% on the week before`} · ${s.engagement?.avgPages ?? 0} page${(s.engagement?.avgPages ?? 0) === 1 ? '' : 's'} per visitor`}
+            legend={<Legend items={[{ label: 'Visitors', color: tc.sky }, { label: 'Page views', color: tc.violet }, { label: '7-day average', color: tc.amber, line: true }]} />}>
             {s.visits.d30 === 0 ? <PanelEmpty message={`No ${SEGMENT_LABEL[segment].toLowerCase()} counted yet.`} /> : (
-              <div className="h-56">
+              <div className="flex-1 min-h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chart}>
+                  <ComposedChart data={chart}>
                     <CartesianGrid {...th.grid} strokeDasharray="3 6" />
                     <XAxis dataKey="label" {...th.xAxis} interval="preserveStartEnd" />
                     <YAxis {...th.yAxis} tickFormatter={(v: number) => String(v)} allowDecimals={false} width={32} />
-                    <Tooltip {...th.tooltip} formatter={(v: unknown, name: unknown) => [String(v), name === 'visitors' ? 'Visitors' : 'Page views']} />
+                    <Tooltip {...th.tooltip} formatter={(v: unknown, name: unknown) => [String(v), name === 'visitors' ? 'Visitors' : name === 'avg' ? '7-day average' : 'Page views']} />
                     <Bar dataKey="visits" fill={tc.violet} radius={[6, 6, 0, 0]} maxBarSize={18} opacity={0.5} />
                     <Bar dataKey="visitors" fill={tc.sky} radius={[6, 6, 0, 0]} maxBarSize={18} />
-                  </BarChart>
+                    <Line type="monotone" dataKey="avg" stroke={tc.amber} strokeWidth={2} strokeDasharray="4 3" dot={false} activeDot={{ r: 3 }} />
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             )}
           </Panel>
         </div>
-        <Panel title="Top pages" subtitle={`${SEGMENT_LABEL[segment]}, last 30 days`}>
-          {s.topPages.length === 0 ? <PanelEmpty message="Nothing yet." /> : (
-            <div className="flex flex-col">
-              {s.topPages.map((x) => <Row key={x.path} label={x.path} value={`${x.visitors.toLocaleString()} · ${x.visits.toLocaleString()} views`} />)}
-            </div>
-          )}
+        <Panel title="Top pages" subtitle={`${SEGMENT_LABEL[segment]}, last 30 days · visitors, then views`}>
+          {s.topPages.length === 0 ? <PanelEmpty message="Nothing yet." /> : <PageRows pages={s.topPages} prospects={segment === 'prospects'} />}
         </Panel>
         <div className="flex flex-col gap-5 min-w-0">
-          <Panel title="Where they come from" subtitle={`${SEGMENT_LABEL[segment]}, referrers, last 30 days`}>
-            {s.topReferrers.length === 0 ? <PanelEmpty message="Only direct visits so far." /> : (
+          <Panel title="Where they come from" subtitle={`${SEGMENT_LABEL[segment]}, how visits started, last 30 days`}>
+            <ReferrerRows referrers={s.topReferrers} entries={s.entries ?? { direct: 0, referred: 0 }} />
+          </Panel>
+          {segment === 'prospects' && (
+            <Panel title="Who is browsing" subtitle="All page views, last 30 days">
               <div className="flex flex-col">
-                {s.topReferrers.map((r) => <Row key={r.host} label={r.host} value={r.visits.toLocaleString()} />)}
+                <Row label="Not signed in" value={`${t.split.anonymous.toLocaleString()}${pct(t.split.anonymous, total30)}`} />
+                <Row label="Signed in" value={`${t.split.signedIn.toLocaleString()}${pct(t.split.signedIn, total30)}`} />
+                <Row label="In the demo" value={`${t.split.demo.toLocaleString()}${pct(t.split.demo, total30)}`} />
               </div>
-            )}
-          </Panel>
-          <Panel title="Who is browsing" subtitle="All page views, last 30 days">
-            <div className="flex flex-col">
-              <Row label="Not signed in" value={`${t.split.anonymous.toLocaleString()}${pct(t.split.anonymous, total30)}`} />
-              <Row label="Signed in" value={`${t.split.signedIn.toLocaleString()}${pct(t.split.signedIn, total30)}`} />
-              <Row label="In the demo" value={`${t.split.demo.toLocaleString()}${pct(t.split.demo, total30)}`} />
-            </div>
-          </Panel>
+            </Panel>
+          )}
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
+        {segment === 'prospects' ? (
+          <div className="md:col-span-2 min-w-0 flex flex-col [&>*]:flex-1">
+            <Panel title="From visitor to customer" subtitle="Last 30 days · each step as a share of the landing page and of the step before">
+              <FunnelRows steps={steps} />
+            </Panel>
+          </div>
+        ) : (
+          <div className="md:col-span-2 min-w-0 flex flex-col [&>*]:flex-1">
+            <Panel title="Who is browsing" subtitle="All page views, last 30 days">
+              <div className="flex flex-col">
+                <Row label="Not signed in" value={`${t.split.anonymous.toLocaleString()}${pct(t.split.anonymous, total30)}`} />
+                <Row label="Signed in" value={`${t.split.signedIn.toLocaleString()}${pct(t.split.signedIn, total30)}`} />
+                <Row label="In the demo" value={`${t.split.demo.toLocaleString()}${pct(t.split.demo, total30)}`} />
+              </div>
+            </Panel>
+          </div>
+        )}
+        <Panel title="How deep they go" subtitle={`${SEGMENT_LABEL[segment]}, last 30 days`}>
+          <EngagementRows s={s} prospects={segment === 'prospects'} />
+        </Panel>
+        <Panel title="When they visit" subtitle={`${SEGMENT_LABEL[segment]}, page views by hour and weekday · your time zone`}>
+          <ActivityStrips byHour={local.byHour} byWeekday={local.byWeekday} total={local.total} color={segment === 'prospects' ? tc.sky : tc.green} />
+        </Panel>
       </div>
 
       {segment === 'prospects' && (
@@ -194,6 +223,164 @@ export default function TrafficPanel({ refreshKey }: { refreshKey: number }) {
         </>
       )}
     </section>
+  );
+}
+
+const KIND_COLOR: Record<ReferrerKind, string> = {
+  search: 'var(--color-green)', social: 'var(--color-card-violet)', ai: 'var(--color-card-sky)', own: 'var(--color-amber)', crawler: 'var(--color-rose)', other: 'var(--color-text-muted)',
+};
+function Tag({ children, color }: { children: React.ReactNode; color: string }) {
+  return (
+    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
+      style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}>{children}</span>
+  );
+}
+function ShareBar({ share, color }: { share: number; color: string }) {
+  return (
+    <div className="h-1 rounded-full w-full overflow-hidden" style={{ background: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)' }}>
+      <div className="h-full rounded-full" style={{ width: `${Math.max(2, Math.round(share * 100))}%`, background: color, opacity: 0.8 }} />
+    </div>
+  );
+}
+
+/** Pages with a share bar on visitors, a kind tag and how many views each visitor took. */
+function PageRows({ pages, prospects }: { pages: TrafficSegment['topPages']; prospects: boolean }) {
+  const max = Math.max(1, ...pages.map((p) => p.visitors));
+  const KIND_TONE = { landing: 'var(--color-primary)', public: 'var(--color-green)', demo: 'var(--color-card-sky)', auth: 'var(--color-amber)', app: 'var(--color-text-muted)' } as const;
+  return (
+    <div className="flex flex-col">
+      {pages.map((x) => {
+        const kind = pageKind(x.path);
+        const perVisitor = x.visitors ? Math.round((x.visits / x.visitors) * 10) / 10 : 0;
+        return (
+          <div key={x.path} className="py-2 flex flex-col gap-1" style={{ borderBottom: '1px solid var(--color-border)' }}>
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="flex items-center gap-2 min-w-0">
+                <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{x.path}</span>
+                {prospects && <Tag color={KIND_TONE[kind]}>{PAGE_KIND_LABEL[kind]}</Tag>}
+              </span>
+              <span className="font-semibold tabular-nums shrink-0">{x.visitors.toLocaleString()} <span className="font-normal" style={{ color: 'var(--color-text-muted)' }}>· {x.visits.toLocaleString()} views{perVisitor > 1.2 ? ` · ${perVisitor}/visitor` : ''}</span></span>
+            </div>
+            <ShareBar share={x.visitors / max} color={prospects ? KIND_TONE[kind] : 'var(--color-green)'} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Direct entries first, then each referrer with what kind of place it is. */
+function ReferrerRows({ referrers, entries }: { referrers: TrafficSegment['topReferrers']; entries: { direct: number; referred: number } }) {
+  const total = entries.direct + entries.referred;
+  if (total === 0 && referrers.length === 0) return <PanelEmpty message="Nothing yet." />;
+  const merged = new Map<string, { host: string; visits: number; kind: ReferrerKind }>();
+  for (const r of referrers) {
+    const c = classifyReferrer(r.host);
+    const cur = merged.get(c.label);
+    if (cur) cur.visits += r.visits; else merged.set(c.label, { host: r.host, visits: r.visits, kind: c.kind });
+  }
+  const rows = [...merged.entries()].map(([label, r]) => ({ label, ...r })).sort((a, b) => b.visits - a.visits);
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center justify-between gap-3 py-1.5 text-sm" style={{ borderBottom: '1px solid var(--color-border)' }}>
+        <span className="flex items-center gap-2 min-w-0">
+          <span style={{ color: 'var(--color-text-secondary)' }}>Direct</span>
+          <span className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>typed, bookmark, untagged link</span>
+        </span>
+        <span className="font-semibold tabular-nums shrink-0">{entries.direct.toLocaleString()}{pct(entries.direct, total)}</span>
+      </div>
+      {rows.map((r) => (
+        <div key={r.label} className="flex items-center justify-between gap-3 py-1.5 text-sm" style={{ borderBottom: '1px solid var(--color-border)' }}>
+          <span className="flex items-center gap-2 min-w-0">
+            <span className="truncate" style={{ color: 'var(--color-text-secondary)' }} title={r.host}>{r.label}</span>
+            <Tag color={KIND_COLOR[r.kind]}>{REFERRER_KIND_LABEL[r.kind]}</Tag>
+          </span>
+          <span className="font-semibold tabular-nums shrink-0">{r.visits.toLocaleString()}</span>
+        </div>
+      ))}
+      {rows.some((r) => r.kind === 'own' || r.kind === 'crawler') && (
+        <p className="text-[11px] mt-2" style={{ color: 'var(--color-text-muted)' }}>
+          "Your own URL" is the Cloud Run service address — you, or a script, not a prospect. Crawlers that pass the user-agent filter still show up here.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function FunnelRows({ steps }: { steps: ReturnType<typeof funnelSteps> }) {
+  const top = steps[0]?.value ?? 0;
+  if (top === 0 && steps.every((s) => s.value === 0)) return <PanelEmpty message="No landing-page visitors yet." />;
+  const tone = ['var(--color-primary)', 'var(--color-card-sky)', 'var(--color-green)', 'var(--color-card-violet)', 'var(--color-amber)'];
+  return (
+    <div className="flex flex-col gap-2.5">
+      {steps.map((st, i) => (
+        <div key={st.key} className="grid items-center gap-x-3 gap-y-1" style={{ gridTemplateColumns: 'minmax(0, 11rem) minmax(0, 1fr) auto' }}>
+          <div className="min-w-0 col-span-2 sm:col-span-1">
+            <p className="text-sm sm:truncate" style={{ color: 'var(--color-text-secondary)' }}>{st.label}</p>
+            <p className="text-[10px] truncate hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>{st.hint}</p>
+          </div>
+          <div className="h-5 rounded-md overflow-hidden col-span-2 sm:col-span-1 order-last sm:order-none" style={{ background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)' }}>
+            <div className="h-full rounded-md" style={{ width: `${top > 0 ? Math.max(st.value > 0 ? 1.5 : 0, (st.value / top) * 100) : 0}%`, background: tone[i], opacity: 0.85 }} />
+          </div>
+          <div className="text-right sm:min-w-[7.5rem]">
+            <p className="text-sm font-semibold tabular-nums">{st.value.toLocaleString()}</p>
+            <p className="text-[10px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
+              {i === 0 ? '100%' : st.ofPrevious == null ? (st.ofTop == null ? '—' : `${st.ofTop}% of landing`) : `${st.ofPrevious}% of previous · ${st.ofTop ?? 0}% of landing`}
+            </p>
+          </div>
+        </div>
+      ))}
+      <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        The first two steps count visitor-days on the page; signups and trials come from the accounts table, so one person can appear in both halves.
+      </p>
+    </div>
+  );
+}
+
+function EngagementRows({ s, prospects }: { s: TrafficSegment; prospects: boolean }) {
+  const e = s.engagement ?? { visitorDays: 0, singlePage: 0, avgPages: 0 };
+  const entries = s.entries ?? { direct: 0, referred: 0 };
+  const explore = e.visitorDays - e.singlePage;
+  return (
+    <div className="flex flex-col">
+      <Row label="Pages per visitor" value={e.avgPages.toLocaleString()} />
+      <Row label="Left after one page" value={`${e.singlePage.toLocaleString()}${pct(e.singlePage, e.visitorDays)}`} tone={e.visitorDays >= 20 && e.singlePage / e.visitorDays >= 0.8 ? 'var(--color-amber)' : undefined} />
+      <Row label="Saw two or more pages" value={`${explore.toLocaleString()}${pct(explore, e.visitorDays)}`} />
+      <Row label="Arrived from a link" value={`${entries.referred.toLocaleString()}${pct(entries.referred, entries.direct + entries.referred)}`} />
+      {prospects && <p className="text-xs mt-3 leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>{engagementHint(e, entries)}</p>}
+    </div>
+  );
+}
+
+/** Two small bar strips: 24 hours and 7 weekdays, in the viewer's zone. */
+function ActivityStrips({ byHour, byWeekday, total, color }: { byHour: number[]; byWeekday: number[]; total: number; color: string }) {
+  if (total === 0) return <PanelEmpty message="Nothing yet." />;
+  const hMax = Math.max(1, ...byHour), dMax = Math.max(1, ...byWeekday);
+  const peak = busiest(byHour, byWeekday);
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <div className="flex items-end gap-[2px] h-14" aria-hidden="true">
+          {byHour.map((n, h) => (
+            <div key={h} className="flex-1 rounded-t" title={`${hourLabel(h)}: ${n}`} style={{ height: `${Math.max(n ? 6 : 2, (n / hMax) * 100)}%`, background: color, opacity: n ? 0.85 : 0.2 }} />
+          ))}
+        </div>
+        <div className="flex justify-between text-[9px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+          {[0, 6, 12, 18].map((h) => <span key={h}>{hourLabel(h)}</span>)}<span>11pm</span>
+        </div>
+      </div>
+      <div>
+        <div className="flex items-end gap-1.5 h-10" aria-hidden="true">
+          {byWeekday.map((n, d) => (
+            <div key={d} className="flex-1 rounded-t" title={`${WEEKDAYS[d]}: ${n}`} style={{ height: `${Math.max(n ? 8 : 3, (n / dMax) * 100)}%`, background: color, opacity: n ? 0.85 : 0.2 }} />
+          ))}
+        </div>
+        <div className="grid grid-cols-7 text-[9px] text-center mt-1" style={{ color: 'var(--color-text-muted)' }}>
+          {WEEKDAYS.map((d) => <span key={d}>{d[0]}</span>)}
+        </div>
+      </div>
+      {peak && <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Busiest: <strong>{peak}</strong> · {total.toLocaleString()} views</p>}
+    </div>
   );
 }
 

@@ -129,6 +129,7 @@ Quick wins (privacy, export) → savings goals + reports (reuse existing pattern
 - Returning-visitor tracking (first-party visitor id in localStorage) to see new vs returning prospects and which pre-signup visits became customers — needs a consent notice for EU visitors and a privacy-policy change; offered and parked.
 - Time on site is first-to-last view within a day; a leave beacon (`visibilitychange`) would make single-page visits measurable.
 - Refresh the GeoLite2 data on a schedule (geoip-lite ships a snapshot; `npm update geoip-lite` picks up newer data).
+- (2026-10-30: the panel gained the funnel bars, a 7-day average, referrer and page kind tags, depth and hour / weekday panels — `lib/admin/traffic.ts`.) Still open: drop known crawler referrer hosts at ingest the way user agents are (aicrawler.store passed the UA filter), and a per-channel conversion table (signups by referrer kind) once signups carry their entry referrer.
 
 ## Growth follow-ups (2026-10-26)
 

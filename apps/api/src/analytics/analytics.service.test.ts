@@ -82,6 +82,25 @@ describe('AnalyticsService.traffic', () => {
     expect(t.topReferrers).toEqual([{ host: 'news.ycombinator.com', visits: 2 }, { host: 'x.com', visits: 1 }]);
   });
 
+  it('counts direct vs referred entries, single-page visitors and when views happen', async () => {
+    const tue14 = new Date('2026-10-20T14:10:00Z'); // Tuesday 14:xx UTC
+    await service.record({ path: '/', entry: true, referrer: 'https://www.google.com/' }, meta('1.1.1.1'), tue14);
+    await service.record({ path: '/pricing' }, meta('1.1.1.1'), new Date(tue14.getTime() + 60_000));
+    await service.record({ path: '/', entry: true }, meta('2.2.2.2'), tue14);
+    await service.record({ path: '/tools/x', entry: true }, meta('3.3.3.3'), new Date('2026-10-19T03:00:00Z')); // Monday 03:00
+    await service.record({ path: '/dashboard', signedIn: true, entry: true }, meta('9.9.9.9'), tue14); // customer
+    const t = await service.traffic(NOW);
+    const p = t.segments.prospects;
+    expect(p.entries).toEqual({ direct: 2, referred: 1 });
+    expect(p.engagement).toEqual({ visitorDays: 3, singlePage: 2, avgPages: 1.3 });
+    expect(p.activity).toHaveLength(168);
+    expect(p.activity[2 * 24 + 14]).toBe(3);   // Tuesday 14:00 UTC: three prospect views
+    expect(p.activity[1 * 24 + 3]).toBe(1);    // Monday 03:00 UTC
+    expect(p.activity.reduce((a, b) => a + b, 0)).toBe(4);
+    expect(t.segments.customers.activity[2 * 24 + 14]).toBe(1);
+    expect(t.segments.customers.entries).toEqual({ direct: 1, referred: 0 });
+  });
+
   it('splits visits by anonymous, signed in and demo, and builds the funnel from users', async () => {
     await seedView(1, '/', '1.1.1.1');
     await seedView(1, '/demo', '1.1.1.1');

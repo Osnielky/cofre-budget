@@ -50,6 +50,44 @@ referrers. Prospects also show "Where they are", "Devices & browsers", "Campaign
 pages" and a "Recent prospect visits" table (stacked rows on phones). A footnote credits
 GeoLite2 (MaxMind) and repeats that nothing stored identifies a person.
 
+## Richer Traffic panel (2026-10-30)
+
+The first panel left most of a wide screen empty and made the owner do the
+arithmetic. Additions, all derived in `apps/web/src/lib/admin/traffic.ts`
+(pure, tested) from three new per-segment fields on `GET /api/admin/traffic`:
+
+- **API** (`TrafficSegment`): `entries { direct, referred }` (entry views with
+  and without a referrer), `engagement { visitorDays, singlePage, avgPages }`
+  (visitor-days, how many saw one page, page views per visitor-day) and
+  `activity[168]` (page views by UTC weekday × hour). The per-visitor and
+  per-hour folds run in JS — the rows are a small app's month and hour extraction
+  differs between Postgres and sqlite.
+- **Tiles**: the 7-day tile carries the change against the previous 7 days.
+- **Per-day chart**: a dashed 7-day average line (amber) over the visitor and
+  page-view bars; the subtitle reads this week's visitors, the week-over-week
+  change and pages per visitor.
+- **Top pages**: a share bar on visitors, a kind tag for prospects (Landing,
+  Public, Demo, Sign in / up, App (demo)) and views per visitor when above 1.2.
+- **Where they come from**: a *Direct* row first (entries without a referrer),
+  then each referrer with a kind tag — Search, Social, AI assistant, Your own URL
+  (the Cloud Run service address: the owner or a script, not a prospect),
+  Crawler (passed the user-agent filter), Other site — hosts that normalise to
+  one label merge (`www.reddit.com` + `reddit.com`), and a note explains the own
+  / crawler rows when present.
+- **From visitor to customer** (prospects): the funnel as bars — landing
+  visitors → opened the demo → created an account → started a trial → paying
+  today — each with its share of the landing page and of the previous step.
+- **How deep they go**: pages per visitor, left after one page (amber at ≥ 80%
+  with 20+ visitor-days), saw two or more pages, arrived from a link, and one
+  plain-language sentence (`engagementHint`: sample size first, then bounce,
+  then channel).
+- **When they visit**: 24-hour and weekday strips in the viewer's time zone
+  (`localActivity` rotates the UTC buckets by the browser offset) with the
+  busiest weekday and two-hour block.
+
+The Customers segment gets the same chart, pages, referrers, depth and timing
+panels; the funnel is replaced by the viewer split.
+
 ## Privacy
 
 Policy §6 adds: location (country/city) is derived from the IP address at the moment of

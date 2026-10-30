@@ -55,6 +55,12 @@ export interface TrafficSegment {
   daily: { date: string; visits: number; visitors: number }[];
   topPages: { path: string; visits: number; visitors: number }[];
   topReferrers: { host: string; visits: number }[];
+  /** Entry views with / without a referrer, 30 days. */
+  entries: { direct: number; referred: number };
+  /** Visitor-days, how many saw one page, page views per visitor-day; 30 days. */
+  engagement: { visitorDays: number; singlePage: number; avgPages: number };
+  /** Page views by UTC weekday × hour (168 buckets, index = weekday * 24 + hour). */
+  activity: number[];
 }
 export interface ProspectProfile {
   countries: { country: string; visitors: number }[];

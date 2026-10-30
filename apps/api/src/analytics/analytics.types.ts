@@ -14,6 +14,12 @@ export interface TrafficSegment {
   daily: { date: string; visits: number; visitors: number }[];
   topPages: { path: string; visits: number; visitors: number }[];
   topReferrers: { host: string; visits: number }[];
+  /** 30 days. Entry views that arrived with a referrer vs without one (typed URL, bookmark, app, untagged message). */
+  entries: { direct: number; referred: number };
+  /** 30 days. Visitor-days, how many saw a single page, and page views per visitor-day. */
+  engagement: { visitorDays: number; singlePage: number; avgPages: number };
+  /** 30 days. Page views by UTC weekday × hour: index = weekday (0 = Sunday) * 24 + hour, 168 buckets. */
+  activity: number[];
 }
 
 /** What prospects look like, 30 days, distinct visitor-days per bucket. Nothing identifies a person. */
