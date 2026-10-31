@@ -5,6 +5,7 @@ import { MonthlyPanel, type ProjectPerformance } from '../TradingPerformance';
 import OverviewStrip from './OverviewStrip';
 import MoneyInOutPanel from './MoneyInOutPanel';
 import AccountCards from './AccountCards';
+import AccountView from './AccountView';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -59,5 +60,9 @@ export default function TradingAccountsSection({ project, accountId, onSelectAcc
       </section>
     );
   }
-  return null; // Task 9 renders the account view here
+  return (
+    <AccountView projectId={project.id} data={data} account={current}
+      onBack={() => onSelectAccount(null)} onSwitch={onSelectAccount}
+      onChanged={async () => { await onProjectChanged(); await load(); }} />
+  );
 }
