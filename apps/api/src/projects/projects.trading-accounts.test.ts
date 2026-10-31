@@ -133,3 +133,50 @@ describe('manual trading accounts', () => {
     expect((await txs.findOneByOrFail({ id: kept.id })).tradingAccountId).toBe(topstep.id);
   });
 });
+
+describe('attributing project transactions to an account', () => {
+  async function setup() {
+    const project = await service.create('u1', { name: 'Trading', type: 'trading' });
+    const topstep = await service.addManualAccount(project.id, 'u1', { name: '50K #1', firm: 'Topstep' });
+    const txs = ds.getRepository(Transaction);
+    const evalFee = await txs.save(txs.create({ userId: 'u1', bankAccountId: checking.id, name: 'TOPSTEP COMBINE', amount: -149, date: '2026-10-01', projectId: project.id }));
+    const payout = await txs.save(txs.create({ userId: 'u1', bankAccountId: checking.id, name: 'TOPSTEP PAYOUT', amount: 1000, date: '2026-10-20', projectId: project.id }));
+    const unrelated = await txs.save(txs.create({ userId: 'u1', bankAccountId: checking.id, name: 'GROCERIES', amount: -40, date: '2026-10-02' }));
+    return { project, topstep, evalFee, payout, unrelated, txs };
+  }
+
+  it('assigns one or many rows, and clears with null', async () => {
+    const { project, topstep, evalFee, payout, txs } = await setup();
+    expect(await service.assignTradingAccount(project.id, 'u1', [evalFee.id, payout.id], topstep.id)).toEqual({ updated: 2 });
+    expect((await txs.findOneByOrFail({ id: payout.id })).tradingAccountId).toBe(topstep.id);
+    expect(await service.assignTradingAccount(project.id, 'u1', [payout.id], null)).toEqual({ updated: 1 });
+    expect((await txs.findOneByOrFail({ id: payout.id })).tradingAccountId).toBeNull();
+    expect((await txs.findOneByOrFail({ id: evalFee.id })).tradingAccountId).toBe(topstep.id);
+  });
+
+  it('refuses an account the project does not follow, and rows that are not the project\'s', async () => {
+    const { project, topstep, evalFee, unrelated } = await setup();
+    await expect(service.assignTradingAccount(project.id, 'u1', [evalFee.id], schwab.id)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.assignTradingAccount(project.id, 'u1', [unrelated.id], topstep.id)).rejects.toBeInstanceOf(BadRequestException);
+    const other = await service.create('u1', { name: 'Other', type: 'trading' });
+    await expect(service.assignTradingAccount(other.id, 'u1', [evalFee.id], topstep.id)).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('links with an account in one call, and unlinking or removing the account clears it', async () => {
+    const { project, topstep, unrelated, txs } = await setup();
+    await service.linkTransaction(project.id, unrelated.id, 'u1', undefined, topstep.id);
+    expect((await txs.findOneByOrFail({ id: unrelated.id }))).toMatchObject({ projectId: project.id, tradingAccountId: topstep.id });
+    await service.unlinkTransaction(unrelated.id, 'u1');
+    expect((await txs.findOneByOrFail({ id: unrelated.id }))).toMatchObject({ projectId: null, tradingAccountId: null });
+
+    const again = await txs.save(txs.create({ userId: 'u1', bankAccountId: checking.id, name: 'RESET', amount: -99, date: '2026-10-05', projectId: project.id, tradingAccountId: topstep.id }));
+    await service.removeAccount(project.id, topstep.id, 'u1');
+    expect((await txs.findOneByOrFail({ id: again.id })).tradingAccountId).toBeNull();
+  });
+
+  it('linking with an account the project does not follow fails before anything is saved', async () => {
+    const { project, unrelated, txs } = await setup();
+    await expect(service.linkTransaction(project.id, unrelated.id, 'u1', undefined, schwab.id)).rejects.toBeInstanceOf(BadRequestException);
+    expect((await txs.findOneByOrFail({ id: unrelated.id })).projectId).toBeNull();
+  });
+});

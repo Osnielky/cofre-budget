@@ -66,10 +66,12 @@ category *Prop Firm Evals*, *Prop Firm Payouts*, …). New: an optional
 `transactions.tradingAccountId` (uuid, FK `bank_accounts` ON DELETE SET NULL)
 names which of the project's accounts the money belongs to.
 
-- `PATCH /api/transactions/:id/trading-account { accountId | null }` — the
-  account must be followed by the transaction's project.
+- `PATCH /api/projects/:id/tx/:txId/account { accountId | null }` — single row
+  (mirrors the category assignment route); the account must be followed by the
+  project.
 - `PATCH /api/projects/:id/assign-account { transactionIds[], accountId }` —
-  bulk, same validation.
+  bulk, same validation. `PATCH /api/projects/:id/link/:txId` accepts an
+  optional `tradingAccountId` so the picker can link and attribute in one call.
 - Unlinking a transaction from the project clears it. The existing guard
   stays: a row *on* a followed account is never linked as a project
   transaction (it is already counted).

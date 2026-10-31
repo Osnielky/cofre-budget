@@ -402,7 +402,7 @@ export class ProjectsService {
     await this.repo.remove(project);
   }
 
-  async linkTransaction(projectId: string, txId: string, userId: string, projectCategoryId?: string): Promise<void> {
+  async linkTransaction(projectId: string, txId: string, userId: string, projectCategoryId?: string, tradingAccountId?: string | null): Promise<void> {
     const project = await this.repo.findOneBy({ id: projectId });
     if (!project || project.userId !== userId) throw new ForbiddenException();
     const tx = await this.txRepo.findOneBy({ id: txId, userId });
@@ -412,9 +412,30 @@ export class ProjectsService {
        project category would count the same money twice. */
     const followed = await this.followedAccountFor(projectId, tx);
     if (followed) throw new BadRequestException(`${project.name} already follows ${followed.bankName} · ${followed.accountName} — this money is counted in its Performance`);
+    if (tradingAccountId) await this.assertFollows(projectId, tradingAccountId);
     tx.projectId = projectId;
     if (projectCategoryId !== undefined) tx.projectCategoryId = projectCategoryId || null;
+    if (tradingAccountId !== undefined) tx.tradingAccountId = tradingAccountId || null;
     await this.txRepo.save(tx);
+  }
+
+  /** The account must be one the project follows, else 400. */
+  private async assertFollows(projectId: string, accountId: string): Promise<void> {
+    const link = await this.linkRepo.findOneBy({ projectId, bankAccountId: accountId });
+    if (!link) throw new BadRequestException('That account is not part of this project');
+  }
+
+  /** Say which of the project's accounts some of its transactions belong to (null = none). */
+  async assignTradingAccount(projectId: string, userId: string, transactionIds: string[], accountId: string | null): Promise<{ updated: number }> {
+    const project = await this.repo.findOneBy({ id: projectId });
+    if (!project || project.userId !== userId) throw new ForbiddenException();
+    const ids = [...new Set(transactionIds)].filter(Boolean);
+    if (ids.length === 0) return { updated: 0 };
+    if (accountId) await this.assertFollows(projectId, accountId);
+    const rows = await this.txRepo.find({ where: { id: In(ids), userId, projectId }, select: ['id'] });
+    if (rows.length !== ids.length) throw new BadRequestException('Every transaction must be linked to this project');
+    await this.txRepo.update({ id: In(ids) }, { tradingAccountId: accountId });
+    return { updated: ids.length };
   }
 
   /** The followed account a transaction sits on or moves money to / from, if any. */
@@ -430,6 +451,7 @@ export class ProjectsService {
     if (!tx) throw new NotFoundException();
     tx.projectId = null;
     tx.projectCategoryId = null;
+    tx.tradingAccountId = null;
     await this.txRepo.save(tx);
   }
 

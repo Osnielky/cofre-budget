@@ -106,9 +106,9 @@ export class ProjectsController {
     @Param('id') id: string,
     @Param('txId') txId: string,
     @Request() req: any,
-    @Body() body: { projectCategoryId?: string },
+    @Body() body: { projectCategoryId?: string; tradingAccountId?: string | null },
   ) {
-    return this.service.linkTransaction(id, txId, req.user.id, body.projectCategoryId);
+    return this.service.linkTransaction(id, txId, req.user.id, body.projectCategoryId, body.tradingAccountId);
   }
 
   @Patch(':id/unlink/:txId')
@@ -123,6 +123,16 @@ export class ProjectsController {
     @Body() body: { projectCategoryId: string | null },
   ) {
     return this.service.assignCategory(txId, body.projectCategoryId, req.user.id);
+  }
+
+  @Patch(':id/tx/:txId/account')
+  assignTxAccount(@Param('id') id: string, @Param('txId') txId: string, @Request() req: any, @Body() body: { accountId: string | null }) {
+    return this.service.assignTradingAccount(id, req.user.id, [txId], body.accountId ?? null);
+  }
+
+  @Patch(':id/assign-account')
+  assignAccount(@Param('id') id: string, @Request() req: any, @Body() body: { transactionIds: string[]; accountId: string | null }) {
+    return this.service.assignTradingAccount(id, req.user.id, body.transactionIds ?? [], body.accountId ?? null);
   }
 
   /* ── Project categories CRUD ── */
