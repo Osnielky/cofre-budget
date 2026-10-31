@@ -28,7 +28,7 @@ beforeEach(async () => {
   await users.save(users.create({ id: 'u1', email: 'u1@example.com' }));
   await users.save(users.create({ id: 'u2', email: 'u2@example.com' }));
   const accounts = ds.getRepository(BankAccount);
-  schwab = await accounts.save(accounts.create({ userId: 'u1', bankName: 'Charles Schwab', accountName: 'Individual', accountType: 'investment', balance: 37799.53 }));
+  schwab = await accounts.save(accounts.create({ userId: 'u1', bankName: 'Charles Schwab', accountName: 'Individual', accountType: 'investment', balance: 37799.53, provider: 'plaid' }));
   futures = await accounts.save(accounts.create({ userId: 'u1', bankName: 'Apex Trader Funding', accountName: 'NQ 50K', accountType: 'investment', balance: 50000 }));
   const tx = ds.getRepository(Transaction);
   await tx.save(tx.create({ userId: 'u1', bankAccountId: schwab.id, name: 'TRANSFER FROM CHECKING', amount: 5000, date: '2026-09-01', plaidCategory: ['cash', 'deposit'] }));
@@ -78,5 +78,49 @@ describe('InvestmentsService.performanceForProject', () => {
 
   it("never reads another user's project", async () => {
     await expect(service.performanceForProject('u2', project.id)).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('performanceForProject: accounts carry meta, cash and the overview', () => {
+  it('returns cash metrics for a prop-firm account from its attributed transactions and an overview across kinds', async () => {
+    const accounts = ds.getRepository(BankAccount);
+    const topstep = await accounts.save(accounts.create({ userId: 'u1', bankName: 'Topstep', accountName: '50K #1', accountType: 'investment', balance: 0, provider: 'manual' }));
+    const links = ds.getRepository(ProjectAccount);
+    await links.save(links.create({ userId: 'u1', projectId: project.id, bankAccountId: topstep.id, kind: 'prop_firm', status: 'funded', firm: 'Topstep', accountSize: 50000, startedAt: '2026-08-01' }));
+    const cats = ds.getRepository(ProjectCategory);
+    const evals = await cats.save(cats.create({ userId: 'u1', projectType: 'trading', name: 'Prop Firm Evals', icon: '🏦', color: '#4BA8D8', type: 'expense', order: 0 }));
+    const checking = await accounts.save(accounts.create({ userId: 'u1', bankName: 'Chase', accountName: 'Checking', accountType: 'checking', balance: 0 }));
+    const tx = ds.getRepository(Transaction);
+    await tx.save(tx.create({ userId: 'u1', bankAccountId: checking.id, name: 'TOPSTEP COMBINE', amount: -149, date: '2026-08-03', projectId: project.id, projectCategoryId: evals.id, tradingAccountId: topstep.id }));
+    await tx.save(tx.create({ userId: 'u1', bankAccountId: checking.id, name: 'TOPSTEP PAYOUT', amount: 500, date: '2026-09-15', projectId: project.id, tradingAccountId: topstep.id }));
+    await tx.save(tx.create({ userId: 'u1', bankAccountId: checking.id, name: 'UNASSIGNED FEE', amount: -20, date: '2026-09-16', projectId: project.id }));
+
+    const p = await service.performanceForProject('u1', project.id);
+    const ts = p.accounts.find((a) => a.account.id === topstep.id)!;
+    expect(ts.meta).toMatchObject({ kind: 'prop_firm', status: 'funded', firm: 'Topstep', accountSize: 50000, provider: 'manual' });
+    expect(ts.cash).toMatchObject({ spent: 149, netCash: 351, payouts: { count: 1, total: 500 } });
+    expect(ts.cash!.spentByCategory[0]).toMatchObject({ id: evals.id, name: 'Prop Firm Evals', total: 149 });
+    expect(ts.cash!.rows.map((r) => r.name)).toEqual(['TOPSTEP PAYOUT', 'TOPSTEP COMBINE']);
+    expect(ts.trades.total).toBe(0);
+
+    const sw = p.accounts.find((a) => a.account.id === schwab.id)!;
+    expect(sw.meta).toMatchObject({ kind: 'broker', status: 'active', provider: 'plaid' });
+    expect(sw.cash).toBeNull();
+    expect(sw.cashByMonth.find((m) => m.month === '2026-09')).toEqual({ month: '2026-09', in: 5000, out: 0 });
+
+    expect(p.overview).toMatchObject({ moneyIn: 5149, moneyOut: 500, accountsByStatus: { active: 2, funded: 1, evaluation: 0, failed: 0, closed: 0 }, passRate: 100 });
+    expect(p.unassigned).toBe(1);
+    expect(p.combined.realizedPnl).toBe(sw.realizedPnl + p.accounts.find((a) => a.account.id === futures.id)!.realizedPnl);
+  });
+
+  it('performance(accountId) carries meta and cash when the account feeds a project, null otherwise', async () => {
+    const one = await service.performance('u1', schwab.id);
+    expect(one.meta).toMatchObject({ kind: 'broker', status: 'active' });
+    expect(one.cash).toBeNull();
+    const accounts = ds.getRepository(BankAccount);
+    const loose = await accounts.save(accounts.create({ userId: 'u1', bankName: 'Webull', accountName: 'Margin', accountType: 'investment', balance: 0 }));
+    const noProject = await service.performance('u1', loose.id);
+    expect(noProject.meta).toMatchObject({ kind: 'broker', status: 'active', firm: null });
+    expect(noProject.cash).toBeNull();
   });
 });
