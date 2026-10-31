@@ -20,26 +20,35 @@ export default function AccountHeader({ projectId, account, meta, onChanged, onR
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function patch(body: Partial<AccountMeta>) {
+  async function patch(body: Partial<AccountMeta>): Promise<boolean> {
     setBusy(true); setError(null);
     try {
       const r = await fetch(`${API}/projects/${projectId}/accounts/${account.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(body) });
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.message ?? 'Could not save');
       await onChanged();
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Could not save'); }
+      return true;
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Could not save'); return false; }
     finally { setBusy(false); }
   }
 
+  function toggleEdit() {
+    if (!editing) setForm({ firm: meta.firm ?? '', accountSize: meta.accountSize == null ? '' : String(meta.accountSize), startedAt: meta.startedAt ?? '', endedAt: meta.endedAt ?? '', notes: meta.notes ?? '' });
+    setEditing((v) => !v);
+  }
+
   async function save() {
-    await patch({ firm: form.firm.trim() || null, accountSize: form.accountSize === '' ? null : Number(form.accountSize), startedAt: form.startedAt || null, endedAt: form.endedAt || null, notes: form.notes.trim() || null });
-    setEditing(false);
+    const ok = await patch({ firm: form.firm.trim() || null, accountSize: form.accountSize === '' ? null : Number(form.accountSize), startedAt: form.startedAt || null, endedAt: form.endedAt || null, notes: form.notes.trim() || null });
+    if (ok) setEditing(false);
   }
 
   async function remove() {
-    setBusy(true);
-    const r = await fetch(`${API}/projects/${projectId}/accounts/${account.id}`, { method: 'DELETE', credentials: 'include' });
-    setBusy(false);
-    if (r.ok) await onRemoved(); else setError('Could not remove the account');
+    setBusy(true); setError(null);
+    try {
+      const r = await fetch(`${API}/projects/${projectId}/accounts/${account.id}`, { method: 'DELETE', credentials: 'include' });
+      if (!r.ok) throw new Error('Could not remove the account');
+      await onRemoved();
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Could not remove the account'); }
+    finally { setBusy(false); }
   }
 
   const connected = meta.provider === 'plaid';
@@ -64,7 +73,7 @@ export default function AccountHeader({ projectId, account, meta, onChanged, onR
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {connected && <a href="/settings?tab=banks" className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Sync in Settings</a>}
-          <button type="button" onClick={() => setEditing((v) => !v)} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>{editing ? 'Cancel' : 'Edit'}</button>
+          <button type="button" onClick={toggleEdit} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>{editing ? 'Cancel' : 'Edit'}</button>
           {!confirmRemove
             ? <button type="button" onClick={() => setConfirmRemove(true)} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>Remove from project</button>
             : <button type="button" disabled={busy} onClick={remove} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>Confirm remove (the account stays in Settings)</button>}

@@ -37,7 +37,7 @@ export default function AccountView({ projectId, data, account, onBack, onSwitch
         )}
       </div>
 
-      <AccountHeader projectId={projectId} account={account.account} meta={account.meta} onChanged={onChanged} onRemoved={async () => { await onChanged(); onBack(); }} />
+      <AccountHeader key={account.account.id} projectId={projectId} account={account.account} meta={account.meta} onChanged={onChanged} onRemoved={async () => { await onChanged(); onBack(); }} />
 
       {prop && account.cash && <CashTiles cash={account.cash} platformPnl={account.netResult} hasTrades={hasTrades} />}
 
