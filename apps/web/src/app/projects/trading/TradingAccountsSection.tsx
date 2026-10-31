@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MonthlyPanel, type ProjectPerformance } from '../TradingPerformance';
 import OverviewStrip from './OverviewStrip';
 import MoneyInOutPanel from './MoneyInOutPanel';
@@ -21,16 +21,23 @@ export default function TradingAccountsSection({ project, accountId, onSelectAcc
   const [data, setData] = useState<ProjectPerformance | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  /* Only the latest request may write state: a slower, older response (another
+     project, or an earlier refresh) is dropped. Every caller of load() is covered. */
+  const latest = useRef(0);
   const load = useCallback(async () => {
+    const id = ++latest.current;
     setError(null);
     try {
       const r = await fetch(`${API}/investments/performance?projectId=${encodeURIComponent(project.id)}`, { credentials: 'include' });
       if (!r.ok) throw new Error(`${r.status}`);
-      setData(await r.json());
-    } catch { setError('Could not load performance'); }
+      const json = await r.json();
+      if (id === latest.current) setData(json);
+    } catch { if (id === latest.current) setError('Could not load performance'); }
   }, [project.id]);
 
-  useEffect(() => { setData(null); load(); }, [load, refreshKey]);
+  // Another project's numbers must never show under this one; a refresh keeps the old data until the new arrives.
+  useEffect(() => { setData(null); }, [project.id]);
+  useEffect(() => { load(); }, [load, refreshKey]);
 
   // Unknown account id (removed, or a stale link): fall back to the overview.
   // In an effect, never during render — a parent state update mid-render is a React error.
