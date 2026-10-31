@@ -216,10 +216,9 @@ export default function ProjectsPage() {
           const hit = list.find((x: Project) => x.id === project);
           if (account && hit?.accounts?.some((a: { id: string }) => a.id === account)) setTradingAccountId(account);
         }
-        urlReady.current = true;
       }
       // The overview is the landing; a project opens full-width when picked.
-    } finally { setLoading(false); }
+    } finally { urlReady.current = true; setLoading(false); }
   }
 
   async function loadDetail(id: string) {
@@ -329,7 +328,7 @@ export default function ProjectsPage() {
       if (!res.ok) return;
       const saved: Project = await res.json();
       setProjects((prev) => editing ? prev.map((p) => (p.id === saved.id ? saved : p)) : [saved, ...prev]);
-      setSelectedId(saved.id);
+      setSelectedId(saved.id); setTradingAccountId(null);
       loadDetail(saved.id);
       closeForm();
     } finally { setSaving(false); }
@@ -418,7 +417,7 @@ export default function ProjectsPage() {
         const remaining = prev.filter((p) => p.id !== project.id);
         if (selectedId === project.id) {
           const next = remaining[0] ?? null;
-          setSelectedId(next?.id ?? null);
+          setSelectedId(next?.id ?? null); setTradingAccountId(null);
           if (next) loadDetail(next.id);
         }
         return remaining;
