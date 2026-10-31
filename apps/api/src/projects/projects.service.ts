@@ -398,7 +398,7 @@ export class ProjectsService {
     const project = await this.repo.findOneBy({ id });
     if (!project) throw new NotFoundException();
     if (project.userId !== userId) throw new ForbiddenException();
-    await this.txRepo.update({ projectId: id }, { projectId: null, projectCategoryId: null });
+    await this.txRepo.update({ projectId: id }, { projectId: null, projectCategoryId: null, tradingAccountId: null });
     await this.repo.remove(project);
   }
 

@@ -179,4 +179,11 @@ describe('attributing project transactions to an account', () => {
     await expect(service.linkTransaction(project.id, unrelated.id, 'u1', undefined, schwab.id)).rejects.toBeInstanceOf(BadRequestException);
     expect((await txs.findOneByOrFail({ id: unrelated.id })).projectId).toBeNull();
   });
+
+  it('deleting the project leaves its transactions with no project, category or account', async () => {
+    const { project, topstep, evalFee, txs } = await setup();
+    await service.assignTradingAccount(project.id, 'u1', [evalFee.id], topstep.id);
+    await service.remove(project.id, 'u1');
+    expect(await txs.findOneByOrFail({ id: evalFee.id })).toMatchObject({ projectId: null, projectCategoryId: null, tradingAccountId: null });
+  });
 });
