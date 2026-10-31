@@ -129,6 +129,9 @@ export default function ProjectsPage() {
   const [showClosed, setShowClosed] = useState(false);
   const [showForm, setShowForm]       = useState(false);
   const [perfRefresh, setPerfRefresh] = useState(0);
+  const [assigningTx, setAssigningTx] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+  const [bulkPickerKey, setBulkPickerKey] = useState(0);
   const [showAddAccount, setShowAddAccount] = useState<string | null>(null); // project id; the modal arrives in Task 10
   const [editing, setEditing]         = useState<Project | null>(null);
   const [showSell, setShowSell]       = useState<Project | null>(null);
@@ -316,12 +319,25 @@ export default function ProjectsPage() {
   }
 
   async function assignTxAccount(projectId: string, txIds: string[], accountId: string | null) {
-    await fetch(`${API}/projects/${projectId}/assign-account`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-      body: JSON.stringify({ transactionIds: txIds, accountId }),
-    });
-    await loadDetail(projectId);
-    setPerfRefresh((n) => n + 1);
+    if (assigningTx) return;
+    setAssigningTx(true); setAssignError(null);
+    try {
+      const r = await fetch(`${API}/projects/${projectId}/assign-account`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ transactionIds: txIds, accountId }),
+      });
+      if (!r.ok) {
+        const msg = (await r.json().catch(() => ({})))?.message;
+        throw new Error(Array.isArray(msg) ? msg.join(', ') : msg ?? 'Could not assign the account');
+      }
+    } catch (err: unknown) {
+      setAssignError(err instanceof Error ? err.message : 'Could not assign the account');
+    } finally {
+      setBulkPickerKey((n) => n + 1);
+      try { await loadDetail(projectId); } catch { /* keep the assign error */ }
+      setPerfRefresh((n) => n + 1);
+      setAssigningTx(false);
+    }
   }
 
   /* Create / update project */
@@ -994,10 +1010,11 @@ export default function ProjectsPage() {
                         <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-xl text-xs" style={{ background: 'color-mix(in srgb, var(--color-amber) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 25%, transparent)', color: 'var(--color-amber)' }}>
                           <span className="font-semibold">{(sel.transactions ?? []).filter((t) => !t.tradingAccountId).length} without an account.</span>
                           <span>Put all of them on</span>
-                          <AccountPicker accounts={sel.accounts!} value={null}
+                          <AccountPicker key={bulkPickerKey} disabled={assigningTx} accounts={sel.accounts!} value={null}
                             onChange={(id) => { if (id) assignTxAccount(sel.id, (sel.transactions ?? []).filter((t) => !t.tradingAccountId).map((t) => t.id), id); }} />
                         </div>
                       )}
+                      {assignError && <p className="text-xs" style={{ color: 'var(--color-rose)' }}>{assignError}</p>}
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
                           Linked Transactions ({sel.txCount})
@@ -1027,7 +1044,7 @@ export default function ProjectsPage() {
                                     onAssign={(catId) => reassignTxCategory(tx.id, sel.id, catId)}
                                   />
                                   {sel.type === 'trading' && (sel.accounts?.length ?? 0) > 0 && (
-                                    <AccountPicker compact accounts={sel.accounts!} value={tx.tradingAccountId ?? null} onChange={(id) => assignTxAccount(sel.id, [tx.id], id)} />
+                                    <AccountPicker compact disabled={assigningTx} accounts={sel.accounts!} value={tx.tradingAccountId ?? null} onChange={(id) => assignTxAccount(sel.id, [tx.id], id)} />
                                   )}
                                 </div>
                               </div>
