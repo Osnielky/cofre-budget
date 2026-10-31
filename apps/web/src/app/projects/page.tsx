@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { closureKind, closureActionLabel, isClosed, statusLabel } from '@/lib/projects/closure';
 import { createPortal } from 'react-dom';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
   Tooltip, CartesianGrid, ReferenceLine,
@@ -105,6 +106,22 @@ export default function ProjectsPage() {
   const [projects, setProjects]     = useState<Project[]>([]);
   const [loading, setLoading]       = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  /* Trading projects open one account at a time (`?account=`); both ids live
+     in the URL so back works and other pages can deep-link. Read once on
+     load from the location (useSearchParams would need a Suspense boundary
+     around this whole page), written with replace on every change. */
+  const [tradingAccountId, setTradingAccountId] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const urlReady = useRef(false);
+  useEffect(() => {
+    if (!urlReady.current) return;
+    const p = new URLSearchParams();
+    if (selectedId) p.set('project', selectedId);
+    if (selectedId && tradingAccountId) p.set('account', tradingAccountId);
+    const qs = p.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [selectedId, tradingAccountId, pathname, router]);
   // Closed projects (sold or terminated) are tucked away until the user asks to see them.
   const [showClosed, setShowClosed] = useState(false);
   const [showForm, setShowForm]       = useState(false);
@@ -189,6 +206,18 @@ export default function ProjectsPage() {
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
       setProjects(list);
+      if (!urlReady.current) {
+        const p = new URLSearchParams(window.location.search);
+        const project = p.get('project');
+        if (project && list.some((x: Project) => x.id === project)) {
+          setSelectedId(project);
+          loadDetail(project);
+          const account = p.get('account');
+          const hit = list.find((x: Project) => x.id === project);
+          if (account && hit?.accounts?.some((a: { id: string }) => a.id === account)) setTradingAccountId(account);
+        }
+        urlReady.current = true;
+      }
       // The overview is the landing; a project opens full-width when picked.
     } finally { setLoading(false); }
   }
@@ -512,7 +541,7 @@ export default function ProjectsPage() {
                 loading={loading}
                 showClosed={showClosed}
                 onToggleClosed={() => setShowClosed((v) => !v)}
-                onOpen={(id) => { setSelectedId(id); const p = projects.find((x) => x.id === id); if (!p?.transactions) loadDetail(id); }}
+                onOpen={(id) => { setSelectedId(id); setTradingAccountId(null); const p = projects.find((x) => x.id === id); if (!p?.transactions) loadDetail(id); }}
                 onCreate={openCreate}
                 typeLabel={(t) => PROJECT_TYPES.find((x) => x.value === t)?.label ?? t}
               />
@@ -537,7 +566,7 @@ export default function ProjectsPage() {
                   {/* ── Back bar + the other projects, one click away ── */}
                   <div className="flex items-center gap-2 px-3 sm:px-5 py-2 shrink-0 min-w-0"
                     style={{ borderBottom: '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)', background: 'color-mix(in srgb, var(--color-text-primary) 2%, transparent)' }}>
-                    <button type="button" onClick={() => setSelectedId(null)}
+                    <button type="button" onClick={() => { setSelectedId(null); setTradingAccountId(null); }}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-colors hover:bg-[var(--color-elevated)]"
                       style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
@@ -548,7 +577,7 @@ export default function ProjectsPage() {
                         {others.map((p) => {
                           const c = p.color || '#9B6DFF';
                           return (
-                            <button key={p.id} type="button" onClick={() => { setSelectedId(p.id); if (!p.transactions) loadDetail(p.id); }}
+                            <button key={p.id} type="button" onClick={() => { setSelectedId(p.id); setTradingAccountId(null); if (!p.transactions) loadDetail(p.id); }}
                               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold shrink-0 whitespace-nowrap transition-colors hover:bg-[var(--color-elevated)]"
                               style={{ color: 'var(--color-text-secondary)', border: '1px solid transparent', opacity: isClosed(p.status) ? 0.6 : 1 }}>
                               <span className="w-5 h-5 rounded-md flex items-center justify-center text-xs overflow-hidden" style={{ background: `${c}25` }}>
