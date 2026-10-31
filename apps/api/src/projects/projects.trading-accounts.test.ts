@@ -154,6 +154,15 @@ describe('attributing project transactions to an account', () => {
     expect((await txs.findOneByOrFail({ id: evalFee.id })).tradingAccountId).toBe(topstep.id);
   });
 
+  it('treats an empty-string accountId as clearing, and a non-array body as no rows', async () => {
+    const { project, topstep, evalFee, txs } = await setup();
+    await service.assignTradingAccount(project.id, 'u1', [evalFee.id], topstep.id);
+    expect(await service.assignTradingAccount(project.id, 'u1', [evalFee.id], '' as any)).toEqual({ updated: 1 });
+    expect((await txs.findOneByOrFail({ id: evalFee.id })).tradingAccountId).toBeNull();
+    expect(await service.assignTradingAccount(project.id, 'u1', 'nope' as any, topstep.id)).toEqual({ updated: 0 });
+    expect(await service.assignTradingAccount(project.id, 'u1', undefined as any, topstep.id)).toEqual({ updated: 0 });
+  });
+
   it('refuses an account the project does not follow, and rows that are not the project\'s', async () => {
     const { project, topstep, evalFee, unrelated } = await setup();
     await expect(service.assignTradingAccount(project.id, 'u1', [evalFee.id], schwab.id)).rejects.toBeInstanceOf(BadRequestException);

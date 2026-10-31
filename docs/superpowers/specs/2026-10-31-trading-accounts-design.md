@@ -124,7 +124,7 @@ Tradovate rows import gross and the account view says so.
 
 Two levels inside the trading project. The projects page keeps its selection
 in memory today; it gains `?project=<id>` and `?account=<id>` (written with
-`router.replace`, read on load, as Reports does) so back and links work and a
+`router.replace`, read on load, as Reports does) so deep links and reload work (Back leaves the page, since replace adds no history entry) and a
 card on the dashboard can open one account directly.
 
 **Level 1 — all accounts** (what opens):

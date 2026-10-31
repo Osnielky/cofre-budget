@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { money, panel, dateLabel } from '../TradingPerformance';
 import type { CashSummary } from '@/lib/projects/trading';
 
@@ -30,9 +31,14 @@ export function CashTiles({ cash, platformPnl, hasTrades }: { cash: CashSummary;
 
 /** The attributed transactions, newest first; "Unassign" sends the row back to the project's unassigned pool. */
 export function CashRows({ projectId, cash, onChanged }: { projectId: string; cash: CashSummary; onChanged: () => Promise<void> }) {
+  const [error, setError] = useState<string | null>(null);
   async function unassign(txId: string) {
-    const r = await fetch(`${API}/projects/${projectId}/tx/${txId}/account`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ accountId: null }) });
-    if (r.ok) await onChanged();
+    setError(null);
+    try {
+      const r = await fetch(`${API}/projects/${projectId}/tx/${txId}/account`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ accountId: null }) });
+      if (!r.ok) throw new Error('Could not unassign');
+      await onChanged();
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : 'Could not unassign'); }
   }
   return (
     <div className="p-3 sm:p-4 min-w-0" style={panel} data-testid="cash-rows">
@@ -40,6 +46,7 @@ export function CashRows({ projectId, cash, onChanged }: { projectId: string; ca
         <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Money in & out</p>
         <p className="text-[10px] hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>What you paid and what you received for this account</p>
       </div>
+      {error && <p className="text-xs mb-2" style={{ color: 'var(--color-rose)' }}>{error}</p>}
       {cash.rows.length === 0 ? (
         <p className="text-xs py-3" style={{ color: 'var(--color-text-muted)' }}>Nothing attributed yet. Link the evaluation payment or a payout to the project, then pick this account on the row.</p>
       ) : (
@@ -55,7 +62,7 @@ export function CashRows({ projectId, cash, onChanged }: { projectId: string; ca
                   <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{dateLabel(r.date)}{r.category ? ` · ${r.category.icon} ${r.category.name}` : ''}</p>
                 </div>
                 <span className="font-bold tabular-nums shrink-0" style={{ color: out ? 'var(--color-green)' : 'var(--color-rose)' }}>{out ? '+' : '-'}{money(Math.abs(r.amount))}</span>
-                <button type="button" onClick={() => unassign(r.id)} className="text-[10px] font-semibold opacity-0 group-hover:opacity-100 focus:opacity-100" style={{ color: 'var(--color-text-muted)' }}>Unassign</button>
+                <button type="button" onClick={() => unassign(r.id)} className="text-[10px] font-semibold sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100" style={{ color: 'var(--color-text-muted)' }}>Unassign</button>
               </li>
             );
           })}

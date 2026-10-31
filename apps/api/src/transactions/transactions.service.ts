@@ -642,6 +642,7 @@ export class TransactionsService {
     // name one of their own stay on the project instead of silently leaving it.
     const parentProjectId = tx.projectId ?? null;
     const parentProjectCategoryId = tx.projectCategoryId ?? null;
+    const parentTradingAccountId = tx.tradingAccountId ?? null;
 
     const sign = Number(tx.amount) >= 0 ? 1 : -1;
 
@@ -651,6 +652,7 @@ export class TransactionsService {
       tx.categorizedByRuleId = null;
       tx.projectId = null;
       tx.projectCategoryId = null;
+      tx.tradingAccountId = null;
       await em.save(tx);
 
       const ids: string[] = [];
@@ -669,6 +671,7 @@ export class TransactionsService {
           categoryId: piece.categoryId ?? undefined,
           projectId: (inherits ? parentProjectId : piece.projectId) ?? undefined,
           projectCategoryId: (inherits ? parentProjectCategoryId : piece.projectCategoryId) ?? undefined,
+          tradingAccountId: inherits ? parentTradingAccountId ?? undefined : undefined,
           pending: tx.pending,
           isSplitParent: false,
           receiptId: tx.receiptId ?? undefined,

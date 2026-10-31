@@ -105,6 +105,9 @@ function blurInput(e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) {
   e.currentTarget.style.boxShadow = 'none';
 }
 
+/** Only prop-firm accounts carry cash metrics, so only they are valid targets for attributing a row. */
+const propAccountsOf = (p: { accounts?: { kind?: string }[] }) => ((p.accounts ?? []).filter((a) => a.kind === 'prop_firm') as NonNullable<Project['accounts']>);
+
 export default function ProjectsPage() {
   const [projects, setProjects]     = useState<Project[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -1006,11 +1009,11 @@ export default function ProjectsPage() {
 
                     {/* ── Linked transactions ── */}
                     <div className="flex flex-col gap-2 pb-6">
-                      {sel.type === 'trading' && (sel.accounts?.length ?? 0) > 0 && (sel.transactions ?? []).some((t) => !t.tradingAccountId) && (
+                      {sel.type === 'trading' && propAccountsOf(sel).length > 0 && (sel.transactions ?? []).some((t) => !t.tradingAccountId) && (
                         <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-xl text-xs" style={{ background: 'color-mix(in srgb, var(--color-amber) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 25%, transparent)', color: 'var(--color-amber)' }}>
                           <span className="font-semibold">{(sel.transactions ?? []).filter((t) => !t.tradingAccountId).length} without an account.</span>
                           <span>Put all of them on</span>
-                          <AccountPicker key={bulkPickerKey} disabled={assigningTx} accounts={sel.accounts!} value={null}
+                          <AccountPicker key={bulkPickerKey} disabled={assigningTx} accounts={propAccountsOf(sel)} value={null}
                             onChange={(id) => { if (id) assignTxAccount(sel.id, (sel.transactions ?? []).filter((t) => !t.tradingAccountId).map((t) => t.id), id); }} />
                         </div>
                       )}
@@ -1043,8 +1046,8 @@ export default function ProjectsPage() {
                                     projectId={sel.id}
                                     onAssign={(catId) => reassignTxCategory(tx.id, sel.id, catId)}
                                   />
-                                  {sel.type === 'trading' && (sel.accounts?.length ?? 0) > 0 && (
-                                    <AccountPicker compact disabled={assigningTx} accounts={sel.accounts!} value={tx.tradingAccountId ?? null} onChange={(id) => assignTxAccount(sel.id, [tx.id], id)} />
+                                  {sel.type === 'trading' && propAccountsOf(sel).length > 0 && (
+                                    <AccountPicker compact disabled={assigningTx} accounts={propAccountsOf(sel)} value={tx.tradingAccountId ?? null} onChange={(id) => assignTxAccount(sel.id, [tx.id], id)} />
                                   )}
                                 </div>
                               </div>

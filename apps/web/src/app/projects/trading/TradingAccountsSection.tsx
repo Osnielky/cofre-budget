@@ -47,12 +47,18 @@ export default function TradingAccountsSection({ project, accountId, onSelectAcc
     if (data && accountId && !current) onSelectAccount(null);
   }, [data, accountId, current, onSelectAccount]);
 
-  if (error) return <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{error}.</p>;
-  if (!data) return <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading accounts…</p>;
+  // A failed load with an account deep-linked and nothing to show: give the page its own sections back.
+  useEffect(() => {
+    if (error && !data && accountId) onSelectAccount(null);
+  }, [error, data, accountId, onSelectAccount]);
+
+  const errorLine = error ? <p className="text-xs" style={{ color: 'var(--color-text-muted)' }} role="alert">{error}.</p> : null;
+  if (!data) return error ? errorLine : <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading accounts…</p>;
 
   if (!current) {
     return (
       <section className="flex flex-col gap-4" data-testid="trading-accounts">
+        {errorLine}
         <OverviewStrip o={data.overview} winRate={data.combined.trades.winRate} closed={data.combined.trades.closed} profitFactor={data.combined.trades.profitFactor} />
         {data.combined.byMonth.length > 0 && <MonthlyPanel months={data.combined.byMonth} />}
         <MoneyInOutPanel months={data.overview.byMonth} />
@@ -61,8 +67,11 @@ export default function TradingAccountsSection({ project, accountId, onSelectAcc
     );
   }
   return (
-    <AccountView projectId={project.id} data={data} account={current}
-      onBack={() => onSelectAccount(null)} onSwitch={onSelectAccount}
-      onChanged={async () => { await onProjectChanged(); await load(); }} />
+    <div className="flex flex-col gap-3">
+      {errorLine}
+      <AccountView projectId={project.id} data={data} account={current}
+        onBack={() => onSelectAccount(null)} onSwitch={onSelectAccount}
+        onChanged={onProjectChanged} />
+    </div>
   );
 }

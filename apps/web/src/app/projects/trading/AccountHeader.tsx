@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { KIND_LABEL, STATUS_LABEL, accountTitle, statusTone, type AccountMeta, type TradingStatus } from '@/lib/projects/trading';
+import { KIND_LABEL, STATUS_LABEL, accountTitle, statusTone, type AccountMeta, type TradingKind, type TradingStatus } from '@/lib/projects/trading';
 import { panel } from '../TradingPerformance';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 const TONE = { up: 'var(--color-green)', down: 'var(--color-rose)', flat: 'var(--color-text-primary)', muted: 'var(--color-text-muted)' } as const;
 const STATUSES: TradingStatus[] = ['evaluation', 'funded', 'failed', 'closed', 'active'];
+const KINDS: TradingKind[] = ['broker', 'prop_firm'];
 const input = 'px-2.5 py-1.5 text-xs rounded-lg outline-none min-w-0';
 const inputStyle = { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' };
 
@@ -59,6 +60,10 @@ export default function AccountHeader({ projectId, account, meta, onChanged, onR
           <h3 className="text-base font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>{accountTitle({ account })}</h3>
           <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[10px] font-bold">
             <span className="px-1.5 py-0.5 rounded-md" style={{ background: 'color-mix(in srgb, var(--color-card-sky) 16%, transparent)', color: 'var(--color-card-sky)' }}>{KIND_LABEL[meta.kind]}{connected ? ' · Connected' : ' · Not connected'}</span>
+            <select value={meta.kind} disabled={busy} aria-label="Account kind" onChange={(e) => patch({ kind: e.target.value as TradingKind })}
+              className="text-[10px] font-semibold rounded-md px-1 py-0.5 cursor-pointer" style={inputStyle}>
+              {KINDS.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+            </select>
             <label className="flex items-center gap-1">
               <span className="px-1.5 py-0.5 rounded-md" style={{ background: `color-mix(in srgb, ${TONE[statusTone(meta.status)]} 14%, transparent)`, color: TONE[statusTone(meta.status)] }}>{STATUS_LABEL[meta.status]}</span>
               <select value={meta.status} disabled={busy} aria-label="Account status" onChange={(e) => patch({ status: e.target.value as TradingStatus })}

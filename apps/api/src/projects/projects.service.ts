@@ -431,12 +431,13 @@ export class ProjectsService {
   async assignTradingAccount(projectId: string, userId: string, transactionIds: string[], accountId: string | null): Promise<{ updated: number }> {
     const project = await this.repo.findOneBy({ id: projectId });
     if (!project || project.userId !== userId) throw new ForbiddenException();
-    const ids = [...new Set(transactionIds)].filter(Boolean);
+    const ids = [...new Set(Array.isArray(transactionIds) ? transactionIds : [])].filter(Boolean);
     if (ids.length === 0) return { updated: 0 };
-    if (accountId) await this.assertFollows(projectId, accountId);
+    const account = typeof accountId === 'string' && accountId.length > 0 ? accountId : null;
+    if (account) await this.assertFollows(projectId, account);
     const rows = await this.txRepo.find({ where: { id: In(ids), userId, projectId }, select: ['id'] });
     if (rows.length !== ids.length) throw new BadRequestException('Every transaction must be linked to this project');
-    await this.txRepo.update({ id: In(ids) }, { tradingAccountId: accountId });
+    await this.txRepo.update({ id: In(ids) }, { tradingAccountId: account });
     return { updated: ids.length };
   }
 
