@@ -85,6 +85,35 @@ when the range changes.
 Charts use `useThemeColors()` and the CVD-safe identity palette; category
 colours come from the categories themselves (as on the dashboard).
 
+## Controls added 2026-10-29 (`lib/reports/state.ts`, tested)
+
+- **URL state.** Tab, period, custom dates, account, grouping, sort and the
+  open row live in the query string (`tab`, `period`, `from`, `to`,
+  `account`, `by`, `sort`, `open`); defaults are omitted so `/reports` stays
+  clean. Back works inside the page, a view can be shared, and other pages
+  can deep-link (`/reports?tab=spending&period=3m&by=wantNeed`). Unknown
+  values fall back to defaults.
+- **Account filter.** A select beside the period presets; it filters the
+  transactions before every calculation, so KPIs, Sankey, insights and
+  exports describe just that account. The Net worth tab ignores it and says
+  so. The Ask Cofre prompt and the CSV file names carry the account.
+- **Grouping ("View by").** Spending rows and the stacked chart group by
+  category (dashboard bucketing), account, needs vs wants (`wantNeed` on the
+  category) or fixed vs flexible (`isFixed`); rows without a category land in
+  "Not classified yet". Income offers category and account.
+  `makeGrouper(by, projects)` builds the bucketer; `categoryRows` and
+  `categoryStack` accept it.
+- **Sort.** By amount (default) or by change — biggest absolute move vs the
+  previous period first, up or down (`sortRows`).
+- **Question chips.** "Where did my money go?", "What changed?", "Who do I pay
+  the most?", "Needs or wants?", "Fixed or flexible?", "Am I saving?". Each
+  only sets tab/grouping/sort and keeps the period and account; the chip
+  shows as active while the state matches it.
+- **Deep link to Transactions.** The open row's drill-down ends in "See all N
+  transactions in Transactions →" with `from`, `to`, `account` and, for a
+  budget category, `category` (Uncategorized → `filter=uncategorized`). The
+  Transactions page reads those parameters once on mount.
+
 ## Out of scope (follow-ups)
 
 Saved/custom report presets, PDF export, scheduled email reports, comparing

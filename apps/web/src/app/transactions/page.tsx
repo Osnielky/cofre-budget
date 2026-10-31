@@ -182,6 +182,20 @@ export default function TransactionsPage() {
   const [sortMode, setSortMode] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc'>('date-desc');
   const [accountFilter, setAccountFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+
+  /* Deep links from Reports (and anywhere else): ?from&to&account&category&filter.
+     Read once on mount from the location rather than useSearchParams, which
+     would need a Suspense boundary around this whole page. */
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const from = p.get('from'), to = p.get('to');
+    if (from && to && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from <= to) {
+      setRangeMode('custom'); setCustomFrom(from); setCustomTo(to);
+    }
+    const account = p.get('account'); if (account) setAccountFilter(account);
+    const category = p.get('category'); if (category) setCategoryFilter(category);
+    if (p.get('filter') === 'uncategorized') setFilter('uncategorized');
+  }, []);
   const [categories, setCategories]     = useState<Category[]>([]);
   const [accounts, setAccounts]         = useState<BankAccount[]>([]);
   const [projects, setProjects]         = useState<Project[]>([]);

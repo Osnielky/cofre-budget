@@ -1,6 +1,8 @@
 export interface Category {
   id: string; name: string; icon: string; color: string; type: string;
   isFixed?: boolean;
+  /** Set by the user on expense categories; null until classified. */
+  wantNeed?: 'want' | 'need' | null;
 }
 export interface BankAccount {
   id: string; bankName: string; accountName: string; accountType: string;

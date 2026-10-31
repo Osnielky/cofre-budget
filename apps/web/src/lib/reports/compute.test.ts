@@ -3,7 +3,7 @@ import type { Transaction, Category } from '@/lib/dashboard/types';
 import { resolveRange } from './range';
 import {
   summarize, monthlySeries, categoryRows, categoryStack, merchantRows, moneyFlow,
-  weekdayProfile, cumulativeSpend, largestTransactions, insights, pctChange, merchantKey,
+  weekdayProfile, cumulativeSpend, largestTransactions, insights, pctChange, merchantKey, makeGrouper, sortRows,
 } from './compute';
 import { toCsv } from './csv';
 
@@ -178,5 +178,54 @@ describe('toCsv', () => {
     expect(csv).toContain(`'+1-800-CALL,1`);
     expect(csv).toContain(`'@user,2`);
     expect(csv).toContain(`'-SUM(A1),3`);
+  });
+});
+
+describe('makeGrouper / sortRows', () => {
+  const rent = { ...cat('eee555', 'Rent'), isFixed: true, wantNeed: 'need' as const };
+  const fun = { ...cat('fff666', 'Fun'), isFixed: false, wantNeed: 'want' as const };
+  const savings = { ...checking, id: 'sav', accountName: 'Savings', color: '#123456' };
+  const rows = [
+    tx('2026-10-01', -1200, 'Landlord', rent),
+    tx('2026-10-02', -60, 'Cinema', fun),
+    tx('2026-10-03', -40, 'Unknown', null),
+    tx('2026-10-04', -25, 'Sushi', dining, { bankAccount: savings }),
+  ];
+
+  it('groups by needs vs wants, filing unclassified categories and uncategorized rows together', () => {
+    const r = categoryRows(rows, [], 'expense', [], makeGrouper('wantNeed'));
+    expect(r.map((x) => [x.id, x.value])).toEqual([['need', 1200], ['unclassified', 65], ['want', 60]]);
+  });
+
+  it('groups by fixed vs flexible', () => {
+    const r = categoryRows(rows, [], 'expense', [], makeGrouper('fixed'));
+    expect(r.map((x) => [x.id, x.value])).toEqual([['fixed', 1200], ['flexible', 85], ['unclassified', 40]]);
+  });
+
+  it('groups by account, naming the bank and account and keeping its colour', () => {
+    const r = categoryRows(rows, [], 'expense', [], makeGrouper('account'));
+    expect(r[0]).toMatchObject({ id: 'acct:acc', name: 'Chase · Checking', value: 1300 });
+    expect(r[1]).toMatchObject({ id: 'acct:sav', name: 'Chase · Savings', value: 25, color: '#123456' });
+  });
+
+  it('category grouping is the dashboard bucketing', () => {
+    const r = categoryRows(rows, [], 'expense', [], makeGrouper('category'));
+    expect(r.map((x) => x.id)).toEqual(['eee555', 'fff666', 'uncat', 'bbb222']);
+  });
+
+  it('the stacked chart accepts the same grouper', () => {
+    const s = categoryStack(rows, ['2026-10'], 'expense', [], 6, makeGrouper('wantNeed'));
+    expect(s.series.map((x) => x.id)).toEqual(['need', 'unclassified', 'want']);
+    expect(s.points[0]).toMatchObject({ need: 1200, want: 60, unclassified: 65 });
+  });
+
+  it('sortRows by change puts the biggest absolute move first, in either direction', () => {
+    const list = [
+      { id: 'a', value: 500, prevValue: 480 },
+      { id: 'b', value: 100, prevValue: 400 },
+      { id: 'c', value: 300, prevValue: 100 },
+    ];
+    expect(sortRows(list, 'change').map((x) => x.id)).toEqual(['b', 'c', 'a']);
+    expect(sortRows(list, 'amount')).toBe(list);
   });
 });

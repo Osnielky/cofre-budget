@@ -68,12 +68,54 @@ export function monthlySeries(txs: Transaction[], months: string[]): MonthPoint[
   });
 }
 
+/* ── Grouping ────────────────────────────────────────────────────────── */
+
+export type GroupBy = 'category' | 'account' | 'wantNeed' | 'fixed';
+export type Grouper = (t: Transaction) => Bucket;
+
+export const GROUP_OPTIONS: { id: GroupBy; label: string }[] = [
+  { id: 'category', label: 'Category' },
+  { id: 'account', label: 'Account' },
+  { id: 'wantNeed', label: 'Needs vs wants' },
+  { id: 'fixed', label: 'Fixed vs flexible' },
+];
+
+/* Synthetic buckets. Colours are the app's chart accents (CLAUDE.md), never
+   the blue UI accent; "not classified" is the same muted grey as Other. */
+const NEEDS: Bucket = { id: 'need', name: 'Needs', icon: '🏠', color: '#4FBF7F' };
+const WANTS: Bucket = { id: 'want', name: 'Wants', icon: '🎉', color: '#F5C842' };
+const FIXED: Bucket = { id: 'fixed', name: 'Fixed', icon: '📌', color: '#4BA8D8' };
+const FLEXIBLE: Bucket = { id: 'flexible', name: 'Flexible', icon: '〰️', color: '#9B6DFF' };
+const UNCLASSIFIED: Bucket = { id: 'unclassified', name: 'Not classified yet', icon: '·', color: '#6B6B8A' };
+const NO_ACCOUNT: Bucket = { id: 'acct:none', name: 'No account', icon: '·', color: '#6B6B8A' };
+
+/**
+ * How rows are grouped on the category list and the stacked chart. 'category'
+ * is the dashboard's bucketing (budget categories, project categories,
+ * projects, Uncategorized); the others read flags the categories already
+ * carry, so a row without a category lands in "Not classified yet".
+ */
+export function makeGrouper(by: GroupBy, projects: BucketProject[] = []): Grouper {
+  if (by === 'category') return makeBucketer(projects);
+  if (by === 'account') return (t) => t.bankAccount
+    ? { id: `acct:${t.bankAccount.id}`, name: `${t.bankAccount.bankName} · ${t.bankAccount.accountName}`, icon: '🏦', color: t.bankAccount.color || '#6B6B8A' }
+    : NO_ACCOUNT;
+  if (by === 'wantNeed') return (t) => t.categoryRef?.wantNeed === 'need' ? NEEDS : t.categoryRef?.wantNeed === 'want' ? WANTS : UNCLASSIFIED;
+  return (t) => !t.categoryRef ? UNCLASSIFIED : t.categoryRef.isFixed ? FIXED : FLEXIBLE;
+}
+
+/** 'amount' is the natural ranking; 'change' puts the biggest moves first, either way. */
+export function sortRows<T extends { value: number; prevValue: number }>(rows: T[], sort: 'amount' | 'change'): T[] {
+  if (sort === 'amount') return rows;
+  return [...rows].sort((a, b) => Math.abs(b.value - b.prevValue) - Math.abs(a.value - a.prevValue) || b.value - a.value);
+}
+
 /* ── Categories ──────────────────────────────────────────────────────── */
 
 export interface CategoryRow extends Bucket { value: number; share: number; count: number; prevValue: number; delta: number | null }
 
-export function categoryRows(cur: Transaction[], prev: Transaction[], dir: 'income' | 'expense', projects: BucketProject[] = []): CategoryRow[] {
-  const bucket = makeBucketer(projects);
+export function categoryRows(cur: Transaction[], prev: Transaction[], dir: 'income' | 'expense', projects: BucketProject[] = [], grouper?: Grouper): CategoryRow[] {
+  const bucket = grouper ?? makeBucketer(projects);
   const pick = dir === 'income' ? isIncome : isSpend;
   const rows = new Map<string, CategoryRow>();
   for (const t of flow(cur).filter(pick)) {
@@ -100,8 +142,8 @@ export interface CategoryStack { points: Array<Record<string, number | string>>;
 const OTHER: Bucket = { id: 'other', name: 'Other', icon: '·', color: '#6B6B8A' };
 
 /** Per-month totals for the top N buckets of the whole period, the rest folded into Other. */
-export function categoryStack(txs: Transaction[], months: string[], dir: 'income' | 'expense', projects: BucketProject[] = [], topN = 6): CategoryStack {
-  const bucket = makeBucketer(projects);
+export function categoryStack(txs: Transaction[], months: string[], dir: 'income' | 'expense', projects: BucketProject[] = [], topN = 6, grouper?: Grouper): CategoryStack {
+  const bucket = grouper ?? makeBucketer(projects);
   const pick = dir === 'income' ? isIncome : isSpend;
   const f = flow(txs).filter(pick);
   const periodTotals = new Map<string, { b: Bucket; v: number }>();

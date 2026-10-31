@@ -1,18 +1,22 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { useThemeColors } from '@/components/ThemeProvider';
 import { useReportsData } from '@/hooks/useReportsData';
-import { resolveRange, parseYmd, type RangePreset } from '@/lib/reports/range';
+import { resolveRange, parseYmd } from '@/lib/reports/range';
 import {
   summarize, monthlySeries, categoryRows, categoryStack, merchantRows, moneyFlow,
-  insights, weekdayProfile, cumulativeSpend, largestTransactions,
+  insights, weekdayProfile, cumulativeSpend, largestTransactions, makeGrouper, sortRows, GROUP_OPTIONS,
+  type CategoryRow, type GroupBy,
 } from '@/lib/reports/compute';
+import { parseReportState, serializeReportState, applyQuestion, type ReportState, type ReportTab } from '@/lib/reports/state';
 import { toCsv, downloadCsv } from '@/lib/reports/csv';
 import { money, Card, Segmented } from '@/components/reports/ui';
 import RangeBar from '@/components/reports/RangeBar';
+import QuestionChips from '@/components/reports/QuestionChips';
 import KpiStrip from '@/components/reports/KpiStrip';
 import MoneyFlowChart from '@/components/reports/MoneyFlowChart';
 import InsightsList from '@/components/reports/InsightsList';
@@ -24,40 +28,84 @@ import MerchantsTable from '@/components/reports/MerchantsTable';
 import CashFlowTab from '@/components/reports/CashFlowTab';
 import NetWorthTab from '@/components/reports/NetWorthTab';
 
-type Tab = 'overview' | 'spending' | 'income' | 'merchants' | 'cashflow' | 'networth';
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: ReportTab; label: string }[] = [
   { id: 'overview', label: 'Overview' }, { id: 'spending', label: 'Spending' }, { id: 'income', label: 'Income' },
   { id: 'merchants', label: 'Merchants' }, { id: 'cashflow', label: 'Cash flow' }, { id: 'networth', label: 'Net worth' },
 ];
+const SORTS = [{ id: 'amount' as const, label: 'By amount' }, { id: 'change' as const, label: 'By change' }];
+const INCOME_GROUPS = GROUP_OPTIONS.filter((g) => g.id === 'category' || g.id === 'account');
 
+/** useSearchParams needs a Suspense boundary above it. */
 export default function ReportsPage() {
+  return <Suspense fallback={null}><Reports /></Suspense>;
+}
+
+function Reports() {
   const tc = useThemeColors();
-  const [preset, setPreset] = useState<RangePreset>('this-month');
-  const [custom, setCustom] = useState({ from: '', to: '' });
-  const [tab, setTab] = useState<Tab>('overview');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [exportOpen, setExportOpen] = useState(false);
   const now = useMemo(() => new Date(), []);
-  const range = useMemo(() => resolveRange(preset, now, custom), [preset, custom, now]);
-  const { cur, prev, projects, history, loading, error } = useReportsData(range);
+
+  /* Every control lives in the URL: back works inside the page, a view can be
+     shared, and other pages can deep-link to a report. */
+  const state = useMemo(() => parseReportState(searchParams), [searchParams]);
+  const update = useCallback((patch: Partial<ReportState>) => {
+    const qs = serializeReportState({ ...state, ...patch });
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [state, pathname, router]);
+
+  const custom = useMemo(() => ({ from: state.from, to: state.to }), [state.from, state.to]);
+  const range = useMemo(() => resolveRange(state.preset, now, custom), [state.preset, custom, now]);
+  const data = useReportsData(range);
+  const { projects, accounts, history, loading, error } = data;
+
+  // The account filter applies before any calculation, so every number on the
+  // page (KPIs, Sankey, insights…) describes just that account.
+  const picked = state.account && accounts.some((a) => a.id === state.account) ? state.account : null;
+  const cur = useMemo(() => picked ? data.cur.filter((t) => t.bankAccount?.id === picked) : data.cur, [data.cur, picked]);
+  const prev = useMemo(() => picked ? data.prev.filter((t) => t.bankAccount?.id === picked) : data.prev, [data.prev, picked]);
 
   /* Every number below comes from lib/reports/compute (tested) — never from JSX. */
+  const spendView: GroupBy = state.view;
+  const incomeView: GroupBy = state.view === 'category' || state.view === 'account' ? state.view : 'category';
+  const spendGrouper = useMemo(() => makeGrouper(spendView, projects), [spendView, projects]);
+  const incomeGrouper = useMemo(() => makeGrouper(incomeView, projects), [incomeView, projects]);
   const summary = useMemo(() => summarize(cur, prev, range.days), [cur, prev, range.days]);
   const months = useMemo(() => monthlySeries(cur, range.months), [cur, range.months]);
-  const spendRows = useMemo(() => categoryRows(cur, prev, 'expense', projects), [cur, prev, projects]);
-  const incomeRows = useMemo(() => categoryRows(cur, prev, 'income', projects), [cur, prev, projects]);
-  const spendStack = useMemo(() => categoryStack(cur, range.months, 'expense', projects), [cur, range.months, projects]);
-  const incomeStack = useMemo(() => categoryStack(cur, range.months, 'income', projects), [cur, range.months, projects]);
+  const spendRows = useMemo(() => sortRows(categoryRows(cur, prev, 'expense', projects, spendGrouper), state.sort), [cur, prev, projects, spendGrouper, state.sort]);
+  const incomeRows = useMemo(() => sortRows(categoryRows(cur, prev, 'income', projects, incomeGrouper), state.sort), [cur, prev, projects, incomeGrouper, state.sort]);
+  const topSpend = useMemo(() => categoryRows(cur, prev, 'expense', projects), [cur, prev, projects]);
+  const spendStack = useMemo(() => categoryStack(cur, range.months, 'expense', projects, 6, spendGrouper), [cur, range.months, projects, spendGrouper]);
+  const incomeStack = useMemo(() => categoryStack(cur, range.months, 'income', projects, 6, incomeGrouper), [cur, range.months, projects, incomeGrouper]);
   const merchants = useMemo(() => merchantRows(cur, prev, range.months), [cur, prev, range.months]);
   const flow = useMemo(() => moneyFlow(cur, projects, 8, tc.primary, tc.green, tc.rose), [cur, projects, tc.primary, tc.green, tc.rose]);
   const facts = useMemo(() => insights(cur, prev, range, projects, now), [cur, prev, range, projects, now]);
   const weekdays = useMemo(() => weekdayProfile(cur, range), [cur, range]);
   const pace = useMemo(() => cumulativeSpend(cur, prev, range, now), [cur, prev, range, now]);
   const largest = useMemo(() => largestTransactions(cur, 6), [cur]);
+  const categoryGrouper = useMemo(() => makeGrouper('category', projects), [projects]);
 
-  const fileStamp = `${range.from}_${range.to}`;
+  /* Deep link into Transactions for the bucket that is open. Project and
+     synthetic buckets (needs/wants, fixed) have no transaction filter yet, so
+     they link to the period only. */
+  const txLink = useCallback((row: CategoryRow, view: GroupBy): string | null => {
+    const p = new URLSearchParams({ from: range.from, to: range.to });
+    if (picked) p.set('account', picked);
+    if (view === 'account') { if (row.id === 'acct:none') return null; p.set('account', row.id.slice(5)); }
+    else if (view === 'category') {
+      if (row.id === 'uncat') p.set('filter', 'uncategorized');
+      else if (!row.id.includes(':')) p.set('category', row.id);
+    }
+    return `/transactions?${p.toString()}`;
+  }, [range.from, range.to, picked]);
+
+  const viewLabel = GROUP_OPTIONS.find((g) => g.id === spendView)?.label ?? 'Category';
+  const fileStamp = `${range.from}_${range.to}${picked ? `_${picked.slice(0, 8)}` : ''}`;
   const exports = [
-    { label: 'Spending by category', run: () => downloadCsv(`cofre-spending-${fileStamp}.csv`, toCsv([
-      { header: 'Category', value: (r) => r.name }, { header: 'Amount', value: (r) => r.value }, { header: 'Share %', value: (r) => r.share },
+    { label: `Spending by ${viewLabel.toLowerCase()}`, run: () => downloadCsv(`cofre-spending-${fileStamp}.csv`, toCsv([
+      { header: viewLabel, value: (r) => r.name }, { header: 'Amount', value: (r) => r.value }, { header: 'Share %', value: (r) => r.share },
       { header: 'Transactions', value: (r) => r.count }, { header: `Previous (${range.prevLabel})`, value: (r) => r.prevValue }, { header: 'Change %', value: (r) => r.delta ?? '' },
     ], spendRows)) },
     { label: 'Income by source', run: () => downloadCsv(`cofre-income-${fileStamp}.csv`, toCsv([
@@ -78,8 +126,10 @@ export default function ReportsPage() {
     ], [...cur].sort((a, b) => b.date.localeCompare(a.date)))) },
   ];
 
-  const askHref = `/ask-cofre?q=${encodeURIComponent(`Where did my money go between ${range.from} and ${range.to}, and what should I change?`)}`;
+  const pickedAccount = picked ? accounts.find((a) => a.id === picked) : null;
+  const askHref = `/ask-cofre?q=${encodeURIComponent(`Where did my money go between ${range.from} and ${range.to}${pickedAccount ? ` in my ${pickedAccount.bankName} ${pickedAccount.accountName} account` : ''}, and what should I change?`)}`;
   const btn = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer';
+  const setTab = (tab: ReportTab) => update({ tab, open: null });
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -117,19 +167,24 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          <RangeBar range={range} preset={preset} custom={custom} onPreset={setPreset} onCustom={(c) => { setCustom(c); setPreset('custom'); }} />
+          <RangeBar range={range} preset={state.preset} custom={custom} accounts={accounts} account={picked}
+            onPreset={(preset) => update({ preset, open: null })}
+            onCustom={(c) => update({ preset: 'custom', from: c.from, to: c.to, open: null })}
+            onAccount={(account) => update({ account, open: null })} />
+
+          <QuestionChips state={state} onPick={(q) => update(applyQuestion(state, q))} />
 
           {error && <p className="text-sm rounded-xl px-4 py-3" style={{ color: 'var(--color-rose)', background: 'color-mix(in srgb, var(--color-rose) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-rose) 30%, transparent)' }}>{error}</p>}
 
           <KpiStrip summary={summary} months={months} prevLabel={range.prevLabel} loading={loading} />
 
-          <Segmented value={tab} options={TABS} onChange={setTab} size="md" />
+          <Segmented value={state.tab} options={TABS} onChange={setTab} size="md" />
 
           {loading ? (
             <p className="py-16 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Building your report…</p>
           ) : (
             <>
-              {tab === 'overview' && (
+              {state.tab === 'overview' && (
                 <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
                   <Card className="xl:col-span-3" title="Money flow" subtitle="Income sources → cash → where it went">
                     <MoneyFlowChart flow={flow} />
@@ -140,19 +195,25 @@ export default function ReportsPage() {
                   <Card className="xl:col-span-3" title="Spending pace" subtitle="Cumulative spending by day of period">
                     <PaceChart points={pace} prevLabel={range.prevLabel} />
                   </Card>
-                  <Card className="xl:col-span-2" title="Top categories" right={<button type="button" onClick={() => setTab('spending')} className="text-xs font-semibold cursor-pointer" style={{ color: 'var(--color-primary)' }}>All spending →</button>}>
-                    <CategoryList rows={spendRows} cur={cur} months={range.months} projects={projects} dir="expense" prevLabel={range.prevLabel} limit={6} />
+                  <Card className="xl:col-span-2" title="Top categories" right={<button type="button" onClick={() => update({ tab: 'spending', view: 'category', open: null })} className="text-xs font-semibold cursor-pointer" style={{ color: 'var(--color-primary)' }}>All spending →</button>}>
+                    <CategoryList rows={topSpend} cur={cur} months={range.months} grouper={categoryGrouper} dir="expense" prevLabel={range.prevLabel} limit={6}
+                      linkFor={(r) => txLink(r, 'category')} />
                   </Card>
                 </div>
               )}
 
-              {tab === 'spending' && (
+              {state.tab === 'spending' && (
                 <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-                  <Card className="xl:col-span-3" title="Spending by category" subtitle="Tap a category for its months, merchants and transactions">
-                    <CategoryList rows={spendRows} cur={cur} months={range.months} projects={projects} dir="expense" prevLabel={range.prevLabel} />
+                  <Card className="xl:col-span-3" title={`Spending by ${viewLabel.toLowerCase()}`} subtitle="Tap a row for its months, merchants and transactions"
+                    right={<div className="flex items-center gap-2 flex-wrap justify-end">
+                      <Segmented value={spendView} options={GROUP_OPTIONS} onChange={(view) => update({ view, open: null })} />
+                      <Segmented value={state.sort} options={SORTS} onChange={(sort) => update({ sort })} />
+                    </div>}>
+                    <CategoryList rows={spendRows} cur={cur} months={range.months} grouper={spendGrouper} dir="expense" prevLabel={range.prevLabel}
+                      openId={state.open} onOpen={(open) => update({ open })} linkFor={(r) => txLink(r, spendView)} />
                   </Card>
                   <div className="xl:col-span-2 flex flex-col gap-4">
-                    <Card title="By month" subtitle="Top categories stacked; the rest as Other">
+                    <Card title="By month" subtitle={spendView === 'category' ? 'Top categories stacked; the rest as Other' : `${viewLabel} by month`}>
                       <CategoryStackChart stack={spendStack} />
                     </Card>
                     <Card title="By weekday" subtitle="Average spend per day of the week">
@@ -177,10 +238,15 @@ export default function ReportsPage() {
                 </div>
               )}
 
-              {tab === 'income' && (
+              {state.tab === 'income' && (
                 <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-                  <Card className="xl:col-span-3" title="Income by source" subtitle="Tap a source for its months and transactions">
-                    <CategoryList rows={incomeRows} cur={cur} months={range.months} projects={projects} dir="income" prevLabel={range.prevLabel} />
+                  <Card className="xl:col-span-3" title={incomeView === 'account' ? 'Income by account' : 'Income by source'} subtitle="Tap a row for its months and transactions"
+                    right={<div className="flex items-center gap-2 flex-wrap justify-end">
+                      <Segmented value={incomeView} options={INCOME_GROUPS} onChange={(view) => update({ view, open: null })} />
+                      <Segmented value={state.sort} options={SORTS} onChange={(sort) => update({ sort })} />
+                    </div>}>
+                    <CategoryList rows={incomeRows} cur={cur} months={range.months} grouper={incomeGrouper} dir="income" prevLabel={range.prevLabel}
+                      openId={state.open} onOpen={(open) => update({ open })} linkFor={(r) => txLink(r, incomeView)} />
                   </Card>
                   <Card className="xl:col-span-2" title="By month">
                     <CategoryStackChart stack={incomeStack} />
@@ -188,15 +254,20 @@ export default function ReportsPage() {
                 </div>
               )}
 
-              {tab === 'merchants' && (
+              {state.tab === 'merchants' && (
                 <Card title="Merchants" subtitle="Who you paid, how often, and how that changed">
                   <MerchantsTable rows={merchants} monthsCount={range.months.length} prevLabel={range.prevLabel} />
                 </Card>
               )}
 
-              {tab === 'cashflow' && <CashFlowTab months={months} />}
+              {state.tab === 'cashflow' && <CashFlowTab months={months} />}
 
-              {tab === 'networth' && <NetWorthTab history={history} range={range} />}
+              {state.tab === 'networth' && (
+                <>
+                  {picked && <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Net worth covers every account; the account filter does not apply here.</p>}
+                  <NetWorthTab history={history} range={range} />
+                </>
+              )}
             </>
           )}
         </div>
