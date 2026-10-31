@@ -163,3 +163,18 @@ actually setting secrets and deploying is on the user.
 - Force an `ITEM_LOGIN_REQUIRED` via Plaid sandbox's `/sandbox/item/reset_login` and
   confirm the Settings UI shows Reconnect and that completing update-mode Link clears it.
 - Manual "Sync" button still works post-migration to `/transactions/sync`.
+
+## Pending → posted hand-over (2026-10-31)
+
+Plaid never updates a pending charge into its posted form: the pending id
+appears in `removed[]` and the posted charge arrives in `added[]` under a new
+id whose `pending_transaction_id` names the old one. Until 2026-10-31 the sync
+inserted the posted charge as a fresh row and tombstoned the pending one, so a
+category, note, project/debt link, receipt or split made while the charge was
+pending vanished a day or two later — the "my categorization didn't stick"
+reports. `runSync` now looks the pending row up by `pending_transaction_id`
+when the posted id is unknown and re-keys that row in place (new `externalId`,
+updated name/merchant/date/amount/pending), so the row keeps its id and
+everything on it; the old id then matches nothing in `removed[]`. Rules still
+apply on the enriched posted name when the row had no category. Tests:
+`plaid.service.pending-posted.test.ts`.

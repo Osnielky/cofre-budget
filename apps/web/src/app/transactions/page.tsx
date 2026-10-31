@@ -521,6 +521,10 @@ export default function TransactionsPage() {
     });
     if (!res.ok) {
       setUpdatingId(null);
+      // Never fail silently: the row would look categorized until the next reload.
+      setRuleToast({ kind: 'error', matchLabel: txBefore?.name ?? '', reason: 'Could not save the category. Please try again.' });
+      if (ruleToastTimer.current) clearTimeout(ruleToastTimer.current);
+      ruleToastTimer.current = setTimeout(() => setRuleToast(null), 6000);
       return false;
     }
     const updated: Transaction = await res.json();

@@ -622,7 +622,17 @@ export class PlaidService {
             continue;
           }
 
-          const existing = await this.txRepo.findOneBy({ externalId: pt.transaction_id, userId: item.userId });
+          let existing = await this.txRepo.findOneBy({ externalId: pt.transaction_id, userId: item.userId });
+          if (!existing && pt.pending_transaction_id) {
+            /* A pending charge that posted. Plaid retires the pending id (it is in this
+               page's removed[]) and issues the posted charge under a new one that names
+               the old id. Re-key the pending row in place instead of inserting a fresh
+               row, so everything the user did to it while it was pending — category,
+               note, project or debt link, receipt, splits — survives the hand-over.
+               The old id then matches nothing in removed[], so nothing is deleted. */
+            const pendingRow = await this.txRepo.findOneBy({ externalId: pt.pending_transaction_id, userId: item.userId, source: 'plaid' });
+            if (pendingRow) { pendingRow.externalId = pt.transaction_id; existing = pendingRow; }
+          }
           if (existing) {
             existing.pending = pt.pending;
             existing.amount = -(pt.amount);
