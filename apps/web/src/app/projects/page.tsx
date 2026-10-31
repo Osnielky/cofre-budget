@@ -11,6 +11,8 @@ import {
 import Sidebar from '@/components/Sidebar';
 import ProjectCategoryForm, { ProjectCategoryValues } from './ProjectCategoryForm';
 import TradingAccountsSection from './trading/TradingAccountsSection';
+import AddAccountModal from './trading/AddAccountModal';
+import AccountPicker from './trading/AccountPicker';
 import ProjectsOverview, { invalidateTradingHeadline } from './ProjectsOverview';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -311,6 +313,15 @@ export default function ProjectsPage() {
       body: JSON.stringify({ projectCategoryId }),
     });
     await loadDetail(projectId);
+  }
+
+  async function assignTxAccount(projectId: string, txIds: string[], accountId: string | null) {
+    await fetch(`${API}/projects/${projectId}/assign-account`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ transactionIds: txIds, accountId }),
+    });
+    await loadDetail(projectId);
+    setPerfRefresh((n) => n + 1);
   }
 
   /* Create / update project */
@@ -690,7 +701,7 @@ export default function ProjectsPage() {
                         onSelectAccount={setTradingAccountId}
                         onProjectChanged={async () => { await loadDetail(sel.id); setPerfRefresh((n) => n + 1); }}
                         onEditProject={() => openEdit(sel)}
-                        onAddAccount={() => openEdit(sel)}
+                        onAddAccount={() => setShowAddAccount(sel.id)}
                         refreshKey={perfRefresh}
                       />
                     )}
@@ -979,6 +990,14 @@ export default function ProjectsPage() {
 
                     {/* ── Linked transactions ── */}
                     <div className="flex flex-col gap-2 pb-6">
+                      {sel.type === 'trading' && (sel.accounts?.length ?? 0) > 0 && (sel.transactions ?? []).some((t) => !t.tradingAccountId) && (
+                        <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-xl text-xs" style={{ background: 'color-mix(in srgb, var(--color-amber) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 25%, transparent)', color: 'var(--color-amber)' }}>
+                          <span className="font-semibold">{(sel.transactions ?? []).filter((t) => !t.tradingAccountId).length} without an account.</span>
+                          <span>Put all of them on</span>
+                          <AccountPicker accounts={sel.accounts!} value={null}
+                            onChange={(id) => { if (id) assignTxAccount(sel.id, (sel.transactions ?? []).filter((t) => !t.tradingAccountId).map((t) => t.id), id); }} />
+                        </div>
+                      )}
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
                           Linked Transactions ({sel.txCount})
@@ -1007,6 +1026,9 @@ export default function ProjectsPage() {
                                     projectId={sel.id}
                                     onAssign={(catId) => reassignTxCategory(tx.id, sel.id, catId)}
                                   />
+                                  {sel.type === 'trading' && (sel.accounts?.length ?? 0) > 0 && (
+                                    <AccountPicker compact accounts={sel.accounts!} value={tx.tradingAccountId ?? null} onChange={(id) => assignTxAccount(sel.id, [tx.id], id)} />
+                                  )}
                                 </div>
                               </div>
                               {tx.id === sel.purchaseTxId && (
@@ -1843,6 +1865,12 @@ export default function ProjectsPage() {
             </div>
           </div>,
           document.body
+        )}
+
+        {showAddAccount && (
+          <AddAccountModal projectId={showAddAccount} onClose={() => setShowAddAccount(null)}
+            onCreated={async () => { await loadProjects(); await loadDetail(showAddAccount); setPerfRefresh((n) => n + 1); }}
+            onConnectInstead={() => { const p = projects.find((x) => x.id === showAddAccount); setShowAddAccount(null); if (p) openEdit(p); }} />
         )}
 
         {/* ── Delete confirmation modal ── */}
