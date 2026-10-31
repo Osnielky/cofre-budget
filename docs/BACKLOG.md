@@ -215,6 +215,9 @@ count, stat and Ask Cofre's default list (`lib/transactions/trades.ts`).
   Performance section now lists deposits and cash-outs and the picker refuses to
   file a followed account's money under a project category — the auto-link is the
   remaining manual step for a weekly recurring deposit.)
+- **Trading accounts phase B** — trade import for unconnected accounts (TopstepX,
+  Tradovate CSV → `closed_trade` rows), trade statistics (expectancy, drawdown,
+  streaks, by weekday), full trade list. Spec §3 and §5.
 - A restore action for `transaction_tombstones` (admin or Settings) instead of SQL.
 
 ## Monarch gap list (2026-10-27)

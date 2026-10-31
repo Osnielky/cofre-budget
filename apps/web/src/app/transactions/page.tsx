@@ -27,6 +27,7 @@ import { followedAccountFor } from '@/lib/projects/followed';
 import { pickProjectSuggestion } from '@/lib/transactions/suggestions';
 import { groupTransactions, GROUP_BY_OPTIONS, type GroupBy, type GroupKind } from '@/lib/transactions/grouping';
 import { splitTrades, summarizeTrades } from '@/lib/transactions/trades';
+import { openPropAccount } from '@/lib/projects/trading';
 import { isClosed, closureKind, selectableProjects } from '@/lib/projects/closure';
 import LinkTransferModal from '@/components/LinkTransferModal';
 import StatStrip from './StatStrip';
@@ -85,7 +86,7 @@ function placePicker(rect: DOMRect): PickerPos {
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface BankAccount { id: string; bankName: string; accountName: string; accountType: string; color: string; provider: string; plaidItemId: string | null; last4?: string | null }
 interface ProjectCategory { id: string; name: string; icon: string; color: string }
-interface Project { id: string; name: string; icon: string; color: string; status: string; type?: string; imageUrl?: string | null; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[]; accounts?: { id: string; bankName: string; accountName: string }[] }
+interface Project { id: string; name: string; icon: string; color: string; status: string; type?: string; imageUrl?: string | null; purchaseTxId: string | null; purchasePrice?: number; categories?: ProjectCategory[]; accounts?: { id: string; bankName: string; accountName: string; kind?: 'broker' | 'prop_firm'; status?: 'active' | 'evaluation' | 'funded' | 'failed' | 'closed' }[] }
 interface TransferMatch { id: string; name: string; amount: number; date: string; bankAccount: BankAccount | null }
 interface Transaction {
   id: string; name: string; merchantName: string | null; amount: number; date: string; source: string; pending: boolean;
@@ -93,6 +94,7 @@ interface Transaction {
   bankAccountId: string; bankAccount: BankAccount | null;
   projectId: string | null;
   projectCategoryId: string | null;
+  tradingAccountId?: string | null;
   transferAccountId: string | null;
   transferAccount: BankAccount | null;
   counterpartTxId: string | null;
@@ -775,9 +777,11 @@ export default function TransactionsPage() {
   async function linkToProject(txId: string, projectId: string, projectCategoryId: string | null) {
     setLinkingProj(true);
     try {
+      const proj = projects.find((p) => p.id === projectId);
+      const tradingAccountId = proj?.type === 'trading' ? openPropAccount(proj.accounts ?? []) : null;
       await fetch(`${API}/projects/${projectId}/link/${txId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ projectCategoryId }),
+        body: JSON.stringify({ projectCategoryId, ...(tradingAccountId ? { tradingAccountId } : {}) }),
       });
 
       /* If assigning a project category, clear the budget category */
@@ -787,11 +791,11 @@ export default function TransactionsPage() {
           body: JSON.stringify({ categoryId: null }),
         });
         setTransactions((prev) => prev.map((t) =>
-          t.id === txId ? { ...t, projectId, projectCategoryId, categoryId: null, categoryRef: null } : t,
+          t.id === txId ? { ...t, projectId, projectCategoryId, tradingAccountId, categoryId: null, categoryRef: null } : t,
         ));
       } else {
         setTransactions((prev) => prev.map((t) =>
-          t.id === txId ? { ...t, projectId, projectCategoryId } : t,
+          t.id === txId ? { ...t, projectId, projectCategoryId, tradingAccountId } : t,
         ));
       }
 
