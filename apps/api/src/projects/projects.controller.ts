@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ProjectsService, ProjectDto, ProjectCategoryDto } from './projects.service';
+import { ProjectsService, ProjectDto, ProjectCategoryDto, ManualAccountDto } from './projects.service';
+import type { TradingAccountMeta } from './project-account.entity';
 
 @UseGuards(JwtAuthGuard)
 @Controller('projects')
@@ -74,6 +75,23 @@ export class ProjectsController {
   @Patch(':id')
   update(@Param('id') id: string, @Request() req: any, @Body() dto: Partial<ProjectDto>) {
     return this.service.update(id, req.user.id, dto);
+  }
+
+  /* ── Followed accounts (trading projects) ── */
+
+  @Post(':id/accounts')
+  addManualAccount(@Param('id') id: string, @Request() req: any, @Body() dto: ManualAccountDto) {
+    return this.service.addManualAccount(id, req.user.id, dto);
+  }
+
+  @Patch(':id/accounts/:accountId')
+  updateAccountMeta(@Param('id') id: string, @Param('accountId') accountId: string, @Request() req: any, @Body() patch: Partial<TradingAccountMeta>) {
+    return this.service.updateAccountMeta(id, accountId, req.user.id, patch);
+  }
+
+  @Delete(':id/accounts/:accountId')
+  removeAccount(@Param('id') id: string, @Param('accountId') accountId: string, @Request() req: any) {
+    return this.service.removeAccount(id, accountId, req.user.id);
   }
 
   @Delete(':id')

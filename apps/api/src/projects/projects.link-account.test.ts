@@ -48,8 +48,9 @@ describe('project ↔ investment accounts', () => {
     expect(ids(created.accounts)).toEqual([schwab.id, futures.id]);
     expect(created.accounts[1]).toMatchObject({ bankName: 'Apex Trader Funding', accountName: 'NQ 50K', accountType: 'investment' });
 
+    // A link that stays keeps its place (and its metadata); only new ones append.
     const updated = await service.update(created.id, 'u1', { bankAccountIds: [webull.id, schwab.id] });
-    expect(ids(updated.accounts)).toEqual([webull.id, schwab.id]);
+    expect(ids(updated.accounts)).toEqual([schwab.id, webull.id]);
     expect(await ds.getRepository(ProjectAccount).count()).toBe(2);
 
     const cleared = await service.update(created.id, 'u1', { bankAccountIds: [] });

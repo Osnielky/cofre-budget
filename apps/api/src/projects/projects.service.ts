@@ -5,7 +5,7 @@ import { Project } from './project.entity';
 import { ProjectCategory } from './project-category.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
-import { ProjectAccount, TradingAccountMeta } from './project-account.entity';
+import { ProjectAccount, TradingAccountMeta, TradingKind, TradingStatus, TRADING_KINDS, TRADING_STATUSES } from './project-account.entity';
 import { isValidClosure, closedStatusFor } from './closure';
 import { activitySummary, ActivitySummary } from './activity';
 import { pickFields } from '../common/http/pick-fields';
@@ -41,6 +41,20 @@ export interface ProjectCategoryDto {
   type?: string;
   description?: string | null;
 }
+
+export interface ManualAccountDto {
+  name: string;
+  firm: string;
+  kind?: TradingKind;
+  status?: TradingStatus;
+  accountSize?: number | null;
+  startedAt?: string | null;
+  notes?: string | null;
+}
+
+const META_FIELDS = ['kind', 'status', 'firm', 'accountSize', 'startedAt', 'endedAt', 'notes'] as const satisfies readonly (keyof TradingAccountMeta)[];
+const ENDED_STATUSES = new Set<TradingStatus>(['failed', 'closed']);
+const today = () => new Date().toISOString().slice(0, 10);
 
 /** Fields a client may set on a project / project category; id, userId, projectType are server-owned. */
 const PROJECT_FIELDS = ['name', 'type', 'icon', 'color', 'description', 'imageUrl', 'purchasePrice', 'purchaseDate', 'status', 'salePrice', 'saleDate'] as const satisfies readonly (keyof ProjectDto)[];
@@ -155,23 +169,99 @@ export class ProjectsService {
     return links.filter((l) => l.bankAccount).map((l) => this.toLinked(l));
   }
 
-  /** Replace a project's account links. Every id must be the owner's own `investment`
-      account and not already followed by another project. */
+  private async tradingProject(projectId: string, userId: string): Promise<Project> {
+    const project = await this.repo.findOneBy({ id: projectId });
+    if (!project) throw new NotFoundException();
+    if (project.userId !== userId) throw new ForbiddenException();
+    if (project.type !== 'trading') throw new BadRequestException('Only a trading project follows accounts');
+    return project;
+  }
+
+  private validateMeta(patch: Partial<TradingAccountMeta>): void {
+    if (patch.kind !== undefined && !TRADING_KINDS.includes(patch.kind)) throw new BadRequestException(`Unknown account kind "${patch.kind}"`);
+    if (patch.status !== undefined && !TRADING_STATUSES.includes(patch.status)) throw new BadRequestException(`Unknown account status "${patch.status}"`);
+    if (patch.firm !== undefined && patch.firm !== null && patch.firm.length > 80) throw new BadRequestException('Firm must be 80 characters or fewer');
+    if (patch.notes !== undefined && patch.notes !== null && patch.notes.length > 2000) throw new BadRequestException('Notes must be 2000 characters or fewer');
+    for (const key of ['startedAt', 'endedAt'] as const) {
+      const v = patch[key];
+      if (v != null && !/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new BadRequestException(`${key} must be YYYY-MM-DD`);
+    }
+    if (patch.accountSize != null && !(Number(patch.accountSize) >= 0)) throw new BadRequestException('Account size must be a positive number');
+  }
+
+  /** Create an investment account the user is not connected to (a prop-firm combine) and follow it. */
+  async addManualAccount(projectId: string, userId: string, dto: ManualAccountDto): Promise<LinkedAccount> {
+    const project = await this.tradingProject(projectId, userId);
+    const name = (dto.name ?? '').trim(), firm = (dto.firm ?? '').trim();
+    if (!name || !firm) throw new BadRequestException('Firm and account name are required');
+    const meta: TradingAccountMeta = {
+      kind: dto.kind ?? 'prop_firm', status: dto.status ?? 'evaluation', firm,
+      accountSize: dto.accountSize == null ? null : Number(dto.accountSize),
+      startedAt: dto.startedAt ?? null, endedAt: null, notes: dto.notes ?? null,
+    };
+    this.validateMeta(meta);
+    const account = await this.accountRepo.save(this.accountRepo.create({
+      userId, bankName: firm, accountName: name, accountType: 'investment', provider: 'manual', balance: 0, currency: 'USD', color: '#4BA8D8',
+    }));
+    const link = await this.linkRepo.save(this.linkRepo.create({ userId, projectId: project.id, bankAccountId: account.id, ...meta }));
+    link.bankAccount = account;
+    return this.toLinked(link);
+  }
+
+  async updateAccountMeta(projectId: string, accountId: string, userId: string, patch: Partial<TradingAccountMeta>): Promise<LinkedAccount> {
+    await this.tradingProject(projectId, userId);
+    const link = await this.linkRepo.findOne({ where: { projectId, bankAccountId: accountId, userId }, relations: ['bankAccount'] });
+    if (!link) throw new NotFoundException('That account is not part of this project');
+    this.validateMeta(patch);
+    Object.assign(link, pickFields(patch, META_FIELDS));
+    if (patch.status !== undefined) {
+      if (ENDED_STATUSES.has(patch.status)) link.endedAt = patch.endedAt ?? link.endedAt ?? today();
+      else if (patch.endedAt === undefined) link.endedAt = null;
+    }
+    await this.linkRepo.save(link);
+    return this.toLinked(link);
+  }
+
+  /** Stop following an account. The bank account itself is never deleted; attributions to it are cleared. */
+  async removeAccount(projectId: string, accountId: string, userId: string): Promise<void> {
+    await this.tradingProject(projectId, userId);
+    const link = await this.linkRepo.findOneBy({ projectId, bankAccountId: accountId, userId });
+    if (!link) throw new NotFoundException('That account is not part of this project');
+    await this.txRepo.update({ projectId, tradingAccountId: accountId }, { tradingAccountId: null });
+    await this.linkRepo.remove(link);
+  }
+
+  /* Sync the project's followed accounts to `ids`. Links that stay keep their
+     trading metadata (status, firm, dates); new manual accounts start as a
+     prop-firm evaluation, new connected ones as an active broker. */
   private async replaceLinks(project: Project, userId: string, ids: string[]): Promise<void> {
     const unique = [...new Set(ids)];
-    if (unique.length > 0) {
-      const accounts = await this.accountRepo.find({ where: { id: In(unique), userId } });
-      if (accounts.length !== unique.length) throw new BadRequestException('Linked account not found');
-      const wrongType = accounts.find((a) => a.accountType !== 'investment');
-      if (wrongType) throw new BadRequestException(`"${wrongType.accountName}" is not an investment account — only brokerage, IRA and futures accounts can feed a trading project`);
-      const taken = await this.linkRepo.find({ where: { bankAccountId: In(unique) } });
-      const other = taken.find((t) => t.projectId !== project.id);
-      if (other) throw new BadRequestException('That account already feeds another project — unlink it there first');
+    const accounts = unique.length ? await this.accountRepo.find({ where: { id: In(unique), userId } }) : [];
+    if (accounts.length !== unique.length) throw new BadRequestException('Linked account not found');
+    const wrongType = accounts.find((a) => a.accountType !== 'investment');
+    if (wrongType) throw new BadRequestException(`"${wrongType.accountName}" is not an investment account — only brokerage, IRA and futures accounts can feed a trading project`);
+    const taken = unique.length ? await this.linkRepo.find({ where: { bankAccountId: In(unique) } }) : [];
+    const other = taken.find((t) => t.projectId !== project.id);
+    if (other) throw new BadRequestException('That account already feeds another project — unlink it there first');
+
+    const current = await this.linkRepo.find({ where: { projectId: project.id } });
+    const keep = new Set(unique);
+    const gone = current.filter((l) => !keep.has(l.bankAccountId));
+    if (gone.length) {
+      await this.txRepo.update({ projectId: project.id, tradingAccountId: In(gone.map((l) => l.bankAccountId)) }, { tradingAccountId: null });
+      await this.linkRepo.remove(gone);
     }
-    await this.linkRepo.delete({ projectId: project.id });
-    if (unique.length > 0) {
-      await this.linkRepo.save(unique.map((bankAccountId) => this.linkRepo.create({ userId, projectId: project.id, bankAccountId })));
-    }
+    const have = new Set(current.map((l) => l.bankAccountId));
+    const fresh = unique.filter((id) => !have.has(id)).map((bankAccountId) => {
+      const a = accounts.find((x) => x.id === bankAccountId)!;
+      return this.linkRepo.create({ userId, projectId: project.id, bankAccountId, ...this.defaultMeta(a) });
+    });
+    if (fresh.length) await this.linkRepo.save(fresh);
+  }
+
+  private defaultMeta(a: BankAccount): TradingAccountMeta {
+    const manual = a.provider === 'manual';
+    return { kind: manual ? 'prop_firm' : 'broker', status: manual ? 'evaluation' : 'active', firm: manual ? a.bankName : null, accountSize: null, startedAt: null, endedAt: null, notes: null };
   }
 
   /* Load categories for a project type, scoped to the user — lazy-seeds defaults on first access */
