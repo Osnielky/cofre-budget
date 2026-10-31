@@ -14,4 +14,6 @@ import { TransactionTombstones1793199267680 } from './1793199267680-TransactionT
 import { PlaidItemInvestments1793200230767 } from './1793200230767-PlaidItemInvestments';
 import { InvestmentActivityFields1793296759537 } from './1793296759537-InvestmentActivityFields';
 
-export const MIGRATIONS = [Baseline1790610365591, NetWorthSnapshots1790968124309, InvestmentsAsSavings1791301606403, UserLastSeen1791904532417, CreditCardDetails1792090417461, UserIsDemo1792200000000, PageViews1792590514718, SupportTickets1792611889908, VisitorProfile1792783917409, AiConversationDeletedAt1793134342276, TransactionTombstones1793199267680, PlaidItemInvestments1793200230767, InvestmentActivityFields1793296759537];
+import { TradingAccounts1793480336419 } from './1793480336419-TradingAccounts';
+
+export const MIGRATIONS = [Baseline1790610365591, NetWorthSnapshots1790968124309, InvestmentsAsSavings1791301606403, UserLastSeen1791904532417, CreditCardDetails1792090417461, UserIsDemo1792200000000, PageViews1792590514718, SupportTickets1792611889908, VisitorProfile1792783917409, AiConversationDeletedAt1793134342276, TransactionTombstones1793199267680, PlaidItemInvestments1793200230767, InvestmentActivityFields1793296759537, TradingAccounts1793480336419];

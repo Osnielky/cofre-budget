@@ -92,6 +92,17 @@ export class Transaction {
   @JoinColumn({ name: 'projectCategoryId' })
   projectCategoryRef: ProjectCategory;
 
+  /* Trading projects: which of the project's accounts this money belongs to — an
+     evaluation paid from a card, a payout received in checking. Only set on rows
+     that have a projectId; cleared when the row is unlinked or the account leaves
+     the project. */
+  @ManyToOne(() => BankAccount, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'tradingAccountId' })
+  tradingAccount: BankAccount;
+
+  @Column({ type: 'uuid', nullable: true })
+  tradingAccountId: string | null;
+
   /* Asset this transaction is linked to (owned-asset income/expense tag) */
   @Column({ type: 'uuid', nullable: true })
   assetId: string | null;

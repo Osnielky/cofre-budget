@@ -5,7 +5,7 @@ import { Project } from './project.entity';
 import { ProjectCategory } from './project-category.entity';
 import { Transaction } from '../transactions/transaction.entity';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
-import { ProjectAccount } from './project-account.entity';
+import { ProjectAccount, TradingAccountMeta } from './project-account.entity';
 import { isValidClosure, closedStatusFor } from './closure';
 import { activitySummary, ActivitySummary } from './activity';
 import { pickFields } from '../common/http/pick-fields';
@@ -27,7 +27,9 @@ export interface ProjectDto {
   bankAccountIds?: string[];
 }
 
-export interface LinkedAccount { id: string; bankName: string; accountName: string; accountType: string; provider: string }
+export interface LinkedAccount extends TradingAccountMeta {
+  id: string; bankName: string; accountName: string; accountType: string; provider: string;
+}
 
 export interface ProjectCategoryDto {
   name: string;
@@ -137,14 +139,20 @@ export class ProjectsService {
     @InjectRepository(ProjectAccount)  private linkRepo: Repository<ProjectAccount>,
   ) {}
 
-  private toLinked(a: BankAccount): LinkedAccount {
-    return { id: a.id, bankName: a.bankName, accountName: a.accountName, accountType: a.accountType, provider: a.provider };
+  private toLinked(l: ProjectAccount): LinkedAccount {
+    const a = l.bankAccount;
+    return {
+      id: a.id, bankName: a.bankName, accountName: a.accountName, accountType: a.accountType, provider: a.provider,
+      kind: l.kind, status: l.status, firm: l.firm ?? null,
+      accountSize: l.accountSize == null ? null : Number(l.accountSize),
+      startedAt: l.startedAt ?? null, endedAt: l.endedAt ?? null, notes: l.notes ?? null,
+    };
   }
 
-  /** Investment accounts a project follows, in link order. */
+  /** Accounts a project follows, in link order, with their trading metadata. */
   async linkedAccounts(projectId: string): Promise<LinkedAccount[]> {
     const links = await this.linkRepo.find({ where: { projectId }, relations: ['bankAccount'], order: { createdAt: 'ASC' } });
-    return links.filter((l) => l.bankAccount).map((l) => this.toLinked(l.bankAccount));
+    return links.filter((l) => l.bankAccount).map((l) => this.toLinked(l));
   }
 
   /** Replace a project's account links. Every id must be the owner's own `investment`
@@ -205,7 +213,7 @@ export class ProjectsService {
     const linksByProject: Record<string, LinkedAccount[]> = {};
     for (const l of allLinks) {
       if (!l.bankAccount) continue;
-      (linksByProject[l.projectId] ??= []).push(this.toLinked(l.bankAccount));
+      (linksByProject[l.projectId] ??= []).push(this.toLinked(l));
     }
 
     // Cache type→categories (at most 4-5 distinct types)

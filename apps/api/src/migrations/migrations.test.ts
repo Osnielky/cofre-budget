@@ -86,7 +86,7 @@ describe.skipIf(!hasDb)('database migrations', { timeout: 30_000 }, () => {
     await synced.query(`ALTER TABLE "${SYNCED}"."ai_conversations" DROP COLUMN "deletedAt"`);
     await synced.query(`ALTER TABLE "${SYNCED}"."plaid_items" DROP COLUMN "investmentsStatus"`);
     await synced.query(`ALTER TABLE "${SYNCED}"."plaid_items" DROP COLUMN "investmentsSyncedThrough"`);
-    for (const col of ['symbol', 'securityName', 'quantity', 'price', 'fees']) await synced.query(`ALTER TABLE "${SYNCED}"."transactions" DROP COLUMN "${col}"`);
+    for (const col of ['symbol', 'securityName', 'quantity', 'price', 'fees', 'tradingAccountId']) await synced.query(`ALTER TABLE "${SYNCED}"."transactions" DROP COLUMN "${col}"`);
     await synced.query(`DROP TABLE "${SYNCED}"."project_accounts"`);
     await synced.query(`INSERT INTO "${SYNCED}"."users" ("email", "name") VALUES ('owner@cofre.dev', 'Owner')`);
     await synced.destroy();
