@@ -10,7 +10,7 @@ import {
 } from 'recharts';
 import Sidebar from '@/components/Sidebar';
 import ProjectCategoryForm, { ProjectCategoryValues } from './ProjectCategoryForm';
-import TradingPerformance from './TradingPerformance';
+import TradingAccountsSection from './trading/TradingAccountsSection';
 import ProjectsOverview, { invalidateTradingHeadline } from './ProjectsOverview';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -61,6 +61,7 @@ interface Transaction {
   projectId: string | null;
   projectCategoryId: string | null;
   projectCategory?: ProjectCategory | null;
+  tradingAccountId?: string | null;
 }
 
 interface Project {
@@ -72,7 +73,7 @@ interface Project {
   imageUrl?: string | null;
   purchaseTxId: string | null;
   /** Trading projects: the investment accounts whose trades feed the Performance section (link order). */
-  accounts?: { id: string; bankName: string; accountName: string; accountType: string; provider: string }[];
+  accounts?: { id: string; bankName: string; accountName: string; accountType: string; provider: string; kind?: 'broker' | 'prop_firm'; status?: 'active' | 'evaluation' | 'funded' | 'failed' | 'closed'; firm?: string | null }[];
   lastActivity?: string | null;
   monthly?: { month: string; income: number; expenses: number; net: number }[];
   transactions?: Transaction[];
@@ -125,6 +126,8 @@ export default function ProjectsPage() {
   // Closed projects (sold or terminated) are tucked away until the user asks to see them.
   const [showClosed, setShowClosed] = useState(false);
   const [showForm, setShowForm]       = useState(false);
+  const [perfRefresh, setPerfRefresh] = useState(0);
+  const [showAddAccount, setShowAddAccount] = useState<string | null>(null); // project id; the modal arrives in Task 10
   const [editing, setEditing]         = useState<Project | null>(null);
   const [showSell, setShowSell]       = useState<Project | null>(null);
   const [showTerminate, setShowTerminate] = useState<Project | null>(null);
@@ -330,6 +333,7 @@ export default function ProjectsPage() {
       setProjects((prev) => editing ? prev.map((p) => (p.id === saved.id ? saved : p)) : [saved, ...prev]);
       setSelectedId(saved.id); setTradingAccountId(null);
       loadDetail(saved.id);
+      setPerfRefresh((n) => n + 1);
       closeForm();
     } finally { setSaving(false); }
   }
@@ -678,6 +682,21 @@ export default function ProjectsPage() {
                   {/* ── Body ── */}
                   <div className="flex flex-col gap-5 px-4 sm:px-5 py-4">
 
+                    {/* ── Trading accounts: overview, or one account (level 2) ── */}
+                    {sel.type === 'trading' && (
+                      <TradingAccountsSection
+                        project={sel}
+                        accountId={tradingAccountId}
+                        onSelectAccount={setTradingAccountId}
+                        onProjectChanged={async () => { await loadDetail(sel.id); setPerfRefresh((n) => n + 1); }}
+                        onEditProject={() => openEdit(sel)}
+                        onAddAccount={() => openEdit(sel)}
+                        refreshKey={perfRefresh}
+                      />
+                    )}
+
+                    {!(sel.type === 'trading' && tradingAccountId) && (
+                    <>
                     {/* P&L breakdown */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {[
@@ -868,11 +887,6 @@ export default function ProjectsPage() {
                       </div>
                     )}
 
-                    {/* ── Trading performance (linked brokerage account) ── */}
-                    {sel.type === 'trading' && (sel.accounts?.length ?? 0) > 0 && (
-                      <TradingPerformance projectId={sel.id} onEdit={() => openEdit(sel)} />
-                    )}
-
                     {/* ── Category breakdown ── */}
                     <div className="flex flex-col gap-2">
                       {/* Toggle bar */}
@@ -1040,6 +1054,8 @@ export default function ProjectsPage() {
                         </div>
                       )}
                     </div>
+                    </>
+                    )}
 
                   </div>
                 </div>

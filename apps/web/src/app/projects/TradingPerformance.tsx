@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useNarrowScreen } from '@/hooks/useNarrowScreen';
 import { monthLabel, monthSeries, monthStats, monthWindow, shortMoney } from '@/lib/investments/monthly';
 
@@ -8,8 +8,6 @@ import { monthLabel, monthSeries, monthStats, monthWindow, shortMoney } from '@/
    Every number comes from GET /api/investments/performance (the API's FIFO
    engine, apps/api/src/investments/performance.ts); this file only renders.
    Spec: docs/superpowers/specs/2026-10-29-trading-performance-design.md */
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
 interface ClosedTrade { date: string; symbol: string; account?: string; side: 'long' | 'short'; quantity: number; entry: number; exit: number; fees: number; pnl: number }
 interface SymbolSummary { symbol: string; name: string | null; realized: number; closedTrades: number; wins: number; openQuantity: number; avgCost: number | null; costBasis: number }
@@ -23,48 +21,40 @@ export interface Performance {
   bySymbol: SymbolSummary[]; byMonth: MonthSummary[]; openPositions: OpenPosition[]; recentClosed: ClosedTrade[];
   cashFlows?: CashFlow[];
 }
+import type { AccountMeta, CashSummary, MonthFlow } from '@/lib/projects/trading';
+export interface TradingOverview {
+  tradingPnl: number; moneyIn: number; moneyOut: number; netInPocket: number;
+  accountsByStatus: Record<'active' | 'evaluation' | 'funded' | 'failed' | 'closed', number>;
+  funded: number; evaluated: number; passRate: number | null; costOfFailed: number; payoutsPerAccount: number | null;
+  byMonth: MonthFlow[];
+}
 interface AccountRef { id: string; bankName: string; accountName: string; accountType: string }
 export interface ProjectPerformance {
   project: { id: string; name: string };
-  accounts: (Performance & { account: AccountRef })[];
+  accounts: (Performance & { account: AccountRef; meta: AccountMeta; cash: CashSummary | null; cashByMonth: MonthFlow[] })[];
   combined: Performance;
+  overview: TradingOverview;
+  unassigned: number;
 }
 
-const money = (n: number, signed = false) => {
+export const money = (n: number, signed = false) => {
   const abs = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (!signed || n === 0) return `$${abs}`;
   return n < 0 ? `-$${abs}` : `+$${abs}`;
 };
-const pnlColor = (n: number) => (n > 0 ? 'var(--color-green)' : n < 0 ? 'var(--color-rose)' : 'var(--color-text-secondary)');
-const dateLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+export const pnlColor = (n: number) => (n > 0 ? 'var(--color-green)' : n < 0 ? 'var(--color-rose)' : 'var(--color-text-secondary)');
+export const dateLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const qty = (n: number) => Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 4 });
 
-const panel: React.CSSProperties = {
+export const panel: React.CSSProperties = {
   background: 'color-mix(in srgb, var(--color-text-primary) 4%, transparent)',
   border: '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)',
   borderRadius: 'var(--radius-card)',
 };
 
-export default function TradingPerformance({ projectId, onEdit }: { projectId: string; onEdit?: () => void }) {
-  const [data, setData] = useState<ProjectPerformance | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  /* 'all' = every linked account added together; otherwise one account's own result.
-     With a single account there is nothing to add up, so that account is the view. */
-  const [view, setView] = useState<string>('all');
-
-  useEffect(() => {
-    let cancelled = false;
-    setData(null); setError(null); setView('all');
-    fetch(`${API}/investments/performance?projectId=${encodeURIComponent(projectId)}`, { credentials: 'include' })
-      .then(async (r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json() as Promise<ProjectPerformance>; })
-      .then((d) => { if (!cancelled) { setData(d); setView(d.accounts.length === 1 ? d.accounts[0].account.id : 'all'); } })
-      .catch(() => { if (!cancelled) setError('Could not load performance'); });
-    return () => { cancelled = true; };
-  }, [projectId]);
-
-  if (error) return <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{error}.</p>;
-  if (!data) return <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading performance…</p>;
-
+export default function TradingPerformance({ data, view, onEdit, onView }: {
+  data: ProjectPerformance; view: string; onEdit?: () => void; onView?: (v: string) => void;
+}) {
   const multi = data.accounts.length > 1;
   const current = view === 'all' ? data.combined : (data.accounts.find((a) => a.account.id === view) ?? data.combined);
   const t = current.trades;
@@ -93,13 +83,14 @@ export default function TradingPerformance({ projectId, onEdit }: { projectId: s
       </div>
 
       {/* Account switcher: the project total (when there is more than one account), then each account on its own */}
+      {onView && (
       <div className="flex items-center gap-2 flex-wrap">
         <div role="tablist" aria-label="Account" className="flex gap-1 p-1 rounded-xl max-w-full overflow-x-auto"
           style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', scrollbarWidth: 'none' }}>
           {[...(multi ? [{ id: 'all', name: 'All accounts', pnl: data.combined.realizedPnl }] : []), ...data.accounts.map((a) => ({ id: a.account.id, name: label(a.account), pnl: a.realizedPnl }))].map((tab) => {
             const on = view === tab.id;
             return (
-              <button key={tab.id} role="tab" aria-selected={on} onClick={() => setView(tab.id)}
+              <button key={tab.id} role="tab" aria-selected={on} onClick={() => onView(tab.id)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 whitespace-nowrap"
                 style={on
                   ? { background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
@@ -117,6 +108,7 @@ export default function TradingPerformance({ projectId, onEdit }: { projectId: s
           </button>
         )}
       </div>
+      )}
 
       {/* Trades without a symbol: rows synced before the trade columns existed. The next sync fills them in. */}
       {t.total > 0 && current.bySymbol.length === 0 && current.openPositions.length === 0 && (
@@ -275,7 +267,7 @@ function Empty({ children }: { children: React.ReactNode }) {
    labelled), the line is the cumulative total since the first month of history, and
    the column beside it carries the figures a trader asks for first. Months the
    engine skipped are filled in so the timeline is continuous. */
-function MonthlyPanel({ months }: { months: MonthSummary[] }) {
+export function MonthlyPanel({ months }: { months: MonthSummary[] }) {
   const narrow = useNarrowScreen();
   const series = monthSeries(months);
   /* Phones draw six months; the figures always read the last twelve so they do not change with the screen. */
