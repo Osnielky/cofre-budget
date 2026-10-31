@@ -413,6 +413,8 @@ export class ProjectsService {
     const followed = await this.followedAccountFor(projectId, tx);
     if (followed) throw new BadRequestException(`${project.name} already follows ${followed.bankName} · ${followed.accountName} — this money is counted in its Performance`);
     if (tradingAccountId) await this.assertFollows(projectId, tradingAccountId);
+    /* Moving a row to another project drops the old project's account: the new project may not follow it. */
+    if (tx.projectId !== projectId) tx.tradingAccountId = null;
     tx.projectId = projectId;
     if (projectCategoryId !== undefined) tx.projectCategoryId = projectCategoryId || null;
     if (tradingAccountId !== undefined) tx.tradingAccountId = tradingAccountId || null;

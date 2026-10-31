@@ -186,4 +186,14 @@ describe('attributing project transactions to an account', () => {
     await service.remove(project.id, 'u1');
     expect(await txs.findOneByOrFail({ id: evalFee.id })).toMatchObject({ projectId: null, projectCategoryId: null, tradingAccountId: null });
   });
+
+  it('re-linking to another project drops the old account; re-linking to the same project keeps it', async () => {
+    const { project, topstep, unrelated, txs } = await setup();
+    const b = await service.create('u1', { name: 'B', type: 'trading' });
+    await service.linkTransaction(project.id, unrelated.id, 'u1', undefined, topstep.id);
+    await service.linkTransaction(project.id, unrelated.id, 'u1');
+    expect((await txs.findOneByOrFail({ id: unrelated.id })).tradingAccountId).toBe(topstep.id);
+    await service.linkTransaction(b.id, unrelated.id, 'u1');
+    expect(await txs.findOneByOrFail({ id: unrelated.id })).toMatchObject({ projectId: b.id, tradingAccountId: null });
+  });
 });
