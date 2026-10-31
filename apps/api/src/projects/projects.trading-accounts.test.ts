@@ -102,4 +102,34 @@ describe('manual trading accounts', () => {
     const project = await service.create('u1', { name: 'Trading', type: 'trading' });
     await expect(service.update(project.id, 'u1', { bankAccountIds: [checking.id] })).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  const attributed = async (projectId: string, tradingAccountId: string) => {
+    const txs = ds.getRepository(Transaction);
+    return txs.save(txs.create({ userId: 'u1', bankAccountId: checking.id, source: 'manual', amount: -25, name: 'Eval fee', date: '2026-10-05', projectId, tradingAccountId }));
+  };
+
+  it('removeAccount clears attributions to that account and keeps the row and the bank account', async () => {
+    const project = await service.create('u1', { name: 'Trading', type: 'trading', bankAccountIds: [schwab.id] });
+    const tx = await attributed(project.id, schwab.id);
+    await service.removeAccount(project.id, schwab.id, 'u1');
+    const after = await ds.getRepository(Transaction).findOneByOrFail({ id: tx.id });
+    expect(after.tradingAccountId).toBeNull();
+    expect(after.projectId).toBe(project.id);
+    expect(await ds.getRepository(BankAccount).countBy({ id: schwab.id })).toBe(1);
+  });
+
+  it('replaceLinks drops a link that leaves, clears its attributions and keeps the remaining link metadata', async () => {
+    const project = await service.create('u1', { name: 'Trading', type: 'trading' });
+    const topstep = await service.addManualAccount(project.id, 'u1', { name: '50K #1', firm: 'Topstep', status: 'funded' });
+    await service.update(project.id, 'u1', { bankAccountIds: [topstep.id, schwab.id] });
+    const dropped = await attributed(project.id, schwab.id);
+    const kept = await attributed(project.id, topstep.id);
+
+    const updated = await service.update(project.id, 'u1', { bankAccountIds: [topstep.id] });
+    expect(updated.accounts.map((a) => [a.id, a.status])).toEqual([[topstep.id, 'funded']]);
+    expect(await ds.getRepository(ProjectAccount).countBy({ bankAccountId: schwab.id })).toBe(0);
+    const txs = ds.getRepository(Transaction);
+    expect((await txs.findOneByOrFail({ id: dropped.id })).tradingAccountId).toBeNull();
+    expect((await txs.findOneByOrFail({ id: kept.id })).tradingAccountId).toBe(topstep.id);
+  });
 });
