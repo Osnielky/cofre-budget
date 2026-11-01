@@ -3,7 +3,7 @@ import type { Transaction, Category } from '@/lib/dashboard/types';
 import { resolveRange } from './range';
 import {
   summarize, monthlySeries, categoryRows, categoryStack, merchantRows, moneyFlow,
-  weekdayProfile, cumulativeSpend, largestTransactions, insights, pctChange, merchantKey, makeGrouper, sortRows,
+  weekdayProfile, cumulativeSpend, largestTransactions, insights, pctChange, merchantKey, makeGrouper, sortRows, nameOf, biggestMoves,
 } from './compute';
 import { toCsv } from './csv';
 
@@ -227,5 +227,47 @@ describe('makeGrouper / sortRows', () => {
     ];
     expect(sortRows(list, 'change').map((x) => x.id)).toEqual(['b', 'c', 'a']);
     expect(sortRows(list, 'amount')).toBe(list);
+  });
+});
+
+describe('nameOf and insight thresholds', () => {
+  it('names an empty-named row by its category, or "Unnamed transaction"', () => {
+    expect(nameOf({ name: '  ', categoryRef: groceries })).toBe('Groceries (unnamed)');
+    expect(nameOf({ name: '', categoryRef: null })).toBe('Unnamed transaction');
+    const rows = merchantRows([tx('2026-10-01', -1300, '', null)], [], ['2026-10']);
+    expect(rows[0].name).toBe('Unnamed transaction');
+  });
+
+  it('holds the comparison facts back on day 1 of a period and names the largest expense', () => {
+    const dayOne = resolveRange('this-month', new Date(2026, 10, 1)); // Nov 1 vs Oct
+    const todayRows = [tx('2026-11-01', -1300, '', null)];
+    const octRows = [tx('2026-10-05', -674, 'Whole Foods'), tx('2026-10-06', -300, 'Chipotle', dining)];
+    const ids = insights(todayRows, octRows, dayOne, [], new Date(2026, 10, 1)).map((i) => i.id);
+    expect(ids).not.toContain('cat-down');
+    expect(ids).not.toContain('weekend');
+    expect(ids).not.toContain('top-merchant');
+    expect(ids).not.toContain('largest');
+    expect(ids).toContain('uncategorized');
+  });
+
+  it('adds the top-3 share and income-sources facts when there is enough to say', () => {
+    const rent = cat('rrr111', 'Rent'), fun = cat('fff222', 'Fun'), freelance = cat('ggg333', 'Freelance', 'income');
+    const rows = [
+      tx('2026-10-01', 4000, 'ACME', salary), tx('2026-10-02', 1000, 'CLIENT', freelance),
+      tx('2026-10-03', -1200, 'Landlord', rent), tx('2026-10-04', -400, 'Whole Foods'), tx('2026-10-05', -200, 'Chipotle', dining), tx('2026-10-06', -50, 'Cinema', fun),
+    ];
+    const r = resolveRange('this-month', now);
+    const facts = insights(rows, prev, r, [], now);
+    expect(facts.find((i) => i.id === 'top3-share')?.text).toBe('Rent, Groceries, Dining made up 97% of your spending.');
+    expect(facts.find((i) => i.id === 'income-sources')?.text).toBe('Income came from 2 sources; Salary was 80% of it.');
+  });
+});
+
+describe('biggestMoves', () => {
+  it('lists the categories that moved the most each way, and nothing without a previous period', () => {
+    const moves = biggestMoves(cur, prev, []);
+    expect(moves.up.map((r) => r.name)).toEqual(['Groceries']);     // 200.5 vs 100
+    expect(moves.down.map((r) => r.name)).toEqual(['Dining']);      // 105 vs 300
+    expect(biggestMoves(cur, [], [])).toEqual({ up: [], down: [] });
   });
 });

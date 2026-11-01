@@ -4,8 +4,11 @@ import { useThemeColors } from '@/components/ThemeProvider';
 import type { Summary, MonthPoint } from '@/lib/reports/compute';
 import { money, Delta, Spark } from './ui';
 
+/** A smaller fact tile shown beside the four headline figures on wide screens. */
+export interface KpiExtra { label: string; value: string; sub: string }
+
 /** Income · Spending · Net · Savings rate, each vs the previous period, with a monthly sparkline when the period spans months. */
-export default function KpiStrip({ summary, months, prevLabel, loading }: { summary: Summary; months: MonthPoint[]; prevLabel: string; loading: boolean }) {
+export default function KpiStrip({ summary, months, prevLabel, loading, extras = [] }: { summary: Summary; months: MonthPoint[]; prevLabel: string; loading: boolean; extras?: KpiExtra[] }) {
   const tc = useThemeColors();
   const tiles = [
     { label: 'Income', value: money(summary.income), delta: summary.deltas.income, inverse: false, color: tc.green, spark: months.map((m) => m.income), prev: money(summary.prev.income) },
@@ -14,7 +17,8 @@ export default function KpiStrip({ summary, months, prevLabel, loading }: { summ
     { label: 'Savings rate', value: summary.savingsRate == null ? '—' : `${summary.savingsRate.toFixed(0)}%`, delta: summary.deltas.savingsRate, inverse: false, points: true, color: tc.sky, spark: months.map((m) => (m.income > 0 ? (m.net / m.income) * 100 : 0)), prev: summary.prev.savingsRate == null ? '—' : `${summary.prev.savingsRate.toFixed(0)}%` },
   ];
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-4">
+    <div className="flex flex-col gap-2.5 sm:gap-4 2xl:flex-row">
+    <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-4 2xl:flex-[3] min-w-0">
       {tiles.map((t) => (
         <div key={t.label} className="rounded-2xl p-3.5 sm:p-4 flex flex-col gap-1 min-w-0"
           style={{ background: `linear-gradient(140deg, color-mix(in srgb, ${t.color} 9%, transparent), var(--color-surface) 60%)`, backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
@@ -29,6 +33,20 @@ export default function KpiStrip({ summary, months, prevLabel, loading }: { summ
           {!loading && months.length > 1 && <div className="mt-1"><Spark values={t.spark} color={t.color} /></div>}
         </div>
       ))}
+    </div>
+    {/* Extra facts: a row of three under the headline tiles, a column beside them on wide screens */}
+    {extras.length > 0 && !loading && (
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-4 2xl:flex-[1.3] min-w-0">
+        {extras.map((e) => (
+          <div key={e.label} className="rounded-2xl p-3 sm:p-3.5 flex flex-col gap-0.5 min-w-0"
+            style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
+            <p className="text-[10.5px] sm:text-[11px] font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>{e.label}</p>
+            <p className="text-[16px] sm:text-[18px] font-bold tabular-nums leading-6 truncate">{e.value}</p>
+            <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-muted)' }}>{e.sub}</p>
+          </div>
+        ))}
+      </div>
+    )}
     </div>
   );
 }

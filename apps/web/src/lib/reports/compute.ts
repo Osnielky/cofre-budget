@@ -174,14 +174,19 @@ export interface MerchantRow {
 
 export const merchantKey = (name: string) => name.trim().toLowerCase().replace(/\s+/g, ' ').replace(/[#*]\s*\S+$/, '').trim();
 
+/* A manual or imported row can have an empty name; without a fallback every
+   sentence built from it reads "took 100% of your spending" with a hole in it. */
+export const nameOf = (t: Pick<Transaction, 'name' | 'categoryRef'>): string =>
+  t.name.trim() || (t.categoryRef?.name ? `${t.categoryRef.name} (unnamed)` : 'Unnamed transaction');
+
 export function merchantRows(cur: Transaction[], prev: Transaction[], months: string[], dir: 'income' | 'expense' = 'expense'): MerchantRow[] {
   const pick = dir === 'income' ? isIncome : isSpend;
   const rows = new Map<string, MerchantRow & { names: Map<string, number> }>();
   const get = (t: Transaction) => {
     const k = merchantKey(t.name);
     let row = rows.get(k);
-    if (!row) { row = { name: t.name.trim(), total: 0, count: 0, avg: 0, prevTotal: 0, delta: null, isNew: false, series: months.map(() => 0), names: new Map() }; rows.set(k, row); }
-    row.names.set(t.name.trim(), (row.names.get(t.name.trim()) ?? 0) + 1);
+    if (!row) { row = { name: nameOf(t), total: 0, count: 0, avg: 0, prevTotal: 0, delta: null, isNew: false, series: months.map(() => 0), names: new Map() }; rows.set(k, row); }
+    row.names.set(nameOf(t), (row.names.get(nameOf(t)) ?? 0) + 1);
     return row;
   };
   for (const t of flow(cur).filter(pick)) {
@@ -272,12 +277,26 @@ export interface Insight { id: string; tone: 'good' | 'bad' | 'neutral'; text: s
 const money = (n: number) => `$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 const pct = (n: number) => `${Math.abs(Math.round(n))}%`;
 
+/** Days of the period that have already happened (the period may run past today). */
+export function elapsedDays(range: Pick<ReportRange, 'from' | 'to'>, now: Date): number {
+  const elapsedTo = ymd(now) < range.to ? ymd(now) : range.to;
+  return elapsedTo >= range.from ? dayCount(range.from, elapsedTo) : 0;
+}
+
+/* Comparisons against the previous period only mean something once the current
+   one has some history: on day 1 of a month every category has "fallen 100%". */
+const MIN_DAYS_FOR_COMPARISONS = 7;
+const MIN_ROWS_FOR_PATTERNS = 5;
+
 export function insights(cur: Transaction[], prev: Transaction[], range: ReportRange, projects: BucketProject[] = [], now: Date = new Date()): Insight[] {
   const out: Insight[] = [];
   const s = summarize(cur, prev, range.days);
   const hasPrev = flow(prev).length > 0;
+  const elapsed = elapsedDays(range, now);
+  const settled = elapsed >= MIN_DAYS_FOR_COMPARISONS;
+  const spendRows = flow(cur).filter(isSpend);
 
-  if (s.savingsRate != null && s.prev.savingsRate != null) {
+  if (s.savingsRate != null && s.prev.savingsRate != null && settled) {
     const d = s.savingsRate - s.prev.savingsRate;
     if (Math.abs(d) >= 3) out.push({ id: 'savings-rate', tone: d > 0 ? 'good' : 'bad', text: `You kept ${pct(s.savingsRate)} of your income, ${d > 0 ? 'up' : 'down'} from ${pct(s.prev.savingsRate)} in the previous period.` });
   } else if (s.savingsRate != null && s.income > 0) {
@@ -285,40 +304,61 @@ export function insights(cur: Transaction[], prev: Transaction[], range: ReportR
   }
 
   const cats = categoryRows(cur, prev, 'expense', projects).filter((r) => r.id !== 'uncat');
-  if (hasPrev) {
+  if (hasPrev && settled) {
     const up = cats.filter((r) => r.prevValue >= 25 && r.value - r.prevValue >= 50 && (r.delta ?? 0) >= 20).sort((a, b) => (b.value - b.prevValue) - (a.value - a.prevValue))[0];
     if (up) out.push({ id: 'cat-up', tone: 'bad', text: `${up.icon} ${up.name} rose ${pct(up.delta!)} to ${money(up.value)} (${money(up.value - up.prevValue)} more than before).` });
     const down = cats.filter((r) => r.prevValue >= 50 && r.prevValue - r.value >= 50 && (r.delta ?? 0) <= -20).sort((a, b) => (b.prevValue - b.value) - (a.prevValue - a.value))[0];
     if (down) out.push({ id: 'cat-down', tone: 'good', text: `${down.icon} ${down.name} fell ${pct(down.delta!)} to ${money(down.value)}, saving ${money(down.prevValue - down.value)}.` });
   }
 
+  if (cats.length >= 4 && s.spending > 0) {
+    const top3 = cats.slice(0, 3).reduce((x, r) => x + r.value, 0);
+    out.push({ id: 'top3-share', tone: 'neutral', text: `${cats.slice(0, 3).map((r) => r.name).join(', ')} made up ${pct((top3 / s.spending) * 100)} of your spending.` });
+  }
+
+  const sources = categoryRows(cur, [], 'income', projects);
+  if (sources.length >= 2 && s.income > 0) {
+    out.push({ id: 'income-sources', tone: 'neutral', text: `Income came from ${sources.length} sources; ${sources[0].name} was ${pct(sources[0].share)} of it.` });
+  }
+
   const merchants = merchantRows(cur, prev, range.months);
-  if (hasPrev) {
+  if (hasPrev && settled) {
     const fresh = merchants.filter((m) => m.isNew);
     const freshTotal = fresh.reduce((x, m) => x + m.total, 0);
     if (fresh.length && freshTotal >= 50) out.push({ id: 'new-merchants', tone: 'neutral', text: `${money(freshTotal)} went to ${fresh.length} merchant${fresh.length === 1 ? '' : 's'} you had not paid in the previous period${fresh[0] ? `, led by ${fresh[0].name}` : ''}.` });
   }
-  if (merchants[0] && s.spending > 0 && merchants[0].total / s.spending >= 0.15) {
+  if (merchants[0] && merchants.length >= 3 && s.spending > 0 && merchants[0].total / s.spending >= 0.15) {
     out.push({ id: 'top-merchant', tone: 'neutral', text: `${merchants[0].name} took ${pct((merchants[0].total / s.spending) * 100)} of your spending (${money(merchants[0].total)} over ${merchants[0].count} transaction${merchants[0].count === 1 ? '' : 's'}).` });
   }
 
   const big = largestTransactions(cur, 1)[0];
-  if (big && s.spending > 0 && abs(big) / s.spending >= 0.1) out.push({ id: 'largest', tone: 'neutral', text: `Your largest expense was ${money(abs(big))} at ${big.name.trim()} on ${parseYmd(big.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.` });
+  if (big && spendRows.length >= 2 && s.spending > 0 && abs(big) / s.spending >= 0.1) out.push({ id: 'largest', tone: 'neutral', text: `Your largest expense was ${money(abs(big))} at ${nameOf(big)} on ${parseYmd(big.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.` });
 
   const wk = weekdayProfile(cur, range);
   const weekend = wk[5].total + wk[6].total;
-  if (s.spending >= 200 && weekend / s.spending >= 0.4) out.push({ id: 'weekend', tone: 'neutral', text: `${pct((weekend / s.spending) * 100)} of your spending happened on weekends.` });
+  if (settled && spendRows.length >= MIN_ROWS_FOR_PATTERNS && s.spending >= 200 && weekend / s.spending >= 0.4) out.push({ id: 'weekend', tone: 'neutral', text: `${pct((weekend / s.spending) * 100)} of your spending happened on weekends.` });
 
-  const elapsedTo = ymd(now) < range.to ? ymd(now) : range.to;
-  if (elapsedTo >= range.from) {
-    const spendDays = new Set(flow(cur).filter(isSpend).map(dayOf));
-    const elapsed = dayCount(range.from, elapsedTo);
+  if (elapsed > 0) {
+    const spendDays = new Set(spendRows.map(dayOf));
     const quiet = elapsed - spendDays.size;
-    if (s.spending > 0 && elapsed >= 7 && quiet > 0) out.push({ id: 'no-spend', tone: 'good', text: `${quiet} of ${elapsed} days had no spending at all.` });
+    if (s.spending > 0 && settled && quiet > 0) out.push({ id: 'no-spend', tone: 'good', text: `${quiet} of ${elapsed} days had no spending at all.` });
   }
 
   const uncat = categoryRows(cur, [], 'expense', projects).find((r) => r.id === 'uncat');
   if (uncat && uncat.value >= 20) out.push({ id: 'uncategorized', tone: 'bad', text: `${money(uncat.value)} across ${uncat.count} transaction${uncat.count === 1 ? '' : 's'} is still uncategorized, so these reports are missing it.` });
 
   return out;
+}
+
+/* ── Biggest moves (category rises and falls vs the previous period) ──── */
+
+export interface CategoryMoves { up: CategoryRow[]; down: CategoryRow[] }
+
+/** The categories that moved the most money, each way, excluding Uncategorized. Empty until the previous period has rows. */
+export function biggestMoves(cur: Transaction[], prev: Transaction[], projects: BucketProject[] = [], n = 4): CategoryMoves {
+  if (flow(prev).length === 0) return { up: [], down: [] };
+  const rows = categoryRows(cur, prev, 'expense', projects).filter((r) => r.id !== 'uncat');
+  const up = rows.filter((r) => r.value > r.prevValue).sort((a, b) => (b.value - b.prevValue) - (a.value - a.prevValue)).slice(0, n);
+  const down = rows.filter((r) => r.value < r.prevValue).sort((a, b) => (b.prevValue - b.value) - (a.prevValue - a.value)).slice(0, n);
+  return { up, down };
 }

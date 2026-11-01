@@ -9,7 +9,7 @@ import { useReportsData } from '@/hooks/useReportsData';
 import { resolveRange, parseYmd } from '@/lib/reports/range';
 import {
   summarize, monthlySeries, categoryRows, categoryStack, merchantRows, moneyFlow,
-  insights, weekdayProfile, cumulativeSpend, largestTransactions, makeGrouper, sortRows, GROUP_OPTIONS,
+  insights, weekdayProfile, cumulativeSpend, largestTransactions, makeGrouper, sortRows, GROUP_OPTIONS, biggestMoves, elapsedDays,
   type CategoryRow, type GroupBy,
 } from '@/lib/reports/compute';
 import { parseReportState, serializeReportState, applyQuestion, type ReportState, type ReportTab } from '@/lib/reports/state';
@@ -25,6 +25,9 @@ import CategoryList from '@/components/reports/CategoryList';
 import CategoryStackChart from '@/components/reports/CategoryStackChart';
 import WeekdayChart from '@/components/reports/WeekdayChart';
 import MerchantsTable from '@/components/reports/MerchantsTable';
+import MerchantsMini from '@/components/reports/MerchantsMini';
+import MovesPanel from '@/components/reports/MovesPanel';
+import LargestList from '@/components/reports/LargestList';
 import CashFlowTab from '@/components/reports/CashFlowTab';
 import NetWorthTab from '@/components/reports/NetWorthTab';
 
@@ -85,6 +88,19 @@ function Reports() {
   const weekdays = useMemo(() => weekdayProfile(cur, range), [cur, range]);
   const pace = useMemo(() => cumulativeSpend(cur, prev, range, now), [cur, prev, range, now]);
   const largest = useMemo(() => largestTransactions(cur, 6), [cur]);
+  const moves = useMemo(() => biggestMoves(cur, prev, projects), [cur, prev, projects]);
+  const incomeSources = useMemo(() => merchantRows(cur, prev, range.months, 'income'), [cur, prev, range.months]);
+  const elapsed = useMemo(() => elapsedDays(range, now), [range, now]);
+  /* Three smaller facts beside the headline tiles. Every number is from compute(). */
+  const kpiExtras = useMemo(() => {
+    const topCat = topSpend[0];
+    const perDay = elapsed > 0 ? summary.spending / elapsed : 0;
+    return [
+      { label: 'Spent per day', value: money(perDay, false), sub: elapsed === range.days ? `over ${elapsed} day${elapsed === 1 ? '' : 's'}` : `${elapsed} of ${range.days} days so far` },
+      { label: 'Transactions', value: String(summary.txCount), sub: summary.prev.txCount ? `vs ${summary.prev.txCount} · ${range.prevLabel}` : 'in this period' },
+      { label: 'Biggest category', value: topCat ? topCat.name : '—', sub: topCat ? `${money(topCat.value, false)} · ${topCat.share.toFixed(0)}% of spending` : 'no spending yet' },
+    ];
+  }, [topSpend, elapsed, summary, range.days, range.prevLabel]);
   const categoryGrouper = useMemo(() => makeGrouper('category', projects), [projects]);
 
   /* Deep link into Transactions for the bucket that is open. Project and
@@ -135,7 +151,7 @@ function Reports() {
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
-        <div className="px-4 sm:px-6 py-4 sm:py-6 flex flex-col gap-4 sm:gap-5 max-w-[1400px]">
+        <div className="px-4 sm:px-6 py-4 sm:py-6 flex flex-col gap-4 sm:gap-5 max-w-[1920px]">
           {/* Header */}
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
@@ -176,7 +192,7 @@ function Reports() {
 
           {error && <p className="text-sm rounded-xl px-4 py-3" style={{ color: 'var(--color-rose)', background: 'color-mix(in srgb, var(--color-rose) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-rose) 30%, transparent)' }}>{error}</p>}
 
-          <KpiStrip summary={summary} months={months} prevLabel={range.prevLabel} loading={loading} />
+          <KpiStrip summary={summary} months={months} prevLabel={range.prevLabel} loading={loading} extras={kpiExtras} />
 
           <Segmented value={state.tab} options={TABS} onChange={setTab} size="md" />
 
@@ -185,26 +201,38 @@ function Reports() {
           ) : (
             <>
               {state.tab === 'overview' && (
-                <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-                  <Card className="xl:col-span-3" title="Money flow" subtitle="Income sources → cash → where it went">
+                <div className="grid grid-cols-1 xl:grid-cols-5 2xl:grid-cols-9 gap-4">
+                  <Card className="xl:col-span-3 2xl:col-span-4" title="Money flow" subtitle="Income sources → cash → where it went">
                     <MoneyFlowChart flow={flow} />
                   </Card>
-                  <Card className="xl:col-span-2" title="What stands out" subtitle={`${range.label} vs ${range.prevLabel}`}>
+                  <Card className="xl:col-span-2 2xl:col-span-3" title="What stands out" subtitle={`${range.label} vs ${range.prevLabel}`}>
                     <InsightsList items={facts} />
                   </Card>
-                  <Card className="xl:col-span-3" title="Spending pace" subtitle="Cumulative spending by day of period">
+                  <Card className="xl:col-span-5 2xl:col-span-2" title="What changed" subtitle={`Categories vs ${range.prevLabel}`}>
+                    <MovesPanel moves={moves} prevLabel={range.prevLabel} />
+                  </Card>
+                  <Card className="xl:col-span-3 2xl:col-span-4" title="Spending pace" subtitle="Cumulative spending by day of period">
                     <PaceChart points={pace} prevLabel={range.prevLabel} />
                   </Card>
-                  <Card className="xl:col-span-2" title="Top categories" right={<button type="button" onClick={() => update({ tab: 'spending', view: 'category', open: null })} className="text-xs font-semibold cursor-pointer" style={{ color: 'var(--color-primary)' }}>All spending →</button>}>
+                  <Card className="xl:col-span-2 2xl:col-span-3" title="Top categories" right={<button type="button" onClick={() => update({ tab: 'spending', view: 'category', open: null })} className="text-xs font-semibold cursor-pointer" style={{ color: 'var(--color-primary)' }}>All spending →</button>}>
                     <CategoryList rows={topSpend} cur={cur} months={range.months} grouper={categoryGrouper} dir="expense" prevLabel={range.prevLabel} limit={6}
                       linkFor={(r) => txLink(r, 'category')} />
+                  </Card>
+                  <Card className="xl:col-span-5 2xl:col-span-2" title="Top merchants" right={<button type="button" onClick={() => setTab('merchants')} className="text-xs font-semibold cursor-pointer" style={{ color: 'var(--color-primary)' }}>All merchants →</button>}>
+                    <MerchantsMini rows={merchants} total={summary.spending} />
+                  </Card>
+                  <Card className="xl:col-span-3 2xl:col-span-4" title="By weekday" subtitle="Average spend per day of the week">
+                    <WeekdayChart profile={weekdays} />
+                  </Card>
+                  <Card className="xl:col-span-2 2xl:col-span-5" title="Largest expenses" subtitle="The biggest single transactions this period">
+                    <LargestList items={largest} />
                   </Card>
                 </div>
               )}
 
               {state.tab === 'spending' && (
-                <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-                  <Card className="xl:col-span-3" title={`Spending by ${viewLabel.toLowerCase()}`} subtitle="Tap a row for its months, merchants and transactions"
+                <div className="grid grid-cols-1 xl:grid-cols-5 2xl:grid-cols-9 gap-4">
+                  <Card className="xl:col-span-3 2xl:col-span-4" title={`Spending by ${viewLabel.toLowerCase()}`} subtitle="Tap a row for its months, merchants and transactions"
                     right={<div className="flex items-center gap-2 flex-wrap justify-end">
                       <Segmented value={spendView} options={GROUP_OPTIONS} onChange={(view) => update({ view, open: null })} />
                       <Segmented value={state.sort} options={SORTS} onChange={(sort) => update({ sort })} />
@@ -212,35 +240,28 @@ function Reports() {
                     <CategoryList rows={spendRows} cur={cur} months={range.months} grouper={spendGrouper} dir="expense" prevLabel={range.prevLabel}
                       openId={state.open} onOpen={(open) => update({ open })} linkFor={(r) => txLink(r, spendView)} />
                   </Card>
-                  <div className="xl:col-span-2 flex flex-col gap-4">
+                  <div className="xl:col-span-2 2xl:col-span-3 flex flex-col gap-4">
                     <Card title="By month" subtitle={spendView === 'category' ? 'Top categories stacked; the rest as Other' : `${viewLabel} by month`}>
                       <CategoryStackChart stack={spendStack} />
                     </Card>
                     <Card title="By weekday" subtitle="Average spend per day of the week">
                       <WeekdayChart profile={weekdays} />
                     </Card>
-                    <Card title="Largest expenses">
-                      {largest.length === 0 ? <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>None yet.</p> : (
-                        <ul className="flex flex-col gap-1.5">
-                          {largest.map((t) => (
-                            <li key={t.id} className="flex items-center justify-between gap-3 text-[12.5px]">
-                              <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>
-                                <span className="tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{parseYmd(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span> {t.name}
-                                {t.categoryRef && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-md" style={{ background: `color-mix(in srgb, ${t.categoryRef.color} 14%, transparent)`, color: t.categoryRef.color }}>{t.categoryRef.icon} {t.categoryRef.name}</span>}
-                              </span>
-                              <span className="tabular-nums font-bold shrink-0">{money(Math.abs(Number(t.amount)))}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                  </div>
+                  <div className="xl:col-span-5 2xl:col-span-2 grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-1 gap-4 content-start">
+                    <Card title="What changed" subtitle={`Categories vs ${range.prevLabel}`}>
+                      <MovesPanel moves={moves} prevLabel={range.prevLabel} />
+                    </Card>
+                    <Card title="Largest expenses" subtitle="Biggest single transactions">
+                      <LargestList items={largest} total={summary.spending} />
                     </Card>
                   </div>
                 </div>
               )}
 
               {state.tab === 'income' && (
-                <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-                  <Card className="xl:col-span-3" title={incomeView === 'account' ? 'Income by account' : 'Income by source'} subtitle="Tap a row for its months and transactions"
+                <div className="grid grid-cols-1 xl:grid-cols-5 2xl:grid-cols-9 gap-4">
+                  <Card className="xl:col-span-3 2xl:col-span-4" title={incomeView === 'account' ? 'Income by account' : 'Income by source'} subtitle="Tap a row for its months and transactions"
                     right={<div className="flex items-center gap-2 flex-wrap justify-end">
                       <Segmented value={incomeView} options={INCOME_GROUPS} onChange={(view) => update({ view, open: null })} />
                       <Segmented value={state.sort} options={SORTS} onChange={(sort) => update({ sort })} />
@@ -248,8 +269,11 @@ function Reports() {
                     <CategoryList rows={incomeRows} cur={cur} months={range.months} grouper={incomeGrouper} dir="income" prevLabel={range.prevLabel}
                       openId={state.open} onOpen={(open) => update({ open })} linkFor={(r) => txLink(r, incomeView)} />
                   </Card>
-                  <Card className="xl:col-span-2" title="By month">
+                  <Card className="xl:col-span-2 2xl:col-span-3" title="By month">
                     <CategoryStackChart stack={incomeStack} />
+                  </Card>
+                  <Card className="xl:col-span-5 2xl:col-span-2" title="Who paid you" subtitle="Payers this period, and how that changed">
+                    <MerchantsMini rows={incomeSources} total={summary.income} dir="income" />
                   </Card>
                 </div>
               )}
