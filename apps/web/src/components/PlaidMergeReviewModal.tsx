@@ -4,8 +4,8 @@ import { useMemo, useState } from 'react';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import { accountTypeMeta } from '@/lib/accountTypes';
 import {
-  accountTypeFromSubtype, cutoverSentence, groupCandidates, summarizeDecisions, untrackedHint,
-  type MergeCandidate, type RankedCandidate, type ReviewDecision,
+  accountTypeFromSubtype, cutoverSentence, groupCandidates, matchWording, summarizeDecisions, untrackedHint,
+  type MatchReason, type MergeCandidate, type RankedCandidate, type ReviewDecision,
 } from '@/lib/plaid/merge-review';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
@@ -14,6 +14,8 @@ interface SuggestedMatch {
   id: string;
   accountName: string;
   lastTransactionDate: string | null;
+  /** Older previews carry no reason; treat them as a last-4 match. */
+  reason?: MatchReason;
 }
 
 export interface PreviewAccount {
@@ -168,7 +170,11 @@ function AccountCard({ account: pa, institutionName, manualAccounts, lastEntryDa
   const pick = (id: string) => onChange({ action: 'merge', mergeIntoAccountId: id, cutoverDate: lastEntryDates[id] ?? '' });
   const type = accountTypeFromSubtype(pa.subtype);
   const meta = accountTypeMeta(type);
-  const { sameBank, otherBanks } = useMemo(() => groupCandidates(manualAccounts, institutionName, pa.mask), [manualAccounts, institutionName, pa.mask]);
+  const { sameBank, otherBanks } = useMemo(
+    () => groupCandidates(manualAccounts, institutionName, pa.mask, pa.suggestedMatch),
+    [manualAccounts, institutionName, pa.mask, pa.suggestedMatch],
+  );
+  const wording = pa.suggestedMatch ? matchWording(pa.suggestedMatch.reason ?? 'last4', meta.label) : null;
   const [showOthers, setShowOthers] = useState(() => !!d.mergeIntoAccountId && otherBanks.some((a) => a.id === d.mergeIntoAccountId));
   const [editDate, setEditDate] = useState(false);
   const chosen = [...sameBank, ...otherBanks].find((a) => a.id === d.mergeIntoAccountId) ?? null;
@@ -198,7 +204,7 @@ function AccountCard({ account: pa, institutionName, manualAccounts, lastEntryDa
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup" aria-label={`What to do with ${pa.name}`}>
         <ChoiceTile selected={d.action === 'merge'} disabled={!hasCandidates}
           title="Link to an account I have"
-          caption={pa.suggestedMatch ? 'Recommended · same last 4' : hasCandidates ? 'Keeps its name and history' : 'No manual accounts yet'}
+          caption={wording ? wording.caption : hasCandidates ? 'Keeps its name and history' : 'No manual accounts yet'}
           onSelect={() => {
             const id = d.mergeIntoAccountId || pa.suggestedMatch?.id || '';
             if (id) pick(id); else onChange({ action: 'merge', mergeIntoAccountId: '' });
@@ -218,7 +224,8 @@ function AccountCard({ account: pa, institutionName, manualAccounts, lastEntryDa
               </p>
             )}
             {sameBank.map((a) => (
-              <CandidateRow key={a.id} candidate={a} selected={a.id === d.mergeIntoAccountId} onSelect={() => pick(a.id)} />
+              <CandidateRow key={a.id} candidate={a} selected={a.id === d.mergeIntoAccountId} onSelect={() => pick(a.id)}
+                tag={a.suggested ? wording?.tag : a.sameLast4 ? 'same last 4' : undefined} />
             ))}
             {otherBanks.length > 0 && (
               <button type="button" onClick={() => setShowOthers((v) => !v)}
@@ -229,7 +236,8 @@ function AccountCard({ account: pa, institutionName, manualAccounts, lastEntryDa
               </button>
             )}
             {showOthers && otherBanks.map((a) => (
-              <CandidateRow key={a.id} candidate={a} selected={a.id === d.mergeIntoAccountId} showBank onSelect={() => pick(a.id)} />
+              <CandidateRow key={a.id} candidate={a} selected={a.id === d.mergeIntoAccountId} showBank onSelect={() => pick(a.id)}
+                tag={a.sameLast4 ? 'same last 4' : undefined} />
             ))}
           </div>
 
@@ -295,8 +303,8 @@ function ChoiceTile({ selected, disabled, title, caption, onSelect }: {
   );
 }
 
-function CandidateRow({ candidate: a, selected, showBank, onSelect }: {
-  candidate: RankedCandidate; selected: boolean; showBank?: boolean; onSelect: () => void;
+function CandidateRow({ candidate: a, selected, showBank, tag, onSelect }: {
+  candidate: RankedCandidate; selected: boolean; showBank?: boolean; tag?: string; onSelect: () => void;
 }) {
   const meta = accountTypeMeta(a.accountType);
   return (
@@ -314,10 +322,10 @@ function CandidateRow({ candidate: a, selected, showBank, onSelect }: {
           {showBank ? `${a.bankName} · ` : ''}{meta.label}{a.last4 ? ` ···${a.last4}` : ''}
         </span>
       </span>
-      {a.sameLast4 && (
+      {tag && (
         <span className="hidden sm:inline text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0"
           style={{ background: 'color-mix(in srgb, var(--color-green) 16%, transparent)', color: 'var(--color-green)' }}>
-          same last 4
+          {tag}
         </span>
       )}
       {/* The accounts list serves numeric columns as strings. */}

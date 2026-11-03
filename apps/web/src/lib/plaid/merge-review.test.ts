@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  groupCandidates, cutoverSentence, formatCutoverDate, summarizeDecisions, untrackedHint, accountTypeFromSubtype,
+  groupCandidates, cutoverSentence, formatCutoverDate, summarizeDecisions, untrackedHint, accountTypeFromSubtype, matchWording,
   type MergeCandidate, type ReviewDecision,
 } from './merge-review';
 
@@ -24,6 +24,22 @@ describe('groupCandidates', () => {
   it('never tags a match when Plaid has no mask', () => {
     const out = groupCandidates([acct({ last4: '1372' })], 'Bank of America', null);
     expect(out.sameBank[0].sameLast4).toBe(false);
+  });
+
+  it('puts the API\'s bank-and-type suggestion on top and marks it suggested', () => {
+    const chk = acct({ id: 'chk', accountName: 'Bank of America Checking', last4: null });
+    const card = acct({ id: 'card', accountName: 'GREY BOA', accountType: 'credit', last4: '1564' });
+    const out = groupCandidates([card, chk], 'Bank of America', '9452', { id: 'chk', reason: 'bank_type' });
+    expect(out.sameBank.map((a) => a.id)).toEqual(['chk', 'card']);
+    expect(out.sameBank[0]).toMatchObject({ suggested: true, sameLast4: false });
+    expect(out.sameBank[1].suggested).toBe(false);
+  });
+});
+
+describe('matchWording', () => {
+  it('explains why an account was suggested', () => {
+    expect(matchWording('last4', 'Checking')).toEqual({ caption: 'Recommended · same last 4', tag: 'same last 4' });
+    expect(matchWording('bank_type', 'Checking')).toEqual({ caption: 'Recommended · the only Checking here without a last 4', tag: 'likely match' });
   });
 });
 

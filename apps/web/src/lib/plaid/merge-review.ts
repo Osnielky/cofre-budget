@@ -12,8 +12,19 @@ export interface MergeCandidate {
 }
 
 export interface RankedCandidate extends MergeCandidate {
-  /** The manual account's last 4 equals the Plaid mask — the match the API suggested. */
+  /** The manual account's last 4 equals the Plaid mask. */
   sameLast4: boolean;
+  /** The account the API suggested (by last 4, or as the only same-bank account of the type with no last 4). */
+  suggested: boolean;
+}
+
+export type MatchReason = 'last4' | 'bank_type';
+
+/** What the Link tile's caption and the picker's tag say about a suggested match. */
+export function matchWording(reason: MatchReason, typeLabel: string): { caption: string; tag: string } {
+  return reason === 'last4'
+    ? { caption: 'Recommended · same last 4', tag: 'same last 4' }
+    : { caption: `Recommended · the only ${typeLabel} here without a last 4`, tag: 'likely match' };
 }
 
 export interface ReviewDecision {
@@ -24,12 +35,18 @@ export interface ReviewDecision {
 
 const norm = (s: string) => s.trim().toLowerCase();
 
-/** Same-bank accounts first (the last-4 match on top), then every other bank. */
-export function groupCandidates(manual: MergeCandidate[], institutionName: string, mask: string | null) {
+/** Same-bank accounts first (the suggested match on top), then every other bank. */
+export function groupCandidates(
+  manual: MergeCandidate[], institutionName: string, mask: string | null, suggested?: { id: string } | null,
+) {
   const bank = norm(institutionName);
-  const rank = (a: MergeCandidate): RankedCandidate => ({ ...a, sameLast4: !!mask && !!a.last4 && a.last4 === mask });
+  const rank = (a: MergeCandidate): RankedCandidate => ({
+    ...a,
+    sameLast4: !!mask && !!a.last4 && a.last4 === mask,
+    suggested: !!suggested && a.id === suggested.id,
+  });
   const sameBank = manual.filter((a) => norm(a.bankName) === bank).map(rank)
-    .sort((a, b) => Number(b.sameLast4) - Number(a.sameLast4));
+    .sort((a, b) => Number(b.suggested || b.sameLast4) - Number(a.suggested || a.sameLast4));
   const otherBanks = manual.filter((a) => norm(a.bankName) !== bank).map(rank);
   return { sameBank, otherBanks };
 }

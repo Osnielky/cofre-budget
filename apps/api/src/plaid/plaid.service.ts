@@ -30,7 +30,10 @@ export interface PreviewAccount {
   subtype: string;
   balance: number;
   currency: string;
-  suggestedMatch: { id: string; accountName: string; lastTransactionDate: string | null } | null;
+  /** `last4`: the manual account's last 4 equals Plaid's mask. `bank_type`: no last-4 match, but
+      exactly one same-bank manual account of the same type has no last 4 stored (added by hand),
+      so it is the only account this could be. Each manual account is suggested at most once. */
+  suggestedMatch: { id: string; accountName: string; lastTransactionDate: string | null; reason: 'last4' | 'bank_type' } | null;
 }
 
 export interface PreviewExchangeResult {
@@ -209,13 +212,20 @@ export class PlaidService {
       for (const r of rows) lastEntryDates[r.accountId] = r.last;
     }
 
+    const sameBank = manualAccounts.filter((m) => m.bankName.trim().toLowerCase() === institutionName.trim().toLowerCase());
+    const taken = new Set<string>();
     for (const pa of balanceRes.data.accounts) {
       const mask = pa.mask ?? null;
-      const match = mask
-        ? manualAccounts.find(
-            (m) => m.bankName.trim().toLowerCase() === institutionName.trim().toLowerCase() && m.last4 === mask,
-          )
-        : undefined;
+      let match = mask ? sameBank.find((m) => m.last4 === mask && !taken.has(m.id)) : undefined;
+      let reason: 'last4' | 'bank_type' = 'last4';
+      if (!match) {
+        /* Added by hand without digits: the only same-bank account of this type that has no
+           last 4 is the one this must be. Any stored last 4 that differs means another account. */
+        const type = mapPlaidSubtype(pa.subtype ?? '');
+        const untracked = sameBank.filter((m) => !m.last4 && m.accountType === type && !taken.has(m.id));
+        if (untracked.length === 1) { match = untracked[0]; reason = 'bank_type'; }
+      }
+      if (match) taken.add(match.id);
 
       accounts.push({
         plaidAccountId: pa.account_id,
@@ -224,7 +234,7 @@ export class PlaidService {
         subtype: pa.subtype ?? '',
         balance: pa.balances.current ?? 0,
         currency: (pa.balances.iso_currency_code ?? 'USD').toUpperCase(),
-        suggestedMatch: match ? { id: match.id, accountName: match.accountName, lastTransactionDate: lastEntryDates[match.id] ?? null } : null,
+        suggestedMatch: match ? { id: match.id, accountName: match.accountName, lastTransactionDate: lastEntryDates[match.id] ?? null, reason } : null,
       });
     }
 

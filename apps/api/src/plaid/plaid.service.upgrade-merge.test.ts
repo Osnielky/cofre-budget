@@ -85,6 +85,25 @@ async function connectAndMerge(service: PlaidService) {
 }
 
 describe('free → Pro: connecting a bank the user already tracked by hand', () => {
+  it('suggests the only same-bank manual account of the same type when it has no last 4', async () => {
+    const sav = await ds.getRepository(BankAccount).save({ userId: USER, bankName: 'chase', accountName: 'Rainy day', accountType: 'savings', balance: 750, provider: 'manual' });
+    const preview = await makeService({ added: [] }).previewExchange(USER, 'public-tok', 'ins_3', 'Chase', 'pro');
+    expect(preview.accounts.find((a) => a.plaidAccountId === 'plaid-chk')!.suggestedMatch).toMatchObject({ id: checking.id, reason: 'last4' });
+    expect(preview.accounts.find((a) => a.plaidAccountId === 'plaid-sav')!.suggestedMatch).toMatchObject({ id: sav.id, accountName: 'Rainy day', reason: 'bank_type' });
+  });
+
+  it('does not guess when the same-bank account has a different last 4 or when two candidates qualify', async () => {
+    const accounts = ds.getRepository(BankAccount);
+    await accounts.save({ userId: USER, bankName: 'Chase', accountName: 'Old savings', accountType: 'savings', balance: 1, last4: '5555', provider: 'manual' });
+    let preview = await makeService({ added: [] }).previewExchange(USER, 'public-tok', 'ins_3', 'Chase', 'pro');
+    expect(preview.accounts.find((a) => a.plaidAccountId === 'plaid-sav')!.suggestedMatch).toBeNull();
+
+    await accounts.save({ userId: USER, bankName: 'Chase', accountName: 'Savings A', accountType: 'savings', balance: 1, provider: 'manual' });
+    await accounts.save({ userId: USER, bankName: 'Chase', accountName: 'Savings B', accountType: 'savings', balance: 1, provider: 'manual' });
+    preview = await makeService({ added: [] }).previewExchange(USER, 'public-tok', 'ins_3', 'Chase', 'pro');
+    expect(preview.accounts.find((a) => a.plaidAccountId === 'plaid-sav')!.suggestedMatch).toBeNull();
+  });
+
   it('previews the last entry date of every manual account so a hand-picked merge gets a cutover too', async () => {
     const preview = await makeService({ added: [] }).previewExchange(USER, 'public-tok', 'ins_3', 'Chase', 'pro');
     expect(preview.lastEntryDates).toEqual({ [checking.id]: '2026-09-20', [cash.id]: '2026-09-15' });
