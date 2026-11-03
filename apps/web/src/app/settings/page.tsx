@@ -1476,12 +1476,15 @@ function SettingsPageInner() {
         document.body,
       )}
 
-      {mergeReview && (
+      {/* Wait for the accounts list: a preview restored from sessionStorage (OAuth banks)
+          arrives on mount, before the manual accounts it offers to merge into exist. */}
+      {mergeReview && !loading && (
         <PlaidMergeReviewModal
           plaidItemId={mergeReview.plaidItemId}
           institutionName={mergeReview.institutionName}
           plaidAccounts={mergeReview.accounts}
           manualAccounts={accounts.filter((a) => a.provider === 'manual')}
+          lastEntryDates={mergeReview.lastEntryDates}
           onClose={() => setMergeReview(null)}
           onDone={(newAccounts: BankAccount[]) => {
             setMergeReview(null);

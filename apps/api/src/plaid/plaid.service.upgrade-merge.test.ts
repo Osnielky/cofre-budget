@@ -85,6 +85,11 @@ async function connectAndMerge(service: PlaidService) {
 }
 
 describe('free → Pro: connecting a bank the user already tracked by hand', () => {
+  it('previews the last entry date of every manual account so a hand-picked merge gets a cutover too', async () => {
+    const preview = await makeService({ added: [] }).previewExchange(USER, 'public-tok', 'ins_3', 'Chase', 'pro');
+    expect(preview.lastEntryDates).toEqual({ [checking.id]: '2026-09-20', [cash.id]: '2026-09-15' });
+  });
+
   it('keeps the merged account, its manual and imported history, and every other account', async () => {
     await connectAndMerge(makeService({ added: [plaidTx('p-late', '2026-09-25', 40, 'Gas')] }));
 

@@ -219,6 +219,14 @@ count, stat and Ask Cofre's default list (`lib/transactions/trades.ts`).
   Tradovate CSV → `closed_trade` rows), trade statistics (expectancy, drawdown,
   streaks, by weekday), full trade list. Spec §3 and §5.
 - A restore action for `transaction_tombstones` (admin or Settings) instead of SQL.
+- **Cutover for investment activity (found 2026-11-03).** `syncInvestments` dedupes
+  only by Plaid's `investment_transaction_id`, so merging a brokerage account onto a
+  manual one that holds imported trades pulls up to 730 days of buys, sells,
+  dividends and deposits on top of them, and Performance counts every closed trade
+  twice. Mirror `runSync`: honour the merge's cutover date, and match rows on or
+  after it by date + amount + symbol + quantity against non-Plaid rows (consuming
+  each once) before inserting. Until then the review dialog's merge is safe for
+  checking / credit only; a brokerage with imported trades should be cleared first.
 
 ## Monarch gap list (2026-10-27)
 

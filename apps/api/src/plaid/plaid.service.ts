@@ -38,6 +38,10 @@ export interface PreviewExchangeResult {
   institutionName: string;
   hasManualAccounts: boolean;
   accounts: PreviewAccount[];
+  /** Manual account id → date of its newest transaction (null when it has none), so the
+      review dialog can default the cutover for an account the user picks by hand too —
+      without a cutover the initial sync runs no duplicate check against manual rows. */
+  lastEntryDates: Record<string, string | null>;
 }
 
 export interface ExchangeDecision {
@@ -193,6 +197,18 @@ export class PlaidService {
     const balanceRes = await timed('plaid', 'accountsBalanceGet', () => this.client.accountsBalanceGet({ access_token }));
     const accounts: PreviewAccount[] = [];
 
+    const lastEntryDates: Record<string, string | null> = {};
+    if (manualAccounts.length > 0) {
+      for (const m of manualAccounts) lastEntryDates[m.id] = null;
+      const rows: { accountId: string; last: string | null }[] = await this.txRepo.createQueryBuilder('tx')
+        .select('tx.bankAccountId', 'accountId').addSelect('MAX(tx.date)', 'last')
+        .where('tx.userId = :userId', { userId })
+        .andWhere('tx.bankAccountId IN (:...ids)', { ids: manualAccounts.map((m) => m.id) })
+        .groupBy('tx.bankAccountId')
+        .getRawMany();
+      for (const r of rows) lastEntryDates[r.accountId] = r.last;
+    }
+
     for (const pa of balanceRes.data.accounts) {
       const mask = pa.mask ?? null;
       const match = mask
@@ -201,12 +217,6 @@ export class PlaidService {
           )
         : undefined;
 
-      let lastTransactionDate: string | null = null;
-      if (match) {
-        const latest = await this.txRepo.findOne({ where: { bankAccountId: match.id }, order: { date: 'DESC' } });
-        lastTransactionDate = latest?.date ?? null;
-      }
-
       accounts.push({
         plaidAccountId: pa.account_id,
         name: pa.name,
@@ -214,7 +224,7 @@ export class PlaidService {
         subtype: pa.subtype ?? '',
         balance: pa.balances.current ?? 0,
         currency: (pa.balances.iso_currency_code ?? 'USD').toUpperCase(),
-        suggestedMatch: match ? { id: match.id, accountName: match.accountName, lastTransactionDate } : null,
+        suggestedMatch: match ? { id: match.id, accountName: match.accountName, lastTransactionDate: lastEntryDates[match.id] ?? null } : null,
       });
     }
 
@@ -223,6 +233,7 @@ export class PlaidService {
       institutionName,
       hasManualAccounts: manualAccounts.length > 0,
       accounts,
+      lastEntryDates,
     };
   }
 
