@@ -32,6 +32,11 @@ export class Subscription {
   @Column({ default: false })
   cancelAtPeriodEnd: boolean;
 
+  /** When Stripe first reported the current past-due spell; null while not past due.
+      BillingService.sweepPastDue drops the user to free 24 h after it. */
+  @Column({ type: Date, nullable: true })
+  pastDueSince: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -115,6 +115,75 @@ describe('BillingService.syncFromStripeSubscription', () => {
     expect(user.plan).toBe('elite');
   });
 
+  describe('past-due downgrade (24 h)', () => {
+    const sync = (o: any = {}) => service.syncFromStripeSubscription('cus_123', fakeSub(o) as any);
+    const plan = async () => (await ds.getRepository(User).findOneByOrFail({ id: userId })).plan;
+    const row = () => ds.getRepository(Subscription).findOneByOrFail({ userId });
+    const HOUR = 3_600_000;
+    const agePastDue = async (hours: number) =>
+      ds.getRepository(Subscription).update({ userId }, { pastDueSince: new Date(Date.now() - hours * HOUR) });
+
+    it('stamps pastDueSince the first time Stripe reports past due and keeps it on repeats', async () => {
+      await sync({ status: 'active' });
+      expect((await row()).pastDueSince).toBeNull();
+      await sync({ status: 'past_due' });
+      const first = (await row()).pastDueSince;
+      expect(first).toBeInstanceOf(Date);
+      await agePastDue(5);
+      await sync({ status: 'past_due' });
+      expect((await row()).pastDueSince!.getTime()).toBeLessThan(first!.getTime());
+      expect(await plan()).toBe('pro');
+    });
+
+    it('keeps the plan for the first 24 hours, then downgrades to free and emails once', async () => {
+      await sync({ status: 'active' });
+      await sync({ status: 'past_due' });
+      mail.sent = [];
+      await agePastDue(23);
+      expect(await service.sweepPastDue()).toBe(0);
+      expect(await plan()).toBe('pro');
+
+      await agePastDue(25);
+      expect(await service.sweepPastDue()).toBe(1);
+      expect(await plan()).toBe('free');
+      expect((await row()).status).toBe('past_due');
+      expect(mail.sent.map((m) => m.content.subject)).toEqual(['Your Cofre Pro plan has ended']);
+
+      expect(await service.sweepPastDue()).toBe(0);
+      expect(mail.sent).toHaveLength(1);
+    });
+
+    it('restores the plan and clears the clock when Stripe collects the payment', async () => {
+      await sync({ status: 'active' });
+      await sync({ status: 'past_due' });
+      await agePastDue(30);
+      await service.sweepPastDue();
+      expect(await plan()).toBe('free');
+      await sync({ status: 'active' });
+      expect(await plan()).toBe('pro');
+      expect((await row()).pastDueSince).toBeNull();
+    });
+
+    it('a repeat past-due webhook after the grace window does not hand the tier back', async () => {
+      await sync({ status: 'active' });
+      await sync({ status: 'past_due' });
+      await agePastDue(30);
+      await service.sweepPastDue();
+      expect(await plan()).toBe('free');
+      await sync({ status: 'past_due' });
+      expect(await plan()).toBe('free');
+      expect((await row()).pastDueSince!.getTime()).toBeLessThan(Date.now() - 29 * HOUR);
+    });
+
+    it('never touches a user whose plan is already free or whose subscription left past due', async () => {
+      await sync({ status: 'active' });
+      await sync({ status: 'canceled' });
+      await ds.getRepository(Subscription).update({ userId }, { pastDueSince: new Date(Date.now() - 48 * HOUR) });
+      expect(await service.sweepPastDue()).toBe(0);
+      expect(mail.sent.filter((m) => m.content.subject.includes('has ended'))).toHaveLength(1);
+    });
+  });
+
   describe('billing emails', () => {
     const sync = (o: any = {}) => service.syncFromStripeSubscription('cus_123', fakeSub(o) as any);
     const subjects = () => mail.sent.map((m) => m.content.subject);

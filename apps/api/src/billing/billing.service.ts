@@ -11,6 +11,11 @@ import { MailService } from '../mail/mail.service';
 import { billingEmailContent, billingEmailFor, type SubState } from './billing-emails';
 import { mapBillingOverview, EMPTY_OVERVIEW, type BillingOverview } from './billing-overview';
 
+/** Grace after Stripe first reports a failed payment before the plan drops to free. */
+export const PAST_DUE_GRACE_HOURS = 24;
+const PAST_DUE_GRACE_MS = PAST_DUE_GRACE_HOURS * 3_600_000;
+const PAST_DUE_SWEEP_EVERY_MS = 3_600_000;
+
 @Injectable()
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
@@ -97,8 +102,16 @@ export class BillingService {
       return;
     }
     const mapped = mapStripeSubscription(sub, this.priceIds);
-    const plan = mapped.status === 'canceled' ? 'free' : mapped.tier;
     const previous = await this.subs.findOneBy({ userId: user.id });
+
+    /* The past-due clock starts on the first webhook that reports it and runs until
+       the status changes; a recovered payment (active again) restores the plan below
+       because `plan` follows the tier for every status but canceled. A repeat past-due
+       webhook after the grace window must not hand the tier back for an hour until the
+       next sweep, so the sync applies the same 24 h rule as sweepPastDue. */
+    const pastDueSince = mapped.status === 'past_due' ? (previous?.pastDueSince ?? new Date()) : null;
+    const graceExpired = pastDueSince != null && Date.now() - pastDueSince.getTime() > PAST_DUE_GRACE_MS;
+    const plan = mapped.status === 'canceled' || graceExpired ? 'free' : mapped.tier;
 
     await this.subs.upsert(
       {
@@ -110,6 +123,7 @@ export class BillingService {
         currentPeriodEnd: mapped.currentPeriodEnd,
         trialEnd: mapped.trialEnd,
         cancelAtPeriodEnd: mapped.cancelAtPeriodEnd,
+        pastDueSince,
       },
       ['userId'],
     );
@@ -148,6 +162,57 @@ export class BillingService {
 
   getSubscription(userId: string): Promise<Subscription | null> {
     return this.subs.findOneBy({ userId });
+  }
+
+  /* 24 hours past due → free, whatever Stripe's own dunning setting does afterwards.
+     Runs at boot and hourly. Only the user's plan changes: the subscription row keeps
+     its past-due status and Stripe keeps retrying, so a later successful charge comes
+     back through the webhook and syncFromStripeSubscription restores the tier. */
+  onApplicationBootstrap(): void {
+    if (process.env.NODE_ENV === 'test') return;
+    setTimeout(() => void this.sweepPastDue(), 20_000).unref();
+    setInterval(() => void this.sweepPastDue(), PAST_DUE_SWEEP_EVERY_MS).unref();
+  }
+
+  /** Downgrades every user past due for longer than the grace window; returns how many. */
+  async sweepPastDue(): Promise<number> {
+    const cutoff = new Date(Date.now() - PAST_DUE_GRACE_MS);
+    let rows: Subscription[];
+    try {
+      rows = await this.subs.createQueryBuilder('sub')
+        .where('sub.status = :status', { status: 'past_due' })
+        .andWhere('sub.pastDueSince IS NOT NULL')
+        .andWhere('sub.pastDueSince < :cutoff', { cutoff })
+        .getMany();
+    } catch (err) {
+      this.logger.error('Past-due sweep could not read subscriptions', err as Error);
+      return 0;
+    }
+
+    let downgraded = 0;
+    for (const sub of rows) {
+      const user = await this.users.findOneBy({ id: sub.userId });
+      if (!user || user.plan === 'free') continue;
+      await this.users.update(user.id, { plan: 'free' });
+      downgraded++;
+      this.logger.log(`Past-due downgrade: user ${user.id} (${sub.tier}) → free after ${PAST_DUE_GRACE_HOURS} h`);
+      try {
+        await this.mail.sendBillingEmail(user.email, billingEmailContent('ended', {
+          name: user.name ?? '',
+          tier: sub.tier,
+          interval: sub.interval,
+          status: 'canceled',
+          amount: null,
+          currency: 'usd',
+          trialEnd: sub.trialEnd,
+          currentPeriodEnd: sub.currentPeriodEnd,
+          appUrl: this.frontendUrl,
+        }));
+      } catch (err) {
+        this.logger.error('Past-due downgrade email failed', err as Error);
+      }
+    }
+    return downgraded;
   }
 
   async switchTier(userId: string, tier: 'pro' | 'elite', interval: 'month' | 'year'): Promise<void> {
