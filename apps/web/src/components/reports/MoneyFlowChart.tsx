@@ -2,6 +2,7 @@
 
 import { Sankey, Tooltip, ResponsiveContainer } from 'recharts';
 import { useThemeColors } from '@/components/ThemeProvider';
+import { ChartTooltipContent } from '@/components/dashboard/ChartTooltipContent';
 import { useNarrowScreen } from '@/hooks/useNarrowScreen';
 import type { MoneyFlow } from '@/lib/reports/compute';
 import { money, compact, Empty } from './ui';
@@ -75,9 +76,7 @@ export default function MoneyFlowChart({ flow, height }: { flow: MoneyFlow; heig
             node={Node as never}
             link={Link as never}
             sort={false}>
-            <Tooltip
-              contentStyle={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', borderRadius: 12, fontSize: 12 }}
-              formatter={(v: unknown) => [money(Number(v)), 'Amount']} />
+            <Tooltip content={ChartTooltipContent} formatter={(v: unknown) => [money(Number(v)), 'Amount']} />
           </Sankey>
         </ResponsiveContainer>
       </div>

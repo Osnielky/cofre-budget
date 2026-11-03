@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import { ChartTooltipContent } from '@/components/dashboard/ChartTooltipContent';
 import type { BudgetWithSpent, Transaction } from '@/lib/budgets/types';
 
 function fmt(n: number) { return Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2 }); }
@@ -69,8 +70,7 @@ export default function BudgetRowDetail({ budget, txs, avg3mo, raiseTo, onRaise,
                       </linearGradient>
                     </defs>
                     <XAxis dataKey="date" hide />
-                    <Tooltip contentStyle={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 11, color: 'var(--color-text-primary)' }}
-                      formatter={(v: unknown) => [`$${fmt(Number(v))}`, 'Spent']} />
+                    <Tooltip content={ChartTooltipContent} formatter={(v: unknown) => [`$${fmt(Number(v))}`, 'Spent']} />
                     <Area type="monotone" dataKey="total" stroke={catColor} strokeWidth={2} fill={`url(#grad-${budget.id})`} dot={false} />
                   </AreaChart>
                 </ResponsiveContainer>

@@ -1,4 +1,5 @@
 import type { ThemeColors } from '@/components/ThemeProvider';
+import { ChartTooltipContent } from './ChartTooltipContent';
 
 /** $1,234.56 */
 export function fmt(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2 }); }
@@ -18,10 +19,13 @@ export function makeChartTheme(tc: ThemeColors) {
       width: 44, tickFormatter: fmtAxis,
     } as const,
     grid: { vertical: false, stroke: tc.border } as const,
+    /* One themed body for every chart: text in the theme's colours, series colour
+       as a swatch. recharts' default body colours its text with the series fill
+       and falls back to black when there is none (Cell-coloured bars, custom
+       shapes, Sankey nodes) — unreadable on dark themes. */
     tooltip: {
       cursor: { fill: 'color-mix(in srgb, currentColor 5%, transparent)' },
-      contentStyle: { background: 'var(--color-elevated)', border: 'var(--glass-border)', borderRadius: 12, fontSize: 12 },
-      labelStyle: { color: tc.textPrimary, fontWeight: 700, marginBottom: 4 },
+      content: ChartTooltipContent,
     } as const,
   };
 }

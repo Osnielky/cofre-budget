@@ -20,7 +20,8 @@ export default function WeekdayChart({ profile }: { profile: WeekdayPoint[] }) {
             <CartesianGrid {...th.grid} strokeDasharray="3 6" />
             <XAxis dataKey="day" {...th.xAxis} />
             <YAxis {...th.yAxis} />
-            <Tooltip {...th.tooltip} formatter={(v: unknown, _n: unknown, item: { payload?: WeekdayPoint }) => [`${money(Number(v))} avg · ${money(item.payload?.total ?? 0)} total`, item.payload?.day ?? '']} />
+            {/* The label line already names the day, so the row is value-only. */}
+            <Tooltip {...th.tooltip} formatter={(v: unknown, _n: unknown, item: { payload?: WeekdayPoint }) => [`${money(Number(v))} avg · ${money(item.payload?.total ?? 0)} total`, '']} />
             <Bar dataKey="avg" radius={[4, 4, 0, 0]} isAnimationActive={false}>
               {profile.map((p) => <Cell key={p.day} fill={p.avg === max && max > 0 ? tc.orange : `color-mix(in srgb, ${tc.orange} 45%, transparent)`} />)}
             </Bar>
