@@ -16,13 +16,14 @@ export interface SubState {
   cancelAtPeriodEnd: boolean;
 }
 
-export type BillingEmailKind = 'started' | 'changed' | 'downgrade_scheduled' | 'cancel_scheduled' | 'ended';
+export type BillingEmailKind = 'started' | 'changed' | 'downgrade_scheduled' | 'cancel_scheduled' | 'ended' | 'recovered';
 
 export function billingEmailFor(prev: SubState | null, next: SubState): BillingEmailKind | null {
   if (next.status === 'canceled') return prev && prev.status !== 'canceled' ? 'ended' : null;
   if (!prev || prev.status === 'canceled') return 'started';
   if (!prev.cancelAtPeriodEnd && next.cancelAtPeriodEnd) return 'cancel_scheduled';
   if (prev.tier !== next.tier || prev.interval !== next.interval) return 'changed';
+  if (prev.status === 'past_due' && next.status !== 'past_due') return 'recovered';
   return null;
 }
 
@@ -165,6 +166,22 @@ export function billingEmailContent(kind: BillingEmailKind, c: BillingEmailConte
         features: PLAN_FEATURES[c.tier].filter((f) => !f.startsWith('Everything in')),
         note: 'Changed your mind? You can keep your plan from Settings → Billing before the date above.',
         cta: { label: 'Keep my plan', href: `${c.appUrl}/settings?tab=billing` },
+      };
+
+    case 'recovered':
+      return {
+        subject: `Payment received — your Cofre ${plan} plan is back`,
+        heading: `Your ${plan} plan is back`,
+        intro: `${hello}thanks — the overdue payment went through and every ${plan} feature is available again.`,
+        rows: [
+          ['Plan', planLabel(c.tier, c.interval)],
+          ['Price', perInterval],
+          ['Next payment', nextPayment],
+        ],
+        featuresTitle: `What's included in ${plan}`,
+        features: PLAN_FEATURES[c.tier],
+        note: 'The receipt for this payment comes separately from Stripe.',
+        cta: { label: 'Open Cofre', href: `${c.appUrl}/dashboard` },
       };
 
     case 'ended':

@@ -31,6 +31,13 @@ export class BillingController {
     return this.billing.switchTier(req.user.id, body.tier, body.interval);
   }
 
+  /** Collects the overdue invoice now (after a failed charge) and restores the plan. */
+  @BlockedInDemo()
+  @Post('pay-overdue')
+  payOverdue(@Request() req: any) {
+    return this.billing.payOverdue(req.user.id);
+  }
+
   @BlockedInDemo()
   @Post('subscription/pending-change/cancel')
   async cancelPendingChange(@Request() req: any) {

@@ -506,3 +506,62 @@ describe('BillingService.switchTier / previewPlanChange / cancelPendingChange', 
     expect(calls[1].params).toEqual({ cancel_at_period_end: true });
   });
 });
+
+describe('BillingService.payOverdue', () => {
+  async function setup(opts: { status?: 'past_due' | 'active'; invoices?: any[]; payError?: any } = {}) {
+    const ds = await makeDataSource();
+    const userRepo = ds.getRepository(User);
+    const user = await userRepo.save(userRepo.create({ email: 'd@example.com', name: 'Dee', stripeCustomerId: 'cus_d', plan: 'free' }));
+    await ds.getRepository(Subscription).save(ds.getRepository(Subscription).create({
+      userId: user.id, stripeSubscriptionId: 'sub_d', tier: 'pro', interval: 'month', status: opts.status ?? 'past_due',
+      cancelAtPeriodEnd: false, currentPeriodEnd: new Date('2026-11-29T00:00:00Z'), pastDueSince: new Date('2026-10-29T00:00:00Z'),
+    }));
+    const mail = new FakeMail();
+    const service = new BillingService(ds.getRepository(User), ds.getRepository(Subscription), fakeConfig(), asMail(mail));
+    const calls: string[] = [];
+    let status = opts.status ?? 'past_due';
+    const item = { id: 'si_d', price: { id: 'price_pro_month', unit_amount: 499, currency: 'usd' }, current_period_end: 1_795_000_000 };
+    (service as any).stripe = {
+      subscriptions: { retrieve: async () => ({ id: 'sub_d', customer: 'cus_d', status, cancel_at_period_end: false, trial_end: null, items: { data: [item] }, schedule: null }) },
+      invoices: {
+        list: async () => { calls.push('invoices.list'); return { data: opts.invoices ?? [{ id: 'in_old', created: 2, amount_due: 499 }, { id: 'in_new', created: 3, amount_due: 499 }] }; },
+        pay: async (id: string) => { calls.push(`invoices.pay:${id}`); if (opts.payError) throw opts.payError; status = 'active'; return { id, status: 'paid', amount_paid: 499, currency: 'usd' }; },
+      },
+    };
+    return { service, ds, userId: user.id, calls, mail };
+  }
+
+  it('pays the oldest open invoice, restores the plan at once and emails that the plan is back', async () => {
+    const { service, ds, userId, calls, mail } = await setup();
+    const out = await service.payOverdue(userId);
+    expect(out).toMatchObject({ paid: true, amount: 4.99, currency: 'usd' });
+    expect(calls).toEqual(['invoices.list', 'invoices.pay:in_old']);
+    expect((await ds.getRepository(User).findOneByOrFail({ id: userId })).plan).toBe('pro');
+    const row = await ds.getRepository(Subscription).findOneByOrFail({ userId });
+    expect(row.status).toBe('active');
+    expect(row.pastDueSince).toBeNull();
+    expect(mail.sent.map((m) => m.content.subject)).toEqual(['Payment received — your Cofre Pro plan is back']);
+  });
+
+  it('turns a declined payment into a clear 409 and changes nothing', async () => {
+    const { service, ds, userId, mail } = await setup({ payError: Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError', code: 'card_declined' }) });
+    await expect(service.payOverdue(userId)).rejects.toThrow(/didn't go through: Your card was declined/);
+    expect((await ds.getRepository(User).findOneByOrFail({ id: userId })).plan).toBe('free');
+    expect(mail.sent).toEqual([]);
+  });
+
+  it('explains when there is no payment method to charge', async () => {
+    const { service, userId } = await setup({ payError: Object.assign(new Error('This customer has no attached payment source or default payment method.'), { type: 'StripeInvalidRequestError', code: 'invoice_payment_intent_requires_action' }) });
+    await expect(service.payOverdue(userId)).rejects.toThrow(/no payment method on file/);
+  });
+
+  it('does nothing when the plan is not past due or no invoice is open', async () => {
+    const active = await setup({ status: 'active' });
+    expect((await active.service.payOverdue(active.userId)).paid).toBe(false);
+    expect(active.calls).toEqual([]);
+    const { service, userId, calls } = await setup({ invoices: [] });
+    const out = await service.payOverdue(userId);
+    expect(out.paid).toBe(false);
+    expect(calls).toEqual(['invoices.list']);
+  });
+});

@@ -98,3 +98,17 @@ describe('billingEmailContent', () => {
     expect(Object.fromEntries(c.rows).Price).toBe('—');
   });
 });
+
+describe('billingEmailFor — recovery', () => {
+  const pastDue: SubState = { tier: 'pro', interval: 'month', status: 'past_due', cancelAtPeriodEnd: false };
+  it('emails once when an overdue payment goes through, not on a repeat past-due webhook', () => {
+    expect(billingEmailFor(pastDue, { ...pastDue, status: 'active' })).toBe('recovered');
+    expect(billingEmailFor(pastDue, pastDue)).toBeNull();
+    expect(billingEmailFor({ ...pastDue, status: 'active' }, { ...pastDue, status: 'active' })).toBeNull();
+  });
+  it('says the plan is back', () => {
+    const c = billingEmailContent('recovered', { name: 'Sam', tier: 'pro', interval: 'month', status: 'active', amount: 4.99, currency: 'usd', trialEnd: null, currentPeriodEnd: new Date('2026-11-29T00:00:00Z'), appUrl: 'https://x' });
+    expect(c.subject).toBe('Payment received — your Cofre Pro plan is back');
+    expect(Object.fromEntries(c.rows)['Next payment']).toBe('$4.99 on November 29, 2026');
+  });
+});

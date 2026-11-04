@@ -334,6 +334,43 @@ export class BillingService {
     return { kind, effectiveAt: effectiveAt.toISOString() };
   }
 
+  /**
+   * Collects the unpaid invoice of a past-due subscription right now with the
+   * customer's default payment method — the way back to the plan after a failed
+   * charge, without waiting for Stripe's own retry schedule. On success the
+   * subscription is active again and the sync restores the plan and emails
+   * "your plan is back" at once; a declined payment leaves everything as it was.
+   */
+  async payOverdue(userId: string): Promise<{ paid: boolean; amount: number | null; currency: string; message: string }> {
+    const { row, stripeSub } = await this.liveSubscription(userId);
+    if (row.status !== 'past_due') return { paid: false, amount: null, currency: 'usd', message: 'Nothing is overdue on your plan.' };
+    const customer = stripeSub.customer as string;
+    const open = await timed('stripe', 'invoices.list', () => this.stripe.invoices.list({ customer, subscription: stripeSub.id, status: 'open', limit: 5 }));
+    const invoice = [...open.data].sort((a, b) => a.created - b.created)[0];
+    if (!invoice?.id) return { paid: false, amount: null, currency: 'usd', message: 'There is no unpaid invoice to collect — Stripe may still be processing the last payment.' };
+    let paid: Stripe.Invoice;
+    try {
+      paid = await timed('stripe', 'invoices.pay', () => this.stripe.invoices.pay(invoice.id as string));
+    } catch (err) {
+      const e = err as Stripe.errors.StripeError;
+      if (e?.type === 'StripeCardError' || e?.type === 'StripeInvalidRequestError') {
+        throw new ConflictException(e.code === 'resource_missing' || /no payment method|default payment method/i.test(e.message ?? '')
+          ? 'There is no payment method on file to charge. Add one and try again.'
+          : `The payment didn't go through: ${(e.message ?? 'declined').replace(/\.$/, '')}. Try another card or bank account.`);
+      }
+      throw err;
+    }
+    const fresh = await timed('stripe', 'subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(stripeSub.id));
+    await this.syncFromStripeSubscription(customer, fresh);
+    const ok = paid.status === 'paid';
+    return {
+      paid: ok,
+      amount: paid.amount_paid / 100,
+      currency: paid.currency,
+      message: ok ? 'Payment received — your plan is active again.' : 'The payment is still processing; your plan comes back as soon as it settles.',
+    };
+  }
+
   /** Drops a scheduled downgrade: the current plan simply continues. */
   async cancelPendingChange(userId: string): Promise<void> {
     const { stripeSub } = await this.liveSubscription(userId);

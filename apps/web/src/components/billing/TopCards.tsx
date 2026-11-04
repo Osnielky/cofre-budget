@@ -15,6 +15,10 @@ export interface BillingActions {
   resumePlan: () => void;
   /** Drops a scheduled downgrade; the current plan continues. */
   cancelPendingChange: () => void;
+  /** Collects the overdue invoice now with the method on file (past due only). */
+  retryPayment: () => void;
+  /** The retry: running, or its outcome. */
+  recovery: { paying: boolean; notice: { tone: 'good' | 'warn'; text: string } | null };
   /** Stripe's portal: on its payment-method page, or on the overview (plan, invoices). */
   openPortal: (flow?: 'payment_method') => void;
   /** The trip to Stripe's portal: opening, or why it did not open. */
@@ -22,10 +26,11 @@ export interface BillingActions {
 }
 
 /** Wide card: plan name, trial / renewal / cancellation status and the main actions. */
-export function CurrentPlanCard({ sub, pastDue, pendingChange, actions }: {
+export function CurrentPlanCard({ sub, pastDue, pendingChange, hasPaymentMethod, actions }: {
   sub: SubscriptionInfo;
   pastDue: PastDueSummary | null;
   pendingChange: BillingOverview['pendingChange'];
+  hasPaymentMethod: boolean;
   actions: BillingActions;
 }) {
   const accent = pastDue?.paused ? 'var(--color-amber)' : sub.tier === 'elite' ? 'var(--color-amber)' : 'var(--color-primary)';
@@ -110,10 +115,19 @@ export function CurrentPlanCard({ sub, pastDue, pendingChange, actions }: {
 
       <div className="flex flex-wrap gap-2 mt-auto">
         {pastDue ? (
-          <button type="button" disabled={actions.portal.opening} onClick={() => actions.openPortal('payment_method')}
-            className="btn-gold px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50 inline-flex items-center gap-2">
-            <Icon name="card" size={15} /> {actions.portal.opening ? 'Opening Stripe…' : pastDue.action}
-          </button>
+          <>
+            {hasPaymentMethod && (
+              <button type="button" disabled={actions.recovery.paying || actions.portal.opening} onClick={actions.retryPayment}
+                className="btn-gold px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50 inline-flex items-center gap-2">
+                <Icon name="check" size={15} /> {actions.recovery.paying ? 'Charging…' : pastDue.due ? `Pay ${fmtMoney(pastDue.due.amount, pastDue.due.currency)} now` : 'Pay now'}
+              </button>
+            )}
+            <button type="button" disabled={actions.portal.opening || actions.recovery.paying} onClick={() => actions.openPortal('payment_method')}
+              className={`${hasPaymentMethod ? '' : 'btn-gold'} px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50 inline-flex items-center gap-2`}
+              style={hasPaymentMethod ? outlineBtn : undefined}>
+              <Icon name="card" size={15} /> {actions.portal.opening ? 'Opening Stripe…' : pastDue.action}
+            </button>
+          </>
         ) : sub.cancelAtPeriodEnd ? (
           <button type="button" disabled={actions.busy} onClick={actions.resumePlan}
             className="btn-gold px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50">
@@ -143,6 +157,20 @@ export function CurrentPlanCard({ sub, pastDue, pendingChange, actions }: {
           <Icon name="gear" size={15} /> Manage in Stripe
         </button>
       </div>
+      {actions.recovery.notice && (
+        <p role="status" className="text-xs font-semibold rounded-xl px-3 py-2 -mt-2 flex items-start gap-2"
+          style={actions.recovery.notice.tone === 'good'
+            ? { background: 'color-mix(in srgb, var(--color-green) 14%, transparent)', color: 'var(--color-green)' }
+            : { background: 'color-mix(in srgb, var(--color-rose) 14%, transparent)', color: 'var(--color-rose)' }}>
+          <span className="mt-px shrink-0"><Icon name={actions.recovery.notice.tone === 'good' ? 'check' : 'xCircle'} size={14} /></span>
+          <span>{actions.recovery.notice.text}</span>
+        </p>
+      )}
+      {pastDue?.due?.hostedUrl && (
+        <a href={pastDue.due.hostedUrl} target="_blank" rel="noopener noreferrer" className="self-start text-xs font-semibold hover:underline -mt-2" style={{ color: 'var(--color-text-muted)' }}>
+          Or pay this invoice on Stripe with another card →
+        </a>
+      )}
       {!sub.cancelAtPeriodEnd && (
         <button type="button" disabled={actions.busy} onClick={actions.cancelPlan}
           className="self-start text-xs font-semibold cursor-pointer hover:underline disabled:opacity-50 -mt-2" style={{ color: 'var(--color-text-muted)' }}>

@@ -85,6 +85,33 @@ export default function BillingTab() {
     url.searchParams.delete('portal');
     window.history.replaceState(null, '', url.toString());
   }, []);
+  // After a failed charge: collect the overdue invoice now and bring the plan back.
+  const [recovery, setRecovery] = useState<BillingActions['recovery']>({ paying: false, notice: null });
+  const retryPayment = useCallback(async (afterPortal = false) => {
+    setRecovery({ paying: true, notice: null });
+    try {
+      const res = await fetch(`${API}/billing/pay-overdue`, { method: 'POST', credentials: 'include' });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(typeof body?.message === 'string' ? body.message : 'The payment could not be taken.');
+      if (body.paid) {
+        setRecovery({ paying: false, notice: { tone: 'good', text: `${afterPortal ? 'Payment method saved and the ' : 'The '}overdue ${fmtMoney(body.amount, body.currency)} went through — your plan is active again.` } });
+        try { setSub(await fetchSubscription()); } catch { /* keep */ }
+        await refetchRef.current();
+      } else {
+        setRecovery({ paying: false, notice: { tone: 'warn', text: body.message } });
+      }
+      reloadOverview();
+    } catch (e) {
+      setRecovery({ paying: false, notice: { tone: 'warn', text: (e as Error).message } });
+    }
+  }, [reloadOverview]);
+
+  const autoRetried = useRef(false);
+  useEffect(() => {
+    if (!returnedFromPortal || autoRetried.current || !sub || sub.status !== 'past_due' || !overview?.paymentMethod) return;
+    autoRetried.current = true;
+    retryPayment(true);
+  }, [returnedFromPortal, sub, overview, retryPayment]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -242,9 +269,11 @@ export default function BillingTab() {
     );
   }
 
-  const actions: BillingActions = { busy, switchTier, cancelPlan, resumePlan, cancelPendingChange, openPortal, portal };
+  const actions: BillingActions = { busy, switchTier, cancelPlan, resumePlan, cancelPendingChange, retryPayment: () => retryPayment(false), recovery, openPortal, portal };
   // The overview is read live from Stripe on this load, so it already reflects the trip.
-  const portalNotice = returnedFromPortal && overview ? portalReturnNotice(overview.paymentMethod, sub.status) : null;
+  // Past due + a method now on file: collect the overdue invoice right away (see the effect below).
+  const portalNotice = returnedFromPortal && overview && !(sub.status === 'past_due' && overview.paymentMethod)
+    ? portalReturnNotice(overview.paymentMethod, sub.status) : null;
   // One story for every card when a payment is unpaid: paused (plan already free) or still inside the grace window.
   const pastDue = pastDueSummary(sub, user?.plan ?? 'free', overview, { money: fmtMoney, date: fmtDate });
   return (
@@ -255,7 +284,7 @@ export default function BillingTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.9fr_1fr_1fr_1fr] gap-4">
-        <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><CurrentPlanCard sub={sub} pastDue={pastDue} pendingChange={overview?.pendingChange ?? null} actions={actions} /></div>
+        <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><CurrentPlanCard sub={sub} pastDue={pastDue} pendingChange={overview?.pendingChange ?? null} hasPaymentMethod={!!overview?.paymentMethod} actions={actions} /></div>
         <PaymentMethodCard overview={overview} sub={sub} notice={portalNotice} actions={actions} />
         <BillingSummaryCard sub={sub} overview={overview} pastDue={pastDue} />
         <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><TrialCard sub={sub} pastDue={pastDue} /></div>
