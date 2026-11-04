@@ -534,7 +534,7 @@ describe('BillingService.payOverdue', () => {
   it('pays the oldest open invoice, restores the plan at once and emails that the plan is back', async () => {
     const { service, ds, userId, calls, mail } = await setup();
     const out = await service.payOverdue(userId);
-    expect(out).toMatchObject({ paid: true, amount: 4.99, currency: 'usd' });
+    expect(out).toMatchObject({ paid: true, amount: 4.99, currency: 'usd', paidThrough: new Date(1_795_000_000 * 1000).toISOString() });
     expect(calls).toEqual(['invoices.list', 'invoices.pay:in_old']);
     expect((await ds.getRepository(User).findOneByOrFail({ id: userId })).plan).toBe('pro');
     const row = await ds.getRepository(Subscription).findOneByOrFail({ userId });

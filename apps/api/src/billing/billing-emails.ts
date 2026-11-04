@@ -176,11 +176,12 @@ export function billingEmailContent(kind: BillingEmailKind, c: BillingEmailConte
         rows: [
           ['Plan', planLabel(c.tier, c.interval)],
           ['Price', perInterval],
+          ['Paid through', date(c.currentPeriodEnd)],
           ['Next payment', nextPayment],
         ],
         featuresTitle: `What's included in ${plan}`,
         features: PLAN_FEATURES[c.tier],
-        note: 'The receipt for this payment comes separately from Stripe.',
+        note: 'This payment covers the period that was overdue, so the renewal date has not moved. The receipt comes separately from Stripe.',
         cta: { label: 'Open Cofre', href: `${c.appUrl}/dashboard` },
       };
 

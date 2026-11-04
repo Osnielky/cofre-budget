@@ -345,13 +345,13 @@ export class BillingService {
    * subscription is active again and the sync restores the plan and emails
    * "your plan is back" at once; a declined payment leaves everything as it was.
    */
-  async payOverdue(userId: string): Promise<{ paid: boolean; amount: number | null; currency: string; message: string }> {
+  async payOverdue(userId: string): Promise<{ paid: boolean; amount: number | null; currency: string; paidThrough: string | null; message: string }> {
     const { row, stripeSub } = await this.liveSubscription(userId);
-    if (row.status !== 'past_due') return { paid: false, amount: null, currency: 'usd', message: 'Nothing is overdue on your plan.' };
+    if (row.status !== 'past_due') return { paid: false, amount: null, currency: 'usd', paidThrough: null, message: 'Nothing is overdue on your plan.' };
     const customer = stripeSub.customer as string;
     const open = await timed('stripe', 'invoices.list', () => this.stripe.invoices.list({ customer, subscription: stripeSub.id, status: 'open', limit: 5 }));
     const invoice = [...open.data].sort((a, b) => a.created - b.created)[0];
-    if (!invoice?.id) return { paid: false, amount: null, currency: 'usd', message: 'There is no unpaid invoice to collect — Stripe may still be processing the last payment.' };
+    if (!invoice?.id) return { paid: false, amount: null, currency: 'usd', paidThrough: null, message: 'There is no unpaid invoice to collect — Stripe may still be processing the last payment.' };
     let paid: Stripe.Invoice;
     try {
       paid = await timed('stripe', 'invoices.pay', () => this.stripe.invoices.pay(invoice.id as string));
@@ -370,10 +370,14 @@ export class BillingService {
     const fresh = await timed('stripe', 'subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(stripeSub.id));
     await this.syncFromStripeSubscription(customer, fresh);
     const ok = paid.status === 'paid';
+    // Stripe does not restart the month on a late payment: the invoice covers the
+    // period it was issued for, so the renewal date stays where it was. Say so.
+    const periodEnd = fresh.items.data[0]?.current_period_end;
     return {
       paid: ok,
       amount: paid.amount_paid / 100,
       currency: paid.currency,
+      paidThrough: typeof periodEnd === 'number' ? new Date(periodEnd * 1000).toISOString() : null,
       message: ok ? 'Payment received — your plan is active again.' : 'The payment is still processing; your plan comes back as soon as it settles.',
     };
   }
