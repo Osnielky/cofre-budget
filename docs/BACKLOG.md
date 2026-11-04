@@ -182,10 +182,16 @@ limits them today, and what was done:
 
 ## Billing follow-ups (2026-11-04)
 
-- **Stripe dashboard settings to verify** — Billing → Subscriptions and emails:
-  "Manage failed payments" must leave the subscription payable (mark unpaid, not
-  cancel) or late recovery from Cofre is impossible; "trial ending" customer
-  emails must stay off (an extension is a Stripe trial internally).
+- **Trial-ending reminder from Cofre** — small. Stripe's 7-day trial reminder is
+  off (an extension in `late-payment.ts` is a Stripe trial, so it would mail
+  "your trial ends" to a paying user). Send Cofre's own "trial ends in 3 days —
+  add a payment method" email from a daily sweep over rows with `status =
+  'trialing'` and `trialEnd` within 3 days, once per subscription (stamp a
+  `trialReminderSentAt`); never for an extension (local status is `active`).
+- **Stripe dashboard settings** — done 2026-11-04, recorded in CLAUDE.md
+  (`billing/` row). Re-check after any Stripe dashboard change: retry windows
+  under one month, cancel + uncollectible after retries, trial reminder off,
+  payment-method-update links to Settings → Billing.
 - **Decline reasons for Link** — Stripe returns only "The payment failed." for
   Link / bank declines; the logged `decline_code` (WARNING, `billing.operation`)
   is the only clue. If it stays empty for Link, read the PaymentIntent's
