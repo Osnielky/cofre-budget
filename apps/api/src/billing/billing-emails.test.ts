@@ -106,6 +106,20 @@ describe('billingEmailFor — recovery', () => {
     expect(billingEmailFor(pastDue, pastDue)).toBeNull();
     expect(billingEmailFor({ ...pastDue, status: 'active' }, { ...pastDue, status: 'active' })).toBeNull();
   });
+  it('reminds about a trial ending: first charge to the card on file, or add one', () => {
+    const base = { name: 'Sam', tier: 'pro' as const, interval: 'month' as const, status: 'trialing' as const, amount: 4.99, currency: 'usd', trialEnd: new Date('2026-11-19T00:00:00Z'), currentPeriodEnd: new Date('2026-11-19T00:00:00Z'), appUrl: 'https://x' };
+    const onFile = billingEmailContent('trial_ending', { ...base, paymentMethodOnFile: true });
+    expect(onFile.subject).toBe('Your Cofre Pro trial ends on November 19, 2026');
+    expect(onFile.intro).toMatch(/\$4\.99 \/ month, charged to the payment method on file — there's nothing to do/);
+    expect(Object.fromEntries(onFile.rows)).toMatchObject({ 'Trial ends': 'November 19, 2026', 'First payment': '$4.99 on November 19, 2026' });
+    expect(onFile.cta).toEqual({ label: 'Manage plan', href: 'https://x/settings?tab=billing' });
+    expect(onFile.note).toMatch(/Cancel any time before November 19, 2026/);
+    const none = billingEmailContent('trial_ending', { ...base, paymentMethodOnFile: false });
+    expect(none.intro).toMatch(/no payment method on file yet: add one before then to keep Pro, or your account moves to the free Basic plan/);
+    expect(Object.fromEntries(none.rows)['First payment']).toBe('$4.99 once a payment method is added');
+    expect(none.cta.label).toBe('Add payment method');
+  });
+
   it('says the plan is back', () => {
     const c = billingEmailContent('recovered', { name: 'Sam', tier: 'pro', interval: 'month', status: 'active', amount: 4.99, currency: 'usd', trialEnd: null, currentPeriodEnd: new Date('2026-11-29T00:00:00Z'), appUrl: 'https://x' });
     expect(c.subject).toBe('Payment received — your Cofre Pro plan is back');

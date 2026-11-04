@@ -202,6 +202,64 @@ describe('BillingService.syncFromStripeSubscription', () => {
     });
   });
 
+  describe('trial-ending reminder', () => {
+    const DAY = 86_400_000;
+    const seed = async (o: Partial<Subscription> = {}) => {
+      await ds.getRepository(Subscription).save(ds.getRepository(Subscription).create({
+        userId, stripeSubscriptionId: 'sub_t', tier: 'pro', interval: 'month', status: 'trialing', cancelAtPeriodEnd: false,
+        trialEnd: new Date(Date.now() + 2 * DAY), currentPeriodEnd: new Date(Date.now() + 2 * DAY), ...o,
+      }));
+    };
+    const stripeWith = (live: any) => { (service as any).stripe = { subscriptions: { retrieve: async () => live } }; };
+    const item = { price: { id: 'price_pro_month', unit_amount: 499, currency: 'usd' } };
+
+    it('emails once when a real trial ends within 3 days, naming the first charge and the card on file', async () => {
+      await seed();
+      stripeWith({ items: { data: [item] }, default_payment_method: { id: 'pm_1' }, customer: { invoice_settings: { default_payment_method: null } } });
+      expect(await service.sweepTrialReminders()).toBe(1);
+      expect(mail.sent).toHaveLength(1);
+      expect(mail.sent[0].content.subject).toMatch(/^Your Cofre Pro trial ends on/);
+      expect(mail.sent[0].content.intro).toMatch(/charged to the payment method on file/);
+      expect((await ds.getRepository(Subscription).findOneByOrFail({ userId })).trialReminderSentAt).toBeInstanceOf(Date);
+      expect(await service.sweepTrialReminders()).toBe(0);
+      expect(mail.sent).toHaveLength(1);
+    });
+
+    it('asks for a payment method when Stripe holds none', async () => {
+      await seed();
+      stripeWith({ items: { data: [item] }, default_payment_method: null, customer: { invoice_settings: { default_payment_method: null } } });
+      await service.sweepTrialReminders();
+      expect(mail.sent[0].content.intro).toMatch(/no payment method on file yet/);
+      expect(mail.sent[0].content.cta.label).toBe('Add payment method');
+    });
+
+    it('skips trials further out, trials set to cancel, ended trials and late-payment extensions', async () => {
+      stripeWith({ items: { data: [item] }, default_payment_method: { id: 'pm_1' }, customer: {} });
+      for (const o of [
+        { trialEnd: new Date(Date.now() + 5 * DAY) },
+        { cancelAtPeriodEnd: true },
+        { trialEnd: new Date(Date.now() - DAY) },
+        { status: 'active' as const, trialEnd: null },
+      ]) {
+        await ds.getRepository(Subscription).delete({ userId });
+        await seed(o);
+        expect(await service.sweepTrialReminders()).toBe(0);
+      }
+      expect(mail.sent).toEqual([]);
+    });
+
+    it('still sends when Stripe cannot be read, and leaves the stamp off when the email fails', async () => {
+      await seed();
+      (service as any).stripe = { subscriptions: { retrieve: async () => { throw new Error('stripe down'); } } };
+      expect(await service.sweepTrialReminders()).toBe(1);
+      expect(mail.sent[0].content.intro).toMatch(/charged to the payment method on file/);
+      await ds.getRepository(Subscription).update({ userId }, { trialReminderSentAt: null });
+      mail.fail = true;
+      expect(await service.sweepTrialReminders()).toBe(0);
+      expect((await ds.getRepository(Subscription).findOneByOrFail({ userId })).trialReminderSentAt).toBeNull();
+    });
+  });
+
   describe('past-due downgrade (24 h)', () => {
     const sync = (o: any = {}) => service.syncFromStripeSubscription('cus_123', fakeSub(o) as any);
     const plan = async () => (await ds.getRepository(User).findOneByOrFail({ id: userId })).plan;

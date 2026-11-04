@@ -37,6 +37,10 @@ export class Subscription {
   @Column({ type: Date, nullable: true })
   pastDueSince: Date | null;
 
+  /** When Cofre's "trial ends in 3 days" email went out (BillingService.sweepTrialReminders); once per subscription. */
+  @Column({ type: Date, nullable: true })
+  trialReminderSentAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -182,12 +182,6 @@ limits them today, and what was done:
 
 ## Billing follow-ups (2026-11-04)
 
-- **Trial-ending reminder from Cofre** — small. Stripe's 7-day trial reminder is
-  off (an extension in `late-payment.ts` is a Stripe trial, so it would mail
-  "your trial ends" to a paying user). Send Cofre's own "trial ends in 3 days —
-  add a payment method" email from a daily sweep over rows with `status =
-  'trialing'` and `trialEnd` within 3 days, once per subscription (stamp a
-  `trialReminderSentAt`); never for an extension (local status is `active`).
 - **Stripe dashboard settings** — done 2026-11-04, recorded in CLAUDE.md
   (`billing/` row). Re-check after any Stripe dashboard change: retry windows
   under one month, cancel + uncollectible after retries, trial reminder off,

@@ -89,6 +89,7 @@ describe.skipIf(!hasDb)('database migrations', { timeout: 30_000 }, () => {
     for (const col of ['symbol', 'securityName', 'quantity', 'price', 'fees', 'tradingAccountId']) await synced.query(`ALTER TABLE "${SYNCED}"."transactions" DROP COLUMN "${col}"`);
     await synced.query(`DROP TABLE "${SYNCED}"."project_accounts"`);
     await synced.query(`ALTER TABLE "${SYNCED}"."subscriptions" DROP COLUMN "pastDueSince"`);
+    await synced.query(`ALTER TABLE "${SYNCED}"."subscriptions" DROP COLUMN "trialReminderSentAt"`);
     await synced.query(`INSERT INTO "${SYNCED}"."users" ("email", "name") VALUES ('owner@cofre.dev', 'Owner')`);
     await synced.destroy();
 

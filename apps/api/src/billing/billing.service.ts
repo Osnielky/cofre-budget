@@ -19,6 +19,8 @@ import { classifyPlanChange, summarizeUpgradePreview, pendingChangeFromSchedule,
 export const PAST_DUE_GRACE_HOURS = 24;
 const PAST_DUE_GRACE_MS = PAST_DUE_GRACE_HOURS * 3_600_000;
 const PAST_DUE_SWEEP_EVERY_MS = 3_600_000;
+/** Cofre's trial-ending reminder goes out when a real trial ends within this many days. */
+const TRIAL_REMINDER_DAYS = 3;
 
 @Injectable()
 export class BillingService {
@@ -229,8 +231,72 @@ export class BillingService {
      back through the webhook and syncFromStripeSubscription restores the tier. */
   onApplicationBootstrap(): void {
     if (process.env.NODE_ENV === 'test') return;
-    setTimeout(() => void this.sweepPastDue(), 20_000).unref();
-    setInterval(() => void this.sweepPastDue(), PAST_DUE_SWEEP_EVERY_MS).unref();
+    const sweep = () => { void this.sweepPastDue(); void this.sweepTrialReminders(); };
+    setTimeout(sweep, 20_000).unref();
+    setInterval(sweep, PAST_DUE_SWEEP_EVERY_MS).unref();
+  }
+
+  /**
+   * Cofre's own "your trial ends on <date>" email, sent once per subscription when
+   * a real trial ends within TRIAL_REMINDER_DAYS. Stripe's reminder is off because
+   * a late-payment extension (late-payment.ts) is a Stripe trial internally — those
+   * rows are `active` here, so they never match. A trial set to cancel gets nothing
+   * (nothing will be charged). Returns how many went out.
+   */
+  async sweepTrialReminders(now: Date = new Date()): Promise<number> {
+    const until = new Date(now.getTime() + TRIAL_REMINDER_DAYS * 86_400_000);
+    let rows: Subscription[];
+    try {
+      rows = await this.subs.createQueryBuilder('sub')
+        .where('sub.status = :status', { status: 'trialing' })
+        .andWhere('sub.trialReminderSentAt IS NULL')
+        .andWhere('sub.cancelAtPeriodEnd = :no', { no: false })
+        .andWhere('sub.trialEnd > :now', { now })
+        .andWhere('sub.trialEnd <= :until', { until })
+        .getMany();
+    } catch (err) {
+      this.logger.error('Trial-reminder sweep could not read subscriptions', err as Error);
+      return 0;
+    }
+    let sent = 0;
+    for (const sub of rows) {
+      const user = await this.users.findOneBy({ id: sub.userId });
+      if (!user) continue;
+      // What the first charge will be and whether anything is there to charge.
+      let amount: number | null = null;
+      let paymentMethodOnFile = true;
+      try {
+        const live = await timed('stripe', 'subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(sub.stripeSubscriptionId, {
+          expand: ['default_payment_method', 'customer.invoice_settings.default_payment_method'],
+        }));
+        const unit = live.items.data[0]?.price?.unit_amount;
+        amount = typeof unit === 'number' ? unit / 100 : null;
+        const customer = live.customer;
+        paymentMethodOnFile = !!live.default_payment_method || (typeof customer === 'object' && !('deleted' in customer) && !!customer.invoice_settings?.default_payment_method);
+      } catch (err) {
+        this.logger.warn(`Trial reminder: could not read Stripe for user ${user.id} — sending without the amount: ${(err as Error).message}`);
+      }
+      try {
+        await this.mail.sendBillingEmail(user.email, billingEmailContent('trial_ending', {
+          name: user.name ?? '',
+          tier: sub.tier,
+          interval: sub.interval,
+          status: 'trialing',
+          amount,
+          currency: 'usd',
+          trialEnd: sub.trialEnd,
+          currentPeriodEnd: sub.currentPeriodEnd,
+          paymentMethodOnFile,
+          appUrl: this.frontendUrl,
+        }));
+        await this.subs.update(sub.id, { trialReminderSentAt: now });
+        sent++;
+        this.logger.log(`Trial reminder sent: user ${user.id} (${sub.tier}), trial ends ${sub.trialEnd?.toISOString()}`);
+      } catch (err) {
+        this.logger.error('Trial reminder email failed', err as Error);
+      }
+    }
+    return sent;
   }
 
   /** Downgrades every user past due for longer than the grace window; returns how many. */

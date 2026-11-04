@@ -16,7 +16,7 @@ export interface SubState {
   cancelAtPeriodEnd: boolean;
 }
 
-export type BillingEmailKind = 'started' | 'changed' | 'downgrade_scheduled' | 'cancel_scheduled' | 'ended' | 'recovered';
+export type BillingEmailKind = 'started' | 'changed' | 'downgrade_scheduled' | 'cancel_scheduled' | 'ended' | 'recovered' | 'trial_ending';
 
 export function billingEmailFor(prev: SubState | null, next: SubState): BillingEmailKind | null {
   if (next.status === 'canceled') return prev && prev.status !== 'canceled' ? 'ended' : null;
@@ -58,6 +58,8 @@ export interface BillingEmailContext {
   currentPeriodEnd: Date | null;
   prevTier?: Tier;
   prevInterval?: Interval;
+  /** `trial_ending` only: whether Stripe holds a payment method to charge at trial end. */
+  paymentMethodOnFile?: boolean;
   appUrl: string;
 }
 
@@ -184,6 +186,27 @@ export function billingEmailContent(kind: BillingEmailKind, c: BillingEmailConte
         note: `Your plan restarts from the day you paid: this payment covers you until ${date(c.currentPeriodEnd)}, which is now your renewal date. The receipt comes separately from Stripe.`,
         cta: { label: 'Open Cofre', href: `${c.appUrl}/dashboard` },
       };
+
+    case 'trial_ending': {
+      const ends = date(c.trialEnd);
+      const onFile = c.paymentMethodOnFile !== false;
+      return {
+        subject: `Your Cofre ${plan} trial ends on ${ends}`,
+        heading: `Your ${plan} trial ends on ${ends}`,
+        intro: onFile
+          ? `${hello}your free trial ends on ${ends}. From then your ${plan} plan is ${perInterval}, charged to the payment method on file — there's nothing to do if you'd like to keep it.`
+          : `${hello}your free trial ends on ${ends}. There's no payment method on file yet: add one before then to keep ${plan}, or your account moves to the free Basic plan.`,
+        rows: [
+          ['Plan', planLabel(c.tier, c.interval)],
+          ['Trial ends', ends],
+          onFile ? ['First payment', nextPayment] : ['First payment', `${amount ?? '—'} once a payment method is added`],
+        ],
+        featuresTitle: `What you keep on ${plan}`,
+        features: PLAN_FEATURES[c.tier],
+        note: `Prefer not to continue? Cancel any time before ${ends} from Settings → Billing and you won't be charged.`,
+        cta: { label: onFile ? 'Manage plan' : 'Add payment method', href: `${c.appUrl}/settings?tab=billing` },
+      };
+    }
 
     case 'ended':
       return {
