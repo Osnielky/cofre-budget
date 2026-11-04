@@ -544,8 +544,8 @@ describe('BillingService.payOverdue', () => {
   });
 
   it('turns a declined payment into a clear 409 and changes nothing', async () => {
-    const { service, ds, userId, mail } = await setup({ payError: Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError', code: 'card_declined' }) });
-    await expect(service.payOverdue(userId)).rejects.toThrow(/didn't go through: Your card was declined/);
+    const { service, ds, userId, mail } = await setup({ payError: Object.assign(new Error('The payment failed.'), { type: 'StripeCardError', code: 'card_declined', decline_code: 'insufficient_funds' }) });
+    await expect(service.payOverdue(userId)).rejects.toThrow(/Stripe could not charge your payment method: the bank reported insufficient funds\. Add another card or bank account/);
     expect((await ds.getRepository(User).findOneByOrFail({ id: userId })).plan).toBe('free');
     expect(mail.sent).toEqual([]);
   });

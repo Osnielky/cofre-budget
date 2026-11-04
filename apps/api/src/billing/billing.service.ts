@@ -7,6 +7,8 @@ import { User } from '../users/user.entity';
 import { Subscription } from './subscription.entity';
 import { mapStripeSubscription, PriceIdMap } from './billing.mapping';
 import { timed } from '../common/logging/timed';
+import { log } from '../common/logging/log';
+import { describePaymentFailure } from './payment-failure';
 import { MailService } from '../mail/mail.service';
 import { billingEmailContent, billingEmailFor, type SubState } from './billing-emails';
 import { mapBillingOverview, EMPTY_OVERVIEW, type BillingOverview } from './billing-overview';
@@ -297,9 +299,11 @@ export class BillingService {
           payment_behavior: 'error_if_incomplete',
         }));
       } catch (err) {
-        const code = (err as Stripe.errors.StripeError)?.code;
-        if (code === 'card_declined' || code === 'resource_missing' || (err as Stripe.errors.StripeError)?.type === 'StripeCardError') {
-          throw new ConflictException("Today's payment didn't go through, so your plan was not changed. Check your payment method and try again.");
+        const e = err as Stripe.errors.StripeError;
+        if (e?.type === 'StripeCardError' || e?.code === 'card_declined' || e?.code === 'resource_missing') {
+          const failure = describePaymentFailure(e);
+          log('WARNING', 'Plan upgrade payment declined', { billing: { operation: 'switchTier', code: failure.code, declineCode: failure.declineCode } });
+          throw new ConflictException(`Today's payment didn't go through, so your plan was not changed. ${failure.message}`);
         }
         throw err;
       }
@@ -354,9 +358,12 @@ export class BillingService {
     } catch (err) {
       const e = err as Stripe.errors.StripeError;
       if (e?.type === 'StripeCardError' || e?.type === 'StripeInvalidRequestError') {
-        throw new ConflictException(e.code === 'resource_missing' || /no payment method|default payment method/i.test(e.message ?? '')
-          ? 'There is no payment method on file to charge. Add one and try again.'
-          : `The payment didn't go through: ${(e.message ?? 'declined').replace(/\.$/, '')}. Try another card or bank account.`);
+        // Stripe's own sentence is often just "The payment failed." (a bank or
+        // Link decline with no detail); the decline code is the only clue and it
+        // is logged here — never amounts, emails or the method itself.
+        const failure = describePaymentFailure(e);
+        log('WARNING', 'Overdue invoice payment declined', { billing: { operation: 'payOverdue', code: failure.code, declineCode: failure.declineCode } });
+        throw new ConflictException(failure.message);
       }
       throw err;
     }
