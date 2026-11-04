@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Fraunces } from 'next/font/google';
+import { display } from '@/app/fonts/display'; // self-hosted Fraunces, see fonts/display.ts
 import { HOME_TITLE, HOME_DESCRIPTION, SITE_NAME, SITE_URL, softwareAppJsonLd, organizationJsonLd, serializeJsonLd } from '@/lib/seo';
 import LandingNav from '@/components/landing/LandingNav';
 import LandingHero from '@/components/landing/LandingHero';
@@ -19,8 +19,6 @@ import SpendingMockup from '@/components/landing/mockups/SpendingMockup';
 import ProjectionMockup from '@/components/landing/mockups/ProjectionMockup';
 import CardMockup from '@/components/landing/mockups/CardMockup';
 
-// Serif display face for landing headlines only; the app keeps Inter.
-const display = Fraunces({ subsets: ['latin'], weight: ['300', '400'], variable: '--font-display', display: 'swap' });
 
 export const metadata: Metadata = {
   title: { absolute: HOME_TITLE },

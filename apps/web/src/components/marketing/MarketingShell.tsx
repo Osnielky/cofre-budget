@@ -1,11 +1,9 @@
 import Link from 'next/link';
-import { Fraunces } from 'next/font/google';
+import { display } from '@/app/fonts/display'; // self-hosted Fraunces, see fonts/display.ts
 import LandingNav from '@/components/landing/LandingNav';
 import LandingFooter from '@/components/landing/LandingFooter';
 import { breadcrumbJsonLd, serializeJsonLd, type Crumb } from '@/lib/seo';
 
-// Same serif display face as the landing page, loaded only on marketing pages.
-const display = Fraunces({ subsets: ['latin'], weight: ['300', '400'], variable: '--font-display', display: 'swap' });
 
 interface Props {
   /** Small uppercase label above the title. */
