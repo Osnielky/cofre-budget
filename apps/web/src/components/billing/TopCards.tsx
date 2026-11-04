@@ -1,7 +1,7 @@
 'use client';
 
 import { PLAN_PRICES, TRIAL_DAYS } from '@/lib/plans';
-import { daysUntil, trialProgress, describePaymentMethod } from '@/lib/billing/derive';
+import { daysUntil, trialProgress, describePaymentMethod, type PastDueSummary } from '@/lib/billing/derive';
 import type { BillingOverview, SubscriptionInfo } from '@/lib/billing/types';
 import { BillingCard, Icon, IconChip, Pill, fmtDate, fmtMoney, outlineBtn, glass } from './ui';
 
@@ -13,17 +13,18 @@ export interface BillingActions {
   switchTier: (tier: 'pro' | 'elite', interval: 'month' | 'year') => void;
   cancelPlan: () => void;
   resumePlan: () => void;
-  openPortal: () => void;
-  /** The trip to Stripe's payment page: opening, or why it did not open. */
+  /** Stripe's portal: on its payment-method page, or on the overview (plan, invoices). */
+  openPortal: (flow?: 'payment_method') => void;
+  /** The trip to Stripe's portal: opening, or why it did not open. */
   portal: { opening: boolean; error: string | null };
 }
 
 /** Wide card: plan name, trial / renewal / cancellation status and the main actions. */
-export function CurrentPlanCard({ sub, actions }: { sub: SubscriptionInfo; actions: BillingActions }) {
-  const accent = sub.tier === 'elite' ? 'var(--color-amber)' : 'var(--color-primary)';
+export function CurrentPlanCard({ sub, pastDue, actions }: { sub: SubscriptionInfo; pastDue: PastDueSummary | null; actions: BillingActions }) {
+  const accent = pastDue?.paused ? 'var(--color-amber)' : sub.tier === 'elite' ? 'var(--color-amber)' : 'var(--color-primary)';
   const trialing = sub.status === 'trialing' && !!sub.trialEnd;
-  const statusLine = sub.status === 'past_due'
-    ? { text: 'Your last payment failed — update your payment method to keep your plan.', color: 'var(--color-rose)' }
+  const statusLine = pastDue
+    ? { text: pastDue.headline, color: 'var(--color-rose)' }
     : sub.cancelAtPeriodEnd
       ? { text: `Your ${TIER[sub.tier]} plan is set to end.`, color: 'var(--color-amber)' }
       : trialing
@@ -39,7 +40,7 @@ export function CurrentPlanCard({ sub, actions }: { sub: SubscriptionInfo; actio
       <div className="flex items-start gap-4">
         <IconChip name="crown" color={accent} size={64} />
         <div className="min-w-0">
-          <Pill color={accent}>CURRENT PLAN</Pill>
+          <Pill color={accent}>{pastDue?.paused ? 'PAUSED · ON BASIC' : 'CURRENT PLAN'}</Pill>
           <h3 className="text-2xl font-bold mt-1.5" style={{ color: 'var(--color-text-primary)' }}>{TIER[sub.tier]} · {INTERVAL[sub.interval]}</h3>
           <p className="text-sm font-semibold mt-0.5" style={{ color: statusLine.color }}>{statusLine.text}</p>
         </div>
@@ -57,7 +58,17 @@ export function CurrentPlanCard({ sub, actions }: { sub: SubscriptionInfo; actio
             </div>
           </div>
         )}
-        {sub.cancelAtPeriodEnd ? (
+        {pastDue ? (
+          <div className="flex items-start gap-3">
+            <span style={{ color: 'var(--color-rose)' }}><Icon name="xCircle" /></span>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                {pastDue.due ? `${fmtMoney(pastDue.due.amount, pastDue.due.currency)} unpaid since ${fmtDate(pastDue.due.date)}` : 'Payment unpaid'}
+              </p>
+              <p className="text-xs leading-snug" style={{ color: 'var(--color-text-muted)' }}>{pastDue.body}</p>
+            </div>
+          </div>
+        ) : sub.cancelAtPeriodEnd ? (
           <div className="flex items-start gap-3">
             <span style={{ color: 'var(--color-amber)' }}><Icon name="xCircle" /></span>
             <div>
@@ -77,7 +88,12 @@ export function CurrentPlanCard({ sub, actions }: { sub: SubscriptionInfo; actio
       </div>
 
       <div className="flex flex-wrap gap-2 mt-auto">
-        {sub.cancelAtPeriodEnd ? (
+        {pastDue ? (
+          <button type="button" disabled={actions.portal.opening} onClick={() => actions.openPortal('payment_method')}
+            className="btn-gold px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50 inline-flex items-center gap-2">
+            <Icon name="card" size={15} /> {actions.portal.opening ? 'Opening Stripe…' : pastDue.action}
+          </button>
+        ) : sub.cancelAtPeriodEnd ? (
           <button type="button" disabled={actions.busy} onClick={actions.resumePlan}
             className="btn-gold px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50">
             Keep my plan
@@ -89,15 +105,16 @@ export function CurrentPlanCard({ sub, actions }: { sub: SubscriptionInfo; actio
             {other === 'elite' ? 'Upgrade to Elite' : 'Downgrade to Pro'}
           </button>
         )}
-        {!sub.cancelAtPeriodEnd && (
+        {!sub.cancelAtPeriodEnd && !pastDue && (
           <button type="button" disabled={actions.busy} onClick={() => actions.switchTier(sub.tier, otherInterval)}
             className="px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50" style={outlineBtn}>
             {otherInterval === 'year' ? 'Switch to yearly (save 20%)' : 'Switch to monthly'}
           </button>
         )}
-        <button type="button" disabled={actions.busy} onClick={actions.openPortal}
+        <button type="button" disabled={actions.busy || actions.portal.opening} onClick={() => actions.openPortal()}
+          title="Plan, invoices and payment method in Stripe's billing portal"
           className="px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50 inline-flex items-center gap-2" style={outlineBtn}>
-          <Icon name="gear" size={15} /> Manage subscription
+          <Icon name="gear" size={15} /> Manage in Stripe
         </button>
       </div>
       {!sub.cancelAtPeriodEnd && (
@@ -124,7 +141,7 @@ export function PaymentMethodCard({ overview, sub, notice, actions }: {
   const { opening, error } = actions.portal;
   return (
     <BillingCard title="Payment method"
-      action={<button type="button" onClick={actions.openPortal} disabled={opening} className="text-xs font-semibold px-3 py-1 rounded-lg cursor-pointer disabled:opacity-60" style={outlineBtn}>Edit</button>}>
+      action={<button type="button" onClick={() => actions.openPortal('payment_method')} disabled={opening} className="text-xs font-semibold px-3 py-1 rounded-lg cursor-pointer disabled:opacity-60" style={outlineBtn}>Edit</button>}>
       {notice && (
         <p role="status" className="text-xs font-semibold rounded-xl px-3 py-2 flex items-start gap-2"
           style={notice.tone === 'good'
@@ -146,7 +163,7 @@ export function PaymentMethodCard({ overview, sub, notice, actions }: {
       </div>
       {pastDue && (
         <p className="text-xs leading-snug" style={{ color: 'var(--color-rose)' }}>
-          Your last payment didn’t go through. Add a working card or bank account — Stripe retries on its own and your plan continues once it succeeds.
+          {pm ? 'This method didn’t work for the last payment. Replace it and Stripe retries on its own.' : 'The last payment had nothing to charge. Add a card or bank account and Stripe collects it on its own.'}
         </p>
       )}
       {a && (
@@ -162,7 +179,7 @@ export function PaymentMethodCard({ overview, sub, notice, actions }: {
         </div>
       )}
       <div className="mt-auto flex flex-col gap-2">
-        <button type="button" onClick={actions.openPortal} disabled={opening}
+        <button type="button" onClick={() => actions.openPortal('payment_method')} disabled={opening}
           className="w-full py-2.5 rounded-xl text-sm font-semibold cursor-pointer inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait"
           style={pm
             ? { border: '1px solid var(--color-primary)', color: 'var(--color-primary)' }
@@ -177,7 +194,7 @@ export function PaymentMethodCard({ overview, sub, notice, actions }: {
   );
 }
 
-export function BillingSummaryCard({ sub, overview }: { sub: SubscriptionInfo; overview: BillingOverview | null }) {
+export function BillingSummaryCard({ sub, overview, pastDue }: { sub: SubscriptionInfo; overview: BillingOverview | null; pastDue: PastDueSummary | null }) {
   const up = overview?.upcoming;
   const list = PLAN_PRICES[sub.tier][sub.interval];
   const nextDate = up?.date ?? (sub.status === 'trialing' ? sub.trialEnd : sub.currentPeriodEnd);
@@ -195,7 +212,17 @@ export function BillingSummaryCard({ sub, overview }: { sub: SubscriptionInfo; o
         {up && up.tax > 0 && row('Tax', fmtMoney(up.tax, up.currency))}
       </div>
       <div className="mt-auto pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
-        {sub.cancelAtPeriodEnd ? (
+        {pastDue ? (
+          <>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm font-bold" style={{ color: 'var(--color-rose)' }}>Amount due</span>
+              <span className="text-xl font-bold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>{pastDue.due ? fmtMoney(pastDue.due.amount, pastDue.due.currency) : fmtMoney(list)}</span>
+            </div>
+            <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+              {pastDue.due ? `Unpaid since ${fmtDate(pastDue.due.date)} · collected once a payment method is on file` : 'Collected once a payment method is on file'}
+            </p>
+          </>
+        ) : sub.cancelAtPeriodEnd ? (
           <>
             <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>No upcoming charges</p>
             <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>Your plan ends on {fmtDate(sub.status === 'trialing' ? sub.trialEnd : sub.currentPeriodEnd)}.</p>
@@ -215,7 +242,7 @@ export function BillingSummaryCard({ sub, overview }: { sub: SubscriptionInfo; o
 }
 
 /** Trial ring while trialing; otherwise how long until renewal (or until the plan ends). */
-export function TrialCard({ sub }: { sub: SubscriptionInfo }) {
+export function TrialCard({ sub, pastDue }: { sub: SubscriptionInfo; pastDue: PastDueSummary | null }) {
   const trialing = sub.status === 'trialing' && !!sub.trialEnd;
   // The ring shows what's left: `usedPct` of it is drawn empty.
   const ring = (usedPct: number, big: string, small: string) => {
@@ -243,6 +270,30 @@ export function TrialCard({ sub }: { sub: SubscriptionInfo }) {
       </div>
     </div>
   );
+
+  if (pastDue) {
+    return (
+      <BillingCard title="Payment overdue">
+        <div className="flex flex-col items-center text-center gap-1 py-2">
+          <span className="inline-flex items-center justify-center w-12 h-12 rounded-full" style={{ background: 'color-mix(in srgb, var(--color-rose) 16%, transparent)', color: 'var(--color-rose)' }}>
+            <Icon name="xCircle" size={24} />
+          </span>
+          <span className="text-3xl font-bold tabular-nums mt-1" style={{ color: 'var(--color-text-primary)' }}>
+            {pastDue.due ? fmtMoney(pastDue.due.amount, pastDue.due.currency) : '—'}
+          </span>
+          <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
+            {pastDue.due ? `due since ${fmtDate(pastDue.due.date)}` : 'waiting on payment'}
+          </span>
+        </div>
+        <p className="text-xs text-center leading-snug" style={{ color: 'var(--color-text-secondary)' }}>
+          {pastDue.paused
+            ? `You're on Basic meanwhile. ${TIER[sub.tier]} returns the moment Stripe collects it.`
+            : `${TIER[sub.tier]} pauses if it stays unpaid. Stripe collects it as soon as a payment method is on file.`}
+        </p>
+        {secure}
+      </BillingCard>
+    );
+  }
 
   if (trialing && sub.trialEnd) {
     const t = trialProgress(sub.trialEnd);

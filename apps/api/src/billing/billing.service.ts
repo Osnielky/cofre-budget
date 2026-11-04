@@ -78,9 +78,9 @@ export class BillingService {
   async createCheckoutSession(userId: string, tier: 'pro' | 'elite', interval: 'month' | 'year'): Promise<{ url: string }> {
     const existing = await this.subs.findOneBy({ userId });
     if (existing && ['trialing', 'active', 'past_due'].includes(existing.status)) {
-      throw new ConflictException(
-        'You already have an active subscription — manage it from Settings instead of starting a new one.',
-      );
+      throw new ConflictException(existing.status === 'past_due'
+        ? 'Your subscription is waiting on a payment — add a payment method in Settings → Billing instead of starting a new one.'
+        : 'You already have an active subscription — manage it from Settings instead of starting a new one.');
     }
     const customerId = await this.getOrCreateCustomer(userId);
     const session = await timed('stripe', 'checkout.sessions.create', () => this.stripe.checkout.sessions.create({
@@ -276,13 +276,19 @@ export class BillingService {
     });
   }
 
-  async createPortalLink(userId: string): Promise<{ url: string }> {
+  /**
+   * Stripe's customer portal. `flow: 'payment_method'` opens straight on the
+   * add / replace payment-method page (and, for a past-due subscription, Stripe
+   * retries the open invoice once one is saved); without it the portal opens on
+   * its overview — plan, invoices, payment method — for "Manage subscription".
+   */
+  async createPortalLink(userId: string, flow?: 'payment_method'): Promise<{ url: string }> {
     const user = await this.users.findOneByOrFail({ id: userId });
     if (!user.stripeCustomerId) throw new Error('User has no Stripe customer yet');
     const session = await timed('stripe', 'billingPortal.sessions.create', () => this.stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
       return_url: `${this.frontendUrl}/settings?tab=billing&portal=return`,
-      flow_data: { type: 'payment_method_update' },
+      ...(flow === 'payment_method' ? { flow_data: { type: 'payment_method_update' as const } } : {}),
     }));
     return { url: session.url };
   }

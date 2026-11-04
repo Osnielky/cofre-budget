@@ -1,5 +1,5 @@
 import { PLAN_PRICES, TRIAL_DAYS } from '@/lib/plans';
-import type { PaymentMethodSummary } from './types';
+import type { BillingOverview, PaymentMethodSummary, SubscriptionInfo } from './types';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -61,4 +61,57 @@ export function portalReturnNotice(pm: PaymentMethodSummary | null, status: 'tri
   const what = describePaymentMethod(pm).title;
   if (status === 'past_due') return { tone: 'good', text: `${what} is saved. Stripe will retry the failed payment with it — your plan is back as soon as it goes through.` };
   return { tone: 'good', text: `${what} is saved and will be used for your next charge.` };
+}
+
+const TIER_NAME = { pro: 'Pro', elite: 'Elite' } as const;
+
+export interface PastDueSummary {
+  /** The 24-hour grace has run out: `users.plan` is already free. */
+  paused: boolean;
+  /** The open invoice Stripe is waiting on, when the overview has loaded it. */
+  due: { amount: number; currency: string; date: string; hostedUrl: string | null } | null;
+  /** One line for the plan card's status. */
+  headline: string;
+  /** What happened and what gets the plan back. */
+  body: string;
+  /** What the primary button should say. */
+  action: 'Add payment method' | 'Update payment method';
+}
+
+/**
+ * Explains a past-due subscription in one place so every billing card tells
+ * the same story: whether the plan is paused, which invoice is unpaid, why it
+ * could not be taken (no method on file vs a failed one) and what fixes it.
+ */
+export function pastDueSummary(
+  sub: SubscriptionInfo,
+  plan: 'free' | 'pro' | 'elite',
+  overview: BillingOverview | null,
+  fmt: { money: (n: number, currency: string) => string; date: (iso: string) => string },
+): PastDueSummary | null {
+  if (sub.status !== 'past_due') return null;
+  const paused = plan === 'free';
+  const tier = TIER_NAME[sub.tier];
+  const open = overview?.invoices.find((i) => i.status === 'open') ?? null;
+  const due = open ? { amount: open.total, currency: open.currency, date: open.date, hostedUrl: open.hostedUrl } : null;
+  const payment = due ? `The ${fmt.money(due.amount, due.currency)} payment due ${fmt.date(due.date)}` : 'Your last payment';
+  const hasMethod = !!overview?.paymentMethod;
+  const why = overview == null
+    ? "couldn't be taken."
+    : hasMethod
+      ? `failed on ${describePaymentMethod(overview.paymentMethod).title}.`
+      : "couldn't be taken — there's no payment method on file.";
+  const outcome = `${tier} ${paused ? 'comes back' : 'stays on'} as soon as it goes through.`;
+  const fix = overview == null
+    ? `Add or update your payment method and Stripe retries right away; ${outcome}`
+    : hasMethod
+      ? `Update it and Stripe retries right away; ${outcome}`
+      : `Add one and Stripe collects it right away; ${outcome}`;
+  return {
+    paused,
+    due,
+    headline: paused ? `${tier} is paused — you're on Basic until the payment goes through.` : `Your last payment failed — ${tier} pauses soon unless it's paid.`,
+    body: `${payment} ${why} ${fix}`,
+    action: hasMethod ? 'Update payment method' : 'Add payment method',
+  };
 }

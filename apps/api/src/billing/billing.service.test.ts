@@ -365,3 +365,29 @@ describe('BillingService.getOverview and resume', () => {
     expect(updates).toEqual([{ cancel_at_period_end: false }]);
   });
 });
+
+describe('BillingService.createPortalLink', () => {
+  async function setup() {
+    const ds = await makeDataSource();
+    const userRepo = ds.getRepository(User);
+    const user = await userRepo.save(userRepo.create({ email: 'p@example.com', stripeCustomerId: 'cus_p', plan: 'pro' }));
+    const service = new BillingService(ds.getRepository(User), ds.getRepository(Subscription), fakeConfig(), asMail(new FakeMail()));
+    const params: any[] = [];
+    (service as any).stripe = { billingPortal: { sessions: { create: async (p: unknown) => { params.push(p); return { url: 'https://billing.stripe.com/s' }; } } } };
+    return { service, userId: user.id, params };
+  }
+
+  it('opens the portal overview by default and returns to the Billing tab', async () => {
+    const { service, userId, params } = await setup();
+    await service.createPortalLink(userId);
+    expect(params[0]).toMatchObject({ customer: 'cus_p' });
+    expect(params[0].return_url).toMatch(/\/settings\?tab=billing&portal=return$/);
+    expect(params[0].flow_data).toBeUndefined();
+  });
+
+  it('jumps straight to the payment-method page when asked', async () => {
+    const { service, userId, params } = await setup();
+    await service.createPortalLink(userId, 'payment_method');
+    expect(params[0].flow_data).toEqual({ type: 'payment_method_update' });
+  });
+});

@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import PricingCards from './PricingCards';
 import { useUser } from './UserProvider';
 import type { BillingOverview, SubscriptionInfo } from '@/lib/billing/types';
-import { portalReturnNotice } from '@/lib/billing/derive';
+import { portalReturnNotice, pastDueSummary } from '@/lib/billing/derive';
+import { fmtDate, fmtMoney } from './billing/ui';
 import { CurrentPlanCard, PaymentMethodCard, BillingSummaryCard, TrialCard, type BillingActions } from './billing/TopCards';
 import { InvoicesCard, ComparePlansCard, IncludedCard, YearlyBanner, BillingHelpCard } from './billing/LowerCards';
 
@@ -186,10 +187,13 @@ export default function BillingTab() {
     }
   }
 
-  async function openPortal() {
+  async function openPortal(flow?: 'payment_method') {
     setPortal({ opening: true, error: null });
     try {
-      const res = await fetch(`${API}/billing/portal-link`, { method: 'POST', credentials: 'include' });
+      const res = await fetch(`${API}/billing/portal-link`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify(flow ? { flow } : {}),
+      });
       if (!res.ok) throw new Error(String(res.status));
       const { url } = await res.json();
       window.location.href = url;
@@ -240,6 +244,8 @@ export default function BillingTab() {
   const actions: BillingActions = { busy, switchTier, cancelPlan, resumePlan, openPortal, portal };
   // The overview is read live from Stripe on this load, so it already reflects the trip.
   const portalNotice = returnedFromPortal && overview ? portalReturnNotice(overview.paymentMethod, sub.status) : null;
+  // One story for every card when a payment is unpaid: paused (plan already free) or still inside the grace window.
+  const pastDue = pastDueSummary(sub, user?.plan ?? 'free', overview, { money: fmtMoney, date: fmtDate });
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -248,10 +254,10 @@ export default function BillingTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.9fr_1fr_1fr_1fr] gap-4">
-        <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><CurrentPlanCard sub={sub} actions={actions} /></div>
+        <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><CurrentPlanCard sub={sub} pastDue={pastDue} actions={actions} /></div>
         <PaymentMethodCard overview={overview} sub={sub} notice={portalNotice} actions={actions} />
-        <BillingSummaryCard sub={sub} overview={overview} />
-        <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><TrialCard sub={sub} /></div>
+        <BillingSummaryCard sub={sub} overview={overview} pastDue={pastDue} />
+        <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><TrialCard sub={sub} pastDue={pastDue} /></div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.3fr_1fr_1fr] gap-4">

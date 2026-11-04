@@ -47,7 +47,7 @@ export class BillingController {
 
   @BlockedInDemo()
   @Post('portal-link')
-  createPortalLink(@Request() req: any) {
-    return this.billing.createPortalLink(req.user.id);
+  createPortalLink(@Request() req: any, @Body() body: { flow?: 'payment_method' } | undefined) {
+    return this.billing.createPortalLink(req.user.id, body?.flow === 'payment_method' ? 'payment_method' : undefined);
   }
 }

@@ -23,6 +23,12 @@ export default function PricingPage() {
         router.push('/signup');
         return;
       }
+      if (res.status === 409) {
+        // Already subscribed (active, trialing or waiting on a payment): the Billing tab
+        // is where that subscription is managed — a second Checkout would double-bill.
+        router.push('/settings?tab=billing');
+        return;
+      }
       if (!res.ok) {
         // Covers the 409 ConflictException thrown when the user already has an active/
         // trialing/past_due subscription, plus any other non-2xx (500, etc.) — this used

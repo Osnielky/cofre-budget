@@ -34,7 +34,7 @@ export function InvoicesCard({ overview, actions }: { overview: BillingOverview 
 
   return (
     <BillingCard title="Recent invoices"
-      action={<button type="button" onClick={actions.openPortal} className="text-xs font-semibold inline-flex items-center gap-1 cursor-pointer hover:underline" style={{ color: 'var(--color-primary)' }}>View all invoices <Icon name="arrow" size={13} /></button>}>
+      action={<button type="button" onClick={() => actions.openPortal()} className="text-xs font-semibold inline-flex items-center gap-1 cursor-pointer hover:underline" style={{ color: 'var(--color-primary)' }}>View all invoices <Icon name="arrow" size={13} /></button>}>
       {invoices.length === 0 ? (
         <p className="text-sm py-6 text-center" style={{ color: 'var(--color-text-muted)' }}>No invoices yet — your first one appears after your first charge.</p>
       ) : (
@@ -182,8 +182,8 @@ export function YearlyBanner({ sub, actions }: { sub: SubscriptionInfo; actions:
 export function BillingHelpCard({ actions }: { actions: BillingActions }) {
   const items: { icon: IconName; title: string; detail: string; href?: string; onClick?: () => void }[] = [
     { icon: 'chat', title: 'Contact support', detail: 'Email our team', href: `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Cofre billing question')}` },
-    { icon: 'book', title: 'All invoices', detail: 'Full history in Stripe', onClick: actions.openPortal },
-    { icon: 'file', title: 'Download receipts', detail: 'Receipts for past charges', onClick: actions.openPortal },
+    { icon: 'book', title: 'All invoices', detail: 'Full history in Stripe', onClick: () => actions.openPortal() },
+    { icon: 'file', title: 'Download receipts', detail: 'Receipts for past charges', onClick: () => actions.openPortal() },
   ];
   return (
     <BillingCard title="Need help with billing?">
