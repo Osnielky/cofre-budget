@@ -16,7 +16,7 @@ export interface SubState {
   cancelAtPeriodEnd: boolean;
 }
 
-export type BillingEmailKind = 'started' | 'changed' | 'cancel_scheduled' | 'ended';
+export type BillingEmailKind = 'started' | 'changed' | 'downgrade_scheduled' | 'cancel_scheduled' | 'ended';
 
 export function billingEmailFor(prev: SubState | null, next: SubState): BillingEmailKind | null {
   if (next.status === 'canceled') return prev && prev.status !== 'canceled' ? 'ended' : null;
@@ -126,9 +126,29 @@ export function billingEmailContent(kind: BillingEmailKind, c: BillingEmailConte
         ],
         featuresTitle: `What's included in ${plan}`,
         features: PLAN_FEATURES[c.tier],
-        note: 'Stripe adjusts any price difference for the rest of this period on your next invoice.',
+        note: "Moving up a plan is charged the same day for the rest of the period, minus credit for the unused part of the old price. Moving down takes effect when the period you've paid for ends. Payments aren't refunded.",
         cta: { label: 'View billing', href: `${c.appUrl}/settings?tab=billing` },
       };
+
+    case 'downgrade_scheduled': {
+      // c.tier / c.interval is the plan the user moves to; prev* is what they keep until then.
+      const keep = c.prevTier && c.prevInterval ? planLabel(c.prevTier, c.prevInterval) : 'your current plan';
+      return {
+        subject: `Your Cofre plan switches to ${planLabel(c.tier, c.interval)} on ${date(c.currentPeriodEnd)}`,
+        heading: 'Your plan change is scheduled',
+        intro: `${hello}we've scheduled your switch to ${planLabel(c.tier, c.interval)}. You keep ${keep} until ${date(c.currentPeriodEnd)} — that time is already paid for — and the new plan starts right after.`,
+        rows: [
+          ['Until ' + date(c.currentPeriodEnd), keep],
+          ['From then', planLabel(c.tier, c.interval)],
+          ['New price', perInterval],
+          ['First charge on the new plan', nextPayment],
+          ['Charged today', 'Nothing'],
+          ['Refund for the remaining time', "None — payments aren't refundable, so you keep the plan you paid for until it ends"],
+        ],
+        note: 'Changed your mind? You can keep your current plan from Settings → Billing before the date above.',
+        cta: { label: 'View billing', href: `${c.appUrl}/settings?tab=billing` },
+      };
+    }
 
     case 'cancel_scheduled':
       return {

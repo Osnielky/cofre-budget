@@ -19,10 +19,22 @@ export class BillingController {
     return this.billing.getSubscription(req.user.id);
   }
 
+  /** What a plan change costs today and when it applies — shown before the user confirms. */
+  @Post('subscription/preview')
+  previewSwitch(@Request() req: any, @Body() body: { tier: 'pro' | 'elite'; interval: 'month' | 'year' }) {
+    return this.billing.previewPlanChange(req.user.id, body.tier, body.interval);
+  }
+
   @BlockedInDemo()
   @Patch('subscription')
-  async switchTier(@Request() req: any, @Body() body: { tier: 'pro' | 'elite'; interval: 'month' | 'year' }) {
-    await this.billing.switchTier(req.user.id, body.tier, body.interval);
+  switchTier(@Request() req: any, @Body() body: { tier: 'pro' | 'elite'; interval: 'month' | 'year' }) {
+    return this.billing.switchTier(req.user.id, body.tier, body.interval);
+  }
+
+  @BlockedInDemo()
+  @Post('subscription/pending-change/cancel')
+  async cancelPendingChange(@Request() req: any) {
+    await this.billing.cancelPendingChange(req.user.id);
     return { ok: true };
   }
 

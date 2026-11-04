@@ -356,7 +356,7 @@ describe('BillingService.getOverview and resume', () => {
     const ds = await makeDataSource();
     const user = await ds.getRepository(User).save(ds.getRepository(User).create({ email: 'n@example.com', plan: 'free' }));
     const service = new BillingService(ds.getRepository(User), ds.getRepository(Subscription), fakeConfig(), asMail(new FakeMail()));
-    expect(await service.getOverview(user.id)).toEqual({ paymentMethod: null, billingAddress: null, upcoming: null, invoices: [] });
+    expect(await service.getOverview(user.id)).toEqual({ paymentMethod: null, billingAddress: null, upcoming: null, pendingChange: null, invoices: [] });
   });
 
   it('resume turns cancel-at-period-end back off in Stripe', async () => {
@@ -389,5 +389,120 @@ describe('BillingService.createPortalLink', () => {
     const { service, userId, params } = await setup();
     await service.createPortalLink(userId, 'payment_method');
     expect(params[0].flow_data).toEqual({ type: 'payment_method_update' });
+  });
+});
+
+describe('BillingService.switchTier / previewPlanChange / cancelPendingChange', () => {
+  async function setup(opts: { status?: 'trialing' | 'active'; tier?: 'pro' | 'elite'; interval?: 'month' | 'year'; schedule?: boolean } = {}) {
+    const ds = await makeDataSource();
+    const userRepo = ds.getRepository(User);
+    const user = await userRepo.save(userRepo.create({ email: 's@example.com', name: 'Sam', stripeCustomerId: 'cus_s', plan: 'pro' }));
+    const tier = opts.tier ?? 'pro', interval = opts.interval ?? 'month';
+    await ds.getRepository(Subscription).save(ds.getRepository(Subscription).create({
+      userId: user.id, stripeSubscriptionId: 'sub_s', tier, interval, status: opts.status ?? 'active',
+      cancelAtPeriodEnd: false, currentPeriodEnd: new Date('2026-11-29T00:00:00Z'), trialEnd: opts.status === 'trialing' ? new Date('2026-11-29T00:00:00Z') : null,
+    }));
+    const mail = new FakeMail();
+    const service = new BillingService(ds.getRepository(User), ds.getRepository(Subscription), fakeConfig(), asMail(mail));
+    const calls: { op: string; params: any }[] = [];
+    const priceId = `price_${tier}_${interval}`;
+    const item = { id: 'si_1', price: { id: priceId, unit_amount: interval === 'month' ? 499 : 4790, currency: 'usd' }, current_period_end: 1_795_000_000 };
+    const stripe = {
+      subscriptions: {
+        retrieve: async () => ({ id: 'sub_s', customer: 'cus_s', status: opts.status ?? 'active', cancel_at_period_end: false, trial_end: null, items: { data: [item] }, schedule: opts.schedule ? { id: 'sched_old', status: 'active', phases: [] } : null }),
+        update: async (_id: string, params: any) => {
+          calls.push({ op: 'subscriptions.update', params });
+          const price = Object.keys({ price_pro_month: 1, price_pro_year: 1, price_elite_month: 1, price_elite_year: 1 }).find((p) => p === params.items?.[0]?.price) ?? priceId;
+          return { id: 'sub_s', customer: 'cus_s', status: opts.status ?? 'active', cancel_at_period_end: params.cancel_at_period_end ?? false, trial_end: null, items: { data: [{ ...item, price: { ...item.price, id: price, unit_amount: price.endsWith('year') ? 4790 : 499 } }] } };
+        },
+      },
+      prices: { retrieve: async (id: string) => ({ id, unit_amount: id.endsWith('year') ? (id.includes('elite') ? 7670 : 4790) : (id.includes('elite') ? 799 : 499), currency: 'usd' }) },
+      invoices: { createPreview: async (params: any) => { calls.push({ op: 'invoices.createPreview', params }); return { amount_due: 4365, lines: { data: [{ amount: -425, period: { end: 1_795_000_000 }, pricing: { price_details: { price: priceId } } }, { amount: 4790, period: { end: 1_826_000_000 }, pricing: { price_details: { price: params.subscription_details.items[0].price } } }] } }; } },
+      subscriptionSchedules: {
+        create: async (params: any) => { calls.push({ op: 'subscriptionSchedules.create', params }); return { id: 'sched_1', phases: [{ start_date: 1_792_000_000, end_date: 1_795_000_000 }] }; },
+        update: async (id: string, params: any) => { calls.push({ op: 'subscriptionSchedules.update', params: { id, ...params } }); return { id }; },
+        release: async (id: string) => { calls.push({ op: 'subscriptionSchedules.release', params: id }); return { id }; },
+      },
+    };
+    (service as any).stripe = stripe;
+    return { service, ds, userId: user.id, calls, mail, stripe };
+  }
+
+  it('previews an upgrade as today’s prorated charge with the unused-time credit and the new period end', async () => {
+    const { service, userId, calls } = await setup();
+    const out = await service.previewPlanChange(userId, 'pro', 'year');
+    expect(out).toMatchObject({ kind: 'upgrade', chargeNow: 43.65, credit: 4.25, from: { tier: 'pro', interval: 'month', amount: 4.99 }, to: { tier: 'pro', interval: 'year', amount: 47.9 }, nextChargeAt: new Date(1_826_000_000 * 1000).toISOString() });
+    expect(calls[0].params.subscription_details).toEqual({ items: [{ id: 'si_1', price: 'price_pro_year' }], proration_behavior: 'always_invoice' });
+  });
+
+  it('previews a downgrade as nothing today, starting when the paid period ends', async () => {
+    const { service, userId, calls } = await setup({ interval: 'year' });
+    const out = await service.previewPlanChange(userId, 'pro', 'month');
+    expect(out).toMatchObject({ kind: 'downgrade', chargeNow: 0, credit: 0, effectiveAt: '2026-11-29T00:00:00.000Z', nextChargeAt: '2026-11-29T00:00:00.000Z', to: { amount: 4.99 } });
+    expect(calls).toEqual([]);
+  });
+
+  it('charges nothing today for an upgrade during the trial; the first payment is at trial end', async () => {
+    const { service, userId } = await setup({ status: 'trialing' });
+    const out = await service.previewPlanChange(userId, 'pro', 'year');
+    expect(out).toMatchObject({ kind: 'upgrade', chargeNow: 0, trialing: true, nextChargeAt: '2026-11-29T00:00:00.000Z' });
+  });
+
+  it('refuses a no-op change', async () => {
+    const { service, userId } = await setup();
+    await expect(service.previewPlanChange(userId, 'pro', 'month')).rejects.toThrow(/already on that plan/);
+  });
+
+  it('upgrades now: always_invoice, refuse-if-unpaid, row and email updated from Stripe’s response without waiting for the webhook', async () => {
+    const { service, ds, userId, calls, mail } = await setup();
+    const out = await service.switchTier(userId, 'pro', 'year');
+    expect(out.kind).toBe('upgrade');
+    expect(calls[0]).toMatchObject({ op: 'subscriptions.update', params: { items: [{ id: 'si_1', price: 'price_pro_year' }], proration_behavior: 'always_invoice', payment_behavior: 'error_if_incomplete' } });
+    const row = await ds.getRepository(Subscription).findOneByOrFail({ userId });
+    expect(row.interval).toBe('year');
+    expect(mail.sent.map((m) => m.content.subject)).toEqual(['Your Cofre plan changed to Pro']);
+    expect(Object.fromEntries(mail.sent[0].content.rows)).toMatchObject({ 'Previous plan': 'Pro · Monthly', 'New plan': 'Pro · Yearly', Price: '$47.90 / year' });
+  });
+
+  it('does not change the plan when today’s payment is declined', async () => {
+    const { service, ds, userId, stripe, mail } = await setup();
+    stripe.subscriptions.update = async () => { throw Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError', code: 'card_declined' }); };
+    await expect(service.switchTier(userId, 'pro', 'year')).rejects.toThrow(/payment didn't go through/);
+    expect((await ds.getRepository(Subscription).findOneByOrFail({ userId })).interval).toBe('month');
+    expect(mail.sent).toEqual([]);
+  });
+
+  it('downgrades at the end of the paid period through a schedule, charges nothing, keeps the row and emails the date and no-refund note', async () => {
+    const { service, ds, userId, calls, mail } = await setup({ interval: 'year' });
+    const out = await service.switchTier(userId, 'pro', 'month');
+    expect(out).toEqual({ kind: 'downgrade', effectiveAt: new Date(1_795_000_000 * 1000).toISOString() });
+    expect(calls.map((c) => c.op)).toEqual(['subscriptionSchedules.create', 'subscriptionSchedules.update']);
+    expect(calls[1].params).toMatchObject({ end_behavior: 'release', phases: [
+      { items: [{ price: 'price_pro_year', quantity: 1 }], start_date: 1_792_000_000, end_date: 1_795_000_000, proration_behavior: 'none' },
+      { items: [{ price: 'price_pro_month', quantity: 1 }], duration: { interval: 'month', interval_count: 1 }, proration_behavior: 'none' },
+    ] });
+    expect((await ds.getRepository(Subscription).findOneByOrFail({ userId })).interval).toBe('year');
+    expect(mail.sent).toHaveLength(1);
+    const rows = Object.fromEntries(mail.sent[0].content.rows);
+    expect(mail.sent[0].content.subject).toMatch(/switches to Pro · Monthly on/);
+    expect(rows['Charged today']).toBe('Nothing');
+    expect(rows['Refund for the remaining time']).toMatch(/None/);
+    expect(rows['From then']).toBe('Pro · Monthly');
+  });
+
+  it('replaces an earlier scheduled change and lets the user cancel one', async () => {
+    const { service, userId, calls } = await setup({ interval: 'year', schedule: true });
+    await service.switchTier(userId, 'elite', 'year');
+    expect(calls.map((c) => c.op)).toEqual(['subscriptionSchedules.release', 'subscriptions.update']);
+    calls.length = 0;
+    await service.cancelPendingChange(userId);
+    expect(calls).toEqual([{ op: 'subscriptionSchedules.release', params: 'sched_old' }]);
+  });
+
+  it('cancelling the plan drops a pending downgrade first', async () => {
+    const { service, userId, calls } = await setup({ schedule: true });
+    await service.cancel(userId);
+    expect(calls.map((c) => c.op)).toEqual(['subscriptionSchedules.release', 'subscriptions.update']);
+    expect(calls[1].params).toEqual({ cancel_at_period_end: true });
   });
 });

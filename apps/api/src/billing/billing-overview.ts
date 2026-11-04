@@ -22,13 +22,15 @@ export interface BillingOverview {
     state: string | null; postalCode: string | null; country: string | null;
   } | null;
   upcoming: { subtotal: number; tax: number; total: number; currency: string; date: string | null } | null;
+  /** A downgrade waiting for the paid period to end (plan-change.ts). */
+  pendingChange: { tier: 'pro' | 'elite'; interval: 'month' | 'year'; effectiveAt: string } | null;
   invoices: {
     id: string; number: string | null; date: string; total: number; currency: string;
     status: string | null; description: string | null; pdfUrl: string | null; hostedUrl: string | null;
   }[];
 }
 
-export const EMPTY_OVERVIEW: BillingOverview = { paymentMethod: null, billingAddress: null, upcoming: null, invoices: [] };
+export const EMPTY_OVERVIEW: BillingOverview = { paymentMethod: null, billingAddress: null, upcoming: null, pendingChange: null, invoices: [] };
 
 const major = (cents: number) => Math.round(cents) / 100;
 const iso = (unix: number) => new Date(unix * 1000).toISOString();
@@ -64,6 +66,7 @@ export function mapBillingOverview(src: {
   invoices: Stripe.Invoice[];
   /** When Stripe's preview has no next payment attempt (e.g. during a trial). */
   fallbackDate: Date | null;
+  pendingChange?: BillingOverview['pendingChange'];
 }): BillingOverview {
   const { customer, subscription, preview } = src;
   // The subscription's own method wins; otherwise the customer's default.
@@ -97,5 +100,5 @@ export function mapBillingOverview(src: {
     hostedUrl: inv.hosted_invoice_url ?? null,
   }));
 
-  return { paymentMethod, billingAddress, upcoming, invoices };
+  return { paymentMethod, billingAddress, upcoming, pendingChange: src.pendingChange ?? null, invoices };
 }

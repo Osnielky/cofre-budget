@@ -8,6 +8,7 @@ import { portalReturnNotice, pastDueSummary } from '@/lib/billing/derive';
 import { fmtDate, fmtMoney } from './billing/ui';
 import { CurrentPlanCard, PaymentMethodCard, BillingSummaryCard, TrialCard, type BillingActions } from './billing/TopCards';
 import { InvoicesCard, ComparePlansCard, IncludedCard, YearlyBanner, BillingHelpCard } from './billing/LowerCards';
+import PlanChangeModal, { type PlanChangeTarget } from './billing/PlanChangeModal';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -135,24 +136,24 @@ export default function BillingTab() {
     }
   }
 
-  async function switchTier(tier: 'pro' | 'elite', interval: 'month' | 'year') {
+  // Any plan switch goes through the confirmation dialog: preview first, Stripe only on confirm.
+  const [planChange, setPlanChange] = useState<PlanChangeTarget | null>(null);
+  function switchTier(tier: 'pro' | 'elite', interval: 'month' | 'year') {
+    setPlanChange({ tier, interval });
+  }
+  async function onPlanChanged() {
+    // An upgrade is saved from Stripe's response before the request returns; a
+    // downgrade only adds a pending change, which the overview reads live.
+    try { setSub(await fetchSubscription()); } catch { /* keep what we have */ }
+    await refetch();
+    reloadOverview();
+  }
+
+  async function cancelPendingChange() {
     setBusy(true);
     try {
-      const res = await fetch(`${API}/billing/subscription`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ tier, interval }),
-      });
-      if (res.ok) {
-        // Busy stays true (button disabled) for the whole poll, not just a fixed delay,
-        // so the UI keeps signalling "still working" until the webhook actually lands.
-        const updated = await waitForSubscriptionChange(
-          fetchSubscription,
-          (s) => s?.tier === tier && s?.interval === interval,
-        );
-        setSub(updated);
-        await refetch();
-        reloadOverview();
-      }
+      const res = await fetch(`${API}/billing/subscription/pending-change/cancel`, { method: 'POST', credentials: 'include' });
+      if (res.ok) reloadOverview();
     } finally {
       setBusy(false);
     }
@@ -241,7 +242,7 @@ export default function BillingTab() {
     );
   }
 
-  const actions: BillingActions = { busy, switchTier, cancelPlan, resumePlan, openPortal, portal };
+  const actions: BillingActions = { busy, switchTier, cancelPlan, resumePlan, cancelPendingChange, openPortal, portal };
   // The overview is read live from Stripe on this load, so it already reflects the trip.
   const portalNotice = returnedFromPortal && overview ? portalReturnNotice(overview.paymentMethod, sub.status) : null;
   // One story for every card when a payment is unpaid: paused (plan already free) or still inside the grace window.
@@ -254,7 +255,7 @@ export default function BillingTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.9fr_1fr_1fr_1fr] gap-4">
-        <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><CurrentPlanCard sub={sub} pastDue={pastDue} actions={actions} /></div>
+        <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><CurrentPlanCard sub={sub} pastDue={pastDue} pendingChange={overview?.pendingChange ?? null} actions={actions} /></div>
         <PaymentMethodCard overview={overview} sub={sub} notice={portalNotice} actions={actions} />
         <BillingSummaryCard sub={sub} overview={overview} pastDue={pastDue} />
         <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><TrialCard sub={sub} pastDue={pastDue} /></div>
@@ -270,6 +271,10 @@ export default function BillingTab() {
         {sub.interval === 'month' && <YearlyBanner sub={sub} actions={actions} />}
         <BillingHelpCard actions={actions} />
       </div>
+
+      {planChange && (
+        <PlanChangeModal target={planChange} overview={overview} onClose={() => setPlanChange(null)} onDone={onPlanChanged} />
+      )}
     </div>
   );
 }

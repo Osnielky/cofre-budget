@@ -11,10 +11,25 @@ export interface BillingOverview {
     state: string | null; postalCode: string | null; country: string | null;
   } | null;
   upcoming: { subtotal: number; tax: number; total: number; currency: string; date: string | null } | null;
+  /** A downgrade waiting for the paid period to end. */
+  pendingChange: { tier: 'pro' | 'elite'; interval: 'month' | 'year'; effectiveAt: string } | null;
   invoices: {
     id: string; number: string | null; date: string; total: number; currency: string;
     status: string | null; description: string | null; pdfUrl: string | null; hostedUrl: string | null;
   }[];
+}
+
+/** Mirrors apps/api/src/billing/plan-change.ts PlanChangePreview. */
+export interface PlanChangePreview {
+  kind: 'upgrade' | 'downgrade';
+  from: { tier: 'pro' | 'elite'; interval: 'month' | 'year'; amount: number };
+  to: { tier: 'pro' | 'elite'; interval: 'month' | 'year'; amount: number };
+  currency: string;
+  chargeNow: number;
+  credit: number;
+  effectiveAt: string;
+  nextChargeAt: string | null;
+  trialing: boolean;
 }
 
 export interface SubscriptionInfo {

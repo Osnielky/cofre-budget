@@ -72,6 +72,12 @@ export default function TermsOfServicePage() {
           to the free plan.</li>
         <li><B>No refunds.</B> Payments are non-refundable, including for partially used billing periods, except
           where the law requires otherwise.</li>
+        <li><B>Plan changes.</B> Moving to a higher plan, or from monthly to yearly billing, takes effect immediately:
+          you are charged that day for the rest of the period at the new price, less a credit for the unused part of
+          the old one, and your billing period restarts if the billing interval changes. Moving to a lower plan, or
+          from yearly to monthly billing, takes effect when the period you have already paid for ends; you keep the
+          current plan until then and no refund or credit is given for the remaining time. We show the exact amount
+          charged, if any, before you confirm a change, and confirm every change by email.</li>
         <li><B>Price changes.</B> We may change prices. We&rsquo;ll notify existing subscribers by email before a
           change takes effect, and it will apply from your next billing period.</li>
         <li><B>Payment processing.</B> Payments are processed by Stripe. If a payment fails, we may limit paid

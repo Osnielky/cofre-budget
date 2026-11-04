@@ -40,7 +40,7 @@ describe('mapBillingOverview', () => {
 
   it('returns empty parts when Stripe has nothing (or a lookup failed)', () => {
     const out = mapBillingOverview({ customer: null, subscription: null, preview: null, invoices: [], fallbackDate: null });
-    expect(out).toEqual({ paymentMethod: null, billingAddress: null, upcoming: null, invoices: [] });
+    expect(out).toEqual({ paymentMethod: null, billingAddress: null, upcoming: null, pendingChange: null, invoices: [] });
   });
 
   it('ignores a payment method that is only an id (not expanded)', () => {

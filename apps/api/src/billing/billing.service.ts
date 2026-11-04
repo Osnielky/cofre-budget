@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -10,6 +10,7 @@ import { timed } from '../common/logging/timed';
 import { MailService } from '../mail/mail.service';
 import { billingEmailContent, billingEmailFor, type SubState } from './billing-emails';
 import { mapBillingOverview, EMPTY_OVERVIEW, type BillingOverview } from './billing-overview';
+import { classifyPlanChange, summarizeUpgradePreview, pendingChangeFromSchedule, type PlanChangePreview } from './plan-change';
 
 /** Grace after Stripe first reports a failed payment before the plan drops to free. */
 export const PAST_DUE_GRACE_HOURS = 24;
@@ -215,20 +216,141 @@ export class BillingService {
     return downgraded;
   }
 
-  async switchTier(userId: string, tier: 'pro' | 'elite', interval: 'month' | 'year'): Promise<void> {
-    const existing = await this.subs.findOneByOrFail({ userId });
-    const stripeSub = await timed('stripe', 'subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(existing.stripeSubscriptionId));
-    const itemId = stripeSub.items.data[0].id;
-    await timed('stripe', 'subscriptions.update', () => this.stripe.subscriptions.update(existing.stripeSubscriptionId, {
-      items: [{ id: itemId, price: this.priceIdFor(tier, interval) }],
-      proration_behavior: 'create_prorations',
+  /** Stripe's subscription with its schedule (a pending downgrade) and item, or 409 without one. */
+  private async liveSubscription(userId: string): Promise<{ row: Subscription; stripeSub: Stripe.Subscription }> {
+    const row = await this.subs.findOneBy({ userId });
+    if (!row || row.status === 'canceled') throw new ConflictException('You have no active subscription to change.');
+    const stripeSub = await timed('stripe', 'subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(row.stripeSubscriptionId, { expand: ['schedule'] }));
+    return { row, stripeSub };
+  }
+
+  private priceAmount(priceId: string): Promise<number | null> {
+    return timed('stripe', 'prices.retrieve', () => this.stripe.prices.retrieve(priceId)).then((p) => (typeof p.unit_amount === 'number' ? p.unit_amount / 100 : null));
+  }
+
+  /**
+   * What a plan change would cost before the user confirms it. An upgrade is
+   * previewed as the prorated invoice Stripe would charge today; a downgrade
+   * costs nothing today and starts when the paid period ends (see plan-change.ts).
+   */
+  async previewPlanChange(userId: string, tier: 'pro' | 'elite', interval: 'month' | 'year'): Promise<PlanChangePreview> {
+    const { row, stripeSub } = await this.liveSubscription(userId);
+    const kind = classifyPlanChange(row, { tier, interval });
+    if (kind === 'same') throw new BadRequestException('You are already on that plan.');
+    const item = stripeSub.items.data[0];
+    const newPriceId = this.priceIdFor(tier, interval);
+    const [fromAmount, toAmount] = await Promise.all([
+      typeof item.price.unit_amount === 'number' ? item.price.unit_amount / 100 : null,
+      this.priceAmount(newPriceId),
+    ]);
+    const trialing = row.status === 'trialing';
+    const currency = item.price.currency ?? 'usd';
+    const base = { from: { tier: row.tier, interval: row.interval, amount: fromAmount ?? 0 }, to: { tier, interval, amount: toAmount ?? 0 }, currency, trialing };
+    const paidThrough = (trialing && row.trialEnd ? row.trialEnd : row.currentPeriodEnd)?.toISOString() ?? null;
+
+    if (kind === 'downgrade') {
+      return { kind, ...base, chargeNow: 0, credit: 0, effectiveAt: paidThrough ?? new Date().toISOString(), nextChargeAt: paidThrough };
+    }
+    const invoice = await timed('stripe', 'invoices.createPreview', () => this.stripe.invoices.createPreview({
+      customer: stripeSub.customer as string,
+      subscription: stripeSub.id,
+      subscription_details: { items: [{ id: item.id, price: newPriceId }], proration_behavior: 'always_invoice' },
     }));
-    // The customer.subscription.updated webhook is what actually persists the change.
+    const p = summarizeUpgradePreview(invoice, newPriceId);
+    return {
+      kind, ...base,
+      chargeNow: trialing ? 0 : p.chargeNow,
+      credit: trialing ? 0 : p.credit,
+      effectiveAt: new Date().toISOString(),
+      nextChargeAt: trialing ? paidThrough : p.periodEnd,
+    };
+  }
+
+  /**
+   * Applies a plan change. Upgrade: Stripe switches the price now and charges the
+   * prorated difference today (`always_invoice`; the switch is refused if that
+   * payment fails), then the row and the "plan changed" email follow at once from
+   * Stripe's response — not from the webhook, which only confirms it later.
+   * Downgrade: a subscription schedule keeps the current price until the period
+   * already paid for ends and then switches; nothing is charged or refunded today,
+   * and the user gets a "scheduled" email now and the "changed" one when it lands.
+   */
+  async switchTier(userId: string, tier: 'pro' | 'elite', interval: 'month' | 'year'): Promise<{ kind: 'upgrade' | 'downgrade'; effectiveAt: string }> {
+    const user = await this.users.findOneByOrFail({ id: userId });
+    const { row, stripeSub } = await this.liveSubscription(userId);
+    const kind = classifyPlanChange(row, { tier, interval });
+    if (kind === 'same') throw new BadRequestException('You are already on that plan.');
+    if (stripeSub.cancel_at_period_end) throw new ConflictException('Your plan is set to end — keep it first, then change it.');
+    const item = stripeSub.items.data[0];
+    const newPriceId = this.priceIdFor(tier, interval);
+
+    // Replacing an earlier scheduled change: a scheduled subscription cannot be updated directly.
+    const schedule = stripeSub.schedule;
+    if (schedule) await this.releaseSchedule(typeof schedule === 'string' ? schedule : schedule.id);
+
+    if (kind === 'upgrade') {
+      let updated: Stripe.Subscription;
+      try {
+        updated = await timed('stripe', 'subscriptions.update', () => this.stripe.subscriptions.update(stripeSub.id, {
+          items: [{ id: item.id, price: newPriceId }],
+          proration_behavior: 'always_invoice',
+          payment_behavior: 'error_if_incomplete',
+        }));
+      } catch (err) {
+        const code = (err as Stripe.errors.StripeError)?.code;
+        if (code === 'card_declined' || code === 'resource_missing' || (err as Stripe.errors.StripeError)?.type === 'StripeCardError') {
+          throw new ConflictException("Today's payment didn't go through, so your plan was not changed. Check your payment method and try again.");
+        }
+        throw err;
+      }
+      await this.syncFromStripeSubscription(updated.customer as string, updated);
+      return { kind, effectiveAt: new Date().toISOString() };
+    }
+
+    const current = item.current_period_end;
+    const created = await timed('stripe', 'subscriptionSchedules.create', () => this.stripe.subscriptionSchedules.create({ from_subscription: stripeSub.id }));
+    const phase0 = created.phases[0];
+    await timed('stripe', 'subscriptionSchedules.update', () => this.stripe.subscriptionSchedules.update(created.id, {
+      end_behavior: 'release',
+      phases: [
+        { items: [{ price: item.price.id, quantity: 1 }], start_date: phase0.start_date, end_date: phase0.end_date, proration_behavior: 'none' },
+        { items: [{ price: newPriceId, quantity: 1 }], duration: { interval, interval_count: 1 }, proration_behavior: 'none' },
+      ],
+    }));
+    const effectiveAt = new Date((phase0.end_date ?? current) * 1000);
+    const toAmount = await this.priceAmount(newPriceId);
+    try {
+      await this.mail.sendBillingEmail(user.email, billingEmailContent('downgrade_scheduled', {
+        name: user.name ?? '',
+        tier, interval, status: row.status,
+        amount: toAmount, currency: item.price.currency ?? 'usd',
+        trialEnd: row.trialEnd, currentPeriodEnd: effectiveAt,
+        prevTier: row.tier, prevInterval: row.interval,
+        appUrl: this.frontendUrl,
+      }));
+    } catch (err) {
+      this.logger.error('Billing email "downgrade_scheduled" failed', err as Error);
+    }
+    return { kind, effectiveAt: effectiveAt.toISOString() };
+  }
+
+  /** Drops a scheduled downgrade: the current plan simply continues. */
+  async cancelPendingChange(userId: string): Promise<void> {
+    const { stripeSub } = await this.liveSubscription(userId);
+    const schedule = stripeSub.schedule;
+    if (!schedule) return;
+    await this.releaseSchedule(typeof schedule === 'string' ? schedule : schedule.id);
+  }
+
+  private async releaseSchedule(id: string): Promise<void> {
+    await timed('stripe', 'subscriptionSchedules.release', () => this.stripe.subscriptionSchedules.release(id));
   }
 
   async cancel(userId: string): Promise<void> {
-    const existing = await this.subs.findOneByOrFail({ userId });
-    await timed('stripe', 'subscriptions.update', () => this.stripe.subscriptions.update(existing.stripeSubscriptionId, { cancel_at_period_end: true }));
+    const { stripeSub } = await this.liveSubscription(userId);
+    // A pending downgrade and a cancellation cannot coexist; the cancellation wins.
+    if (stripeSub.schedule) await this.releaseSchedule(typeof stripeSub.schedule === 'string' ? stripeSub.schedule : stripeSub.schedule.id);
+    await timed('stripe', 'subscriptions.update', () => this.stripe.subscriptions.update(stripeSub.id, { cancel_at_period_end: true }));
   }
 
   /** Undo a scheduled cancellation; the subscription.updated webhook persists it. */
@@ -259,7 +381,7 @@ export class BillingService {
 
     const [customer, subscription, invoices, preview] = await Promise.all([
       attempt('customers.retrieve', () => this.stripe.customers.retrieve(customerId, { expand: ['invoice_settings.default_payment_method'] })),
-      live ? attempt('subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(live.stripeSubscriptionId, { expand: ['default_payment_method'] })) : null,
+      live ? attempt('subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(live.stripeSubscriptionId, { expand: ['default_payment_method', 'schedule'] })) : null,
       attempt('invoices.list', () => this.stripe.invoices.list({ customer: customerId, limit: 5 })),
       // No next charge once the plan is set to end.
       live && !live.cancelAtPeriodEnd
@@ -267,9 +389,12 @@ export class BillingService {
         : null,
     ]);
 
+    const stripeSub = (subscription as Stripe.Subscription | null) ?? null;
+    const schedule = stripeSub?.schedule && typeof stripeSub.schedule !== 'string' ? stripeSub.schedule : null;
     return mapBillingOverview({
       customer: customer && !(customer as Stripe.DeletedCustomer).deleted ? (customer as Stripe.Customer) : null,
-      subscription: (subscription as Stripe.Subscription | null) ?? null,
+      subscription: stripeSub,
+      pendingChange: pendingChangeFromSchedule(schedule, this.priceIds),
       preview: (preview as Stripe.Invoice | null) ?? null,
       invoices: (invoices?.data ?? []) as Stripe.Invoice[],
       fallbackDate: live ? (live.status === 'trialing' && live.trialEnd ? live.trialEnd : live.currentPeriodEnd) : null,

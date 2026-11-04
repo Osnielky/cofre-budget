@@ -13,6 +13,8 @@ export interface BillingActions {
   switchTier: (tier: 'pro' | 'elite', interval: 'month' | 'year') => void;
   cancelPlan: () => void;
   resumePlan: () => void;
+  /** Drops a scheduled downgrade; the current plan continues. */
+  cancelPendingChange: () => void;
   /** Stripe's portal: on its payment-method page, or on the overview (plan, invoices). */
   openPortal: (flow?: 'payment_method') => void;
   /** The trip to Stripe's portal: opening, or why it did not open. */
@@ -20,11 +22,18 @@ export interface BillingActions {
 }
 
 /** Wide card: plan name, trial / renewal / cancellation status and the main actions. */
-export function CurrentPlanCard({ sub, pastDue, actions }: { sub: SubscriptionInfo; pastDue: PastDueSummary | null; actions: BillingActions }) {
+export function CurrentPlanCard({ sub, pastDue, pendingChange, actions }: {
+  sub: SubscriptionInfo;
+  pastDue: PastDueSummary | null;
+  pendingChange: BillingOverview['pendingChange'];
+  actions: BillingActions;
+}) {
   const accent = pastDue?.paused ? 'var(--color-amber)' : sub.tier === 'elite' ? 'var(--color-amber)' : 'var(--color-primary)';
   const trialing = sub.status === 'trialing' && !!sub.trialEnd;
   const statusLine = pastDue
     ? { text: pastDue.headline, color: 'var(--color-rose)' }
+    : pendingChange
+      ? { text: `Switching to ${TIER[pendingChange.tier]} · ${INTERVAL[pendingChange.interval]} on ${fmtDate(pendingChange.effectiveAt)}.`, color: 'var(--color-amber)' }
     : sub.cancelAtPeriodEnd
       ? { text: `Your ${TIER[sub.tier]} plan is set to end.`, color: 'var(--color-amber)' }
       : trialing
@@ -68,6 +77,18 @@ export function CurrentPlanCard({ sub, pastDue, actions }: { sub: SubscriptionIn
               <p className="text-xs leading-snug" style={{ color: 'var(--color-text-muted)' }}>{pastDue.body}</p>
             </div>
           </div>
+        ) : pendingChange ? (
+          <div className="flex items-start gap-3">
+            <span style={{ color: 'var(--color-amber)' }}><Icon name="calendar" /></span>
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+                {TIER[sub.tier]} · {INTERVAL[sub.interval]} until {fmtDate(pendingChange.effectiveAt)}
+              </p>
+              <p className="text-xs leading-snug" style={{ color: 'var(--color-text-muted)' }}>
+                You've paid for it until then, so it stays. From that date you're on {TIER[pendingChange.tier]} · {INTERVAL[pendingChange.interval]} at {fmtMoney(PLAN_PRICES[pendingChange.tier][pendingChange.interval])} / {pendingChange.interval}. No refund for the remaining time — nothing is lost, you keep using it.
+              </p>
+            </div>
+          </div>
         ) : sub.cancelAtPeriodEnd ? (
           <div className="flex items-start gap-3">
             <span style={{ color: 'var(--color-amber)' }}><Icon name="xCircle" /></span>
@@ -98,6 +119,11 @@ export function CurrentPlanCard({ sub, pastDue, actions }: { sub: SubscriptionIn
             className="btn-gold px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50">
             Keep my plan
           </button>
+        ) : pendingChange ? (
+          <button type="button" disabled={actions.busy} onClick={actions.cancelPendingChange}
+            className="btn-gold px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50">
+            Keep {TIER[sub.tier]} · {INTERVAL[sub.interval]}
+          </button>
         ) : (
           <button type="button" disabled={actions.busy} onClick={() => actions.switchTier(other, sub.interval)}
             className={`${other === 'elite' ? 'btn-gold' : ''} px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50`}
@@ -105,7 +131,7 @@ export function CurrentPlanCard({ sub, pastDue, actions }: { sub: SubscriptionIn
             {other === 'elite' ? 'Upgrade to Elite' : 'Downgrade to Pro'}
           </button>
         )}
-        {!sub.cancelAtPeriodEnd && !pastDue && (
+        {!sub.cancelAtPeriodEnd && !pastDue && !pendingChange && (
           <button type="button" disabled={actions.busy} onClick={() => actions.switchTier(sub.tier, otherInterval)}
             className="px-4 py-2.5 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-50" style={outlineBtn}>
             {otherInterval === 'year' ? 'Switch to yearly (save 20%)' : 'Switch to monthly'}
@@ -196,8 +222,9 @@ export function PaymentMethodCard({ overview, sub, notice, actions }: {
 
 export function BillingSummaryCard({ sub, overview, pastDue }: { sub: SubscriptionInfo; overview: BillingOverview | null; pastDue: PastDueSummary | null }) {
   const up = overview?.upcoming;
+  const pending = overview?.pendingChange ?? null;
   const list = PLAN_PRICES[sub.tier][sub.interval];
-  const nextDate = up?.date ?? (sub.status === 'trialing' ? sub.trialEnd : sub.currentPeriodEnd);
+  const nextDate = pending ? pending.effectiveAt : up?.date ?? (sub.status === 'trialing' ? sub.trialEnd : sub.currentPeriodEnd);
   const row = (label: string, value: string) => (
     <div className="flex items-center justify-between gap-3 text-sm py-1.5">
       <span style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
@@ -208,7 +235,7 @@ export function BillingSummaryCard({ sub, overview, pastDue }: { sub: Subscripti
     <BillingCard title="Billing summary">
       <div className="flex flex-col">
         {row('Plan', `${TIER[sub.tier]} (${INTERVAL[sub.interval]})`)}
-        {row('Base price', fmtMoney(up?.subtotal ?? list, up?.currency))}
+        {row('Base price', fmtMoney(pending ? list : up?.subtotal ?? list, up?.currency))}
         {up && up.tax > 0 && row('Tax', fmtMoney(up.tax, up.currency))}
       </div>
       <div className="mt-auto pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
@@ -231,9 +258,13 @@ export function BillingSummaryCard({ sub, overview, pastDue }: { sub: Subscripti
           <>
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>Next charge</span>
-              <span className="text-xl font-bold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>{fmtMoney(up?.total ?? list, up?.currency)}</span>
+              <span className="text-xl font-bold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>
+                {pending ? fmtMoney(PLAN_PRICES[pending.tier][pending.interval]) : fmtMoney(up?.total ?? list, up?.currency)}
+              </span>
             </div>
-            <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>On {fmtDate(nextDate)}</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>
+              On {fmtDate(nextDate)}{pending ? ` · first ${TIER[pending.tier]} · ${INTERVAL[pending.interval]} payment` : ''}
+            </p>
           </>
         )}
       </div>
