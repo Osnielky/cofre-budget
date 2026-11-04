@@ -61,6 +61,7 @@ export function describePlanChange(
   } else {
     breakdown.push(`${money(p.to.amount)} for ${to} covers ${p.to.interval === 'year' ? 'the next 12 months' : 'the rest of this period'} starting today.`);
     if (p.credit > 0) breakdown.push(`Minus ${money(p.credit)} credit for the unused part of your ${INTERVAL[p.from.interval].toLowerCase()} ${TIER[p.from.tier]} plan.`);
+    if (p.forfeitsPaidThrough) breakdown.push(`Your ${from} days until ${fmt.date(p.forfeitsPaidThrough)} are not credited — payments aren't refunded.`);
     afterwards.push(`${to} starts right away.`);
     afterwards.push(`Then ${newPrice}${p.nextChargeAt ? `, next on ${fmt.date(p.nextChargeAt)}` : ''}, until you change or cancel.`);
   }

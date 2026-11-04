@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { PAID_EXTENSION_METADATA_KEY } from './late-payment';
+import { isPaidExtension } from './late-payment';
 
 export type PriceIdMap = Record<string, { tier: 'pro' | 'elite'; interval: 'month' | 'year' }>;
 
@@ -34,8 +34,7 @@ export function mapStripeSubscription(sub: Stripe.Subscription, priceIds: PriceI
   // A late payment moves the renewal date with a Stripe "trial" (late-payment.ts):
   // that trial is the paid period, not a free one, so it reads as active and
   // runs until the trial end.
-  const paidExtension = sub.status === 'trialing' && !!sub.metadata?.[PAID_EXTENSION_METADATA_KEY] && !!sub.trial_end;
-  if (paidExtension) {
+  if (isPaidExtension(sub)) {
     return {
       tier: tierInterval.tier,
       interval: tierInterval.interval,

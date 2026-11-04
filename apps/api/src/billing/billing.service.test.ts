@@ -117,13 +117,17 @@ describe('BillingService.syncFromStripeSubscription', () => {
 
   describe('late payment moves the renewal date', () => {
     const DAY = 86_400_000;
-    function stubStripe() {
+    const periodEnd = Math.floor(Date.now() / 1000) + 15 * 86_400;
+    const items = { data: [{ price: { id: 'price_pro_month' }, current_period_end: periodEnd }] };
+    /** Stripe as re-read before extending: `live` is what the subscription really looks like now. */
+    function stubStripe(live: any = { status: 'active', latest_invoice: { status: 'paid', amount_paid: 499, status_transitions: { paid_at: Math.floor(Date.now() / 1000) } } }) {
       const updates: any[] = [];
       (service as any).stripe = {
         subscriptions: {
+          retrieve: async () => fakeSub({ trial_end: null, items, ...live }),
           update: async (id: string, params: any) => {
             updates.push({ id, params });
-            return fakeSub({ status: 'trialing', trial_end: params.trial_end, metadata: params.metadata });
+            return fakeSub({ status: 'trialing', trial_end: params.trial_end, metadata: params.metadata, items });
           },
         },
       };
@@ -132,14 +136,14 @@ describe('BillingService.syncFromStripeSubscription', () => {
 
     it('after a recovery, extends the paid period by the time spent past due — whoever collected the payment', async () => {
       const pastDueSince = new Date(Date.now() - 10 * DAY);
-      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'past_due', trial_end: null }) as any);
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'past_due', trial_end: null, items }) as any);
       await ds.getRepository(Subscription).update({ userId }, { pastDueSince });
       const updates = stubStripe();
       mail.sent = [];
       // Stripe's retry (or the portal) paid the old invoice: the webhook says active again.
-      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'active', trial_end: null }) as any);
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'active', trial_end: null, items }) as any);
       expect(updates).toHaveLength(1);
-      const expectedEnd = 1_800_000_000 + Math.round((Date.now() - pastDueSince.getTime()) / 1000);
+      const expectedEnd = periodEnd + Math.round((Date.now() - pastDueSince.getTime()) / 1000);
       expect(Math.abs(updates[0].params.trial_end - expectedEnd)).toBeLessThan(5);
       expect(updates[0].params.proration_behavior).toBe('none');
       expect(updates[0].params.metadata).toEqual({ cofre_paid_period_extended: pastDueSince.toISOString() });
@@ -151,10 +155,26 @@ describe('BillingService.syncFromStripeSubscription', () => {
       expect((await ds.getRepository(User).findOneByOrFail({ id: userId })).plan).toBe('pro');
       expect(mail.sent.map((m) => m.content.subject)).toEqual(['Payment received — your Cofre Pro plan is back']);
       // Stripe then reports the extension itself: nothing more happens.
-      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'trialing', trial_end: updates[0].params.trial_end, metadata: updates[0].params.metadata }) as any);
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'trialing', trial_end: updates[0].params.trial_end, metadata: updates[0].params.metadata, items }) as any);
       expect(updates).toHaveLength(1);
       expect((await ds.getRepository(Subscription).findOneByOrFail({ userId })).status).toBe('active');
       expect(mail.sent).toHaveLength(1);
+    });
+
+    it('does not trust the webhook alone: no extension unless Stripe shows a paid invoice settled after the clock started', async () => {
+      const pastDueSince = new Date(Date.now() - 10 * DAY);
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'past_due', trial_end: null, items }) as any);
+      await ds.getRepository(Subscription).update({ userId }, { pastDueSince });
+      // A stale "active" event: Stripe still shows the invoice open.
+      let updates = stubStripe({ status: 'past_due', latest_invoice: { status: 'open', amount_paid: 0, status_transitions: { paid_at: null } } });
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'active', trial_end: null, items }) as any);
+      expect(updates).toHaveLength(0);
+      // Active, but the latest paid invoice predates the past-due clock (an old event replayed).
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'past_due', trial_end: null, items }) as any);
+      await ds.getRepository(Subscription).update({ userId }, { pastDueSince });
+      updates = stubStripe({ status: 'active', latest_invoice: { status: 'paid', amount_paid: 499, status_transitions: { paid_at: Math.floor(pastDueSince.getTime() / 1000) - 86_400 } } });
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'active', trial_end: null, items }) as any);
+      expect(updates).toHaveLength(0);
     });
 
     it('leaves the dates alone when the plan was not past due, and when Stripe refuses the move', async () => {
@@ -165,7 +185,7 @@ describe('BillingService.syncFromStripeSubscription', () => {
       // Past due, then Stripe errors on the update: the recovery still lands on Stripe's dates.
       await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'past_due', trial_end: null }) as any);
       await ds.getRepository(Subscription).update({ userId }, { pastDueSince: new Date(Date.now() - 3 * DAY) });
-      (service as any).stripe = { subscriptions: { update: async () => { throw new Error('boom'); } } };
+      (service as any).stripe = { subscriptions: { retrieve: async () => { throw new Error('boom'); }, update: async () => { throw new Error('boom'); } } };
       await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'active', trial_end: null }) as any);
       const row = await ds.getRepository(Subscription).findOneByOrFail({ userId });
       expect(row.status).toBe('active');
@@ -212,7 +232,10 @@ describe('BillingService.syncFromStripeSubscription', () => {
     });
 
     it('restores the plan and clears the clock when Stripe collects the payment', async () => {
-      (service as any).stripe = { subscriptions: { update: async (_id: string, p: any) => fakeSub({ status: 'trialing', trial_end: p.trial_end, metadata: p.metadata }) } };
+      (service as any).stripe = { subscriptions: {
+        retrieve: async () => fakeSub({ status: 'active', trial_end: null, latest_invoice: { status: 'paid', amount_paid: 499, status_transitions: { paid_at: Math.floor(Date.now() / 1000) } } }),
+        update: async (_id: string, p: any) => fakeSub({ status: 'trialing', trial_end: p.trial_end, metadata: p.metadata }),
+      } };
       await sync({ status: 'active' });
       await sync({ status: 'past_due' });
       await agePastDue(30);
@@ -221,8 +244,8 @@ describe('BillingService.syncFromStripeSubscription', () => {
       await sync({ status: 'active' });
       expect(await plan()).toBe('pro');
       expect((await row()).pastDueSince).toBeNull();
-      // 30 hours late → the paid period runs 30 hours longer than Stripe's own date.
-      expect(Math.abs((await row()).currentPeriodEnd!.getTime() - (1_800_000_000 * 1000 + 30 * HOUR))).toBeLessThan(5000);
+      // Stripe's own period end (Jan 2027) is already more than a month away, so a 30-hour delay earns nothing extra.
+      expect((await row()).currentPeriodEnd).toEqual(new Date(1_800_000_000 * 1000));
     });
 
     it('a repeat past-due webhook after the grace window does not hand the tier back', async () => {
@@ -454,7 +477,7 @@ describe('BillingService.createPortalLink', () => {
 });
 
 describe('BillingService.switchTier / previewPlanChange / cancelPendingChange', () => {
-  async function setup(opts: { status?: 'trialing' | 'active'; tier?: 'pro' | 'elite'; interval?: 'month' | 'year'; schedule?: boolean } = {}) {
+  async function setup(opts: { status?: 'trialing' | 'active'; tier?: 'pro' | 'elite'; interval?: 'month' | 'year'; schedule?: boolean; extension?: boolean } = {}) {
     const ds = await makeDataSource();
     const userRepo = ds.getRepository(User);
     const user = await userRepo.save(userRepo.create({ email: 's@example.com', name: 'Sam', stripeCustomerId: 'cus_s', plan: 'pro' }));
@@ -470,7 +493,10 @@ describe('BillingService.switchTier / previewPlanChange / cancelPendingChange', 
     const item = { id: 'si_1', price: { id: priceId, unit_amount: interval === 'month' ? 499 : 4790, currency: 'usd' }, current_period_end: 1_795_000_000 };
     const stripe = {
       subscriptions: {
-        retrieve: async () => ({ id: 'sub_s', customer: 'cus_s', status: opts.status ?? 'active', cancel_at_period_end: false, trial_end: null, items: { data: [item] }, schedule: opts.schedule ? { id: 'sched_old', status: 'active', phases: [] } : null }),
+        // `extension`: the row is active, but Stripe holds the subscription as a stamped trial (late-payment.ts).
+        retrieve: async () => ({ id: 'sub_s', customer: 'cus_s', status: opts.extension ? 'trialing' : opts.status ?? 'active', cancel_at_period_end: false,
+          trial_end: opts.extension ? 1_795_000_000 : null, metadata: opts.extension ? { cofre_paid_period_extended: '2026-10-29T00:00:00.000Z' } : {},
+          items: { data: [item] }, schedule: opts.schedule ? { id: 'sched_old', status: 'active', phases: [] } : null }),
         update: async (_id: string, params: any) => {
           calls.push({ op: 'subscriptions.update', params });
           const price = Object.keys({ price_pro_month: 1, price_pro_year: 1, price_elite_month: 1, price_elite_year: 1 }).find((p) => p === params.items?.[0]?.price) ?? priceId;
@@ -480,7 +506,7 @@ describe('BillingService.switchTier / previewPlanChange / cancelPendingChange', 
       prices: { retrieve: async (id: string) => ({ id, unit_amount: id.endsWith('year') ? (id.includes('elite') ? 7670 : 4790) : (id.includes('elite') ? 799 : 499), currency: 'usd' }) },
       invoices: { createPreview: async (params: any) => { calls.push({ op: 'invoices.createPreview', params }); return { amount_due: 4365, lines: { data: [{ amount: -425, period: { end: 1_795_000_000 }, pricing: { price_details: { price: priceId } } }, { amount: 4790, period: { end: 1_826_000_000 }, pricing: { price_details: { price: params.subscription_details.items[0].price } } }] } }; } },
       subscriptionSchedules: {
-        create: async (params: any) => { calls.push({ op: 'subscriptionSchedules.create', params }); return { id: 'sched_1', phases: [{ start_date: 1_792_000_000, end_date: 1_795_000_000 }] }; },
+        create: async (params: any) => { calls.push({ op: 'subscriptionSchedules.create', params }); return { id: 'sched_1', phases: [{ start_date: 1_792_000_000, end_date: 1_795_000_000, ...(opts.extension ? { trial_end: 1_795_000_000 } : {}) }] }; },
         update: async (id: string, params: any) => { calls.push({ op: 'subscriptionSchedules.update', params: { id, ...params } }); return { id }; },
         release: async (id: string) => { calls.push({ op: 'subscriptionSchedules.release', params: id }); return { id }; },
       },
@@ -507,6 +533,37 @@ describe('BillingService.switchTier / previewPlanChange / cancelPendingChange', 
     const { service, userId } = await setup({ status: 'trialing' });
     const out = await service.previewPlanChange(userId, 'pro', 'year');
     expect(out).toMatchObject({ kind: 'upgrade', chargeNow: 0, trialing: true, nextChargeAt: '2026-11-29T00:00:00.000Z' });
+  });
+
+  describe('inside a late-payment extension (Stripe holds the subscription as a trial)', () => {
+    it('previews an upgrade as the full new price today, the remaining paid days given up, next charge one interval out', async () => {
+      const { service, userId, calls } = await setup({ extension: true });
+      const out = await service.previewPlanChange(userId, 'elite', 'month');
+      expect(out).toMatchObject({ kind: 'upgrade', chargeNow: 7.99, credit: 0, trialing: false, forfeitsPaidThrough: '2026-11-29T00:00:00.000Z' });
+      const cap = new Date(); cap.setUTCMonth(cap.getUTCMonth() + 1);
+      expect(Math.abs(new Date(out.nextChargeAt!).getTime() - cap.getTime())).toBeLessThan(5000);
+      expect(calls.map((c) => c.op)).not.toContain('invoices.createPreview');
+    });
+
+    it('an upgrade ends the extension so the new price is charged today, and clears the stamp', async () => {
+      const { service, userId, calls } = await setup({ extension: true });
+      await service.switchTier(userId, 'elite', 'month');
+      expect(calls[0]).toMatchObject({ op: 'subscriptions.update', params: { items: [{ id: 'si_1', price: 'price_elite_month' }], proration_behavior: 'always_invoice', trial_end: 'now', metadata: { cofre_paid_period_extended: '' } } });
+    });
+
+    it('a scheduled downgrade carries the extension through phase 0 so nothing bills before it ends', async () => {
+      const { service, userId, calls } = await setup({ extension: true, interval: 'year' });
+      await service.switchTier(userId, 'pro', 'month');
+      expect(calls[1].params.phases[0]).toMatchObject({ start_date: 1_792_000_000, end_date: 1_795_000_000, trial_end: 1_795_000_000 });
+      expect(calls[1].params.phases[1]).not.toHaveProperty('trial_end');
+    });
+  });
+
+  it('outside an extension the upgrade sends no trial_end', async () => {
+    const { service, userId, calls } = await setup();
+    await service.switchTier(userId, 'pro', 'year');
+    expect(calls[0].params).not.toHaveProperty('trial_end');
+    expect(calls[0].params).not.toHaveProperty('metadata');
   });
 
   it('refuses a no-op change', async () => {
@@ -585,7 +642,8 @@ describe('BillingService.payOverdue', () => {
     const updates: any[] = [];
     (service as any).stripe = {
       subscriptions: {
-        retrieve: async () => ({ id: 'sub_d', customer: 'cus_d', status, cancel_at_period_end: false, trial_end: null, items: { data: [item] }, schedule: null }),
+        retrieve: async () => ({ id: 'sub_d', customer: 'cus_d', status, cancel_at_period_end: false, trial_end: null, items: { data: [item] }, schedule: null,
+          latest_invoice: status === 'active' ? { status: 'paid', amount_paid: 499, status_transitions: { paid_at: Math.floor(Date.now() / 1000) } } : null }),
         update: async (id: string, params: any) => { updates.push(params); return { id, customer: 'cus_d', status: 'trialing', cancel_at_period_end: false, trial_end: params.trial_end, metadata: params.metadata, items: { data: [item] }, schedule: null }; },
       },
       invoices: {

@@ -8,7 +8,7 @@ const visa = { kind: 'card', brand: 'visa', last4: '4242', expMonth: 1, expYear:
 const upgrade: PlanChangePreview = {
   kind: 'upgrade', currency: 'usd', trialing: false,
   from: { tier: 'pro', interval: 'month', amount: 4.99 }, to: { tier: 'pro', interval: 'year', amount: 47.9 },
-  chargeNow: 43.65, credit: 4.25, effectiveAt: '2026-11-04T12:00:00Z', nextChargeAt: '2027-11-04T12:00:00Z',
+  chargeNow: 43.65, credit: 4.25, effectiveAt: '2026-11-04T12:00:00Z', nextChargeAt: '2027-11-04T12:00:00Z', forfeitsPaidThrough: null,
 };
 
 describe('describePlanChange', () => {
@@ -22,6 +22,15 @@ describe('describePlanChange', () => {
     expect(c.afterwards[1]).toBe('Then $47.90 / year, next on 2027-11-04, until you change or cancel.');
     expect(c.payment).toEqual({ text: 'Charged today to Visa ending in 4242.', blocking: false });
     expect(c.confirmLabel).toBe('Confirm and pay $43.65');
+  });
+
+  it('says the remaining paid days are given up when the upgrade ends a late-payment extension', () => {
+    const c = describePlanChange({ ...upgrade, to: { tier: 'elite', interval: 'month', amount: 7.99 }, chargeNow: 7.99, credit: 0, forfeitsPaidThrough: '2026-12-14T00:00:00Z' }, visa, fmt);
+    expect(c.breakdown).toEqual([
+      '$7.99 for Elite · Monthly covers the rest of this period starting today.',
+      "Your Pro · Monthly days until 2026-12-14 are not credited — payments aren't refunded.",
+    ]);
+    expect(c.confirmLabel).toBe('Confirm and pay $7.99');
   });
 
   it('blocks an upgrade that costs money today when nothing is on file', () => {
@@ -41,7 +50,7 @@ describe('describePlanChange', () => {
     const c = describePlanChange({
       kind: 'downgrade', currency: 'usd', trialing: false,
       from: { tier: 'pro', interval: 'year', amount: 47.9 }, to: { tier: 'pro', interval: 'month', amount: 4.99 },
-      chargeNow: 0, credit: 0, effectiveAt: '2027-11-04T12:00:00Z', nextChargeAt: '2027-11-04T12:00:00Z',
+      chargeNow: 0, credit: 0, effectiveAt: '2027-11-04T12:00:00Z', nextChargeAt: '2027-11-04T12:00:00Z', forfeitsPaidThrough: null,
     }, visa, fmt);
     expect(c.chargeNow.amount).toBe(0);
     expect(c.breakdown).toEqual(["You've already paid for Pro · Yearly until 2027-11-04, so nothing is charged now."]);

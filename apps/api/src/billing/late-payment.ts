@@ -17,12 +17,31 @@ export const PAID_EXTENSION_METADATA_KEY = 'cofre_paid_period_extended';
 /** Below this the recovery was quick enough that nothing is owed back. */
 export const MIN_LATE_MS = 60 * 60 * 1000;
 
+export type Interval = 'month' | 'year';
+
+export function addInterval(date: Date, interval: Interval): Date {
+  const d = new Date(date.getTime());
+  if (interval === 'month') d.setUTCMonth(d.getUTCMonth() + 1);
+  else d.setUTCFullYear(d.getUTCFullYear() + 1);
+  return d;
+}
+
 /**
  * The renewal date a late payment earns: the current period end pushed out by
- * the time spent past due. Null when the payment was not meaningfully late.
+ * the time spent past due, capped at one full interval from the payment — a
+ * subscription that sat past due across several Stripe cycles gets one paid
+ * period from the day it paid, never more. Null when the payment was not
+ * meaningfully late or the date would not move.
  */
-export function extendedPeriodEnd(currentPeriodEnd: Date, pastDueSince: Date, now: Date = new Date()): Date | null {
-  const late = now.getTime() - pastDueSince.getTime();
+export function extendedPeriodEnd(input: { currentPeriodEnd: Date; pastDueSince: Date; paidAt: Date; interval: Interval }): Date | null {
+  const late = input.paidAt.getTime() - input.pastDueSince.getTime();
   if (!Number.isFinite(late) || late < MIN_LATE_MS) return null;
-  return new Date(currentPeriodEnd.getTime() + late);
+  const end = Math.min(input.currentPeriodEnd.getTime() + late, addInterval(input.paidAt, input.interval).getTime());
+  if (end <= input.currentPeriodEnd.getTime()) return null;
+  return new Date(end);
+}
+
+/** A Stripe "trial" that is really a paid period moved by a late payment. */
+export function isPaidExtension(sub: { status: string; trial_end?: number | null; metadata?: Record<string, string> | null }): boolean {
+  return sub.status === 'trialing' && !!sub.metadata?.[PAID_EXTENSION_METADATA_KEY] && !!sub.trial_end;
 }

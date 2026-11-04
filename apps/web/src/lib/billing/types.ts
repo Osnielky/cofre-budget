@@ -30,6 +30,8 @@ export interface PlanChangePreview {
   effectiveAt: string;
   nextChargeAt: string | null;
   trialing: boolean;
+  /** The upgrade ends a late-payment extension: this paid-through date is given up, not credited. */
+  forfeitsPaidThrough: string | null;
 }
 
 export interface SubscriptionInfo {

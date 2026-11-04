@@ -40,6 +40,8 @@ export interface PlanChangePreview {
   /** The first regular charge on the new plan. */
   nextChargeAt: string | null;
   trialing: boolean;
+  /** Set when the upgrade ends a late-payment extension: the paid-through date given up, not credited. */
+  forfeitsPaidThrough: string | null;
 }
 
 const major = (cents: number) => Math.round(cents) / 100;

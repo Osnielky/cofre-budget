@@ -6,7 +6,7 @@ import Stripe from 'stripe';
 import { User } from '../users/user.entity';
 import { Subscription } from './subscription.entity';
 import { mapStripeSubscription, PriceIdMap, type MappedSubscription } from './billing.mapping';
-import { extendedPeriodEnd, PAID_EXTENSION_METADATA_KEY } from './late-payment';
+import { addInterval, extendedPeriodEnd, isPaidExtension, PAID_EXTENSION_METADATA_KEY } from './late-payment';
 import { timed } from '../common/logging/timed';
 import { log } from '../common/logging/log';
 import { describePaymentFailure } from './payment-failure';
@@ -110,8 +110,8 @@ export class BillingService {
 
     // Recovered from past due (paid from Cofre, the portal, the hosted invoice or a
     // Stripe retry alike): the paid period now starts on the day it was paid.
-    if (previous?.status === 'past_due' && previous.pastDueSince && mapped.status === 'active' && sub.status === 'active' && mapped.currentPeriodEnd) {
-      const extended = await this.extendPaidPeriod(sub, mapped.currentPeriodEnd, previous.pastDueSince);
+    if (previous?.status === 'past_due' && previous.pastDueSince && mapped.status === 'active' && sub.status === 'active') {
+      const extended = await this.extendPaidPeriod(sub.id, previous.pastDueSince, mapped.interval);
       if (extended) { sub = extended; mapped = mapStripeSubscription(sub, this.priceIds); }
     }
 
@@ -146,19 +146,32 @@ export class BillingService {
   /**
    * Moves the renewal date out by the time the subscription spent past due, so a
    * late payment buys a full period from the day it was paid (late-payment.ts).
-   * A failure here is logged and the recovery stands on Stripe's own dates.
+   * The webhook that got us here is not trusted on its own (events can arrive out
+   * of order): the subscription is re-read from Stripe and must be active with a
+   * paid, non-zero latest invoice settled after the past-due clock started — the
+   * extension is measured from that payment. A failure is logged and the recovery
+   * stands on Stripe's own dates.
    */
-  private async extendPaidPeriod(sub: Stripe.Subscription, currentPeriodEnd: Date, pastDueSince: Date): Promise<Stripe.Subscription | null> {
-    const newEnd = extendedPeriodEnd(currentPeriodEnd, pastDueSince);
-    if (!newEnd) return null;
+  private async extendPaidPeriod(subscriptionId: string, pastDueSince: Date, interval: 'month' | 'year'): Promise<Stripe.Subscription | null> {
     try {
-      const updated = await timed('stripe', 'subscriptions.update', () => this.stripe.subscriptions.update(sub.id, {
+      const fresh = await timed('stripe', 'subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(subscriptionId, { expand: ['latest_invoice'] }));
+      const invoice = fresh.latest_invoice;
+      const paidAtUnix = typeof invoice === 'object' && invoice?.status === 'paid' && invoice.amount_paid > 0 ? invoice.status_transitions?.paid_at : null;
+      const periodEndUnix = fresh.items.data[0]?.current_period_end;
+      if (fresh.status !== 'active' || !paidAtUnix || !periodEndUnix) {
+        log('INFO', 'Late payment: no settled payment to extend from', { billing: { operation: 'extendPaidPeriod', status: fresh.status, latestInvoice: typeof invoice === 'object' ? invoice?.status : null } });
+        return null;
+      }
+      const paidAt = new Date(paidAtUnix * 1000);
+      const newEnd = extendedPeriodEnd({ currentPeriodEnd: new Date(periodEndUnix * 1000), pastDueSince, paidAt, interval });
+      if (!newEnd) return null;
+      const updated = await timed('stripe', 'subscriptions.update', () => this.stripe.subscriptions.update(subscriptionId, {
         trial_end: Math.floor(newEnd.getTime() / 1000),
         proration_behavior: 'none',
         metadata: { [PAID_EXTENSION_METADATA_KEY]: pastDueSince.toISOString() },
       }));
       log('INFO', 'Late payment: paid period moved to the payment date', {
-        billing: { operation: 'extendPaidPeriod', lateDays: Math.round((Date.now() - pastDueSince.getTime()) / 86_400_000) },
+        billing: { operation: 'extendPaidPeriod', lateDays: Math.round((paidAt.getTime() - pastDueSince.getTime()) / 86_400_000) },
       });
       return updated;
     } catch (err) {
@@ -284,7 +297,13 @@ export class BillingService {
     const paidThrough = (trialing && row.trialEnd ? row.trialEnd : row.currentPeriodEnd)?.toISOString() ?? null;
 
     if (kind === 'downgrade') {
-      return { kind, ...base, chargeNow: 0, credit: 0, effectiveAt: paidThrough ?? new Date().toISOString(), nextChargeAt: paidThrough };
+      return { kind, ...base, chargeNow: 0, credit: 0, effectiveAt: paidThrough ?? new Date().toISOString(), nextChargeAt: paidThrough, forfeitsPaidThrough: null };
+    }
+    // Inside a late-payment extension Stripe holds the subscription as trialing and
+    // would charge nothing for an upgrade until it ends. The upgrade ends the
+    // extension instead: the full new price today, the remaining days not credited.
+    if (isPaidExtension(stripeSub)) {
+      return { kind, ...base, chargeNow: toAmount ?? 0, credit: 0, effectiveAt: new Date().toISOString(), nextChargeAt: addInterval(new Date(), interval).toISOString(), forfeitsPaidThrough: paidThrough };
     }
     const invoice = await timed('stripe', 'invoices.createPreview', () => this.stripe.invoices.createPreview({
       customer: stripeSub.customer as string,
@@ -298,6 +317,7 @@ export class BillingService {
       credit: trialing ? 0 : p.credit,
       effectiveAt: new Date().toISOString(),
       nextChargeAt: trialing ? paidThrough : p.periodEnd,
+      forfeitsPaidThrough: null,
     };
   }
 
@@ -330,6 +350,9 @@ export class BillingService {
           items: [{ id: item.id, price: newPriceId }],
           proration_behavior: 'always_invoice',
           payment_behavior: 'error_if_incomplete',
+          // A late-payment extension is a Stripe trial: end it, or the new price is
+          // free until it runs out. Charges the full new price today (see preview).
+          ...(isPaidExtension(stripeSub) ? { trial_end: 'now' as const, metadata: { [PAID_EXTENSION_METADATA_KEY]: '' } } : {}),
         }));
       } catch (err) {
         const e = err as Stripe.errors.StripeError;
@@ -350,7 +373,8 @@ export class BillingService {
     await timed('stripe', 'subscriptionSchedules.update', () => this.stripe.subscriptionSchedules.update(created.id, {
       end_behavior: 'release',
       phases: [
-        { items: [{ price: item.price.id, quantity: 1 }], start_date: phase0.start_date, end_date: phase0.end_date, proration_behavior: 'none' },
+        // phase0.trial_end carries a late-payment extension (or a real trial) through: without it the phase would bill at once.
+        { items: [{ price: item.price.id, quantity: 1 }], start_date: phase0.start_date, end_date: phase0.end_date, proration_behavior: 'none', ...(phase0.trial_end ? { trial_end: phase0.trial_end } : {}) },
         { items: [{ price: newPriceId, quantity: 1 }], duration: { interval, interval_count: 1 }, proration_behavior: 'none' },
       ],
     }));

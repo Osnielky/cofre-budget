@@ -182,13 +182,6 @@ limits them today, and what was done:
 
 ## Billing follow-ups (2026-11-04)
 
-- **Upgrade during a late-payment extension** — small. While the renewal date is
-  moved with Stripe's `trial_end` (`late-payment.ts`), Stripe treats the subscription
-  as trialing: `switchTier`'s `always_invoice` update charges nothing until the
-  extension ends, but `previewPlanChange` still shows a prorated charge for today.
-  Either preview $0 + "first charge on <date>" when the Stripe sub carries the
-  `cofre_paid_period_extended` stamp, or end the extension (`trial_end: 'now'`) on
-  upgrade and charge the full new price today.
 - **Stripe dashboard settings to verify** — Billing → Subscriptions and emails:
   "Manage failed payments" must leave the subscription payable (mark unpaid, not
   cancel) or late recovery from Cofre is impossible; "trial ending" customer
