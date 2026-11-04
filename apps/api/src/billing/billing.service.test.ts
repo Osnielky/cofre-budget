@@ -123,6 +123,7 @@ describe('BillingService.syncFromStripeSubscription', () => {
     function stubStripe(live: any = { status: 'active', latest_invoice: { status: 'paid', amount_paid: 499, status_transitions: { paid_at: Math.floor(Date.now() / 1000) } } }) {
       const updates: any[] = [];
       (service as any).stripe = {
+        invoices: { list: async (params: any) => ({ data: live.outstanding?.includes(params.status) ? [{ id: 'in_open' }] : [] }) },
         subscriptions: {
           retrieve: async () => fakeSub({ trial_end: null, items, ...live }),
           update: async (id: string, params: any) => {
@@ -175,6 +176,14 @@ describe('BillingService.syncFromStripeSubscription', () => {
       updates = stubStripe({ status: 'active', latest_invoice: { status: 'paid', amount_paid: 499, status_transitions: { paid_at: Math.floor(pastDueSince.getTime() / 1000) - 86_400 } } });
       await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'active', trial_end: null, items }) as any);
       expect(updates).toHaveLength(0);
+      // Active because a later, smaller invoice was paid while the overdue one is still open.
+      for (const outstanding of [['open'], ['uncollectible']]) {
+        await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'past_due', trial_end: null, items }) as any);
+        await ds.getRepository(Subscription).update({ userId }, { pastDueSince });
+        updates = stubStripe({ status: 'active', outstanding, latest_invoice: { status: 'paid', amount_paid: 120, status_transitions: { paid_at: Math.floor(Date.now() / 1000) } } });
+        await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'active', trial_end: null, items }) as any);
+        expect(updates).toHaveLength(0);
+      }
     });
 
     it('leaves the dates alone when the plan was not past due, and when Stripe refuses the move', async () => {
@@ -232,7 +241,7 @@ describe('BillingService.syncFromStripeSubscription', () => {
     });
 
     it('restores the plan and clears the clock when Stripe collects the payment', async () => {
-      (service as any).stripe = { subscriptions: {
+      (service as any).stripe = { invoices: { list: async () => ({ data: [] }) }, subscriptions: {
         retrieve: async () => fakeSub({ status: 'active', trial_end: null, latest_invoice: { status: 'paid', amount_paid: 499, status_transitions: { paid_at: Math.floor(Date.now() / 1000) } } }),
         update: async (_id: string, p: any) => fakeSub({ status: 'trialing', trial_end: p.trial_end, metadata: p.metadata }),
       } };
@@ -566,6 +575,13 @@ describe('BillingService.switchTier / previewPlanChange / cancelPendingChange', 
     expect(calls[0].params).not.toHaveProperty('metadata');
   });
 
+  it('refuses any plan change while past due — the overdue invoice is paid first', async () => {
+    const { service, userId, calls } = await setup({ status: 'past_due' as any });
+    await expect(service.previewPlanChange(userId, 'elite', 'month')).rejects.toThrow(/pay the overdue invoice/);
+    await expect(service.switchTier(userId, 'elite', 'month')).rejects.toThrow(/pay the overdue invoice/);
+    expect(calls).toEqual([]);
+  });
+
   it('refuses a no-op change', async () => {
     const { service, userId } = await setup();
     await expect(service.previewPlanChange(userId, 'pro', 'month')).rejects.toThrow(/already on that plan/);
@@ -640,6 +656,7 @@ describe('BillingService.payOverdue', () => {
     let status = opts.status ?? 'past_due';
     const item = { id: 'si_d', price: { id: 'price_pro_month', unit_amount: 499, currency: 'usd' }, current_period_end: 1_795_000_000 };
     const updates: any[] = [];
+    const paidIds = new Set<string>();
     (service as any).stripe = {
       subscriptions: {
         retrieve: async () => ({ id: 'sub_d', customer: 'cus_d', status, cancel_at_period_end: false, trial_end: null, items: { data: [item] }, schedule: null,
@@ -647,8 +664,12 @@ describe('BillingService.payOverdue', () => {
         update: async (id: string, params: any) => { updates.push(params); return { id, customer: 'cus_d', status: 'trialing', cancel_at_period_end: false, trial_end: params.trial_end, metadata: params.metadata, items: { data: [item] }, schedule: null }; },
       },
       invoices: {
-        list: async () => { calls.push('invoices.list'); return { data: opts.invoices ?? [{ id: 'in_old', created: 2, amount_due: 499 }, { id: 'in_new', created: 3, amount_due: 499 }] }; },
-        pay: async (id: string) => { calls.push(`invoices.pay:${id}`); if (opts.payError) throw opts.payError; status = 'active'; return { id, status: 'paid', amount_paid: 499, currency: 'usd' }; },
+        list: async (params: any) => {
+          if (params.status === 'uncollectible') return { data: [] };
+          calls.push('invoices.list');
+          return { data: (opts.invoices ?? [{ id: 'in_old', created: 2, amount_due: 499 }]).filter((i: any) => !paidIds.has(i.id)) };
+        },
+        pay: async (id: string) => { calls.push(`invoices.pay:${id}`); if (opts.payError) throw opts.payError; paidIds.add(id); status = 'active'; return { id, status: 'paid', amount_paid: 499, currency: 'usd' }; },
       },
     };
     return { service, ds, userId: user.id, calls, mail, updates };
@@ -658,7 +679,7 @@ describe('BillingService.payOverdue', () => {
     const { service, ds, userId, calls, mail, updates } = await setup();
     const out = await service.payOverdue(userId);
     expect(out).toMatchObject({ paid: true, amount: 4.99, currency: 'usd' });
-    expect(calls).toEqual(['invoices.list', 'invoices.pay:in_old']);
+    expect(calls.slice(0, 2)).toEqual(['invoices.list', 'invoices.pay:in_old']);
     // Past due since Oct 29: the paid month now starts today, so the renewal date moves out by that much.
     const expectedEnd = 1_795_000_000 + Math.round((Date.now() - new Date('2026-10-29T00:00:00Z').getTime()) / 1000);
     expect(updates).toHaveLength(1);
@@ -670,6 +691,15 @@ describe('BillingService.payOverdue', () => {
     expect(row.pastDueSince).toBeNull();
     expect(row.currentPeriodEnd).toEqual(new Date(out.paidThrough!));
     expect(mail.sent.map((m) => m.content.subject)).toEqual(['Payment received — your Cofre Pro plan is back']);
+  });
+
+  it('pays the oldest of several open invoices and does not move the date while one is still open', async () => {
+    const { service, ds, userId, calls, updates } = await setup({ invoices: [{ id: 'in_old', created: 2, amount_due: 499 }, { id: 'in_new', created: 3, amount_due: 499 }] });
+    const out = await service.payOverdue(userId);
+    expect(out.paid).toBe(true);
+    expect(calls.slice(0, 2)).toEqual(['invoices.list', 'invoices.pay:in_old']);
+    expect(updates).toHaveLength(0);
+    expect((await ds.getRepository(Subscription).findOneByOrFail({ userId })).currentPeriodEnd).toEqual(new Date(1_795_000_000 * 1000));
   });
 
   it('turns a declined payment into a clear 409 and changes nothing', async () => {

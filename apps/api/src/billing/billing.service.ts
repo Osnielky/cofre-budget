@@ -162,6 +162,16 @@ export class BillingService {
         log('INFO', 'Late payment: no settled payment to extend from', { billing: { operation: 'extendPaidPeriod', status: fresh.status, latestInvoice: typeof invoice === 'object' ? invoice?.status : null } });
         return null;
       }
+      // "Latest invoice paid" is not "the overdue invoice paid": a later, smaller
+      // invoice (an upgrade proration) can flip Stripe to active while the old one
+      // stays open. Nothing may be outstanding on the subscription.
+      for (const status of ['open', 'uncollectible'] as const) {
+        const outstanding = await timed('stripe', 'invoices.list', () => this.stripe.invoices.list({ subscription: subscriptionId, status, limit: 1 }));
+        if (outstanding.data.length > 0) {
+          log('INFO', 'Late payment: an invoice is still outstanding, not extending', { billing: { operation: 'extendPaidPeriod', outstanding: status } });
+          return null;
+        }
+      }
       const paidAt = new Date(paidAtUnix * 1000);
       const newEnd = extendedPeriodEnd({ currentPeriodEnd: new Date(periodEndUnix * 1000), pastDueSince, paidAt, interval });
       if (!newEnd) return null;
@@ -272,6 +282,11 @@ export class BillingService {
     return { row, stripeSub };
   }
 
+  /** A plan change while past due would let a small proration invoice stand in for the overdue one. */
+  private refuseWhilePastDue(row: Subscription): void {
+    if (row.status === 'past_due') throw new ConflictException('Your plan is waiting on a payment — pay the overdue invoice in Settings → Billing before changing it.');
+  }
+
   private priceAmount(priceId: string): Promise<number | null> {
     return timed('stripe', 'prices.retrieve', () => this.stripe.prices.retrieve(priceId)).then((p) => (typeof p.unit_amount === 'number' ? p.unit_amount / 100 : null));
   }
@@ -283,6 +298,7 @@ export class BillingService {
    */
   async previewPlanChange(userId: string, tier: 'pro' | 'elite', interval: 'month' | 'year'): Promise<PlanChangePreview> {
     const { row, stripeSub } = await this.liveSubscription(userId);
+    this.refuseWhilePastDue(row);
     const kind = classifyPlanChange(row, { tier, interval });
     if (kind === 'same') throw new BadRequestException('You are already on that plan.');
     const item = stripeSub.items.data[0];
@@ -333,6 +349,7 @@ export class BillingService {
   async switchTier(userId: string, tier: 'pro' | 'elite', interval: 'month' | 'year'): Promise<{ kind: 'upgrade' | 'downgrade'; effectiveAt: string }> {
     const user = await this.users.findOneByOrFail({ id: userId });
     const { row, stripeSub } = await this.liveSubscription(userId);
+    this.refuseWhilePastDue(row);
     const kind = classifyPlanChange(row, { tier, interval });
     if (kind === 'same') throw new BadRequestException('You are already on that plan.');
     if (stripeSub.cancel_at_period_end) throw new ConflictException('Your plan is set to end — keep it first, then change it.');
