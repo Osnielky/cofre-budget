@@ -10,6 +10,7 @@ import { CardProfile } from './card-profile.entity';
 import type { CardProfileView, CardView, DebitView, LiabilitiesStatus, PlaidCardData } from './card-types';
 import { MANUAL_FIELDS, mergePlaidData, mergeSnapshot } from './detail-merge';
 import { validateDetailPatch, validateProfile } from './card-validation';
+import { monthBounds } from '../common/dates/month-bounds';
 
 export interface PlaidCardReport {
   plaidAccountId: string;
@@ -49,14 +50,14 @@ export class CreditCardsService {
   async listDebitForUser(userId: string, now: Date = new Date()): Promise<DebitView[]> {
     const accounts = await this.accounts.find({ where: { userId, accountType: 'checking' }, order: { createdAt: 'ASC' } });
     if (accounts.length === 0) return [];
-    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const { start, end } = monthBounds(now);
     const rows = await this.transactions.createQueryBuilder('tx')
       .leftJoinAndSelect('tx.categoryRef', 'categoryRef')
       .where('tx.userId = :userId', { userId })
       .andWhere('tx.bankAccountId IN (:...ids)', { ids: accounts.map((a) => a.id) })
       .andWhere('tx.isSplitParent = :split', { split: false })
       .andWhere('tx.amount < 0')
-      .andWhere('tx.date >= :start AND tx.date <= :end', { start: `${ym}-01`, end: `${ym}-31` })
+      .andWhere('tx.date >= :start AND tx.date <= :end', { start, end })
       .getMany();
     const spent = new Map<string, number>();
     for (const t of rows) {

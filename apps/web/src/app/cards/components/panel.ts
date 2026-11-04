@@ -10,12 +10,3 @@ export const PANEL: CSSProperties = {
 };
 
 export const MUTED: CSSProperties = { color: 'var(--color-text-muted)' };
-
-/* Accent per card position, from the theme's card accents (not issuer colors). */
-export const CARD_ACCENTS = [
-  'var(--color-card-sky)',
-  'var(--color-card-violet)',
-  'var(--color-card-green)',
-  'var(--color-card-orange)',
-  'var(--color-card-amber)',
-];

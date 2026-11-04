@@ -30,11 +30,23 @@ plus extras: bank accounts, Plaid, CSV import, projects, debts) are not listed.
   Cards page redesign shipped 2026-10-16 (stat tiles, Credit/Debit/All tabs,
   payment-strategy tips). Its "Coming soon" panels still need: a daily snapshot of
   card balances for the utilization-trend chart, and the phase 2 catalog for
-  rewards. Debit tiles link to /transactions without an account filter — add
-  `?account=` support to the Transactions page.
+  rewards. The debit detail and "All transactions" link to /transactions without
+  an account filter — add `?account=` support to the Transactions page.
 
-  Phase 1 follow-ups: card edit drawer accessibility (dialog role, Escape,
-  focus, scroll lock, confirm before discarding edits); a sync landing within
+  **Card deck (2026-11-04)** — the grid and the Credit / Debit / All tabs became a
+  3D carousel picker (Embla) with the selected card's full detail under it,
+  animated figures (NumberFlow) and the edit form in the app sheet (Vaul).
+  Follow-ups: remember the picked card across visits (`sessionStorage`);
+  a "swipe to switch" hint the first time on a phone; `GET /transactions`
+  for the activity list carries category and account joins the panel never
+  reads — a slim `?fields=` or a `/cards/:id/activity` endpoint would cut the
+  payload; the deck art has no issuer logos by design, but the card *colour*
+  table (`lib/cards/card-colors.ts`) knows only a dozen products — grow it.
+  Spec: [docs/superpowers/specs/2026-11-04-cards-deck-design.md](superpowers/specs/2026-11-04-cards-deck-design.md)
+
+  Phase 1 follow-ups: confirm before discarding edits in the card sheet
+  (dialog role, Escape, focus and scroll lock came with Vaul on 2026-11-04);
+  a sync landing within
   milliseconds of a manual edit can overwrite it; editing only the promo APR
   marks the purchase APR as hand-entered too; `useBankData` should 400 when no
   bank snapshot exists; tests for the `LIABILITIES` webhook branch and
