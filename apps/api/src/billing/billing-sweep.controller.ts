@@ -16,9 +16,11 @@ export class BillingSweepController {
   @Post('sweep')
   @HttpCode(200)
   async run(@Headers('x-sweep-secret') provided?: string): Promise<{ pastDueDowngraded: number; trialRemindersSent: number }> {
-    const expected = this.config.get<string>('PLAID_SWEEP_SECRET');
+    // Trimmed: `openssl rand | gcloud secrets create --data-file=-` stores a trailing
+    // newline, and a header never carries one.
+    const expected = this.config.get<string>('PLAID_SWEEP_SECRET')?.trim();
     if (!expected) throw new NotFoundException();
-    const a = Buffer.from(provided ?? '');
+    const a = Buffer.from((provided ?? '').trim());
     const b = Buffer.from(expected);
     if (a.length !== b.length || !timingSafeEqual(a, b)) throw new UnauthorizedException();
     const pastDueDowngraded = await this.billing.sweepPastDue();

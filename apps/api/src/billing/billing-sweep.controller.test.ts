@@ -28,6 +28,11 @@ describe('BillingSweepController', () => {
     expect(calls).toEqual([]);
   });
 
+  it('ignores the trailing newline a secret created from a pipe carries', async () => {
+    const { controller } = make('s3cret\n');
+    await expect(controller.run('s3cret')).resolves.toEqual({ pastDueDowngraded: 2, trialRemindersSent: 1 });
+  });
+
   it('runs both billing sweeps and reports the counts', async () => {
     const { controller, calls } = make('s3cret');
     await expect(controller.run('s3cret')).resolves.toEqual({ pastDueDowngraded: 2, trialRemindersSent: 1 });
