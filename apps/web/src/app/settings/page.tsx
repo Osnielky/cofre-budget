@@ -17,8 +17,7 @@ import DataResetModal from '@/components/DataResetModal';
 import PlaidMergeReviewModal, { PreviewExchangeResult } from '@/components/PlaidMergeReviewModal';
 import IntegrationsTab from '@/components/IntegrationsTab';
 import BillingTab from '@/components/BillingTab';
-import { useTheme } from '@/components/ThemeProvider';
-import { THEMES } from '@/lib/theme';
+import AppearanceTab from '@/components/AppearanceTab';
 import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
 import { connectBankError, InstitutionLimitError } from '@/lib/connect-bank-error';
 import MyTicketsList from '@/components/support/MyTicketsList';
@@ -243,7 +242,6 @@ function SettingsPageInner() {
   const [activeTab, setActiveTab] = useState<Tab>('banks');
   const [gmailStatus, setGmailStatus] = useState<{ connected: boolean; email?: string; connectedAt?: string } | null>(null);
   const [gmailLoading, setGmailLoading] = useState(false);
-  const { theme: activeTheme, setTheme } = useTheme();
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showManualForm, setShowManualForm] = useState(false);
@@ -1358,60 +1356,7 @@ function SettingsPageInner() {
           {activeTab === 'help' && (
             <div className="max-w-2xl"><MyTicketsList /></div>
           )}
-          {activeTab === 'appearance' && (
-            <div className="flex flex-col gap-6 max-w-2xl">
-              <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-                Choose a visual theme. Your preference is saved locally.
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {THEMES.map((t) => {
-                  const selected = activeTheme === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => setTheme(t.id)}
-                      className="text-left flex flex-col gap-4 p-4 rounded-2xl transition-all hover:scale-[1.02]"
-                      style={{
-                        background: t.preview.bg,
-                        border: selected ? `2px solid ${t.preview.accent}` : `2px solid ${t.preview.border}`,
-                        boxShadow: selected
-                          ? `0 0 0 3px ${t.preview.accent}33, 0 8px 32px rgba(0,0,0,0.30)`
-                          : '0 2px 12px rgba(0,0,0,0.12)',
-                      }}>
-
-                      {/* Color swatches */}
-                      <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 rounded-xl shrink-0"
-                          style={{ background: t.preview.surface, border: `1px solid ${t.preview.border}` }} />
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex gap-1.5">
-                            <div className="w-4 h-4 rounded-md" style={{ background: t.preview.accent }} />
-                            <div className="w-4 h-4 rounded-md" style={{ background: t.preview.accent2 }} />
-                            <div className="w-4 h-4 rounded-md opacity-50" style={{ background: t.preview.textDim }} />
-                          </div>
-                          <div className="h-1.5 rounded-full" style={{ background: t.preview.accent, width: 40, opacity: 0.7 }} />
-                        </div>
-                      </div>
-
-                      {/* Name + description */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-sm font-bold leading-tight" style={{ color: t.preview.text }}>{t.name}</p>
-                          <p className="text-[11px] mt-0.5" style={{ color: t.preview.textDim }}>{t.description}</p>
-                        </div>
-                        {selected && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
-                            style={{ background: `${t.preview.accent}22`, color: t.preview.accent }}>
-                            Active
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {activeTab === 'appearance' && <AppearanceTab />}
 
         </div>
       </main>

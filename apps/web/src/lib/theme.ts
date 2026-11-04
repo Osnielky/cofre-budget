@@ -91,3 +91,9 @@ export const THEMES: Theme[] = [
     },
   },
 ];
+
+/** Radio-group keyboard step: the id `delta` places from `current`, wrapping at both ends. */
+export function stepTheme<T extends string>(ids: readonly T[], current: T, delta: number): T {
+  const i = Math.max(0, ids.indexOf(current));
+  return ids[(i + delta + ids.length) % ids.length];
+}
