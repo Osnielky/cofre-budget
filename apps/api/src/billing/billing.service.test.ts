@@ -333,7 +333,7 @@ describe('BillingService.getOverview and resume', () => {
   it('returns the card and next charge for an active subscription', async () => {
     const { service, userId } = await setup();
     const out = await service.getOverview(userId);
-    expect(out.paymentMethod?.last4).toBe('4242');
+    expect(out.paymentMethod).toMatchObject({ kind: 'card', last4: '4242' });
     expect(out.upcoming).toMatchObject({ total: 4.99, date: '2026-11-14T00:00:00.000Z' });
   });
 
@@ -349,7 +349,7 @@ describe('BillingService.getOverview and resume', () => {
     stripe.invoices.list = async () => { throw new Error('stripe down'); };
     const out = await service.getOverview(userId);
     expect(out.invoices).toEqual([]);
-    expect(out.paymentMethod?.last4).toBe('4242');
+    expect(out.paymentMethod).toMatchObject({ kind: 'card', last4: '4242' });
   });
 
   it('returns an empty overview for a user with no Stripe customer', async () => {

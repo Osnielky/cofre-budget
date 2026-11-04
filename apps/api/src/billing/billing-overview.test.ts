@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapBillingOverview } from './billing-overview';
+import { mapBillingOverview, summarizePaymentMethod } from './billing-overview';
 
 const card = { type: 'card', card: { brand: 'visa', last4: '4242', exp_month: 4, exp_year: 2028 } };
 
@@ -19,7 +19,7 @@ describe('mapBillingOverview', () => {
       }] as any,
       fallbackDate: null,
     });
-    expect(out.paymentMethod).toEqual({ brand: 'visa', last4: '4242', expMonth: 4, expYear: 2028 });
+    expect(out.paymentMethod).toEqual({ kind: 'card', brand: 'visa', last4: '4242', expMonth: 4, expYear: 2028 });
     expect(out.billingAddress).toEqual({ line1: '123 Finance St', line2: 'Apt 4B', city: 'New York', state: 'NY', postalCode: '10001', country: 'US' });
     expect(out.upcoming).toEqual({ subtotal: 4.99, tax: 0.4, total: 5.39, currency: 'usd', date: new Date(1_793_000_000 * 1000).toISOString() });
     expect(out.invoices[0]).toEqual({
@@ -35,7 +35,7 @@ describe('mapBillingOverview', () => {
       subscription: { default_payment_method: sub } as any,
       preview: null, invoices: [], fallbackDate: null,
     });
-    expect(out.paymentMethod?.last4).toBe('5555');
+    expect(out.paymentMethod).toMatchObject({ kind: 'card', last4: '5555' });
   });
 
   it('returns empty parts when Stripe has nothing (or a lookup failed)', () => {
@@ -43,13 +43,28 @@ describe('mapBillingOverview', () => {
     expect(out).toEqual({ paymentMethod: null, billingAddress: null, upcoming: null, invoices: [] });
   });
 
-  it('ignores a payment method that is only an id or not a card', () => {
+  it('ignores a payment method that is only an id (not expanded)', () => {
     const out = mapBillingOverview({
       customer: { invoice_settings: { default_payment_method: 'pm_123' } } as any,
-      subscription: { default_payment_method: { type: 'us_bank_account' } } as any,
+      subscription: { default_payment_method: null } as any,
       preview: null, invoices: [], fallbackDate: null,
     });
     expect(out.paymentMethod).toBeNull();
+  });
+
+  it('summarizes a US bank account (ACH through Link) as a bank debit, never as "no card"', () => {
+    const out = mapBillingOverview({
+      customer: { invoice_settings: { default_payment_method: { type: 'us_bank_account', us_bank_account: { bank_name: 'Chase', last4: '7682', account_holder_type: 'company', routing_number: '021000021' } } } } as any,
+      subscription: null, preview: null, invoices: [], fallbackDate: null,
+    });
+    expect(out.paymentMethod).toEqual({ kind: 'bank', bankName: 'Chase', last4: '7682' });
+  });
+
+  it('labels wallets and unknown types without exposing their details', () => {
+    expect(summarizePaymentMethod({ type: 'link', link: { email: 'x@y.z' } } as any)).toEqual({ kind: 'other', label: 'Link' });
+    expect(summarizePaymentMethod({ type: 'cashapp', cashapp: { cashtag: '$x' } } as any)).toEqual({ kind: 'other', label: 'Cash App' });
+    expect(summarizePaymentMethod({ type: 'sepa_debit', sepa_debit: { last4: '3000', bank_code: '37040044' } } as any)).toEqual({ kind: 'bank', bankName: null, last4: '3000' });
+    expect(summarizePaymentMethod({ type: 'wechat_pay' } as any)).toEqual({ kind: 'other', label: 'wechat pay' });
   });
 
   it('uses the fallback date when Stripe gives no next payment attempt, and 0 tax when none applies', () => {

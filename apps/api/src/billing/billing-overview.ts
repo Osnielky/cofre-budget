@@ -5,8 +5,18 @@ import type Stripe from 'stripe';
  * on file, the billing address, the next charge and recent invoices — read live
  * from Stripe and reduced to display fields only (amounts in major units).
  */
+/**
+ * The payment method Stripe will charge next, reduced to what the page may
+ * show. Cards keep brand and expiry; bank debits (ACH, SEPA, BACS…) keep the
+ * bank and last 4; wallets (Link, Cash App, PayPal…) keep only a label.
+ */
+export type PaymentMethodSummary =
+  | { kind: 'card'; brand: string; last4: string; expMonth: number; expYear: number }
+  | { kind: 'bank'; bankName: string | null; last4: string | null }
+  | { kind: 'other'; label: string };
+
 export interface BillingOverview {
-  paymentMethod: { brand: string; last4: string; expMonth: number; expYear: number } | null;
+  paymentMethod: PaymentMethodSummary | null;
   billingAddress: {
     line1: string | null; line2: string | null; city: string | null;
     state: string | null; postalCode: string | null; country: string | null;
@@ -23,9 +33,28 @@ export const EMPTY_OVERVIEW: BillingOverview = { paymentMethod: null, billingAdd
 const major = (cents: number) => Math.round(cents) / 100;
 const iso = (unix: number) => new Date(unix * 1000).toISOString();
 
-function cardOf(pm: string | Stripe.PaymentMethod | null | undefined): BillingOverview['paymentMethod'] {
-  if (!pm || typeof pm === 'string' || pm.type !== 'card' || !pm.card) return null;
-  return { brand: pm.card.brand, last4: pm.card.last4, expMonth: pm.card.exp_month, expYear: pm.card.exp_year };
+const WALLET_LABELS: Record<string, string> = {
+  link: 'Link', cashapp: 'Cash App', paypal: 'PayPal', amazon_pay: 'Amazon Pay', revolut_pay: 'Revolut Pay',
+};
+
+export function summarizePaymentMethod(pm: string | Stripe.PaymentMethod | null | undefined): PaymentMethodSummary | null {
+  if (!pm || typeof pm === 'string') return null;
+  switch (pm.type) {
+    case 'card':
+      return pm.card ? { kind: 'card', brand: pm.card.brand, last4: pm.card.last4, expMonth: pm.card.exp_month, expYear: pm.card.exp_year } : null;
+    case 'us_bank_account':
+      return { kind: 'bank', bankName: pm.us_bank_account?.bank_name ?? null, last4: pm.us_bank_account?.last4 ?? null };
+    case 'acss_debit':
+      return { kind: 'bank', bankName: pm.acss_debit?.bank_name ?? null, last4: pm.acss_debit?.last4 ?? null };
+    case 'sepa_debit':
+      return { kind: 'bank', bankName: null, last4: pm.sepa_debit?.last4 ?? null };
+    case 'bacs_debit':
+      return { kind: 'bank', bankName: null, last4: pm.bacs_debit?.last4 ?? null };
+    case 'au_becs_debit':
+      return { kind: 'bank', bankName: null, last4: pm.au_becs_debit?.last4 ?? null };
+    default:
+      return { kind: 'other', label: WALLET_LABELS[pm.type] ?? pm.type.replace(/_/g, ' ') };
+  }
 }
 
 export function mapBillingOverview(src: {
@@ -37,9 +66,9 @@ export function mapBillingOverview(src: {
   fallbackDate: Date | null;
 }): BillingOverview {
   const { customer, subscription, preview } = src;
-  // The subscription's own card wins; otherwise the customer's default card.
-  const paymentMethod = cardOf(subscription?.default_payment_method as Stripe.PaymentMethod | string | null)
-    ?? cardOf(customer?.invoice_settings?.default_payment_method);
+  // The subscription's own method wins; otherwise the customer's default.
+  const paymentMethod = summarizePaymentMethod(subscription?.default_payment_method as Stripe.PaymentMethod | string | null)
+    ?? summarizePaymentMethod(customer?.invoice_settings?.default_payment_method);
 
   const a = customer?.address;
   const billingAddress = a && (a.line1 || a.city || a.postal_code)

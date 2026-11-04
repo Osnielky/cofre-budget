@@ -1,7 +1,7 @@
 'use client';
 
 import { PLAN_PRICES, TRIAL_DAYS } from '@/lib/plans';
-import { cardBrandLabel, daysUntil, trialProgress } from '@/lib/billing/derive';
+import { daysUntil, trialProgress, describePaymentMethod } from '@/lib/billing/derive';
 import type { BillingOverview, SubscriptionInfo } from '@/lib/billing/types';
 import { BillingCard, Icon, IconChip, Pill, fmtDate, fmtMoney, outlineBtn, glass } from './ui';
 
@@ -14,6 +14,8 @@ export interface BillingActions {
   cancelPlan: () => void;
   resumePlan: () => void;
   openPortal: () => void;
+  /** The trip to Stripe's payment page: opening, or why it did not open. */
+  portal: { opening: boolean; error: string | null };
 }
 
 /** Wide card: plan name, trial / renewal / cancellation status and the main actions. */
@@ -21,7 +23,7 @@ export function CurrentPlanCard({ sub, actions }: { sub: SubscriptionInfo; actio
   const accent = sub.tier === 'elite' ? 'var(--color-amber)' : 'var(--color-primary)';
   const trialing = sub.status === 'trialing' && !!sub.trialEnd;
   const statusLine = sub.status === 'past_due'
-    ? { text: 'Your last payment failed — update your card to keep your plan.', color: 'var(--color-rose)' }
+    ? { text: 'Your last payment failed — update your payment method to keep your plan.', color: 'var(--color-rose)' }
     : sub.cancelAtPeriodEnd
       ? { text: `Your ${TIER[sub.tier]} plan is set to end.`, color: 'var(--color-amber)' }
       : trialing
@@ -108,26 +110,45 @@ export function CurrentPlanCard({ sub, actions }: { sub: SubscriptionInfo; actio
   );
 }
 
-export function PaymentMethodCard({ overview, actions }: { overview: BillingOverview | null; actions: BillingActions }) {
-  const pm = overview?.paymentMethod;
+export function PaymentMethodCard({ overview, sub, notice, actions }: {
+  overview: BillingOverview | null;
+  sub: SubscriptionInfo;
+  /** Shown once after coming back from Stripe (see BillingTab). */
+  notice: { tone: 'good' | 'warn'; text: string } | null;
+  actions: BillingActions;
+}) {
+  const pm = overview?.paymentMethod ?? null;
   const a = overview?.billingAddress;
+  const d = describePaymentMethod(pm);
+  const pastDue = sub.status === 'past_due';
+  const { opening, error } = actions.portal;
   return (
     <BillingCard title="Payment method"
-      action={<button type="button" onClick={actions.openPortal} className="text-xs font-semibold px-3 py-1 rounded-lg cursor-pointer" style={outlineBtn}>Edit</button>}>
-      <div className="flex items-center gap-3 rounded-xl p-3" style={{ border: '1px solid var(--color-border)', background: 'var(--color-elevated)' }}>
+      action={<button type="button" onClick={actions.openPortal} disabled={opening} className="text-xs font-semibold px-3 py-1 rounded-lg cursor-pointer disabled:opacity-60" style={outlineBtn}>Edit</button>}>
+      {notice && (
+        <p role="status" className="text-xs font-semibold rounded-xl px-3 py-2 flex items-start gap-2"
+          style={notice.tone === 'good'
+            ? { background: 'color-mix(in srgb, var(--color-green) 14%, transparent)', color: 'var(--color-green)' }
+            : { background: 'color-mix(in srgb, var(--color-amber) 14%, transparent)', color: 'var(--color-amber)' }}>
+          <span className="mt-px shrink-0"><Icon name={notice.tone === 'good' ? 'check' : 'xCircle'} size={14} /></span>
+          <span>{notice.text}</span>
+        </p>
+      )}
+      <div className="flex items-center gap-3 rounded-xl p-3" style={{ border: `1px solid ${pm ? 'var(--color-border)' : 'color-mix(in srgb, var(--color-amber) 45%, transparent)'}`, background: 'var(--color-elevated)' }}>
         <span className="inline-flex items-center justify-center rounded-md px-2 h-8 min-w-12 text-[11px] font-black tracking-wide shrink-0"
           style={{ background: 'var(--color-text-primary)', color: 'var(--color-surface)' }}>
-          {pm ? pm.brand.toUpperCase().slice(0, 4) : <Icon name="card" size={16} />}
+          {d.badge ?? <Icon name={pm?.kind === 'bank' ? 'bank' : 'card'} size={16} />}
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
-            {pm ? `${cardBrandLabel(pm.brand)} ending in ${pm.last4}` : 'No card on file'}
-          </p>
-          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            {pm ? `Expires ${String(pm.expMonth).padStart(2, '0')}/${pm.expYear}` : 'Add one before your next charge'}
-          </p>
+          <p className="text-sm font-semibold leading-snug" style={{ color: 'var(--color-text-primary)' }}>{d.title}</p>
+          <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{d.detail}</p>
         </div>
       </div>
+      {pastDue && (
+        <p className="text-xs leading-snug" style={{ color: 'var(--color-rose)' }}>
+          Your last payment didn’t go through. Add a working card or bank account — Stripe retries on its own and your plan continues once it succeeds.
+        </p>
+      )}
       {a && (
         <div className="flex items-start gap-3 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
           <span className="mt-0.5"><Icon name="pin" size={16} /></span>
@@ -140,11 +161,18 @@ export function PaymentMethodCard({ overview, actions }: { overview: BillingOver
           </div>
         </div>
       )}
-      <button type="button" onClick={actions.openPortal}
-        className="mt-auto w-full py-2.5 rounded-xl text-sm font-semibold cursor-pointer inline-flex items-center justify-center gap-2"
-        style={{ border: '1px solid var(--color-primary)', color: 'var(--color-primary)' }}>
-        <Icon name="card" size={16} /> {pm ? 'Update payment method' : 'Add payment method'}
-      </button>
+      <div className="mt-auto flex flex-col gap-2">
+        <button type="button" onClick={actions.openPortal} disabled={opening}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold cursor-pointer inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait"
+          style={pm
+            ? { border: '1px solid var(--color-primary)', color: 'var(--color-primary)' }
+            : { background: 'var(--color-primary)', color: 'var(--btn-primary-text, #fff)' }}>
+          <Icon name="card" size={16} /> {opening ? 'Opening Stripe…' : pm ? 'Change payment method' : 'Add payment method'}
+        </button>
+        <p className="text-[11px] leading-snug text-center" style={{ color: error ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
+          {error ?? 'Opens Stripe, our payment partner, in this tab. Save a card or bank account there and you’ll land back here.'}
+        </p>
+      </div>
     </BillingCard>
   );
 }

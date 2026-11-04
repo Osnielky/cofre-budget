@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import PricingCards from './PricingCards';
 import { useUser } from './UserProvider';
 import type { BillingOverview, SubscriptionInfo } from '@/lib/billing/types';
+import { portalReturnNotice } from '@/lib/billing/derive';
 import { CurrentPlanCard, PaymentMethodCard, BillingSummaryCard, TrialCard, type BillingActions } from './billing/TopCards';
 import { InvoicesCard, ComparePlansCard, IncludedCard, YearlyBanner, BillingHelpCard } from './billing/LowerCards';
 
@@ -71,6 +72,17 @@ export default function BillingTab() {
   const [busy, setBusy] = useState(false);
   const [overview, setOverview] = useState<BillingOverview | null>(null);
   const reloadOverview = useCallback(() => { fetchOverview().then(setOverview); }, []);
+  const [portal, setPortal] = useState<{ opening: boolean; error: string | null }>({ opening: false, error: null });
+  // True on the page load that Stripe's payment-method page returns to (?portal=return);
+  // the param is stripped right away so a refresh does not repeat the notice.
+  const [returnedFromPortal, setReturnedFromPortal] = useState(false);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('portal') !== 'return') return;
+    setReturnedFromPortal(true);
+    url.searchParams.delete('portal');
+    window.history.replaceState(null, '', url.toString());
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -175,10 +187,16 @@ export default function BillingTab() {
   }
 
   async function openPortal() {
-    const res = await fetch(`${API}/billing/portal-link`, { method: 'POST', credentials: 'include' });
-    if (!res.ok) return;
-    const { url } = await res.json();
-    window.location.href = url;
+    setPortal({ opening: true, error: null });
+    try {
+      const res = await fetch(`${API}/billing/portal-link`, { method: 'POST', credentials: 'include' });
+      if (!res.ok) throw new Error(String(res.status));
+      const { url } = await res.json();
+      window.location.href = url;
+      // Stay "opening" while the browser leaves the page.
+    } catch {
+      setPortal({ opening: false, error: 'Couldn’t open Stripe just now. Try again in a moment.' });
+    }
   }
 
   if (loading) return null;
@@ -219,7 +237,9 @@ export default function BillingTab() {
     );
   }
 
-  const actions: BillingActions = { busy, switchTier, cancelPlan, resumePlan, openPortal };
+  const actions: BillingActions = { busy, switchTier, cancelPlan, resumePlan, openPortal, portal };
+  // The overview is read live from Stripe on this load, so it already reflects the trip.
+  const portalNotice = returnedFromPortal && overview ? portalReturnNotice(overview.paymentMethod, sub.status) : null;
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -229,7 +249,7 @@ export default function BillingTab() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.9fr_1fr_1fr_1fr] gap-4">
         <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><CurrentPlanCard sub={sub} actions={actions} /></div>
-        <PaymentMethodCard overview={overview} actions={actions} />
+        <PaymentMethodCard overview={overview} sub={sub} notice={portalNotice} actions={actions} />
         <BillingSummaryCard sub={sub} overview={overview} />
         <div className="md:col-span-2 xl:col-span-1 flex flex-col [&>*]:flex-1 min-w-0"><TrialCard sub={sub} /></div>
       </div>

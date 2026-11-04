@@ -281,7 +281,7 @@ export class BillingService {
     if (!user.stripeCustomerId) throw new Error('User has no Stripe customer yet');
     const session = await timed('stripe', 'billingPortal.sessions.create', () => this.stripe.billingPortal.sessions.create({
       customer: user.stripeCustomerId,
-      return_url: `${this.frontendUrl}/settings`,
+      return_url: `${this.frontendUrl}/settings?tab=billing&portal=return`,
       flow_data: { type: 'payment_method_update' },
     }));
     return { url: session.url };
@@ -299,7 +299,7 @@ export class BillingService {
   async createPortalLinkForCustomer(stripeCustomerId: string): Promise<{ url: string }> {
     const session = await timed('stripe', 'billingPortal.sessions.create', () => this.stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
-      return_url: `${this.frontendUrl}/settings`,
+      return_url: `${this.frontendUrl}/settings?tab=billing&portal=return`,
       flow_data: { type: 'payment_method_update' },
     }));
     return { url: session.url };

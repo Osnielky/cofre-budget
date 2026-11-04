@@ -1,6 +1,11 @@
 /** Mirrors apps/api/src/billing/billing-overview.ts — keep in sync. */
+export type PaymentMethodSummary =
+  | { kind: 'card'; brand: string; last4: string; expMonth: number; expYear: number }
+  | { kind: 'bank'; bankName: string | null; last4: string | null }
+  | { kind: 'other'; label: string };
+
 export interface BillingOverview {
-  paymentMethod: { brand: string; last4: string; expMonth: number; expYear: number } | null;
+  paymentMethod: PaymentMethodSummary | null;
   billingAddress: {
     line1: string | null; line2: string | null; city: string | null;
     state: string | null; postalCode: string | null; country: string | null;
