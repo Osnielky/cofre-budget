@@ -6,12 +6,13 @@ import { BillingService } from './billing.service';
 import { StripeWebhookVerifierService } from './stripe-webhook-verifier.service';
 import { BillingController } from './billing.controller';
 import { BillingWebhookController } from './billing-webhook.controller';
+import { BillingSweepController } from './billing-sweep.controller';
 import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User, Subscription]), MailModule],
   providers: [BillingService, StripeWebhookVerifierService],
-  controllers: [BillingController, BillingWebhookController],
+  controllers: [BillingController, BillingWebhookController, BillingSweepController],
   exports: [BillingService],
 })
 export class BillingModule {}

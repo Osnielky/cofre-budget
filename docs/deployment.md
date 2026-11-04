@@ -130,6 +130,28 @@ gcloud scheduler jobs create http plaid-sweep \
 The response is `{ stale, synced, failed, skipped }`; `failed` > 0 for the same item
 on consecutive nights means its token is bad and the user should see Reconnect.
 
+## Billing sweeps when nobody is looking
+
+The same problem applies to billing: the 24-hour past-due downgrade and the
+"your trial ends in 3 days" reminder run on an in-process hourly timer, so with
+no traffic for a few days a reminder would go out late or a lapsed user would
+keep Pro. `POST /api/billing/sweep` runs both on demand with the **same**
+`x-sweep-secret` header and `PLAID_SWEEP_SECRET` (no second secret). Add a
+second scheduler job:
+
+```bash
+# Daily at 06:00 UTC, after the Plaid sweep
+gcloud scheduler jobs create http billing-sweep \
+  --schedule="0 6 * * *" --time-zone="Etc/UTC" \
+  --uri="https://<api-host>/api/billing/sweep" --http-method=POST \
+  --headers="x-sweep-secret=$(gcloud secrets versions access latest --secret=PLAID_SWEEP_SECRET)" \
+  --attempt-deadline=300s --location=<region>
+```
+
+The response is `{ pastDueDowngraded, trialRemindersSent }`. Both sweeps are
+idempotent: a user is downgraded once and a trial reminded once
+(`subscriptions.trialReminderSentAt`), so running the job more often is safe.
+
 ## Operating it
 
 ```bash
