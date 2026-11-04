@@ -54,6 +54,18 @@ describe('mapStripeSubscription', () => {
     expect(mapStripeSubscription(fakeSub({ priceId: 'price_pro_month', status: 'canceled' } as any), PRICE_IDS).status).toBe('canceled');
   });
 
+  it('reads a late-payment extension (Stripe "trial" stamped by Cofre) as the paid period', () => {
+    const out = mapStripeSubscription(fakeSub({
+      priceId: 'price_pro_month', status: 'trialing', trial_end: 1_805_000_000,
+      metadata: { cofre_paid_period_extended: '2026-10-29T00:00:00.000Z' },
+    } as any), PRICE_IDS);
+    expect(out.status).toBe('active');
+    expect(out.trialEnd).toBeNull();
+    expect(out.currentPeriodEnd).toEqual(new Date(1_805_000_000 * 1000));
+    // A real trial, no stamp: unchanged.
+    expect(mapStripeSubscription(fakeSub({ priceId: 'price_pro_month', status: 'trialing', metadata: {} } as any), PRICE_IDS).status).toBe('trialing');
+  });
+
   it('carries cancelAtPeriodEnd through unchanged', () => {
     const out = mapStripeSubscription(fakeSub({ priceId: 'price_pro_month', cancel_at_period_end: true } as any), PRICE_IDS);
     expect(out.cancelAtPeriodEnd).toBe(true);

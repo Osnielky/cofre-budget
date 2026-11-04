@@ -180,6 +180,24 @@ limits them today, and what was done:
   now. Local prices (EUR, INR) are a Stripe Prices change plus `PLAN_PRICES`
   per currency, later.
 
+## Billing follow-ups (2026-11-04)
+
+- **Upgrade during a late-payment extension** — small. While the renewal date is
+  moved with Stripe's `trial_end` (`late-payment.ts`), Stripe treats the subscription
+  as trialing: `switchTier`'s `always_invoice` update charges nothing until the
+  extension ends, but `previewPlanChange` still shows a prorated charge for today.
+  Either preview $0 + "first charge on <date>" when the Stripe sub carries the
+  `cofre_paid_period_extended` stamp, or end the extension (`trial_end: 'now'`) on
+  upgrade and charge the full new price today.
+- **Stripe dashboard settings to verify** — Billing → Subscriptions and emails:
+  "Manage failed payments" must leave the subscription payable (mark unpaid, not
+  cancel) or late recovery from Cofre is impossible; "trial ending" customer
+  emails must stay off (an extension is a Stripe trial internally).
+- **Decline reasons for Link** — Stripe returns only "The payment failed." for
+  Link / bank declines; the logged `decline_code` (WARNING, `billing.operation`)
+  is the only clue. If it stays empty for Link, read the PaymentIntent's
+  `last_payment_error` in `payOverdue` and log that instead.
+
 ## Plaid Investments follow-ups (2026-10-28)
 
 Spec: [docs/superpowers/specs/2026-10-28-plaid-investments-design.md](superpowers/specs/2026-10-28-plaid-investments-design.md).

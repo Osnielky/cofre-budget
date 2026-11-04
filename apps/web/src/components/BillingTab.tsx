@@ -95,7 +95,7 @@ export default function BillingTab() {
       if (!res.ok) throw new Error(typeof body?.message === 'string' ? body.message : 'The payment could not be taken.');
       if (body.paid) {
         const covered = typeof body.paidThrough === 'string'
-          ? ` It covers the month that was overdue, so you're paid through ${fmtDate(body.paidThrough)} and the next ${fmtMoney(body.amount, body.currency)} charge is on that date.`
+          ? ` Your plan restarts today: you're paid through ${fmtDate(body.paidThrough)}, and the next ${fmtMoney(body.amount, body.currency)} charge is on that date.`
           : '';
         setRecovery({ paying: false, notice: { tone: 'good', text: `${afterPortal ? 'Payment method saved and the ' : 'The '}overdue ${fmtMoney(body.amount, body.currency)} went through — your plan is active again.${covered}` } });
         try { setSub(await fetchSubscription()); } catch { /* keep */ }

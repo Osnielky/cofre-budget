@@ -181,7 +181,7 @@ export function billingEmailContent(kind: BillingEmailKind, c: BillingEmailConte
         ],
         featuresTitle: `What's included in ${plan}`,
         features: PLAN_FEATURES[c.tier],
-        note: 'This payment covers the period that was overdue, so the renewal date has not moved. The receipt comes separately from Stripe.',
+        note: `Your plan restarts from the day you paid: this payment covers you until ${date(c.currentPeriodEnd)}, which is now your renewal date. The receipt comes separately from Stripe.`,
         cta: { label: 'Open Cofre', href: `${c.appUrl}/dashboard` },
       };
 

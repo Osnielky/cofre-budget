@@ -5,7 +5,8 @@ import { Repository } from 'typeorm';
 import Stripe from 'stripe';
 import { User } from '../users/user.entity';
 import { Subscription } from './subscription.entity';
-import { mapStripeSubscription, PriceIdMap } from './billing.mapping';
+import { mapStripeSubscription, PriceIdMap, type MappedSubscription } from './billing.mapping';
+import { extendedPeriodEnd, PAID_EXTENSION_METADATA_KEY } from './late-payment';
 import { timed } from '../common/logging/timed';
 import { log } from '../common/logging/log';
 import { describePaymentFailure } from './payment-failure';
@@ -98,14 +99,21 @@ export class BillingService {
     return { url: session.url };
   }
 
-  async syncFromStripeSubscription(stripeCustomerId: string, sub: Stripe.Subscription): Promise<void> {
+  async syncFromStripeSubscription(stripeCustomerId: string, sub: Stripe.Subscription): Promise<MappedSubscription | null> {
     const user = await this.users.findOneBy({ stripeCustomerId });
     if (!user) {
       this.logger.warn(`No local user for Stripe customer ${stripeCustomerId} — ignoring webhook`);
-      return;
+      return null;
     }
-    const mapped = mapStripeSubscription(sub, this.priceIds);
+    let mapped = mapStripeSubscription(sub, this.priceIds);
     const previous = await this.subs.findOneBy({ userId: user.id });
+
+    // Recovered from past due (paid from Cofre, the portal, the hosted invoice or a
+    // Stripe retry alike): the paid period now starts on the day it was paid.
+    if (previous?.status === 'past_due' && previous.pastDueSince && mapped.status === 'active' && sub.status === 'active' && mapped.currentPeriodEnd) {
+      const extended = await this.extendPaidPeriod(sub, mapped.currentPeriodEnd, previous.pastDueSince);
+      if (extended) { sub = extended; mapped = mapStripeSubscription(sub, this.priceIds); }
+    }
 
     /* The past-due clock starts on the first webhook that reports it and runs until
        the status changes; a recovered payment (active again) restores the plan below
@@ -132,6 +140,31 @@ export class BillingService {
     );
     await this.users.update(user.id, { plan });
     await this.sendBillingEmail(user, previous, mapped, sub);
+    return mapped;
+  }
+
+  /**
+   * Moves the renewal date out by the time the subscription spent past due, so a
+   * late payment buys a full period from the day it was paid (late-payment.ts).
+   * A failure here is logged and the recovery stands on Stripe's own dates.
+   */
+  private async extendPaidPeriod(sub: Stripe.Subscription, currentPeriodEnd: Date, pastDueSince: Date): Promise<Stripe.Subscription | null> {
+    const newEnd = extendedPeriodEnd(currentPeriodEnd, pastDueSince);
+    if (!newEnd) return null;
+    try {
+      const updated = await timed('stripe', 'subscriptions.update', () => this.stripe.subscriptions.update(sub.id, {
+        trial_end: Math.floor(newEnd.getTime() / 1000),
+        proration_behavior: 'none',
+        metadata: { [PAID_EXTENSION_METADATA_KEY]: pastDueSince.toISOString() },
+      }));
+      log('INFO', 'Late payment: paid period moved to the payment date', {
+        billing: { operation: 'extendPaidPeriod', lateDays: Math.round((Date.now() - pastDueSince.getTime()) / 86_400_000) },
+      });
+      return updated;
+    } catch (err) {
+      this.logger.error('Late payment: could not move the paid period — keeping Stripe\'s dates', err as Error);
+      return null;
+    }
   }
 
   /**
@@ -368,16 +401,14 @@ export class BillingService {
       throw err;
     }
     const fresh = await timed('stripe', 'subscriptions.retrieve', () => this.stripe.subscriptions.retrieve(stripeSub.id));
-    await this.syncFromStripeSubscription(customer, fresh);
+    // The sync moves the renewal date to a full period from today (late-payment.ts).
+    const synced = await this.syncFromStripeSubscription(customer, fresh);
     const ok = paid.status === 'paid';
-    // Stripe does not restart the month on a late payment: the invoice covers the
-    // period it was issued for, so the renewal date stays where it was. Say so.
-    const periodEnd = fresh.items.data[0]?.current_period_end;
     return {
       paid: ok,
       amount: paid.amount_paid / 100,
       currency: paid.currency,
-      paidThrough: typeof periodEnd === 'number' ? new Date(periodEnd * 1000).toISOString() : null,
+      paidThrough: synced?.currentPeriodEnd?.toISOString() ?? null,
       message: ok ? 'Payment received — your plan is active again.' : 'The payment is still processing; your plan comes back as soon as it settles.',
     };
   }

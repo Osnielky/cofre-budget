@@ -111,6 +111,6 @@ describe('billingEmailFor — recovery', () => {
     expect(c.subject).toBe('Payment received — your Cofre Pro plan is back');
     expect(Object.fromEntries(c.rows)['Paid through']).toBe('November 29, 2026');
     expect(Object.fromEntries(c.rows)['Next payment']).toBe('$4.99 on November 29, 2026');
-    expect(c.note).toMatch(/renewal date has not moved/);
+    expect(c.note).toMatch(/restarts from the day you paid: this payment covers you until November 29, 2026, which is now your renewal date/);
   });
 });

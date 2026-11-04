@@ -115,6 +115,64 @@ describe('BillingService.syncFromStripeSubscription', () => {
     expect(user.plan).toBe('elite');
   });
 
+  describe('late payment moves the renewal date', () => {
+    const DAY = 86_400_000;
+    function stubStripe() {
+      const updates: any[] = [];
+      (service as any).stripe = {
+        subscriptions: {
+          update: async (id: string, params: any) => {
+            updates.push({ id, params });
+            return fakeSub({ status: 'trialing', trial_end: params.trial_end, metadata: params.metadata });
+          },
+        },
+      };
+      return updates;
+    }
+
+    it('after a recovery, extends the paid period by the time spent past due — whoever collected the payment', async () => {
+      const pastDueSince = new Date(Date.now() - 10 * DAY);
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'past_due', trial_end: null }) as any);
+      await ds.getRepository(Subscription).update({ userId }, { pastDueSince });
+      const updates = stubStripe();
+      mail.sent = [];
+      // Stripe's retry (or the portal) paid the old invoice: the webhook says active again.
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'active', trial_end: null }) as any);
+      expect(updates).toHaveLength(1);
+      const expectedEnd = 1_800_000_000 + Math.round((Date.now() - pastDueSince.getTime()) / 1000);
+      expect(Math.abs(updates[0].params.trial_end - expectedEnd)).toBeLessThan(5);
+      expect(updates[0].params.proration_behavior).toBe('none');
+      expect(updates[0].params.metadata).toEqual({ cofre_paid_period_extended: pastDueSince.toISOString() });
+      const row = await ds.getRepository(Subscription).findOneByOrFail({ userId });
+      expect(row.status).toBe('active');
+      expect(row.trialEnd).toBeNull();
+      expect(row.pastDueSince).toBeNull();
+      expect(Math.abs(row.currentPeriodEnd!.getTime() / 1000 - expectedEnd)).toBeLessThan(5);
+      expect((await ds.getRepository(User).findOneByOrFail({ id: userId })).plan).toBe('pro');
+      expect(mail.sent.map((m) => m.content.subject)).toEqual(['Payment received — your Cofre Pro plan is back']);
+      // Stripe then reports the extension itself: nothing more happens.
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'trialing', trial_end: updates[0].params.trial_end, metadata: updates[0].params.metadata }) as any);
+      expect(updates).toHaveLength(1);
+      expect((await ds.getRepository(Subscription).findOneByOrFail({ userId })).status).toBe('active');
+      expect(mail.sent).toHaveLength(1);
+    });
+
+    it('leaves the dates alone when the plan was not past due, and when Stripe refuses the move', async () => {
+      const updates = stubStripe();
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'trialing' }) as any);
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'active', trial_end: null }) as any);
+      expect(updates).toHaveLength(0);
+      // Past due, then Stripe errors on the update: the recovery still lands on Stripe's dates.
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'past_due', trial_end: null }) as any);
+      await ds.getRepository(Subscription).update({ userId }, { pastDueSince: new Date(Date.now() - 3 * DAY) });
+      (service as any).stripe = { subscriptions: { update: async () => { throw new Error('boom'); } } };
+      await service.syncFromStripeSubscription('cus_123', fakeSub({ status: 'active', trial_end: null }) as any);
+      const row = await ds.getRepository(Subscription).findOneByOrFail({ userId });
+      expect(row.status).toBe('active');
+      expect(row.currentPeriodEnd).toEqual(new Date(1_800_000_000 * 1000));
+    });
+  });
+
   describe('past-due downgrade (24 h)', () => {
     const sync = (o: any = {}) => service.syncFromStripeSubscription('cus_123', fakeSub(o) as any);
     const plan = async () => (await ds.getRepository(User).findOneByOrFail({ id: userId })).plan;
@@ -154,6 +212,7 @@ describe('BillingService.syncFromStripeSubscription', () => {
     });
 
     it('restores the plan and clears the clock when Stripe collects the payment', async () => {
+      (service as any).stripe = { subscriptions: { update: async (_id: string, p: any) => fakeSub({ status: 'trialing', trial_end: p.trial_end, metadata: p.metadata }) } };
       await sync({ status: 'active' });
       await sync({ status: 'past_due' });
       await agePastDue(30);
@@ -162,6 +221,8 @@ describe('BillingService.syncFromStripeSubscription', () => {
       await sync({ status: 'active' });
       expect(await plan()).toBe('pro');
       expect((await row()).pastDueSince).toBeNull();
+      // 30 hours late → the paid period runs 30 hours longer than Stripe's own date.
+      expect(Math.abs((await row()).currentPeriodEnd!.getTime() - (1_800_000_000 * 1000 + 30 * HOUR))).toBeLessThan(5000);
     });
 
     it('a repeat past-due webhook after the grace window does not hand the tier back', async () => {
@@ -217,7 +278,7 @@ describe('BillingService.syncFromStripeSubscription', () => {
 
     it('still saves the subscription when the email fails to send', async () => {
       mail.fail = true;
-      await expect(sync({ status: 'active' })).resolves.toBeUndefined();
+      await expect(sync({ status: 'active' })).resolves.toMatchObject({ status: 'active' });
       const user = await ds.getRepository(User).findOneByOrFail({ id: userId });
       expect(user.plan).toBe('pro');
     });
@@ -521,25 +582,35 @@ describe('BillingService.payOverdue', () => {
     const calls: string[] = [];
     let status = opts.status ?? 'past_due';
     const item = { id: 'si_d', price: { id: 'price_pro_month', unit_amount: 499, currency: 'usd' }, current_period_end: 1_795_000_000 };
+    const updates: any[] = [];
     (service as any).stripe = {
-      subscriptions: { retrieve: async () => ({ id: 'sub_d', customer: 'cus_d', status, cancel_at_period_end: false, trial_end: null, items: { data: [item] }, schedule: null }) },
+      subscriptions: {
+        retrieve: async () => ({ id: 'sub_d', customer: 'cus_d', status, cancel_at_period_end: false, trial_end: null, items: { data: [item] }, schedule: null }),
+        update: async (id: string, params: any) => { updates.push(params); return { id, customer: 'cus_d', status: 'trialing', cancel_at_period_end: false, trial_end: params.trial_end, metadata: params.metadata, items: { data: [item] }, schedule: null }; },
+      },
       invoices: {
         list: async () => { calls.push('invoices.list'); return { data: opts.invoices ?? [{ id: 'in_old', created: 2, amount_due: 499 }, { id: 'in_new', created: 3, amount_due: 499 }] }; },
         pay: async (id: string) => { calls.push(`invoices.pay:${id}`); if (opts.payError) throw opts.payError; status = 'active'; return { id, status: 'paid', amount_paid: 499, currency: 'usd' }; },
       },
     };
-    return { service, ds, userId: user.id, calls, mail };
+    return { service, ds, userId: user.id, calls, mail, updates };
   }
 
   it('pays the oldest open invoice, restores the plan at once and emails that the plan is back', async () => {
-    const { service, ds, userId, calls, mail } = await setup();
+    const { service, ds, userId, calls, mail, updates } = await setup();
     const out = await service.payOverdue(userId);
-    expect(out).toMatchObject({ paid: true, amount: 4.99, currency: 'usd', paidThrough: new Date(1_795_000_000 * 1000).toISOString() });
+    expect(out).toMatchObject({ paid: true, amount: 4.99, currency: 'usd' });
     expect(calls).toEqual(['invoices.list', 'invoices.pay:in_old']);
+    // Past due since Oct 29: the paid month now starts today, so the renewal date moves out by that much.
+    const expectedEnd = 1_795_000_000 + Math.round((Date.now() - new Date('2026-10-29T00:00:00Z').getTime()) / 1000);
+    expect(updates).toHaveLength(1);
+    expect(Math.abs(updates[0].trial_end - expectedEnd)).toBeLessThan(5);
+    expect(Math.abs(new Date(out.paidThrough!).getTime() / 1000 - expectedEnd)).toBeLessThan(5);
     expect((await ds.getRepository(User).findOneByOrFail({ id: userId })).plan).toBe('pro');
     const row = await ds.getRepository(Subscription).findOneByOrFail({ userId });
     expect(row.status).toBe('active');
     expect(row.pastDueSince).toBeNull();
+    expect(row.currentPeriodEnd).toEqual(new Date(out.paidThrough!));
     expect(mail.sent.map((m) => m.content.subject)).toEqual(['Payment received — your Cofre Pro plan is back']);
   });
 

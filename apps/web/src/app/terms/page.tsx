@@ -81,7 +81,8 @@ export default function TermsOfServicePage() {
         <li><B>Price changes.</B> We may change prices. We&rsquo;ll notify existing subscribers by email before a
           change takes effect, and it will apply from your next billing period.</li>
         <li><B>Payment processing.</B> Payments are processed by Stripe. If a payment fails, we may limit paid
-          features until it goes through.</li>
+          features until it goes through. When a failed payment is paid later, your paid period starts on the
+          day it is paid, and your renewal date moves accordingly.</li>
       </ul>
 
       <H2>7. Acceptable use</H2>
