@@ -141,21 +141,19 @@ export default function CardsPage() {
 
           {!loading && deck.length > 0 && (
             <div className="flex flex-col gap-5">
-              {/* Phones: the deck first, its detail, then the summary. From xl the summary leads and deck + detail sit side by side. */}
+              {/* One column at every width: the deck across the top, the picked card's detail under it, then the summary. */}
+              <div className="min-w-0">
+                <CardDeck deck={deck} index={index} onSelect={select} />
+              </div>
+              {selected && (
+                <SelectedCardPanel entry={selected} direction={direction} onEdit={setEditing} onEnable={enable} />
+              )}
               {cards.length > 0 && (
-                <div className="order-2 xl:order-1 grid grid-cols-1 xl:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
                   <TotalUtilization cards={cards} />
                   <StatTiles cards={cards} today={today} />
                 </div>
               )}
-              <div className="order-1 xl:order-2 grid grid-cols-1 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-5 items-start">
-                <div className="xl:sticky xl:top-0 min-w-0">
-                  <CardDeck deck={deck} index={index} onSelect={select} />
-                </div>
-                {selected && (
-                  <SelectedCardPanel entry={selected} direction={direction} onEdit={setEditing} onEnable={enable} />
-                )}
-              </div>
             </div>
           )}
 

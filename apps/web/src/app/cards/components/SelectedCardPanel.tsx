@@ -121,7 +121,7 @@ function CreditDetail({ card, reduce, onEdit, onEnable }: { card: CardView; redu
         <Tile label="Rewards" i={2} reduce={reduce}>{card.rewardsBalance === null ? '—' : <Money value={card.rewardsBalance} />}</Tile>
       </div>
 
-      <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-sm pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
+      <dl className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-x-4 gap-y-3 text-sm pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
         <Fact i={3} reduce={reduce} label="Purchase APR" value={purchase === null ? '—' : `${purchase}%`}
           sub={monthlyInterest !== null ? `≈ $${fmt(monthlyInterest)} interest / month` : undefined} />
         <Fact i={4} reduce={reduce} label="Promo APR" value={promo === null ? '—' : `${promo}%`}
