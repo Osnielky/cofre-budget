@@ -27,9 +27,9 @@ describe('AiReadToolsService', () => {
 
   // Real constructor order: (txRepo, transactions, categories, budgets, netWorthGoal,
   // bankAccounts, debts, creditCards). Only what each test touches is real.
-  function makeService(creditCards: any = {}, projects: any = {}) {
+  function makeService(creditCards: any = {}, projects: any = {}, extra: { categories?: any; budgets?: any; netWorthGoal?: any; bankAccounts?: any } = {}) {
     return new AiReadToolsService(
-      ds.getRepository(Transaction), {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, creditCards, projects as any,
+      ds.getRepository(Transaction), {} as any, extra.categories ?? {}, extra.budgets ?? {}, extra.netWorthGoal ?? {}, extra.bankAccounts ?? {}, {} as any, creditCards, projects as any,
     );
   }
 
@@ -110,6 +110,112 @@ describe('AiReadToolsService', () => {
 
   it("an account filter never reaches another user's transactions", async () => {
     expect(await makeService().getTransactions('u2', { accountId: grey.id })).toEqual([]);
+  });
+
+  describe('getSpendingSummary', () => {
+    /** Adds the rows every grouping test shares: two categories, a transfer, savings, a debt
+     *  payment, a trade and a tracking-account row — only the first two are spending. */
+    async function seedSpending() {
+      const cats = ds.getRepository(Category);
+      const groceries = await cats.save(cats.create({ userId: 'u1', name: 'Groceries', type: 'expense', icon: '🛒', color: '#4FBF7F' }));
+      const transfer = await cats.save(cats.create({ userId: 'u1', name: 'Internal Transfer', type: 'transfer', icon: '↔', color: '#999' }));
+      const savings = await cats.save(cats.create({ userId: 'u1', name: 'Investments', type: 'savings', icon: '📈', color: '#9B6DFF' }));
+      const accounts = ds.getRepository(BankAccount);
+      const schwab = await accounts.save(accounts.create({ userId: 'u1', bankName: 'Schwab', accountName: 'Individual', accountType: 'investment', balance: 1 }));
+      const tx = ds.getRepository(Transaction);
+      await tx.update({ userId: 'u1', name: 'Publix' }, { categoryId: groceries.id, merchantName: 'Publix' });
+      await tx.save(tx.create({ userId: 'u1', bankAccountId: red.id, name: 'PUBLIX #112', merchantName: 'Publix', amount: -22, date: '2026-10-20', categoryId: groceries.id }));
+      await tx.save(tx.create({ userId: 'u1', bankAccountId: grey.id, name: 'Transfer to savings', amount: -500, date: '2026-10-10', categoryId: transfer.id }));
+      await tx.save(tx.create({ userId: 'u1', bankAccountId: grey.id, name: 'Schwab deposit', amount: -300, date: '2026-10-11', categoryId: savings.id }));
+      await tx.save(tx.create({ userId: 'u1', bankAccountId: grey.id, name: 'Zelle to Osmany', amount: -200, date: '2026-10-12', debtId: 'debt-1' }));
+      await tx.save(tx.create({ userId: 'u1', bankAccountId: schwab.id, name: 'BUY VTI', amount: -1000, date: '2026-10-13', plaidCategory: ['buy', 'buy'] }));
+      await tx.save(tx.create({ userId: 'u1', bankAccountId: schwab.id, name: 'ADR fee', amount: -3, date: '2026-10-14' }));
+      await tx.save(tx.create({ userId: 'u1', name: 'Rent', amount: -1200, date: '2026-09-01' }));
+    }
+
+    it('groups the period\'s spending by category, largest first, with only cash-flow rows', async () => {
+      await seedSpending();
+      const out = await makeService().getSpendingSummary('u1', { startDate: '2026-10-01', endDate: '2026-10-31', groupBy: 'category' });
+      expect(out.groups).toEqual([
+        { name: 'Groceries', total: 80, count: 2 },
+        { name: 'Uncategorized', total: 40, count: 1 },
+      ]);
+      expect(out.total).toBe(120);
+      expect(out.period).toEqual({ startDate: '2026-10-01', endDate: '2026-10-31' });
+    });
+
+    it('groups by merchant, falling back to the transaction name', async () => {
+      await seedSpending();
+      const out = await makeService().getSpendingSummary('u1', { startDate: '2026-10-01', endDate: '2026-10-31', groupBy: 'merchant' });
+      expect(out.groups).toEqual([
+        { name: 'Publix', total: 80, count: 2 },
+        { name: 'Chevron', total: 40, count: 1 },
+      ]);
+    });
+
+    it('groups by month in calendar order', async () => {
+      await seedSpending();
+      const out = await makeService().getSpendingSummary('u1', { startDate: '2026-09-01', endDate: '2026-10-31', groupBy: 'month' });
+      expect(out.groups).toEqual([
+        { name: '2026-09', total: 1200, count: 1 },
+        { name: '2026-10', total: 120, count: 3 },
+      ]);
+    });
+
+    it('folds everything past the top 25 groups into Other', async () => {
+      const tx = ds.getRepository(Transaction);
+      for (let i = 0; i < 30; i++) {
+        await tx.save(tx.create({ userId: 'u1', name: `Shop ${String(i).padStart(2, '0')}`, amount: -(100 - i), date: '2026-10-15' }));
+      }
+      const out = await makeService().getSpendingSummary('u1', { startDate: '2026-10-15', endDate: '2026-10-15', groupBy: 'merchant' });
+      expect(out.groups).toHaveLength(26);
+      expect(out.groups[0]).toEqual({ name: 'Shop 00', total: 100, count: 1 });
+      expect(out.groups[25]).toEqual({ name: 'Other (5 more)', total: 71 + 72 + 73 + 74 + 75, count: 5 });
+    });
+
+    it('never counts another user\'s rows', async () => {
+      const out = await makeService().getSpendingSummary('u2', { startDate: '2026-10-01', endDate: '2026-10-31', groupBy: 'category' });
+      expect(out).toMatchObject({ total: 0, groups: [] });
+    });
+  });
+
+  describe('getSnapshot', () => {
+    it('gathers the accounts, goal, month totals and category names for the prompt', async () => {
+      const cats = ds.getRepository(Category);
+      const groceries = await cats.save(cats.create({ userId: 'u1', name: 'Groceries', type: 'expense', icon: '🛒', color: '#4FBF7F' }));
+      const salary = await cats.save(cats.create({ userId: 'u1', name: 'Salary', type: 'income', icon: '💼', color: '#4BA8D8' }));
+      const service = makeService({}, {}, {
+        categories: { findAllByUser: async () => [groceries, salary] },
+        budgets: { findWithSpent: async (_u: string, month: string) => (month === '2026-10' ? [
+          { amount: '300', spent: 98, category: { type: 'expense' }, projectCategoryId: null },
+          { amount: '5000', spent: 0, category: { type: 'income' }, projectCategoryId: null },
+          { amount: '900', spent: 10, category: null, projectCategoryId: 'pc1' },
+        ] : []) },
+        netWorthGoal: { get: async () => ({ target: 1_000_000, current: 2255.28, projectedDate: null }) },
+        bankAccounts: { findAllByUser: async () => [grey, red] },
+      });
+      const snap = await service.getSnapshot('u1', '2026-10');
+      expect(snap.accounts).toEqual([
+        { name: 'GREY BOA', type: 'credit', balance: 1645.96 },
+        { name: 'RED BOA', type: 'credit', balance: 630.32 },
+      ]);
+      expect(snap.netWorth).toEqual({ current: 2255.28, target: 1_000_000, projectedDate: null });
+      expect(snap.month).toEqual({ key: '2026-10', income: 20, spending: 98, budgeted: 300, budgetSpent: 98 });
+      expect(snap.categories).toEqual([{ name: 'Groceries', type: 'expense' }, { name: 'Salary', type: 'income' }]);
+      expect(snap.focusMonth).toBe('2026-10');
+    });
+
+    it('still answers when the goal lookup fails', async () => {
+      const service = makeService({}, {}, {
+        categories: { findAllByUser: async () => [] },
+        budgets: { findWithSpent: async () => [] },
+        netWorthGoal: { get: async () => { throw new Error('no snapshot table'); } },
+        bankAccounts: { findAllByUser: async () => [] },
+      });
+      const snap = await service.getSnapshot('u1', null);
+      expect(snap.netWorth).toBeNull();
+      expect(snap.month?.income).toBe(0);
+    });
   });
 
   it('get_credit_cards combines cards and the card profile', async () => {

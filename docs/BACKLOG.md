@@ -251,6 +251,28 @@ count, stat and Ask Cofre's default list (`lib/transactions/trades.ts`).
   each once) before inserting. Until then the review dialog's merge is safe for
   checking / credit only; a brokerage with imported trades should be cleared first.
 
+## Ask Cofre advisor follow-ups (2026-11-05)
+
+Shipped: advisor-scoped system prompt (declines anything that is not this
+user's finances), cached prefix, per-turn `<snapshot>`, 20-message history
+window, `get_spending_summary`, Sonnet 5.5 at low effort, token/cache log line.
+Checks: `docs/ask-cofre-eval.md`.
+
+- **Measure before trusting the settings.** Run the eval list on the demo
+  account and read `cacheReadInputTokens` in the `Ask Cofre turn` log. If low
+  effort misses tool calls or reads shallow, move to `medium`; if the snapshot
+  is routinely ignored, shorten it or move the category list into a tool.
+- **Recurring charges tool.** "Which subscriptions can I cancel?" still relies
+  on the model spotting repeats in a merchant summary. A `get_recurring`
+  tool over the recurring-rules module (merchant, cadence, amount, last seen)
+  would make that one call and exact.
+- **Snapshot for Elite power users.** The snapshot lists every category name;
+  a user with 60+ categories pays ~300 extra tokens a turn. Cap the list or
+  group by type if it shows up in the usage numbers.
+- **Automated eval.** The hand-run list could become a vitest file that calls
+  the model on the demo seed and grades decline / number-sourcing behaviour
+  with a judge — only worth it once the prompt changes more than monthly.
+
 ## Monarch gap list (2026-10-27)
 
 What Monarch Money offers that Cofre does not, from monarchmoney.com/features

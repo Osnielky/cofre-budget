@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
 import { betaTool } from '@anthropic-ai/sdk/helpers/beta/json-schema';
 import { AiConversationsService } from './ai-conversations.service';
@@ -6,21 +6,40 @@ import { AiReadToolsService } from './ai-read-tools.service';
 import { AiProposeToolsService } from './ai-propose-tools.service';
 import type { AiMessageWidget, SavingsTrendWidgetData, SafeToSpendWidgetData } from './ai-message.entity';
 import { timed } from '../common/logging/timed';
+import { buildSnapshot, composeTurn } from './ai-snapshot';
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = 'claude-sonnet-5-5';
 const MAX_TOKENS = 8192;
+/** Earlier messages sent with each turn. The snapshot carries the current state, so old
+ *  turns only matter for conversational continuity. */
+const HISTORY_WINDOW = 20;
 
-const SYSTEM_PROMPT = `You are Cofre's personal finance coach. Your job is to help this user reach $1,000,000 in net worth as soon as realistically possible — surface wasteful spending, point out where they're ahead or behind pace, and give direct, specific, encouraging guidance, not generic platitudes. You can see their transactions, categories, budgets, accounts, debts, and net-worth goal, and answer questions about them using your tools — never guess numbers, always look them up. Categories of type 'savings' (such as Investments) hold money the user moved into savings or investments: it is still theirs, so never count it as spending — treat it as progress toward the goal.
+/**
+ * Stable for every user and every turn — it is the cached prefix (tools render before
+ * it, so the cache block on this text covers them too). Anything per-user or per-turn
+ * goes in the <snapshot> block of the user message (ai-snapshot.ts), never here.
+ */
+const SYSTEM_PROMPT = `You are Cofre, the personal finance advisor built into the Cofre budget app. You advise one person: the user you are talking to. Everything you say is about their own money — the accounts, transactions, categories, budgets, debts, credit cards, projects and net-worth goal that Cofre holds for them. Your purpose is to help them waste less, keep more, pay less interest and reach $1,000,000 in net worth sooner.
 
-Credit cards: get_credit_cards gives each card's APRs, limit, utilization, statement, minimum payment, due date and the user's card goals; get_transactions returns each transaction's account and can filter by accountId, so you can compare spending per card. Use only the numbers these tools return — never invent an APR, limit, fee or reward rate. When a card lists something under "missing", say so and ask the user for it (or point them to the Credit Cards page). You do not have any card's rewards program or fees, so don't claim one card earns more on a category unless the user tells you the rewards terms. Keeping each card and the total under 30% utilization helps credit scores; paying the highest-APR balance first minimizes interest.
+# Scope
+In scope: their spending, income, saving rate, budgets, cash flow, subscriptions and recurring charges, credit cards and interest, debts, net worth and the pace toward the goal, and how a purchase or decision they describe would affect those numbers.
+Out of scope — decline in one sentence and offer the nearest thing you can do with their data: anything not about this user's finances (general knowledge, other people's money, coding, writing, trivia); picking specific stocks, funds, crypto or timing the market; tax filing, legal or insurance advice beyond general awareness; and anything that would need information Cofre does not hold. You are an educational tool, not a licensed financial, tax or legal advisor — say so when a decision is large enough to warrant a professional.
 
-Projects and debts: besides budget categories, the user files some transactions under a PROJECT (a side venture, flip, trading account or small business — get_projects lists each one with the categories it accepts and whether it is closed) or against a DEBT (money lent to or owed to a specific person — get_debts). A project row is categorized by its project, not by a budget category, and a debt payment is categorized by the debt, so neither counts as uncategorized. Before you categorize anything, call get_projects and get_debts: if a merchant or person plainly matches an active project (for example a prop-firm or trading fee for a "Trading" project, parts for a car flip, a tenant's rent for a property) propose propose_link_to_project with the matching project category instead of a budget category; if a deposit comes from someone who owes the user money, or a payment goes to someone the user owes, propose propose_link_to_debt instead of calling it income or spending. Only suggest a brand-new budget category when no project, debt or existing category fits.
+# How you answer
+Every message starts with a <snapshot> block: today's date, the month the user is looking at, their accounts and balances, net worth, the month's income / spending / budgets, and their category names. Treat it as fact and answer from it directly when it already holds the number. Use "the month the user is looking at" as the period whenever they say "this month" or give no period.
+Every figure you state comes from the snapshot or a tool result — never estimate, round from memory, or invent an amount, rate, fee, date or merchant. If the data is not there, say what is missing and how they can add it (connect the account, set the budget, enter the card's APR).
+Pick the smallest tool call that answers: get_spending_summary for "where did my money go" / "how much on X" / "biggest expenses" (by category, merchant or month); get_budgets for budget status; get_transactions only when the user needs the individual rows (a specific merchant, categorizing, something to link). Combine calls in one turn when you need several.
+Lead with the number, then the one or two insights that matter, then the single most useful next step. Be direct and specific; no generic tips, no lists of everything you could say. Keep replies short and conversational — under 120 words unless the user asks for detail. Use plain Markdown; a small table only when comparing several items.
 
-You can also propose changes: categorizing transactions, creating a category, setting a budget, linking transactions to a project, recording transactions as debt payments, or setting the net-worth goal's target date. You never make these changes directly — calling a propose_* tool only creates a pending proposal that the user must explicitly confirm in the UI. Say so plainly ("I've proposed..."), never claim to have made a change yourself. If you want to propose more than one change, do them one at a time across separate turns rather than multiple propose-tool calls in a single reply.
+# Money rules
+Categories of type 'savings' (such as Investments) hold money the user moved into savings or investments: it is still theirs, so never count it as spending — it is progress toward the goal. Rows with a 'transfer' category, debt payments, and anything on a tracking account (investment, mortgage, other asset or liability) are not income or spending either. Brokerage buys and sells are trades, not spending.
 
-There is no tool for moving money, paying bills, or anything outside what's listed above — don't imply you can.
+Credit cards: get_credit_cards gives each card's APRs, limit, utilization, statement, minimum payment, due date and the user's card goals; get_transactions can filter by accountId to compare spending per card. When a card lists something under "missing", say so and point them to the Cards page. You do not know any card's rewards program or fees — never claim one card earns more unless the user gives the terms. Under 30% utilization per card and overall helps credit scores; paying the highest-APR balance first minimizes interest.
 
-Keep answers concise and conversational.`;
+Projects and debts: the user files some transactions under a PROJECT (a side venture, flip, trading account or small business — get_projects lists each one with the categories it accepts and whether it is closed) or against a DEBT (money lent to or owed to a person — get_debts). A project row is categorized by its project and a debt payment by its debt, so neither is uncategorized. Before you categorize anything, call get_projects and get_debts: if a merchant or person plainly matches an active project, propose propose_link_to_project with the matching project category instead of a budget category; if a deposit comes from someone who owes the user, or a payment goes to someone they owe, propose propose_link_to_debt instead of calling it income or spending. Only suggest a brand-new budget category when no project, debt or existing category fits.
+
+# Changes
+You can propose changes: categorizing transactions, creating a category, setting a budget, linking transactions to a project, recording debt payments, or setting the goal's target date. A propose_* call only creates a pending proposal the user confirms in the UI — say "I've proposed…", never claim you changed something. One proposal per turn. There is no tool for moving money, paying bills or anything else — never imply you can.`;
 
 export interface SendMessageParams {
   userId: string;
@@ -37,6 +56,7 @@ export interface SendMessageResult {
 
 @Injectable()
 export class AiChatService {
+  private readonly logger = new Logger(AiChatService.name);
   private client = new Anthropic();
 
   constructor(
@@ -70,6 +90,20 @@ export class AiChatService {
           },
         },
         run: async (args) => JSON.stringify(await this.readTools.getTransactions(userId, args as any)),
+      }),
+      betaTool({
+        name: 'get_spending_summary',
+        description: 'Spending in a date range, grouped by category, merchant or month: each group\'s total and count plus the period total, largest first (months in calendar order), capped at 25 groups plus Other. Money out only, with transfers, savings, debt payments, trades and tracking accounts left out. Use this for "where did my money go", "how much on X", "biggest expenses", "spending by month" instead of listing transactions.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            startDate: { type: 'string', description: 'YYYY-MM-DD, inclusive' },
+            endDate: { type: 'string', description: 'YYYY-MM-DD, inclusive' },
+            groupBy: { type: 'string', enum: ['category', 'merchant', 'month'] },
+          },
+          required: ['startDate', 'endDate', 'groupBy'],
+        },
+        run: async (args) => JSON.stringify(await this.readTools.getSpendingSummary(userId, args as any)),
       }),
       betaTool({
         name: 'get_categories',
@@ -245,16 +279,23 @@ export class AiChatService {
       }),
     ];
 
-    const history = await this.conversations.historyForModel(conversationId, userId);
-    const monthNote = monthContext ? `[The user is currently focused on ${monthContext}.] ` : '';
-    const messages = [...history.slice(0, -1), { role: 'user' as const, content: `${monthNote}${userText}` }];
+    // The controller stored the user's message before calling us, so the history ends
+    // with it; composeTurn re-sends that last message with the fresh snapshot in front.
+    const [history, snapshot] = await Promise.all([
+      this.conversations.historyForModel(conversationId, userId),
+      this.readTools.getSnapshot(userId, monthContext ?? null),
+    ]);
+    const stored = history.length && history[history.length - 1].role === 'user' ? history : [...history, { role: 'user' as const, content: userText }];
+    const messages = composeTurn(stored, buildSnapshot(snapshot), HISTORY_WINDOW);
 
     const runner = this.client.beta.messages.toolRunner({
       model: MODEL,
       max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
+      // One breakpoint after the stable prefix (tools + this text); the snapshot and the
+      // conversation come after it, so every turn and every tool round reads it from cache.
+      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       thinking: { type: 'adaptive' },
-      output_config: { effort: 'medium' },
+      output_config: { effort: 'low' },
       tools,
       messages,
       stream: true,
@@ -272,6 +313,17 @@ export class AiChatService {
       }
       return runner.done();
     }, { slowMs: 30_000 });
+    // Token counts only (never text): cache_read should be most of the input on every
+    // turn after the first — zero means something is breaking the stable prefix.
+    const u = finalMessage.usage;
+    this.logger.log('Ask Cofre turn', {
+      model: MODEL,
+      inputTokens: u.input_tokens,
+      cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
+      cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
+      outputTokens: u.output_tokens,
+      stopReason: finalMessage.stop_reason,
+    });
     const text = finalMessage.content
       .filter((b): b is Anthropic.Beta.Messages.BetaTextBlock => b.type === 'text')
       .map((b) => b.text)

@@ -15,6 +15,7 @@ import type { SavingsTrendWidgetData, SafeToSpendWidgetData } from './ai-message
 import { ProjectsService } from '../projects/projects.service';
 import { CreditCardsService } from '../cards/credit-cards.service';
 import { summarizeCreditCards, type AiCreditCardsSummary } from './ai-credit-cards.summary';
+import { monthKeyOf, type SnapshotInput } from './ai-snapshot';
 
 export interface GetTransactionsArgs {
   startDate?: string;
@@ -35,9 +36,26 @@ export interface GetTransactionsArgs {
 export const NOT_A_TRADE_SQL = "(tx.plaidCategory IS NULL OR NOT (tx.plaidCategory LIKE 'buy,%' OR tx.plaidCategory LIKE 'sell,%' OR tx.plaidCategory IN ('buy', 'sell')))";
 
 function currentMonthKey(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  return monthKeyOf(new Date());
 }
+
+function lastDayOf(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+}
+
+export interface SpendingSummaryArgs {
+  startDate: string;
+  endDate: string;
+  groupBy: 'category' | 'merchant' | 'month';
+}
+
+export interface SpendingGroup { name: string; total: number; count: number }
+
+/** Groups past this many are folded into one "Other (N more)" row. */
+const MAX_GROUPS = 25;
+
+const round2 = (n: number) => +n.toFixed(2);
 
 @Injectable()
 export class AiReadToolsService {
@@ -84,6 +102,92 @@ export class AiReadToolsService {
       debtId: t.debtId ?? null,
       ...(t.plaidCategory?.length && ['buy', 'sell'].includes(t.plaidCategory[0]) ? { trade: `${t.plaidCategory[0]}${t.plaidCategory[1] && t.plaidCategory[1] !== t.plaidCategory[0] ? ` (${t.plaidCategory[1]})` : ''}` } : {}),
     }));
+  }
+
+  /** Cash-flow rows in a date range: the dashboard's `inCashFlow` rule (no transfer / savings
+   *  categories, no debt payments, no tracking accounts) plus no split parents and no trades. */
+  private cashFlowRows(userId: string, startDate: string, endDate: string) {
+    return this.txRepo.createQueryBuilder('tx')
+      .leftJoin('tx.categoryRef', 'cat')
+      .leftJoin('tx.bankAccount', 'ba')
+      .select(['tx.amount', 'tx.date', 'tx.name', 'tx.merchantName'])
+      .addSelect('cat.name', 'categoryName')
+      .where('tx.userId = :userId', { userId })
+      .andWhere('tx.isSplitParent = false')
+      .andWhere('tx.date >= :start AND tx.date <= :end', { start: startDate, end: endDate })
+      .andWhere("(cat.type IS NULL OR cat.type NOT IN ('transfer', 'savings'))")
+      .andWhere('tx.debtId IS NULL')
+      .andWhere('(ba.accountType IS NULL OR ba.accountType NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] })
+      .andWhere(NOT_A_TRADE_SQL)
+      .getRawMany<{ tx_amount: string; tx_date: string; tx_name: string; tx_merchantName: string | null; categoryName: string | null }>();
+  }
+
+  /** Spending in a period, grouped — one small answer to "where does my money go" instead
+   *  of a hundred raw rows. Only money out; income and refunds are left out. */
+  async getSpendingSummary(userId: string, args: SpendingSummaryArgs) {
+    const rows = await this.cashFlowRows(userId, args.startDate, args.endDate);
+    const groups = new Map<string, SpendingGroup>();
+    let total = 0;
+    for (const r of rows) {
+      const amount = Number(r.tx_amount);
+      if (!(amount < 0)) continue;
+      const name = args.groupBy === 'category' ? (r.categoryName ?? 'Uncategorized')
+        : args.groupBy === 'merchant' ? (r.tx_merchantName || r.tx_name)
+          : String(r.tx_date).slice(0, 7);
+      const g = groups.get(name) ?? { name, total: 0, count: 0 };
+      g.total += -amount;
+      g.count += 1;
+      groups.set(name, g);
+      total += -amount;
+    }
+    let list = [...groups.values()].map((g) => ({ ...g, total: round2(g.total) }));
+    list.sort(args.groupBy === 'month' ? (a, b) => a.name.localeCompare(b.name) : (a, b) => b.total - a.total);
+    if (list.length > MAX_GROUPS + 1) {
+      const rest = list.slice(MAX_GROUPS);
+      list = [...list.slice(0, MAX_GROUPS), {
+        name: `Other (${rest.length} more)`,
+        total: round2(rest.reduce((s, g) => s + g.total, 0)),
+        count: rest.reduce((s, g) => s + g.count, 0),
+      }];
+    }
+    return { period: { startDate: args.startDate, endDate: args.endDate }, groupBy: args.groupBy, total: round2(total), groups: list };
+  }
+
+  /** Everything the per-turn snapshot (ai-snapshot.ts) words for the model. Each part is
+   *  gathered on its own so one failing lookup never blocks the chat. */
+  async getSnapshot(userId: string, focusMonth: string | null): Promise<SnapshotInput> {
+    const today = new Date();
+    const month = focusMonth ?? monthKeyOf(today);
+    const settle = async <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch(() => fallback);
+
+    const [accounts, categories, goal, budgets, rows] = await Promise.all([
+      settle(this.bankAccounts.findAllByUser(userId), []),
+      settle(this.categories.findAllByUser(userId), []),
+      settle(this.netWorthGoal.get(userId).then((g) => ({ current: Number(g.current), target: Number(g.target), projectedDate: g.projectedDate ?? null })), null),
+      settle(this.budgets.findWithSpent(userId, month), []),
+      settle(this.cashFlowRows(userId, `${month}-01`, lastDayOf(month)), null),
+    ]);
+
+    let income = 0;
+    let spending = 0;
+    for (const r of rows ?? []) {
+      const amount = Number(r.tx_amount);
+      if (amount > 0) income += amount; else spending -= amount;
+    }
+    const spendingBudgets = budgets.filter((b) => b.category?.type !== 'income' && !b.projectCategoryId);
+
+    return {
+      today,
+      focusMonth,
+      accounts: accounts.map((a) => ({ name: a.accountName, type: a.accountType, balance: Number(a.balance) })),
+      netWorth: goal,
+      month: rows ? {
+        key: month, income: round2(income), spending: round2(spending),
+        budgeted: round2(spendingBudgets.reduce((s, b) => s + Number(b.amount), 0)),
+        budgetSpent: round2(spendingBudgets.reduce((s, b) => s + Number(b.spent ?? 0), 0)),
+      } : null,
+      categories: categories.map((c) => ({ name: c.name, type: c.type })),
+    };
   }
 
   /** Projects (side ventures, flips, businesses) with the categories each one accepts. */
