@@ -124,6 +124,7 @@ describe('JwtStrategy — last-seen touch is throttled before it reaches the DB'
     const touched: string[] = [];
     const svc = {
       findById: async () => user,
+      findByIdCached: async () => user,
       touchLastSeen: async (id: string) => { touched.push(id); },
     };
     const strategy = new JwtStrategy(fakeConfig(), svc as unknown as UsersService);
