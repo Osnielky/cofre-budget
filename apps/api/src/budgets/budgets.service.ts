@@ -15,6 +15,23 @@ export interface BudgetWithSpent extends Budget {
   remaining: number;
 }
 
+type Totals = { spent: number; earned: number };
+type MonthTotals = { cat: Map<string, Totals>; proj: Map<string, Totals> };
+
+/** A budget plus its month's figure. Income categories and project categories track
+    earnings (positive amounts); every other budget tracks spending. */
+function withSpent(b: Budget, totals: MonthTotals | undefined): BudgetWithSpent {
+  const isIncome = b.category?.type === 'income' || !!b.projectCategoryId;
+  const t = b.projectCategoryId
+    ? totals?.proj.get(`${b.projectId}:${b.projectCategoryId}`)
+    : b.categoryId ? totals?.cat.get(b.categoryId) : undefined;
+  const spent      = t ? (isIncome ? t.earned : t.spent) : 0;
+  const amount     = parseFloat(b.amount as any);
+  const percentage = amount > 0 ? Math.round((spent / amount) * 100) : 0;
+  const remaining  = amount - spent;
+  return { ...b, spent, percentage, remaining };
+}
+
 /** Per-budget settings that ride along with create/update. All optional: an
     omitted field leaves the stored value untouched. */
 export interface BudgetSettings {
@@ -87,38 +104,49 @@ export class BudgetsService {
       await this.repo.remove(orphans);
     }
     const budgets = all.filter(b => b.category || b.projectCategoryId);
-    const startDate = `${month}-01`;
-    const endDate   = lastDayOfMonth(month);
+    // One grouped query for the month, then each budget reads its own total.
+    const totals = (await this.totalsByMonth(userId, `${month}-01`, lastDayOfMonth(month))).get(month);
+    return budgets.map((b) => withSpent(b, totals));
+  }
 
-    return Promise.all(
-      budgets.map(async (b) => {
-        // Income categories track earnings (positive amounts); the rest track spending.
-        const isIncome = b.category?.type === 'income' || !!b.projectCategoryId;
-        const qb = this.txRepo
-          .createQueryBuilder('tx')
-          .leftJoin('tx.bankAccount', 'ba')
-          .select(isIncome ? 'COALESCE(SUM(tx.amount), 0)' : 'COALESCE(SUM(ABS(tx.amount)), 0)', 'spent')
-          .where('tx.userId = :userId', { userId })
-          .andWhere(isIncome ? 'tx.amount > 0' : 'tx.amount < 0')
-          .andWhere('tx.date >= :startDate AND tx.date <= :endDate', { startDate, endDate })
-          .andWhere('(ba."accountType" IS NULL OR ba."accountType" NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] });
+  /**
+   * Money moved per month and per budget key over [from, to], in one query:
+   * `cat` is keyed by categoryId, `proj` by `${projectId}:${projectCategoryId}`.
+   * `spent` sums the negative rows as a positive number, `earned` the positive
+   * rows. Tracking accounts (investment, mortgage…) are left out, as the
+   * dashboard's cash-flow rule does. A category budget reads `cat` whatever
+   * project the rows sit in; a project-category budget reads `proj` whatever
+   * their categoryId, which is what the one-query-per-budget version did.
+   */
+  private async totalsByMonth(userId: string, from: string, to: string): Promise<Map<string, MonthTotals>> {
+    const rows = await this.txRepo
+      .createQueryBuilder('tx')
+      .leftJoin('tx.bankAccount', 'ba')
+      .select('SUBSTR(CAST(tx.date AS TEXT), 1, 7)', 'month')
+      .addSelect('tx.categoryId', 'categoryId')
+      .addSelect('tx.projectId', 'projectId')
+      .addSelect('tx.projectCategoryId', 'projectCategoryId')
+      .addSelect('COALESCE(SUM(CASE WHEN tx.amount < 0 THEN ABS(tx.amount) ELSE 0 END), 0)', 'spent')
+      .addSelect('COALESCE(SUM(CASE WHEN tx.amount > 0 THEN tx.amount ELSE 0 END), 0)', 'earned')
+      .where('tx.userId = :userId', { userId })
+      .andWhere('tx.date >= :from AND tx.date <= :to', { from, to })
+      .andWhere('(ba."accountType" IS NULL OR ba."accountType" NOT IN (:...tracking))', { tracking: [...TRACKING_TYPES] })
+      .groupBy('SUBSTR(CAST(tx.date AS TEXT), 1, 7)')
+      .addGroupBy('tx.categoryId').addGroupBy('tx.projectId').addGroupBy('tx.projectCategoryId')
+      .getRawMany<{ month: string; categoryId: string | null; projectId: string | null; projectCategoryId: string | null; spent: string; earned: string }>();
 
-        if (b.projectCategoryId) {
-          qb.andWhere('tx.projectId = :projectId', { projectId: b.projectId })
-            .andWhere('tx.projectCategoryId = :pcid', { pcid: b.projectCategoryId });
-        } else {
-          qb.andWhere('tx.categoryId = :categoryId', { categoryId: b.categoryId });
-        }
-        const raw = await qb.getRawOne<{ spent: string }>();
-
-        const spent      = parseFloat(raw?.spent ?? '0');
-        const amount     = parseFloat(b.amount as any);
-        const percentage = amount > 0 ? Math.round((spent / amount) * 100) : 0;
-        const remaining  = amount - spent;
-
-        return { ...b, spent, percentage, remaining };
-      }),
-    );
+    const months = new Map<string, MonthTotals>();
+    const add = (map: Map<string, Totals>, key: string, r: { spent: string; earned: string }) => {
+      const cur = map.get(key) ?? { spent: 0, earned: 0 };
+      map.set(key, { spent: cur.spent + parseFloat(r.spent), earned: cur.earned + parseFloat(r.earned) });
+    };
+    for (const r of rows) {
+      let m = months.get(r.month);
+      if (!m) { m = { cat: new Map(), proj: new Map() }; months.set(r.month, m); }
+      if (r.categoryId) add(m.cat, r.categoryId, r);
+      if (r.projectId && r.projectCategoryId) add(m.proj, `${r.projectId}:${r.projectCategoryId}`, r);
+    }
+    return months;
   }
 
   /** Copy budgets from the most recent prior month if none exist for the target month.
@@ -165,22 +193,28 @@ export class BudgetsService {
 
   /** Spending-budget totals vs. actual spend for each of the last N calendar months
       (ending at the current month), for the plan-history sparkline. */
-  async history(userId: string, months = 6): Promise<{ month: string; budget: number; spent: number }[]> {
+  async history(userId: string, months = 6, now: Date = new Date()): Promise<{ month: string; budget: number; spent: number }[]> {
     const n = Math.min(Math.max(months, 1), 24);
-    const now = new Date();
     const keys = Array.from({ length: n }, (_, i) => {
       const d = new Date(now.getFullYear(), now.getMonth() - (n - 1 - i), 1);
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     });
-    return Promise.all(keys.map(async (month) => {
-      const rows = await this.findWithSpent(userId, month);
-      const spending = rows.filter((b) => (b.category ? b.category.type !== 'income' : true) && !b.projectCategoryId);
+    // Two queries for the whole window (budgets, totals) instead of one per budget per month.
+    const [all, totals] = await Promise.all([
+      this.repo.find({ where: { userId, month: In(keys) } }),
+      this.totalsByMonth(userId, `${keys[0]}-01`, lastDayOfMonth(keys[n - 1])),
+    ]);
+    return keys.map((month) => {
+      const spending = all
+        .filter((b) => b.month === month && (b.category || b.projectCategoryId))
+        .filter((b) => (b.category ? b.category.type !== 'income' : true) && !b.projectCategoryId)
+        .map((b) => withSpent(b, totals.get(month)));
       return {
         month,
         budget: +spending.reduce((s, b) => s + Number(b.amount), 0).toFixed(2),
         spent: +spending.reduce((s, b) => s + Number(b.spent), 0).toFixed(2),
       };
-    }));
+    });
   }
 
   async getMonthSummaries(userId: string): Promise<{ month: string; total: number; count: number }[]> {
