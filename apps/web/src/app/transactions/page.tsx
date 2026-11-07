@@ -1501,8 +1501,9 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        {/* ── Transaction list. Keyed by the tab so a tab change replays the rise, group by group. ── */}
-        <Stagger key={filter} className="px-3 sm:px-6 py-4 sm:py-5 flex flex-col gap-4">
+        {/* ── Transaction list. Rises in once on mount; a filter change just re-renders
+            the groups (no key here: remounting hundreds of rows on every tab was slow). ── */}
+        <Stagger className="px-3 sm:px-6 py-4 sm:py-5 flex flex-col gap-4">
           {filter === 'trades' && !loading && (
             <StaggerItem className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-xs"
               style={{ ...glass, borderRadius: 'var(--radius-card)', color: 'var(--color-text-secondary)' }}

@@ -1,26 +1,29 @@
 import { motion, useReducedMotion, type Variants } from 'motion/react';
 import type { CSSProperties, ReactNode } from 'react';
-import { springs } from '@/lib/motion/tokens';
+import { durations } from '@/lib/motion/tokens';
 
 /* Page entry motion: the pieces of a page rise into place one after another
    (stat row, then each panel). Wrap the page body in <Stagger> and each piece
    in <StaggerItem>; a variant-aware component such as the Reports Card can
    also take `riseVariants` directly and will join the same sequence.
 
-   Fade and a 14px rise on the app's soft spring (lib/motion/tokens, the same
-   travel as fadeUp), no blur: a filter on a wrapper turns off the glass
-   backdrop-filter inside it for the whole animation. Key the <Stagger> by the
-   active tab when switching tabs should replay it. No 'use client' here on
-   purpose: the file is only imported by client components (see ask-cofre/motion.tsx).
+   Kept fast on purpose: a short fade with an 8px rise (durations.fast from
+   lib/motion/tokens) and 25ms between pieces, so a dashboard of twenty panels
+   is fully in place well under half a second. A longer step with the soft
+   spring read as "the charts are slow to load". No blur: a filter on a wrapper
+   turns off the glass backdrop-filter inside it for the whole animation. Key
+   the <Stagger> by the active tab only where the content really is swapped
+   (Settings, Reports), never on a filter that re-renders the same list. No
+   'use client' here on purpose: the file is only imported by client components.
 
    Reduced motion: everything is in place at once. */
 
 export const riseVariants: Variants = {
-  hidden: { opacity: 0, y: 14 },
-  show: { opacity: 1, y: 0, transition: springs.soft },
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: durations.base, ease: [0.2, 0.8, 0.2, 1] } },
 };
 
-export function Stagger({ children, className, style, step = 0.045, delay = 0.04, ...rest }: {
+export function Stagger({ children, className, style, step = 0.025, delay = 0, ...rest }: {
   children: ReactNode; className?: string; style?: CSSProperties; step?: number; delay?: number;
   [data: `data-${string}`]: string;
 }) {
