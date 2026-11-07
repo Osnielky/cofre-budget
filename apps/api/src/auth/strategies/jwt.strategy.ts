@@ -23,7 +23,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   // make a token a session. Only login access tokens carry typ: 'access'.
   async validate(payload: { sub?: unknown; typ?: unknown }) {
     if (payload.typ !== 'access' || typeof payload.sub !== 'string' || !payload.sub) return null;
-    const user = await this.usersService.findById(payload.sub);
+    // Cached for a few seconds: every authenticated call used to pay one user
+    // query, and a page fires 7–10 of them at once.
+    const user = await this.usersService.findByIdCached(payload.sub);
     if (user) {
       setRequestUser(user.id);
       // The WHERE in touchLastSeen is the race guard; skip the write here so most requests never hit the DB.

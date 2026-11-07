@@ -3,6 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 
+export const USER_CACHE_TTL_MS = 30_000;
+const USER_CACHE_MAX = 1_000;
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -16,6 +19,32 @@ export class UsersService {
     // findOneBy drops undefined keys from the WHERE, which would return the first user.
     if (!id) return Promise.resolve(null);
     return this.repo.findOneBy({ id });
+  }
+
+  /* The JWT strategy's lookup. Every authenticated request used to cost one
+     user query, and a page fires 7–10 at once, so a hit is kept for a short
+     while. Writes through this service invalidate at once; the few writers
+     elsewhere (billing plan changes, Plaid, the demo reset, the net-worth goal)
+     are read at most USER_CACHE_TTL_MS stale, which the UI tolerates. The map
+     is per instance and bounded. */
+  private readonly cache = new Map<string, { user: User; expires: number }>();
+
+  async findByIdCached(id: string, now: number = Date.now()): Promise<User | null> {
+    if (!id) return null;
+    const hit = this.cache.get(id);
+    if (hit && hit.expires > now) return hit.user;
+    const user = await this.findById(id);
+    if (user) {
+      if (this.cache.size >= USER_CACHE_MAX) this.cache.delete(this.cache.keys().next().value as string);
+      this.cache.set(id, { user, expires: now + USER_CACHE_TTL_MS });
+    } else {
+      this.cache.delete(id);
+    }
+    return user;
+  }
+
+  invalidate(id: string): void {
+    this.cache.delete(id);
   }
 
   /**
@@ -68,14 +97,17 @@ export class UsersService {
 
   async markEmailVerified(id: string): Promise<void> {
     await this.repo.update(id, { emailVerified: true });
+    this.invalidate(id);
   }
 
   async setPassword(id: string, passwordHash: string): Promise<void> {
     await this.repo.update(id, { password: passwordHash });
+    this.invalidate(id);
   }
 
   async findOrCreateByGoogle(profile: { id: string; email: string; name: string; avatarUrl?: string }): Promise<User> {
     let user = await this.repo.findOneBy({ googleId: profile.id });
+    if (user) this.invalidate(user.id);
     if (user) {
       // Refresh the Google picture in case it changed.
       if (profile.avatarUrl && user.avatarUrl !== profile.avatarUrl) {
@@ -87,6 +119,7 @@ export class UsersService {
 
     user = await this.repo.findOneBy({ email: profile.email });
     if (user) {
+      this.invalidate(user.id);
       // An unverified account's password and name were set by whoever
       // registered the address — possibly not its owner. Google has just
       // proven ownership, so that password must not keep working; the owner
@@ -115,6 +148,7 @@ export class UsersService {
     const patch: Partial<User> = {};
     if (typeof data.name === 'string') patch.name = data.name.trim();
     if (Object.keys(patch).length) await this.repo.update(id, patch);
+    this.invalidate(id);
     return this.repo.findOneByOrFail({ id });
   }
 }
