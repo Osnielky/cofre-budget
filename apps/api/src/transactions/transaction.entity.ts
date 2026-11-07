@@ -15,6 +15,15 @@ import { CategorizationRule } from '../categorization-rules/categorization-rule.
    scoped to the owning user, not global. */
 @Entity('transactions')
 @Index(['userId', 'externalId'], { unique: true })
+/* The list, budgets, net worth and imports all filter by owner + date or
+   account + date; the single-column ones back the FKs' SET NULL and the
+   project / receipt / recurring lookups. Postgres indexes none of these on its own. */
+@Index(['userId', 'date'])
+@Index(['bankAccountId', 'date'])
+@Index(['categoryId'])
+@Index(['projectId'])
+@Index(['recurringRuleId'])
+@Index(['parentId'])
 export class Transaction {
   @PrimaryGeneratedColumn('uuid')
   id: string;

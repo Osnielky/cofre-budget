@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, Index } from 'typeorm';
 import { Debt } from './debt.entity';
 
 @Entity('debt_payments')
+@Index(['debtId'])
 export class DebtPayment {
   @PrimaryGeneratedColumn('uuid') id: string;
   @ManyToOne(() => Debt, { onDelete: 'CASCADE' })

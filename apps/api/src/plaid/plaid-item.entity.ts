@@ -1,11 +1,12 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
   ManyToOne, JoinColumn,
-  CreateDateColumn, UpdateDateColumn,
+  CreateDateColumn, UpdateDateColumn, Index,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 
 @Entity('plaid_items')
+@Index(['userId'])
 export class PlaidItem {
   @PrimaryGeneratedColumn('uuid')
   id: string;

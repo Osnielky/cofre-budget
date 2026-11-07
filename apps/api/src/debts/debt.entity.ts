@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 @Entity('debts')
+@Index(['userId'])
 export class Debt {
   @PrimaryGeneratedColumn('uuid') id: string;
   @Column() userId: string;

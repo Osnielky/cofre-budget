@@ -1,6 +1,6 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
-  ManyToOne, JoinColumn, CreateDateColumn,
+  ManyToOne, JoinColumn, CreateDateColumn, Index,
 } from 'typeorm';
 import { AiConversation } from './ai-conversation.entity';
 
@@ -26,6 +26,7 @@ export type AiMessageWidget =
   | { type: 'safe_to_spend'; data: SafeToSpendWidgetData };
 
 @Entity('ai_messages')
+@Index(['conversationId'])
 export class AiMessage {
   @PrimaryGeneratedColumn('uuid')
   id: string;

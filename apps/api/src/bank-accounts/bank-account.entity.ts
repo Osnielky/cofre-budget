@@ -1,7 +1,7 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
   ManyToOne, JoinColumn,
-  CreateDateColumn, UpdateDateColumn,
+  CreateDateColumn, UpdateDateColumn, Index,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 
@@ -12,6 +12,8 @@ export type AccountType =
   | 'investment' | 'mortgage' | 'other_asset' | 'other_liability'; // tracking
 
 @Entity('bank_accounts')
+@Index(['userId'])
+@Index(['plaidAccountId'])
 export class BankAccount {
   @PrimaryGeneratedColumn('uuid')
   id: string;

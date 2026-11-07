@@ -1,11 +1,12 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
   ManyToOne, JoinColumn,
-  CreateDateColumn, UpdateDateColumn,
+  CreateDateColumn, UpdateDateColumn, Index,
 } from 'typeorm';
 import { User } from '../users/user.entity';
 
 @Entity('ai_conversations')
+@Index(['userId'])
 export class AiConversation {
   @PrimaryGeneratedColumn('uuid')
   id: string;
