@@ -1,4 +1,4 @@
-import type { Payment } from '@/app/debts/types';
+import type { Payment } from '@/app/(app)/debts/types';
 
 export interface PaymentRow extends Payment {
   /** 1 = oldest payment. */

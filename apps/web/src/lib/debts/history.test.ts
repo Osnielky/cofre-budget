@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { paymentHistory, historySummary } from './history';
-import type { Payment } from '@/app/debts/types';
+import type { Payment } from '@/app/(app)/debts/types';
 
 const pay = (id: string, date: string, amount: number): Payment =>
   ({ id, date, amount, note: null, transactionId: null });
