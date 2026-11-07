@@ -4,6 +4,7 @@ import { TransactionsService, CsvRow, SplitPiece } from './transactions.service'
 import { ReceiptFinderService } from './receipt-finder.service';
 import { isTransferKind } from './transfer-kind';
 import { RecurringService, CreateRuleDto } from './recurring.service';
+import { clampListLimit } from './list-limit';
 
 @UseGuards(JwtAuthGuard)
 @Controller('transactions')
@@ -50,7 +51,7 @@ export class TransactionsController {
     // No scheduler in this deployment, so recurring occurrences are written
     // when they are next asked for. Never let that fail the read.
     await this.recurring.materialiseDue(req.user.id).catch(() => undefined);
-    return this.service.findByUser(req.user.id, accountId, from, to, limit ? parseInt(limit) : 500);
+    return this.service.findByUser(req.user.id, accountId, from, to, clampListLimit(limit));
   }
 
   @Get('recurring')

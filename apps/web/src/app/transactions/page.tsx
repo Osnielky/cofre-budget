@@ -375,12 +375,13 @@ export default function TransactionsPage() {
   const loadTransactions = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
+      // Explicit limit: the API default is 500, which silently cut a busy month or a custom range.
+      const params = new URLSearchParams({ limit: '5000' });
       if (from) params.set('from', from);
       if (to)   params.set('to', to);
       const cur = fetch(`${API}/transactions?${params}`, { credentials: 'include' }).then((r) => r.json());
       const prev = prevRange
-        ? fetch(`${API}/transactions?from=${prevRange.from}&to=${prevRange.to}`, { credentials: 'include' })
+        ? fetch(`${API}/transactions?from=${prevRange.from}&to=${prevRange.to}&limit=5000`, { credentials: 'include' })
             .then((r) => r.json()).catch(() => [])
         : Promise.resolve([]);
       const [data, prevData] = await Promise.all([cur, prev]);

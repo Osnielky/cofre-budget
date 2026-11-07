@@ -44,6 +44,17 @@ export interface CsvRow {
  */
 const DELETABLE_SOURCES = new Set(['manual', 'recurring', 'csv']);
 
+/* What the list endpoint selects from each joined object. Grep the web for
+   `.bankAccount.` / `.categoryRef.` before trimming; add here before reading a
+   new field on the client. */
+const LIST_RELATION_COLUMNS = [
+  'categoryRef.id', 'categoryRef.name', 'categoryRef.icon', 'categoryRef.color', 'categoryRef.type', 'categoryRef.isFixed', 'categoryRef.wantNeed',
+  'projectCategoryRef.id', 'projectCategoryRef.name', 'projectCategoryRef.icon', 'projectCategoryRef.color', 'projectCategoryRef.type',
+  'bankAccount.id', 'bankAccount.bankName', 'bankAccount.accountName', 'bankAccount.accountType', 'bankAccount.color', 'bankAccount.currency',
+  'transferAccount.id', 'transferAccount.bankName', 'transferAccount.accountName', 'transferAccount.accountType',
+  'categorizedByRule.id', 'categorizedByRule.matchType', 'categorizedByRule.matchValue',
+];
+
 @Injectable()
 export class TransactionsService {
   constructor(
@@ -107,6 +118,7 @@ export class TransactionsService {
     return hints;
   }
 
+  /** The list endpoint: every column of the row itself, slim joined objects. */
   findByUser(
     userId: string,
     bankAccountId?: string,
@@ -114,15 +126,18 @@ export class TransactionsService {
     to?: string,
     limit = 500,
   ): Promise<Transaction[]> {
+    // The joined objects carry only the fields the web reads (see LIST_RELATION_COLUMNS):
+    // a full BankAccount repeated on every one of 5,000 rows was most of the payload.
     const qb = this.repo.createQueryBuilder('tx')
-      .leftJoinAndSelect('tx.categoryRef', 'categoryRef')
+      .leftJoin('tx.categoryRef', 'categoryRef')
       // A project-categorised row has categoryId = null by design, so without
       // this join the client cannot tell it apart from a genuinely
       // uncategorised one and reports it as "Uncategorized".
-      .leftJoinAndSelect('tx.projectCategoryRef', 'projectCategoryRef')
-      .leftJoinAndSelect('tx.bankAccount', 'bankAccount')
-      .leftJoinAndSelect('tx.transferAccount', 'transferAccount')
-      .leftJoinAndSelect('tx.categorizedByRule', 'categorizedByRule')
+      .leftJoin('tx.projectCategoryRef', 'projectCategoryRef')
+      .leftJoin('tx.bankAccount', 'bankAccount')
+      .leftJoin('tx.transferAccount', 'transferAccount')
+      .leftJoin('tx.categorizedByRule', 'categorizedByRule')
+      .addSelect(LIST_RELATION_COLUMNS)
       .where('tx.userId = :userId', { userId })
       .andWhere('tx.isSplitParent = false')
       .orderBy('tx.date', 'DESC')
