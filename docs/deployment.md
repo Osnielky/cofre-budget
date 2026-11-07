@@ -178,3 +178,31 @@ gcloud secrets versions add ADMIN_EMAILS --data-file=-
 ```
 
 Logs and alert queries: `docs/observability.md`.
+
+## Performance baseline
+
+Measured on 2026-11-07 against budgetcofre.com with the demo account (warm
+instances, curl and a headless browser), before the speed work on `dev`
+(indexes, slim transaction rows, once-a-day recurring materialiser, cached user
+lookup, boot sweeps off the cold-start path, SWR client cache, lazy chunks,
+one authenticated layout). Re-run the same measurement after that deploy and
+fill in the second column; the commands are in
+`docs/superpowers/plans/2026-11-07-app-speed.md` (Task 12).
+
+| Measurement | Before | After |
+|---|---|---|
+| `/api/auth/me` alone (453 bytes) | 250 ms | |
+| Any API call while the dashboard fires its 7–10 | 600–1,100 ms | |
+| Dashboard: data requests start / all data in | 0.73 s / ~1.9 s | |
+| Dashboard requests / transfer per load | 109 / 2.8 MB | |
+| `/api/transactions`, 12 months (`limit=20000`) | 841 KB raw, 48 KB gzip, 1.2 s | |
+| `ask-cofre-logo.png` on every app page | 1.58 MB | 45 KB |
+| Dashboard → Transactions → Dashboard | every list refetched | cached ≤ 10 s, then background refresh |
+| Landing page first paint | 3.4 s | not addressed (4 MB hero video, three 330 KB JPEGs, own font) |
+
+Where the time went: two Cloud Run hops per call, a user row read per call,
+the recurring materialiser on every list call, `db-f1-micro` with no index on
+`transactions (userId, date)`, and no client cache. Still open after this
+round: `--min-instances=1` on cofre-web or a direct browser → API path (both
+cost money or a cookie-domain change), the next Cloud SQL tier, and the landing
+page assets.
