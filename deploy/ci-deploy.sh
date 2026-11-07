@@ -72,7 +72,7 @@ deploy_api() {
   # for visitor locations. Costs nothing while scaled to zero.
   gcloud run deploy cofre-api \
     --image "${API_IMAGE}" --region "${REGION}" --allow-unauthenticated \
-    --min-instances=0 --max-instances=2 --memory=1Gi \
+    --min-instances=0 --max-instances=2 --memory=1Gi --cpu-boost \
     --add-cloudsql-instances "${SQL_CONN}" \
     --update-labels "cfg=${CFG}" \
     --set-env-vars "NODE_ENV=production,GOOGLE_CLOUD_PROJECT=${PROJECT_ID},DB_HOST=/cloudsql/${SQL_CONN},DB_PORT=5432,DB_USER=${DB_USER},DB_NAME=${DB_NAME},JWT_EXPIRES_IN=7d,GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID},MAIL_FROM=${MAIL_FROM},PLAID_CLIENT_ID=${PLAID_CLIENT_ID},PLAID_ENV=production,PLAID_LIABILITIES_ENABLED=true,PLAID_INVESTMENTS_ENABLED=true,STRIPE_PRICE_PRO_MONTHLY=${STRIPE_PRICE_PRO_MONTHLY},STRIPE_PRICE_PRO_YEARLY=${STRIPE_PRICE_PRO_YEARLY},STRIPE_PRICE_ELITE_MONTHLY=${STRIPE_PRICE_ELITE_MONTHLY},STRIPE_PRICE_ELITE_YEARLY=${STRIPE_PRICE_ELITE_YEARLY},FRONTEND_URL=${PUBLIC_URL},GOOGLE_CALLBACK_URL=${PUBLIC_URL}/api/auth/google/callback,GOOGLE_GMAIL_REDIRECT_URI=${PUBLIC_URL}/api/gmail/callback,PLAID_WEBHOOK_URL=${API_URL}/api/plaid/webhook,PLAID_OAUTH_REDIRECT_URI=${PUBLIC_URL}/settings/plaid-oauth-redirect" \
@@ -82,7 +82,7 @@ deploy_api() {
 deploy_web() {
   gcloud run deploy cofre-web \
     --image "${WEB_IMAGE}" --region "${REGION}" --allow-unauthenticated \
-    --min-instances=0 --max-instances=2 --memory=512Mi \
+    --min-instances=0 --max-instances=2 --memory=512Mi --cpu-boost \
     --update-labels "cfg=${CFG}" \
     --set-env-vars "API_PROXY_URL=${API_URL}" \
     --set-secrets "PROXY_SHARED_SECRET=PROXY_SHARED_SECRET:latest"

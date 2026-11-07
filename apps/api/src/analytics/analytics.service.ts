@@ -1,3 +1,4 @@
+import { BOOT_SWEEP_DELAY_MS } from '../common/boot-sweep';
 import { Inject, Injectable, Logger, OnApplicationBootstrap, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, LessThan, SelectQueryBuilder } from 'typeorm';
@@ -51,8 +52,13 @@ export class AnalyticsService implements OnApplicationBootstrap {
     this.geo = geo ?? geoLookup;
   }
 
-  /** Old rows go at boot; with daily deploys that is sweep enough for a 90-day table. */
-  async onApplicationBootstrap(): Promise<void> {
+  /** Old rows go shortly after boot (deferred so a cold start answers its first
+      request first); with daily deploys that is sweep enough for a 90-day table. */
+  onApplicationBootstrap(): void {
+    setTimeout(() => void this.runBootSweep(), BOOT_SWEEP_DELAY_MS).unref();
+  }
+
+  async runBootSweep(): Promise<void> {
     try {
       const n = await this.sweep(new Date());
       if (n) this.logger.log(`Swept ${n} page views older than ${RETENTION_DAYS} days`);

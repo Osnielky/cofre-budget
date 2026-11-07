@@ -1,3 +1,4 @@
+import { BOOT_SWEEP_DELAY_MS } from '../common/boot-sweep';
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, LessThan } from 'typeorm';
@@ -42,14 +43,25 @@ export class DemoService implements OnApplicationBootstrap {
 
   constructor(@InjectDataSource() private readonly ds: DataSource) {}
 
-  /** Rockefeller must exist for the owner; stale sandboxes are cheap to sweep here. Never fails boot. */
+  /** Rockefeller must exist before the first login, so that part still runs before
+      the port opens. The sandbox sweep (up to 50 multi-table wipes) is deferred: on
+      Cloud Run every cold start ran it ahead of the first request. Never fails boot. */
   async onApplicationBootstrap(): Promise<void> {
     try {
       await this.ensureOwner(new Date());
+    } catch (err) {
+      this.logger.error(`Demo bootstrap failed: ${(err as Error).message}`);
+    }
+    setTimeout(() => void this.runBootSweep(), BOOT_SWEEP_DELAY_MS).unref();
+  }
+
+  /** The deferred part of boot: sweep stale visitor sandboxes. */
+  async runBootSweep(): Promise<void> {
+    try {
       const swept = await this.sweepStaleVisitors(new Date());
       if (swept) this.logger.log(`Swept ${swept} stale demo sandbox(es)`);
     } catch (err) {
-      this.logger.error(`Demo bootstrap failed: ${(err as Error).message}`);
+      this.logger.error(`Demo sweep failed: ${(err as Error).message}`);
     }
   }
 

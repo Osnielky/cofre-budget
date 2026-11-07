@@ -1,3 +1,4 @@
+import { BOOT_SWEEP_DELAY_MS } from '../common/boot-sweep';
 import { Injectable, NotFoundException, ForbiddenException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, LessThan, Repository } from 'typeorm';
@@ -15,7 +16,12 @@ export class AiConversationsService implements OnModuleInit {
     @InjectRepository(AiPendingAction) private actions: Repository<AiPendingAction>,
   ) {}
 
-  async onModuleInit() {
+  /** Deferred so a cold start answers its first request before purging old soft-deletes. */
+  onModuleInit() {
+    setTimeout(() => void this.runBootSweep(), BOOT_SWEEP_DELAY_MS).unref();
+  }
+
+  async runBootSweep(): Promise<void> {
     await this.purgeDeleted().catch(() => undefined);
   }
 

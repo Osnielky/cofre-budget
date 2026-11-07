@@ -22,6 +22,11 @@ export default registerAs('database', (): TypeOrmModuleOptions => ({
   // Slow (> SLOW_QUERY_MS) and failed queries only, without parameter values.
   logger: new TypeOrmLogger(),
   maxQueryExecutionTime: slowQueryMs(),
+  // pg pool. Cloud SQL's smallest tier allows ~25 connections and Cloud Run runs
+  // at most 2 API instances, so 12 each stays under it while giving a page's
+  // 7–10 parallel calls their own connections. Waiting for a free connection is
+  // capped so a stuck pool fails fast instead of hanging the request.
+  extra: { max: 12, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 30_000 },
   ssl: (() => {
     if (!process.env.DB_HOST?.includes('supabase.co')) return false;
     const caPath = ['supabase-ca.crt.crt', 'supabase-ca.crt'].map(f => path.resolve(process.cwd(), f)).find(p => fs.existsSync(p)) ?? '';

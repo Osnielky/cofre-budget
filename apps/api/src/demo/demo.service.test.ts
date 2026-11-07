@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../users/user.entity';
@@ -151,5 +151,21 @@ describe('DemoService owner (Rockefeller)', { timeout: SEED_TIMEOUT }, () => {
     expect((await rowsOwnedBy(owner.id)).transactions).toBeGreaterThan(900);
     const withPw = await ds.getRepository(User).createQueryBuilder('u').addSelect('u.password').where('u.id = :id', { id: owner.id }).getOne();
     expect(await bcrypt.compare(DEMO_OWNER_PASSWORD, withPw!.password)).toBe(true);
+  });
+});
+
+describe('boot', () => {
+  it('onApplicationBootstrap creates the owner but leaves the sandbox sweep to the deferred runBootSweep', async () => {
+    vi.useFakeTimers();
+    try {
+      const sweep = vi.spyOn(service, 'sweepStaleVisitors');
+      await service.onApplicationBootstrap();
+      expect(await ds.getRepository(User).findOneBy({ email: DEMO_OWNER_EMAIL })).not.toBeNull();
+      expect(sweep).not.toHaveBeenCalled();
+      await service.runBootSweep();
+      expect(sweep).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

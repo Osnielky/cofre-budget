@@ -1,3 +1,4 @@
+import { BOOT_SWEEP_DELAY_MS } from '../common/boot-sweep';
 import { Injectable, Logger, BadRequestException, NotFoundException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource, Repository } from 'typeorm';
@@ -35,7 +36,12 @@ export class SupportService {
     this.appUrl = config?.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
   }
 
-  async onApplicationBootstrap(): Promise<void> {
+  /** Deferred so a cold start answers its first request before sweeping old screenshots. */
+  onApplicationBootstrap(): void {
+    setTimeout(() => void this.runBootSweep(), BOOT_SWEEP_DELAY_MS).unref();
+  }
+
+  async runBootSweep(): Promise<void> {
     await this.sweep(new Date()).catch((err) => this.logger.error('Screenshot sweep failed', err as Error));
   }
 
