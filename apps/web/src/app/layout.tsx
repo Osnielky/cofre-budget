@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import ThemeProvider from '@/components/ThemeProvider';
 import UserProvider from '@/components/UserProvider';
+import SwrProvider from '@/components/SwrProvider';
 import DemoBanner from '@/components/DemoBanner';
 import PageViewBeacon from '@/components/PageViewBeacon';
 import WebVitals from '@/components/WebVitals';
@@ -32,9 +33,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <WebVitals />
         <ThemeProvider>
           <UserProvider>
-            {children}
-            <DemoBanner />
-            <PageViewBeacon />
+            <SwrProvider>
+              {children}
+              <DemoBanner />
+              <PageViewBeacon />
+            </SwrProvider>
           </UserProvider>
         </ThemeProvider>
       </body>

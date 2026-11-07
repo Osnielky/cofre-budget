@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import type { Transaction, BankAccount, Project } from '@/lib/dashboard/types';
 import type { HistoryPoint } from '@/lib/goals/history';
 import type { ReportRange } from '@/lib/reports/range';
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
+import { useApi } from './useApi';
 
 export interface ReportsData {
   cur: Transaction[];
@@ -17,50 +16,33 @@ export interface ReportsData {
   error: string | null;
 }
 
+const NO_TX: Transaction[] = [];
+const NO_PROJECTS: Project[] = [];
+const NO_ACCOUNTS: BankAccount[] = [];
+const NO_HISTORY: { points: HistoryPoint[] } = { points: [] };
+
 /**
  * One transactions request covering the previous period through the end of
  * the current one, split client-side; projects, accounts and the net worth
- * history load once. Reloads transactions whenever the range changes.
+ * history come from the shared cache (hooks/useApi), as does each range once
+ * it has been seen, so switching presets back and forth is instant.
  */
 export function useReportsData(range: ReportRange): ReportsData {
-  const [cur, setCur] = useState<Transaction[]>([]);
-  const [prev, setPrev] = useState<Transaction[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [accounts, setAccounts] = useState<BankAccount[]>([]);
-  const [history, setHistory] = useState<HistoryPoint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const projects = useApi<Project[]>('/projects', NO_PROJECTS);
+  const accounts = useApi<BankAccount[]>('/bank-accounts', NO_ACCOUNTS);
+  const history = useApi<{ points: HistoryPoint[] }>('/net-worth-goal/history', NO_HISTORY);
+  const rows = useApi<Transaction[]>(`/transactions?from=${range.prevFrom}&to=${range.to}&limit=20000`, NO_TX);
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
-      fetch(`${API}/projects`, { credentials: 'include' }).then((r) => r.json()).catch(() => []),
-      fetch(`${API}/bank-accounts`, { credentials: 'include' }).then((r) => r.json()).catch(() => []),
-      fetch(`${API}/net-worth-goal/history`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : { points: [] })).catch(() => ({ points: [] })),
-    ]).then(([p, a, h]) => {
-      if (cancelled) return;
-      setProjects(Array.isArray(p) ? p : []);
-      setAccounts(Array.isArray(a) ? a : []);
-      setHistory(Array.isArray(h?.points) ? h.points : []);
-    });
-    return () => { cancelled = true; };
-  }, []);
+  const list = Array.isArray(rows.data) ? rows.data : NO_TX;
+  const cur = useMemo(() => list.filter((t) => t.date.slice(0, 10) >= range.from && t.date.slice(0, 10) <= range.to), [list, range.from, range.to]);
+  const prev = useMemo(() => list.filter((t) => t.date.slice(0, 10) >= range.prevFrom && t.date.slice(0, 10) <= range.prevTo), [list, range.prevFrom, range.prevTo]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true); setError(null);
-    fetch(`${API}/transactions?from=${range.prevFrom}&to=${range.to}&limit=20000`, { credentials: 'include' })
-      .then((r) => { if (!r.ok) throw new Error('request failed'); return r.json(); })
-      .then((rows: Transaction[]) => {
-        if (cancelled) return;
-        const list = Array.isArray(rows) ? rows : [];
-        setCur(list.filter((t) => t.date.slice(0, 10) >= range.from && t.date.slice(0, 10) <= range.to));
-        setPrev(list.filter((t) => t.date.slice(0, 10) >= range.prevFrom && t.date.slice(0, 10) <= range.prevTo));
-      })
-      .catch(() => { if (!cancelled) setError('Could not load your transactions. Please try again.'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [range.from, range.to, range.prevFrom, range.prevTo]);
-
-  return { cur, prev, projects, accounts, history, loading, error };
+  return {
+    cur, prev,
+    projects: Array.isArray(projects.data) ? projects.data : NO_PROJECTS,
+    accounts: Array.isArray(accounts.data) ? accounts.data : NO_ACCOUNTS,
+    history: Array.isArray(history.data?.points) ? history.data.points : [],
+    loading: rows.loading,
+    error: rows.error ? 'Could not load your transactions. Please try again.' : null,
+  };
 }

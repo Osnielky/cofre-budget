@@ -1,56 +1,57 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { Transaction, BankAccount, Budget, Project, Debt } from '@/lib/dashboard/types';
+import { useApi } from './useApi';
+import { monthRange, monthWithin, sliceMonth } from '@/lib/dashboard/monthSlice';
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
+const NO_TX: Transaction[] = [];
+const NO_ACCOUNTS: BankAccount[] = [];
+const NO_BUDGETS: Budget[] = [];
+const NO_PROJECTS: Project[] = [];
+const NO_DEBTS: Debt[] = [];
 
 function currentMonth() { return new Date().toISOString().slice(0, 7); }
-function monthFrom(m: string) { return `${m}-01`; }
-function monthTo(m: string) {
-  const [y, mo] = m.split('-').map(Number);
-  return new Date(y, mo, 0).toISOString().slice(0, 10);
-}
 
+/* Everything the dashboard reads, each list on its own cache key (hooks/useApi)
+   so a month change refetches only the budgets for that month, and the Goals
+   and Ask Cofre pages, which call this too, share the same responses. The
+   month's rows come out of the year-to-date list whenever the month is in it;
+   only a month outside the current year costs its own request. */
 export function useDashboardData() {
   const [month, setMonth] = useState(currentMonth);
-  const [transactions, setTx] = useState<Transaction[]>([]);
-  const [yearTx, setYearTx] = useState<Transaction[]>([]);
-  const [accounts, setAccounts] = useState<BankAccount[]>([]);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [debts, setDebts] = useState<Debt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const yearFrom = `${new Date().getFullYear()}-01-01`;
+  const yearTo = new Date().toISOString().slice(0, 10);
+  const inYear = monthWithin(month, yearFrom, yearTo);
+  const { from, to } = monthRange(month);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const from = monthFrom(month), to = monthTo(month);
-      const yearFrom = `${new Date().getFullYear()}-01-01`;
-      const yearTo = new Date().toISOString().slice(0, 10);
-      const [tx, ytx, accs, bdg, proj, dbt] = await Promise.all([
-        fetch(`${API}/transactions?from=${from}&to=${to}&limit=500`, { credentials: 'include' }).then((r) => r.json()),
-        fetch(`${API}/transactions?from=${yearFrom}&to=${yearTo}&limit=5000`, { credentials: 'include' }).then((r) => r.json()),
-        fetch(`${API}/bank-accounts`, { credentials: 'include' }).then((r) => r.json()),
-        fetch(`${API}/budgets?month=${month}`, { credentials: 'include' }).then((r) => r.json()),
-        fetch(`${API}/projects`, { credentials: 'include' }).then((r) => r.json()),
-        fetch(`${API}/debts`, { credentials: 'include' }).then((r) => r.json()),
-      ]);
-      setTx(Array.isArray(tx) ? tx : []);
-      setYearTx(Array.isArray(ytx) ? ytx : []);
-      setAccounts(Array.isArray(accs) ? accs : []);
-      setBudgets(Array.isArray(bdg) ? bdg : []);
-      setProjects(Array.isArray(proj) ? proj : []);
-      setDebts(Array.isArray(dbt) ? dbt : []);
-    } catch (err) {
-      console.error('[dashboard] failed to load data', err);
-      setError('Something went wrong loading your data. Please try again.');
-    } finally { setLoading(false); }
-  }, [month]);
+  const year = useApi<Transaction[]>(`/transactions?from=${yearFrom}&to=${yearTo}&limit=5000`, NO_TX);
+  const monthOnly = useApi<Transaction[]>(inYear ? null : `/transactions?from=${from}&to=${to}&limit=5000`, NO_TX);
+  const accounts = useApi<BankAccount[]>('/bank-accounts', NO_ACCOUNTS);
+  const budgets = useApi<Budget[]>(`/budgets?month=${month}`, NO_BUDGETS);
+  const projects = useApi<Project[]>('/projects', NO_PROJECTS);
+  const debts = useApi<Debt[]>('/debts', NO_DEBTS);
 
-  useEffect(() => { reload(); }, [reload]);
+  const yearTx = Array.isArray(year.data) ? year.data : NO_TX;
+  const transactions = useMemo(
+    () => (inYear ? sliceMonth(yearTx, month) : Array.isArray(monthOnly.data) ? monthOnly.data : NO_TX),
+    [inYear, yearTx, month, monthOnly.data],
+  );
 
-  return { month, setMonth, transactions, yearTx, accounts, budgets, projects, debts, loading, error, reload };
+  const parts = [year, monthOnly, accounts, budgets, projects, debts];
+  const loading = parts.some((p) => p.loading);
+  const error = parts.some((p) => p.error) ? 'Something went wrong loading your data. Please try again.' : null;
+
+  const reload = useCallback(() => {
+    void Promise.all([year.mutate(), monthOnly.mutate(), accounts.mutate(), budgets.mutate(), projects.mutate(), debts.mutate()]);
+  }, [year.mutate, monthOnly.mutate, accounts.mutate, budgets.mutate, projects.mutate, debts.mutate]);
+
+  return {
+    month, setMonth, transactions, yearTx,
+    accounts: Array.isArray(accounts.data) ? accounts.data : NO_ACCOUNTS,
+    budgets: Array.isArray(budgets.data) ? budgets.data : NO_BUDGETS,
+    projects: Array.isArray(projects.data) ? projects.data : NO_PROJECTS,
+    debts: Array.isArray(debts.data) ? debts.data : NO_DEBTS,
+    loading, error, reload,
+  };
 }

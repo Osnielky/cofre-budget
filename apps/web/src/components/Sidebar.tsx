@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Logo from './Logo';
 import Avatar from './Avatar';
 import { useUser } from './UserProvider';
+import { clearApiCache } from '@/lib/api/cache';
 import dynamic from 'next/dynamic';
 
 /* Loaded on first click only: the modal pulls in html-to-image, which no other page needs. */
@@ -48,6 +49,8 @@ export default function Sidebar() {
     setLoggingOut(true);
     try {
       await fetch(`${API}/auth/logout`, { method: 'POST', credentials: 'include' });
+      // The next account must not see this one's cached lists.
+      await clearApiCache();
     } catch {
       // Network error or API down — log out client-side anyway.
     } finally {

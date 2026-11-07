@@ -8,6 +8,10 @@ import { assemble, daysIn, monthFraction, shiftMonth, TREND_MONTHS } from '@/lib
 import { computePlan } from '@/lib/budgets/calculations';
 import { canUndo, draftReducer, emptyDraft } from '@/lib/budgets/draft';
 import { buildBatchPayload, saveBudgetBatch } from '@/lib/budgets/persist';
+import { useApi } from './useApi';
+
+const NO_CATEGORIES: Category[] = [];
+const NO_PROJECTS: Project[] = [];
 
 export const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -24,8 +28,9 @@ const json = (r: Response) => (r.ok ? r.json() : Promise.reject(new Error(String
 export function useBudgetScenario() {
   const [month, setMonthState] = useState(() => monthKeyOf(new Date()));
   const [budgets, setBudgets] = useState<BudgetWithSpent[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  // Reference lists come from the shared cache (hooks/useApi): other pages already hold them.
+  const categories = useApi<Category[]>('/categories', NO_CATEGORIES).data;
+  const projects = useApi<Project[]>('/projects', NO_PROJECTS).data;
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [categoryAverages, setCategoryAverages] = useState<Record<string, number>>({});
   const [txs, setTxs] = useState<Transaction[]>([]);
@@ -58,18 +63,14 @@ export function useBudgetScenario() {
       .catch(() => undefined)
       .then(() => Promise.all([
         fetch(`${API}/budgets?month=${month}`, { credentials: 'include' }).then(json),
-        fetch(`${API}/categories`, { credentials: 'include' }).then(json),
-        fetch(`${API}/projects`, { credentials: 'include' }).then(json),
         fetch(`${API}/transactions?from=${from}&to=${to}&limit=5000`, { credentials: 'include' }).then(json),
         // Secondary panels: a failure here shouldn't block the editor.
         fetch(`${API}/budgets/history?months=6`, { credentials: 'include' }).then(json).catch(() => []),
         fetch(`${API}/budgets/category-averages?months=3&month=${month}`, { credentials: 'include' }).then(json).catch(() => ({})),
       ]))
-      .then(([b, c, p, t, h, avgs]) => {
+      .then(([b, t, h, avgs]) => {
         if (cancelled) return;
         setBudgets(Array.isArray(b) ? b : []);
-        setCategories(Array.isArray(c) ? c : []);
-        setProjects(Array.isArray(p) ? p : []);
         setTxs(Array.isArray(t) ? t : []);
         setHistory(Array.isArray(h) ? h : []);
         setCategoryAverages(avgs && typeof avgs === 'object' && !Array.isArray(avgs) ? avgs : {});

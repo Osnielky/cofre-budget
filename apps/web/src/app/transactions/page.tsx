@@ -7,6 +7,9 @@ import RecurringPanel, { emptyRecurring, occurrenceDates, type RecurringState } 
 import DatePicker from '@/components/DatePicker';
 import Sidebar from '@/components/Sidebar';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
+import { useApi } from '@/hooks/useApi';
+
+const EMPTY_LIST: never[] = [];
 import { StretchTabs, type StretchTabItem } from '@/components/ui/StretchTabs';
 import Avatar from '@/components/Avatar';
 import { useUser } from '@/components/UserProvider';
@@ -393,21 +396,25 @@ export default function TransactionsPage() {
   }, [from, to, prevRange]);
 
 
+  /* Reference lists come from the shared cache (hooks/useApi), so arriving from
+     another page paints them at once; the page keeps its own copies because it
+     appends to them locally (new category, new account) before the cache
+     revalidates. The hint maps are this page's alone. */
+  const cachedCategories = useApi<Category[]>('/categories', EMPTY_LIST as Category[]).data;
+  const cachedAccounts = useApi<BankAccount[]>('/bank-accounts', EMPTY_LIST as BankAccount[]).data;
+  const cachedProjects = useApi<Project[]>('/projects', EMPTY_LIST as Project[]).data;
+  const cachedDebts = useApi<DebtLite[]>('/debts', EMPTY_LIST as DebtLite[]).data;
+  useEffect(() => { if (Array.isArray(cachedCategories)) setCategories(cachedCategories); }, [cachedCategories]);
+  useEffect(() => { if (Array.isArray(cachedAccounts)) setAccounts(cachedAccounts); }, [cachedAccounts]);
+  useEffect(() => { if (Array.isArray(cachedProjects)) setProjects(cachedProjects); }, [cachedProjects]);
+  useEffect(() => { if (Array.isArray(cachedDebts)) setDebts(cachedDebts); }, [cachedDebts]);
   useEffect(() => {
     Promise.all([
-      fetch(`${API}/categories`, { credentials: 'include' }).then((r) => r.json()),
-      fetch(`${API}/bank-accounts`, { credentials: 'include' }).then((r) => r.json()),
-      fetch(`${API}/projects`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/transactions/category-hints`, { credentials: 'include' }).then((r) => r.json()),
       fetch(`${API}/transactions/project-hints`, { credentials: 'include' }).then((r) => r.json()).catch(() => ({})),
-      fetch(`${API}/debts`, { credentials: 'include' }).then((r) => r.json()).catch(() => []),
-    ]).then(([cats, accs, projs, hints, pHints, dbt]) => {
-      setCategories(Array.isArray(cats) ? cats : []);
-      setAccounts(Array.isArray(accs) ? accs : []);
-      setProjects(Array.isArray(projs) ? projs : []);
+    ]).then(([hints, pHints]) => {
       if (hints && typeof hints === 'object') setCategoryHints(hints);
       if (pHints && typeof pHints === 'object') setProjectHints(pHints);
-      setDebts(Array.isArray(dbt) ? dbt : []);
     }).catch(() => {});
   }, []);
 

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { clearApiCache } from '@/lib/api/cache';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -61,7 +62,7 @@ export default function UserProvider({ children }: { children: React.ReactNode }
   }, []);
 
   return (
-    <UserContext.Provider value={{ user, loading, clearUser: () => setUser(null), refetch: fetchUser }}>
+    <UserContext.Provider value={{ user, loading, clearUser: () => { setUser(null); void clearApiCache(); }, refetch: fetchUser }}>
       {children}
     </UserContext.Provider>
   );

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
+import { useCallback } from 'react';
+import { useApi } from './useApi';
+import { API } from '@/lib/api/client';
 
 export interface NetWorthGoal {
   target: number;
@@ -14,26 +14,11 @@ export interface NetWorthGoal {
   projectedDate: string | null;
 }
 
+/** Cached (hooks/useApi): the dashboard panel and the Goals page share one read. */
 export function useNetWorthGoal() {
-  const [data, setData] = useState<NetWorthGoal | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, mutate } = useApi<NetWorthGoal | null>('/net-worth-goal', null);
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`${API}/net-worth-goal`, { credentials: 'include' });
-      if (!res.ok) throw new Error('request failed');
-      setData(await res.json());
-    } catch {
-      setError('Could not load your net worth goal.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { reload(); }, [reload]);
+  const reload = useCallback(() => { void mutate(); }, [mutate]);
 
   const setTargetDate = useCallback(async (targetDate: string | null): Promise<boolean> => {
     const res = await fetch(`${API}/net-worth-goal`, {
@@ -42,9 +27,9 @@ export function useNetWorthGoal() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ targetDate }),
     });
-    if (res.ok) setData(await res.json());
+    if (res.ok) await mutate(await res.json(), { revalidate: false });
     return res.ok;
-  }, []);
+  }, [mutate]);
 
-  return { data, loading, error, reload, setTargetDate };
+  return { data, loading, error: error ? 'Could not load your net worth goal.' : null, reload, setTargetDate };
 }
