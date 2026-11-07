@@ -283,10 +283,12 @@ export class ProjectsService {
     const projects = await this.repo.find({ where: { userId }, order: { createdAt: 'DESC' } });
     if (projects.length === 0) return [];
 
-    // Single query for ALL project transactions instead of one per project
+    // Single query for ALL project transactions instead of one per project, and
+    // only the three columns the sums and the activity summary read.
     const projectIds = projects.map(p => p.id);
     const allTxs = await this.txRepo
       .createQueryBuilder('tx')
+      .select(['tx.projectId', 'tx.date', 'tx.amount'])
       .where('tx.userId = :userId', { userId })
       .andWhere('tx.projectId IN (:...ids)', { ids: projectIds })
       .getMany();
@@ -340,7 +342,8 @@ export class ProjectsService {
       this.loadTypeCategories(userId, project.type ?? 'other'),
     ]);
 
-    const stats = await this.withStats(project);
+    // The rows are already in hand: no second load for the totals.
+    const stats = await this.withStats(project, transactions);
 
     const categoryBreakdown: CategoryBreakdown[] = categories.map((cat) => {
       const catTxs = transactions.filter((t) => t.projectCategoryId === cat.id);
@@ -547,8 +550,9 @@ export class ProjectsService {
     await this.txRepo.save(tx);
   }
 
-  private async withStats(p: Project): Promise<ProjectWithStats> {
-    const txs      = await this.txRepo.findBy({ projectId: p.id });
+  /** Totals for one project. Pass `preloaded` when the caller already holds the rows. */
+  private async withStats(p: Project, preloaded?: { date: string; amount: number | string }[]): Promise<ProjectWithStats> {
+    const txs      = preloaded ?? await this.txRepo.find({ where: { projectId: p.id }, select: { date: true, amount: true } });
     const expenses = txs.filter((t) => Number(t.amount) < 0).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
     const income   = txs.filter((t) => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
     const costBasis = (p.purchaseTxId ? 0 : Number(p.purchasePrice)) + expenses;
