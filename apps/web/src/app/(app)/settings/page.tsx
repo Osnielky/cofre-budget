@@ -5,7 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import PlaidLauncher from '@/components/PlaidLauncher';
-import Sidebar from '@/components/Sidebar';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useStretchIndicator } from '@/components/ui/useStretchIndicator';
 import BankSelect, { BANKS } from '@/components/BankSelect';
@@ -662,8 +661,7 @@ function SettingsPageInner() {
   const tabIndicatorRef = useStretchIndicator(tabWrapRef, activeTab, { pad: 8 });
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+    <div className="contents">
       {/* Plaid's script is only fetched once a link is about to open. */}
       {linkToken && <PlaidLauncher token={linkToken} onSuccess={onPlaidSuccess} onExit={onPlaidExit} />}
 

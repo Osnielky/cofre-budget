@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PlaidLauncher from '@/components/PlaidLauncher';
-import Sidebar from '@/components/Sidebar';
 import TotalUtilization from './components/TotalUtilization';
 import StatTiles from './components/StatTiles';
 import CardDeck from './components/CardDeck';
@@ -117,8 +116,7 @@ export default function CardsPage() {
   }, [deck, index]);
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+    <div className="contents">
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
         <div className="p-4 sm:p-6 flex flex-col gap-5">
           <div>

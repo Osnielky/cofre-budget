@@ -11,7 +11,7 @@ import type { CardView, DebitView } from '@/lib/cards/types';
 import type { DeckEntry } from '@/lib/cards/deck';
 import { utilization, utilizationLevel, LEVEL_COLOR, aprOf } from '@/lib/cards/utilization';
 import { cardNotice } from '@/lib/cards/card-notice';
-import { fmt, fmtDate } from '@/app/debts/format';
+import { fmt, fmtDate } from '@/app/(app)/debts/format';
 import { Money, MoneyGroup, Percent } from '@/components/motion/Money';
 import { springs, durations, slideVariants, fadeUp } from '@/lib/motion/tokens';
 import { PANEL, MUTED } from './panel';

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePlaidLink } from 'react-plaid-link';
-import Sidebar from '@/components/Sidebar';
 import type { PreviewExchangeResult } from '@/components/PlaidMergeReviewModal';
 import { InstitutionLimitError } from '@/lib/connect-bank-error';
 
@@ -127,8 +126,7 @@ export default function PlaidOAuthRedirectPage() {
   useEffect(() => { if (error) setStatus('error'); }, [error]);
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+    <div className="contents">
       <main className="flex-1 flex items-center justify-center px-6 text-center pt-14 md:pt-0">
         <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
           {status === 'error' ? 'Could not complete bank connection. Return to Settings and try again.' : 'Finishing bank connection…'}

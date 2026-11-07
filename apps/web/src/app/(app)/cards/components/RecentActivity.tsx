@@ -7,7 +7,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { Transaction } from '@/lib/dashboard/types';
-import { fmtDateShort } from '@/app/debts/format';
+import { fmtDateShort } from '@/app/(app)/debts/format';
 import { Money } from '@/components/motion/Money';
 import { durations, fadeUp } from '@/lib/motion/tokens';
 

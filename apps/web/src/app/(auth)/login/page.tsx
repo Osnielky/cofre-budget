@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import AuthShell from '@/components/AuthShell';
 import { useUser } from '@/components/UserProvider';
+import { clearApiCache } from '@/lib/api/cache';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -48,6 +49,7 @@ function LoginInner() {
         throw new Error();
       }
       if (!res.ok) throw new Error();
+      await clearApiCache();     // nothing cached from a previous account survives a new login
       refetch();                 // reload the user context so the new session shows immediately
       router.push('/dashboard');
     } catch {

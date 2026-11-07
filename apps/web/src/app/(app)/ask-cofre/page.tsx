@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import ChatMarkdown from '@/components/ChatMarkdown';
-import Sidebar from '@/components/Sidebar';
 import { useAiChat } from '@/hooks/useAiChat';
 import { useUser } from '@/components/UserProvider';
 import ProposalCard from './ProposalCard';
@@ -81,8 +80,7 @@ export default function AskCofrePage() {
 
   if (user && user.plan === 'free') {
     return (
-      <div className="flex h-dvh overflow-hidden">
-        <Sidebar />
+      <div className="contents">
         <main className="flex-1 flex items-center justify-center p-6 pt-20 md:pt-6">
           <div className="max-w-md text-center rounded-2xl p-8 flex flex-col items-center gap-4"
             style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
@@ -102,8 +100,7 @@ export default function AskCofrePage() {
   }
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+    <div className="contents">
       <main className="flex-1 overflow-hidden pt-14 md:pt-0 flex">
         {/* Phones get a compact header and tighter spacing so the conversation keeps most of the height. */}
         <div className="flex-1 flex flex-col min-w-0 px-4 sm:px-6 md:px-8 py-3 sm:py-6 gap-3 sm:gap-4">

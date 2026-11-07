@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Sidebar from '@/components/Sidebar';
 import { useAdminStats, resetDemoOwner } from '@/hooks/useAdmin';
 import DemoResetPanel from './components/DemoResetPanel';
 import TrafficPanel from './components/TrafficPanel';
@@ -19,8 +18,7 @@ export default function AdminPage() {
   const refresh = () => { reload(); setRefreshKey((k) => k + 1); };
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+    <div className="contents">
       <main className="flex-1 min-w-0 overflow-y-auto pt-14 md:pt-0">
         <div className="px-4 sm:px-6 md:px-8 py-6 flex flex-col gap-5">
           {notFound ? (

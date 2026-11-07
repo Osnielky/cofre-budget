@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Sidebar from '@/components/Sidebar';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useNetWorthGoal } from '@/hooks/useNetWorthGoal';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -23,8 +22,7 @@ export default function GoalsPage() {
   const breakdown = netWorthBreakdown(accounts, debts, yearTx, currentMonth());
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+    <div className="contents">
       <main className="flex-1 min-w-0 overflow-y-auto pt-14 md:pt-0">
         {/* No width cap: on wide screens the chart row grows a third column (milestones). */}
         <Stagger className="px-4 sm:px-6 md:px-8 2xl:px-10 py-5 sm:py-6 flex flex-col gap-5">

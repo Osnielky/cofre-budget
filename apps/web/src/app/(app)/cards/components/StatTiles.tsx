@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import type { CardView } from '@/lib/cards/types';
 import { availableCredit, highestApr, nextPayment, shortDate } from '@/lib/cards/overview';
-import { fmt } from '@/app/debts/format';
+import { fmt } from '@/app/(app)/debts/format';
 import { PANEL, MUTED } from './panel';
 
 function Tile({ accent, icon, label, value, sub }: { accent: string; icon: ReactNode; label: string; value: string; sub: string }) {

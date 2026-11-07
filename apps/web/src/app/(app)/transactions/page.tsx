@@ -5,7 +5,6 @@ import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import RecurringPanel, { emptyRecurring, occurrenceDates, type RecurringState } from '@/components/RecurringPanel';
 import DatePicker from '@/components/DatePicker';
-import Sidebar from '@/components/Sidebar';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useApi } from '@/hooks/useApi';
 
@@ -1083,8 +1082,7 @@ export default function TransactionsPage() {
 
   /* ════════════════════════════════════════════════════════════ */
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+    <div className="contents">
 
       <main className="flex-1 overflow-y-auto min-w-0 pt-14 md:pt-0">
 

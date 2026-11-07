@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useBudgetScenario, API } from '@/hooks/useBudgetScenario';
 import { dailySeries, isIncomeBudget, monthsBack, shiftMonth, TREND_MONTHS } from '@/lib/budgets/assemble';
@@ -214,8 +213,7 @@ export default function BudgetsPage() {
   );
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+    <div className="contents">
       <main className="flex-1 min-w-0 overflow-y-auto pt-14 md:pt-0 flex flex-col">
 
         {/* ── Header ── */}

@@ -3,7 +3,7 @@
 import { totalUtilization, utilizationLevel, LEVEL_COLOR } from '@/lib/cards/utilization';
 import { utilizationRating } from '@/lib/cards/overview';
 import type { CardView } from '@/lib/cards/types';
-import { fmt } from '@/app/debts/format';
+import { fmt } from '@/app/(app)/debts/format';
 import { PANEL, MUTED } from './panel';
 
 export default function TotalUtilization({ cards }: { cards: CardView[] }) {

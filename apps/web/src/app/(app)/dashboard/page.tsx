@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import Sidebar from '@/components/Sidebar';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useUser } from '@/components/UserProvider';
 import { useThemeColors } from '@/components/ThemeProvider';
@@ -205,8 +204,7 @@ export default function DashboardPage() {
   const pill = 'items-center justify-center rounded-full text-[11.5px] sm:text-[12.5px] font-semibold uppercase no-underline transition-all px-4 py-2.5 sm:px-[26px] sm:py-3.5 tracking-[0.12em] sm:tracking-[0.18em] whitespace-nowrap';
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+    <div className="contents">
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
         {/* The page rises in: greeting, stat row, then each Panel in its turn (Panel carries the item variants). */}
         <Stagger className="px-4 sm:px-6 md:px-8 py-4 sm:py-6 flex flex-col gap-3 sm:gap-4">

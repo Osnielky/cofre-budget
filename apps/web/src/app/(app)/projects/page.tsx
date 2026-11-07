@@ -8,7 +8,6 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
   Tooltip, CartesianGrid, ReferenceLine,
 } from 'recharts';
-import Sidebar from '@/components/Sidebar';
 import ProjectCategoryForm, { ProjectCategoryValues } from './ProjectCategoryForm';
 import TradingAccountsSection from './trading/TradingAccountsSection';
 import AddAccountModal from './trading/AddAccountModal';
@@ -542,8 +541,7 @@ export default function ProjectsPage() {
     .slice(0, 60);
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+    <div className="contents">
       <main className="flex-1 flex flex-col overflow-hidden pt-14 md:pt-0">
 
         {/* Header */}

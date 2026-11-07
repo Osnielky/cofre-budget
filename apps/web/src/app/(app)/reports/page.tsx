@@ -3,7 +3,6 @@
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useThemeColors } from '@/components/ThemeProvider';
 import { useReportsData } from '@/hooks/useReportsData';
@@ -152,8 +151,7 @@ function Reports() {
   const setTab = (tab: ReportTab) => update({ tab, open: null });
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <Sidebar />
+    <div className="contents">
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
         <Stagger className="px-4 sm:px-6 py-4 sm:py-6 flex flex-col gap-4 sm:gap-5 max-w-[1920px]">
           {/* Header */}
