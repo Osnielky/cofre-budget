@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { usePlaidLink } from 'react-plaid-link';
 import Sidebar from '@/components/Sidebar';
+import { Stagger, StaggerItem } from '@/components/motion/stagger';
+import { useStretchIndicator } from '@/components/ui/useStretchIndicator';
 import CsvImportModal from '@/components/CsvImportModal';
 import CategoryManager from '@/components/CategoryManager';
 import RulesManager from '@/components/RulesManager';
@@ -655,6 +657,9 @@ function SettingsPageInner() {
     document.querySelector<HTMLElement>(`[data-settings-tab="${activeTab}"]`)
       ?.scrollIntoView({ block: 'nearest', inline: 'center' });
   }, [activeTab]);
+  /* The underline is one bar that stretches from tab to tab; 8px in from each tab edge. */
+  const tabWrapRef = useRef<HTMLDivElement>(null);
+  const tabIndicatorRef = useStretchIndicator(tabWrapRef, activeTab, { pad: 8 });
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -676,7 +681,9 @@ function SettingsPageInner() {
             {tabFade.left && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 w-10 z-10" style={{ background: 'linear-gradient(90deg, var(--header-bg), transparent)' }} />}
             {tabFade.right && <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-14 z-10" style={{ background: 'linear-gradient(270deg, var(--header-bg), transparent)' }} />}
             <div ref={tabStripRef} className="overflow-x-auto px-4 sm:px-6" style={{ scrollbarWidth: 'none' }}>
-              <div className="flex items-stretch gap-0.5 min-w-max">
+              <div ref={tabWrapRef} className="relative flex items-stretch gap-0.5 min-w-max">
+                <span ref={tabIndicatorRef} aria-hidden="true" className="absolute -bottom-px h-[2px] rounded-full pointer-events-none"
+                  style={{ opacity: 0, background: 'var(--color-primary)', boxShadow: '0 0 10px color-mix(in srgb, var(--color-primary) 70%, transparent)' }} />
                 {TABS.map((tab) => {
                   const active = activeTab === tab.id;
                   const danger = tab.id === 'data';
@@ -686,6 +693,7 @@ function SettingsPageInner() {
                       <button
                         type="button"
                         data-settings-tab={tab.id}
+                        data-tab-key={tab.id}
                         aria-current={active ? 'page' : undefined}
                         aria-label={danger ? tab.label : undefined}
                         title={danger ? tab.label : undefined}
@@ -701,10 +709,6 @@ function SettingsPageInner() {
                         ) : (
                           <span className={danger ? 'hidden sm:inline' : ''}>{tab.label}</span>
                         )}
-                        {active && (
-                          <span aria-hidden="true" className="absolute left-2 right-2 -bottom-px h-[2px] rounded-full"
-                            style={{ background: 'var(--color-primary)', boxShadow: '0 0 10px color-mix(in srgb, var(--color-primary) 70%, transparent)' }} />
-                        )}
                       </button>
                     </Fragment>
                   );
@@ -714,7 +718,8 @@ function SettingsPageInner() {
           </nav>
         </div>
 
-        <div className="p-4 sm:p-6">
+        {/* Keyed by the tab so each section rises in when picked. */}
+        <Stagger key={activeTab} className="p-4 sm:p-6"><StaggerItem>
 
           {/* ── BANK ACCOUNTS TAB ── */}
           {activeTab === 'banks' && (
@@ -1358,7 +1363,7 @@ function SettingsPageInner() {
           )}
           {activeTab === 'appearance' && <AppearanceTab />}
 
-        </div>
+        </StaggerItem></Stagger>
       </main>
 
       {importAccount && (

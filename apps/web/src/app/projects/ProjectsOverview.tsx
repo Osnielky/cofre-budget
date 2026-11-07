@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { isClosed } from '@/lib/projects/closure';
 import { headlineFigures, money, portfolioTotals, relativeDay, sparklinePoints, type OverviewProject, type TradingHeadline } from '@/lib/projects/overview';
+import { Stagger, StaggerItem } from '@/components/motion/stagger';
 
 /* The Projects landing: a strip of totals across every project and one card per
    project with the three figures its type cares about, a six-month sparkline and
@@ -74,9 +75,9 @@ export default function ProjectsOverview({ projects, loading, showClosed, onTogg
     .sort((a, b) => Number(isClosed(a.status)) - Number(isClosed(b.status)) || (b.lastActivity ?? '').localeCompare(a.lastActivity ?? ''));
 
   return (
-    <div className="px-3 sm:px-6 py-4 sm:py-5 flex flex-col gap-4 sm:gap-5" data-testid="projects-overview">
+    <Stagger className="px-3 sm:px-6 py-4 sm:py-5 flex flex-col gap-4 sm:gap-5" data-testid="projects-overview">
       {/* Portfolio strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+      <StaggerItem className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
         {[
           { label: 'Projects', value: `${totals.active} active`, sub: totals.closed ? `${totals.closed} closed` : 'none closed', clr: 'var(--color-text-primary)' },
           { label: 'Cost basis', value: money(totals.costBasis), sub: 'across every project', clr: 'var(--color-card-violet)' },
@@ -89,24 +90,28 @@ export default function ProjectsOverview({ projects, loading, showClosed, onTogg
             <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{k.sub}</p>
           </div>
         ))}
-      </div>
+      </StaggerItem>
 
       {loading && <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>}
 
       {!loading && projects.length === 0 && (
-        <div className="flex flex-col items-center gap-3 text-center py-16 px-4" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
+        <StaggerItem className="flex flex-col items-center gap-3 text-center py-16 px-4" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
           <span className="text-5xl opacity-25">📦</span>
           <p className="font-semibold text-sm">No projects yet</p>
           <p className="text-xs max-w-xs" style={{ color: 'var(--color-text-muted)' }}>Track a car flip, a rental, a side business or a trading account — cost basis, income and the result.</p>
           <button onClick={onCreate} className="mt-1 px-4 py-2 text-xs font-semibold text-white rounded-xl hover:brightness-110" style={{ background: 'var(--color-card-violet)' }}>
             Create first project
           </button>
-        </div>
+        </StaggerItem>
       )}
 
-      {/* Cards */}
+      {/* Cards, each rising in its turn. The wrapper takes the motion so the card keeps its hover lift. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
-        {visible.map((p) => <ProjectCard key={p.id} p={p} onOpen={onOpen} typeLabel={typeLabel} />)}
+        {visible.map((p) => (
+          <StaggerItem key={p.id} className="min-w-0 flex flex-col [&>*]:flex-1">
+            <ProjectCard p={p} onOpen={onOpen} typeLabel={typeLabel} />
+          </StaggerItem>
+        ))}
       </div>
 
       {projects.some((p) => isClosed(p.status)) && (
@@ -116,7 +121,7 @@ export default function ProjectsOverview({ projects, loading, showClosed, onTogg
           {showClosed ? 'Hide sold & terminated' : `Show sold & terminated (${projects.filter((p) => isClosed(p.status)).length})`}
         </button>
       )}
-    </div>
+    </Stagger>
   );
 }
 

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
+import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useUser } from '@/components/UserProvider';
 import { useThemeColors } from '@/components/ThemeProvider';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -207,11 +208,12 @@ export default function DashboardPage() {
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
-        <div className="px-4 sm:px-6 md:px-8 py-4 sm:py-6 flex flex-col gap-3 sm:gap-4">
+        {/* The page rises in: greeting, stat row, then each Panel in its turn (Panel carries the item variants). */}
+        <Stagger className="px-4 sm:px-6 md:px-8 py-4 sm:py-6 flex flex-col gap-3 sm:gap-4">
 
           {/* ── Topbar. Phones: smaller greeting, one status sentence, no rule, icon buttons;
                  the full pills and the two-sentence line return from sm. ── */}
-          <div className="flex items-end justify-between gap-3 sm:gap-6 flex-wrap">
+          <StaggerItem className="flex items-end justify-between gap-3 sm:gap-6 flex-wrap">
             <div className="min-w-0">
               <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(26px, 3.6vw, 48px)', lineHeight: 1.08 }}>
                 {greeting()}{user?.name ? <>, <span style={{ color: 'var(--color-primary)' }}>{user.name.split(' ')[0]}</span></> : ''}
@@ -247,7 +249,7 @@ export default function DashboardPage() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
               </Link>
             </div>
-          </div>
+          </StaggerItem>
 
           {/* ── Error banner ── */}
           {error && (
@@ -261,7 +263,7 @@ export default function DashboardPage() {
           )}
 
           {/* ── Stat cards ── */}
-          <StatCardsRow cards={statCards} loading={loading} />
+          <StaggerItem><StatCardsRow cards={statCards} loading={loading} /></StaggerItem>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-5">
             <IncomeExpensesPanel data={d.cashFlow} loading={loading} />
@@ -317,7 +319,7 @@ export default function DashboardPage() {
               <RecentTransactionsPanel transactions={transactions} loading={loading} />
             </div>
           </div>
-        </div>
+        </Stagger>
       </main>
     </div>
   );

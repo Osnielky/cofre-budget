@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceDot } from 'recharts';
 import { useThemeColors } from '@/components/ThemeProvider';
+import { StretchTabs } from '@/components/ui/StretchTabs';
 import { compactMoney } from '@/lib/goals/levels';
 import {
   RANGES, filterRange, rangeSummary, milestoneCrossings, rangeLabel, monthLabel,
@@ -92,15 +93,8 @@ export default function NetWorthHistoryChart({ points, loading, error }: Props) 
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div role="group" aria-label="Chart range" className="flex p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-            {RANGES.map((r) => (
-              <button key={r.id} type="button" aria-pressed={range === r.id} onClick={() => setRange(r.id)}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${range === r.id ? 'btn-gold' : ''}`}
-                style={range === r.id ? undefined : { color: 'var(--color-text-secondary)' }}>
-                {r.label}
-              </button>
-            ))}
-          </div>
+          <StretchTabs role="group" ariaLabel="Chart range" value={range} onChange={setRange}
+            items={RANGES.map((r) => ({ id: r.id, label: r.label }))} />
           {visible.length > 0 && (
             <span className="text-xs px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
               {rangeLabel(visible)}

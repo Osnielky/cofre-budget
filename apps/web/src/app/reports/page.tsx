@@ -4,6 +4,7 @@ import { Suspense, useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useThemeColors } from '@/components/ThemeProvider';
 import { useReportsData } from '@/hooks/useReportsData';
 import { resolveRange, parseYmd } from '@/lib/reports/range';
@@ -151,9 +152,9 @@ function Reports() {
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
-        <div className="px-4 sm:px-6 py-4 sm:py-6 flex flex-col gap-4 sm:gap-5 max-w-[1920px]">
+        <Stagger className="px-4 sm:px-6 py-4 sm:py-6 flex flex-col gap-4 sm:gap-5 max-w-[1920px]">
           {/* Header */}
-          <div className="flex items-start justify-between gap-3 flex-wrap">
+          <StaggerItem className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Reports</h1>
               <p className="text-sm mt-0.5 hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>Where the money went, and how that is changing.</p>
@@ -181,25 +182,28 @@ function Reports() {
                 <span aria-hidden="true">✦</span><span className="hidden sm:inline">Ask Cofre about this</span><span className="sm:hidden">Ask</span>
               </Link>
             </div>
-          </div>
+          </StaggerItem>
 
-          <RangeBar range={range} preset={state.preset} custom={custom} accounts={accounts} account={picked}
-            onPreset={(preset) => update({ preset, open: null })}
-            onCustom={(c) => update({ preset: 'custom', from: c.from, to: c.to, open: null })}
-            onAccount={(account) => update({ account, open: null })} />
+          <StaggerItem>
+            <RangeBar range={range} preset={state.preset} custom={custom} accounts={accounts} account={picked}
+              onPreset={(preset) => update({ preset, open: null })}
+              onCustom={(c) => update({ preset: 'custom', from: c.from, to: c.to, open: null })}
+              onAccount={(account) => update({ account, open: null })} />
+          </StaggerItem>
 
-          <QuestionChips state={state} onPick={(q) => update(applyQuestion(state, q))} />
+          <StaggerItem><QuestionChips state={state} onPick={(q) => update(applyQuestion(state, q))} /></StaggerItem>
 
           {error && <p className="text-sm rounded-xl px-4 py-3" style={{ color: 'var(--color-rose)', background: 'color-mix(in srgb, var(--color-rose) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-rose) 30%, transparent)' }}>{error}</p>}
 
-          <KpiStrip summary={summary} months={months} prevLabel={range.prevLabel} loading={loading} extras={kpiExtras} />
+          <StaggerItem><KpiStrip summary={summary} months={months} prevLabel={range.prevLabel} loading={loading} extras={kpiExtras} /></StaggerItem>
 
-          <Segmented value={state.tab} options={TABS} onChange={setTab} size="md" />
+          <StaggerItem><Segmented value={state.tab} options={TABS} onChange={setTab} size="md" ariaLabel="Report" /></StaggerItem>
 
           {loading ? (
             <p className="py-16 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>Building your report…</p>
           ) : (
-            <>
+            /* Keyed by tab so a tab change replays the rise; the Cards inside carry the item variants. */
+            <Stagger key={state.tab} className="flex flex-col gap-4 sm:gap-5">
               {state.tab === 'overview' && (
                 <div className="grid grid-cols-1 xl:grid-cols-5 2xl:grid-cols-9 gap-4">
                   <Card className="xl:col-span-3 2xl:col-span-4" title="Money flow" subtitle="Income sources → cash → where it went">
@@ -292,9 +296,9 @@ function Reports() {
                   <NetWorthTab history={history} range={range} />
                 </>
               )}
-            </>
+            </Stagger>
           )}
-        </div>
+        </Stagger>
       </main>
     </div>
   );

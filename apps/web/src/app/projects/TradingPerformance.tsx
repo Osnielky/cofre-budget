@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useNarrowScreen } from '@/hooks/useNarrowScreen';
+import { StretchTabs } from '@/components/ui/StretchTabs';
 import { monthLabel, monthSeries, monthStats, monthWindow, shortMoney } from '@/lib/investments/monthly';
 
 /* Performance section of a trading project linked to an investment account.
@@ -85,22 +86,11 @@ export default function TradingPerformance({ data, view, onEdit, onView }: {
       {/* Account switcher: the project total (when there is more than one account), then each account on its own */}
       {onView && (
       <div className="flex items-center gap-2 flex-wrap">
-        <div role="tablist" aria-label="Account" className="flex gap-1 p-1 rounded-xl max-w-full overflow-x-auto"
-          style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', scrollbarWidth: 'none' }}>
-          {[...(multi ? [{ id: 'all', name: 'All accounts', pnl: data.combined.realizedPnl }] : []), ...data.accounts.map((a) => ({ id: a.account.id, name: label(a.account), pnl: a.realizedPnl }))].map((tab) => {
-            const on = view === tab.id;
-            return (
-              <button key={tab.id} role="tab" aria-selected={on} onClick={() => onView(tab.id)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 whitespace-nowrap"
-                style={on
-                  ? { background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
-                  : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
-                {tab.name}
-                <span className="tabular-nums" style={{ color: on ? 'inherit' : pnlColor(tab.pnl), opacity: on ? 0.8 : 1 }}>{money(tab.pnl, true)}</span>
-              </button>
-            );
-          })}
-        </div>
+        <StretchTabs ariaLabel="Account" value={view} onChange={onView}
+          items={[...(multi ? [{ id: 'all', name: 'All accounts', pnl: data.combined.realizedPnl }] : []), ...data.accounts.map((a) => ({ id: a.account.id, name: label(a.account), pnl: a.realizedPnl }))].map((tab) => ({
+            id: tab.id,
+            label: <>{tab.name}<span className="tabular-nums" style={{ color: view === tab.id ? 'inherit' : pnlColor(tab.pnl), opacity: view === tab.id ? 0.8 : 1 }}>{money(tab.pnl, true)}</span></>,
+          }))} />
         {onEdit && (
           <button type="button" onClick={onEdit} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg hover:brightness-110"
             style={{ color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>

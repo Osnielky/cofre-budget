@@ -6,6 +6,8 @@ import dynamic from 'next/dynamic';
 import RecurringPanel, { emptyRecurring, occurrenceDates, type RecurringState } from '@/components/RecurringPanel';
 import DatePicker from '@/components/DatePicker';
 import Sidebar from '@/components/Sidebar';
+import { Stagger, StaggerItem } from '@/components/motion/stagger';
+import { StretchTabs, type StretchTabItem } from '@/components/ui/StretchTabs';
 import Avatar from '@/components/Avatar';
 import { useUser } from '@/components/UserProvider';
 import CsvImportModal from '@/components/CsvImportModal';
@@ -1447,10 +1449,9 @@ export default function TransactionsPage() {
           {/* ── Status tabs ── */}
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 flex-wrap min-w-0 max-w-full">
-              {/* Segmented controls scroll sideways on narrow phones rather than pushing the page wider. */}
-              <div className="flex gap-1 p-1 rounded-xl max-w-full overflow-x-auto"
-                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', scrollbarWidth: 'none' }}>
-                {([
+              {/* The strip scrolls sideways on narrow phones rather than pushing the page wider. */}
+              <StretchTabs ariaLabel="Show" value={filter} onChange={setFilter}
+                items={[
                   { id: 'all',       label: 'All',       count: ledger.length },
                   { id: 'expense',   label: 'Expenses',  count: ledger.filter((t) => Number(t.amount) < 0).length },
                   { id: 'income',    label: 'Income',    count: ledger.filter((t) => Number(t.amount) >= 0).length },
@@ -1459,38 +1460,16 @@ export default function TransactionsPage() {
                   ...(trades.length > 0 ? [{ id: 'trades' as Filter, label: 'Trades', count: trades.length }] : []),
                   /* Phones: the uncategorized pill joins this row as an amber tab (the pill
                      itself and the group-by control are desktop-only there). */
-                  { id: 'uncategorized', label: 'Uncategorized', count: uncategorizedCount, phoneOnly: true, amber: uncategorizedCount > 0 },
-                ] as { id: Filter; label: string; count: number; phoneOnly?: boolean; amber?: boolean }[]).map((f) => (
-                  <button key={f.id} onClick={() => setFilter(f.id)}
-                    className={`${f.phoneOnly ? 'sm:hidden' : ''} flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 whitespace-nowrap`}
-                    style={filter === f.id
-                      ? (f.amber
-                        ? { background: 'color-mix(in srgb, var(--color-amber) 18%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 45%, transparent)' }
-                        : { background: 'color-mix(in srgb, var(--color-primary) 22%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' })
-                      : { color: f.amber ? 'var(--color-amber)' : 'var(--color-text-secondary)', border: '1px solid transparent' }}>
-                    {f.amber && <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-amber)' }} />}
-                    {f.label}
-                    <span className="opacity-50">{f.count}</span>
-                  </button>
-                ))}
-              </div>
+                  {
+                    id: 'uncategorized', label: 'Uncategorized', count: uncategorizedCount, className: 'sm:hidden',
+                    tone: uncategorizedCount > 0 ? 'amber' : 'primary',
+                    icon: uncategorizedCount > 0 ? <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-amber)' }} /> : undefined,
+                  },
+                ] as StretchTabItem<Filter>[]} />
               <div className="hidden sm:flex items-center gap-2 flex-wrap">
                 <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>Group by</span>
-                <div role="radiogroup" aria-label="Group transactions by" className="flex gap-1 p-1 rounded-xl max-w-full overflow-x-auto"
-                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', scrollbarWidth: 'none' }}>
-                  {GROUP_BY_OPTIONS.map((o) => {
-                    const on = groupBy === o.value;
-                    return (
-                      <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => setGroupBy(o.value)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer shrink-0 whitespace-nowrap"
-                        style={on
-                          ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
-                          : { color: 'var(--color-text-muted)', border: '1px solid transparent' }}>
-                        {o.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                <StretchTabs role="radiogroup" ariaLabel="Group transactions by" value={groupBy} onChange={setGroupBy}
+                  items={GROUP_BY_OPTIONS.map((o) => ({ id: o.value, label: o.label }))} />
               </div>
             </div>
             <div className="hidden sm:flex items-center gap-2 flex-wrap">
@@ -1522,10 +1501,10 @@ export default function TransactionsPage() {
           </div>
         </div>
 
-        {/* ── Transaction list ── */}
-        <div className="px-3 sm:px-6 py-4 sm:py-5 flex flex-col gap-4">
+        {/* ── Transaction list. Keyed by the tab so a tab change replays the rise, group by group. ── */}
+        <Stagger key={filter} className="px-3 sm:px-6 py-4 sm:py-5 flex flex-col gap-4">
           {filter === 'trades' && !loading && (
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-xs"
+            <StaggerItem className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3 text-xs"
               style={{ ...glass, borderRadius: 'var(--radius-card)', color: 'var(--color-text-secondary)' }}
               data-testid="trades-summary">
               <span className="font-semibold" style={{ color: 'var(--color-text-primary)' }}>
@@ -1537,7 +1516,7 @@ export default function TransactionsPage() {
               <span className="basis-full sm:basis-auto sm:ml-auto" style={{ color: 'var(--color-text-muted)' }}>
                 Buys and sells move money between cash and holdings inside the account — nothing to categorize. Deposits, dividends and interest stay in All.
               </span>
-            </div>
+            </StaggerItem>
           )}
 
           {loading ? (
@@ -1579,7 +1558,7 @@ export default function TransactionsPage() {
               const dates = Object.keys(dateMap).sort((a, b) => b.localeCompare(a));
 
               return (
-                <div key={accountId} className="flex flex-col gap-2">
+                <StaggerItem key={accountId} className="flex flex-col gap-2">
 
                   {/* ── Account header ── */}
                   <button
@@ -2704,11 +2683,11 @@ export default function TransactionsPage() {
                   })}
                   </div>
                   )}
-                </div>
+                </StaggerItem>
               );
             })
           )}
-        </div>
+        </Stagger>
 
         {/* Split transaction modal (manual — no receipt involved) */}
         {splitTx && (

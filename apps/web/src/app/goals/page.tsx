@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
+import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useNetWorthGoal } from '@/hooks/useNetWorthGoal';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useNetWorthHistory } from '@/hooks/useNetWorthHistory';
@@ -26,8 +27,8 @@ export default function GoalsPage() {
       <Sidebar />
       <main className="flex-1 min-w-0 overflow-y-auto pt-14 md:pt-0">
         {/* No width cap: on wide screens the chart row grows a third column (milestones). */}
-        <div className="px-4 sm:px-6 md:px-8 2xl:px-10 py-5 sm:py-6 flex flex-col gap-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+        <Stagger className="px-4 sm:px-6 md:px-8 2xl:px-10 py-5 sm:py-6 flex flex-col gap-5">
+          <StaggerItem className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(26px, 3vw, 38px)' }}>Your road to $1,000,000</h1>
               <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>See how far you&rsquo;ve come. Keep building what&rsquo;s next.</p>
@@ -40,7 +41,7 @@ export default function GoalsPage() {
               </svg>
               Update assets
             </Link>
-          </div>
+          </StaggerItem>
 
           {goalLoading || dataLoading ? (
             <div className="flex flex-col gap-5" aria-busy="true">
@@ -51,26 +52,26 @@ export default function GoalsPage() {
             <p style={{ color: 'var(--color-rose)' }}>{goalError ?? 'Could not load your net worth goal.'}</p>
           ) : (
             <>
-              <GoalsHero netWorth={breakdown.total} monthNet={breakdown.monthNet} />
+              <StaggerItem><GoalsHero netWorth={breakdown.total} monthNet={breakdown.monthNet} /></StaggerItem>
               {dataError && <p className="text-sm" style={{ color: 'var(--color-rose)' }}>{dataError}</p>}
               {/* Two columns from xl, balanced by height: chart + wide net-worth mix on the left,
                   next step + milestones on the right. Stacked below xl. */}
               {/* Below xl the column wrappers dissolve (`contents`) so the cards stack in reading
-                  order: chart, next step, mix, milestones. */}
+                  order: chart, next step, mix, milestones. Each cell rises in its turn. */}
               <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] gap-5 items-start">
                 <div className="contents xl:flex xl:flex-col xl:gap-5 xl:min-w-0">
-                  <div className="order-1 xl:order-none min-w-0"><NetWorthHistoryChart points={history.points} loading={history.loading} error={history.error} /></div>
-                  <div className="order-3 xl:order-none min-w-0"><NetWorthMixCard breakdown={breakdown} /></div>
+                  <StaggerItem className="order-1 xl:order-none min-w-0"><NetWorthHistoryChart points={history.points} loading={history.loading} error={history.error} /></StaggerItem>
+                  <StaggerItem className="order-3 xl:order-none min-w-0"><NetWorthMixCard breakdown={breakdown} /></StaggerItem>
                 </div>
                 <div className="contents xl:flex xl:flex-col xl:gap-5 xl:min-w-0">
-                  <div className="order-2 xl:order-none min-w-0"><NextStepCard netWorth={breakdown.total} history={history.points} targetDate={goal.targetDate} onSetTargetDate={setTargetDate} /></div>
-                  <div className="order-4 xl:order-none min-w-0"><MilestonesCard netWorth={breakdown.total} history={history.points} /></div>
+                  <StaggerItem className="order-2 xl:order-none min-w-0"><NextStepCard netWorth={breakdown.total} history={history.points} targetDate={goal.targetDate} onSetTargetDate={setTargetDate} /></StaggerItem>
+                  <StaggerItem className="order-4 xl:order-none min-w-0"><MilestonesCard netWorth={breakdown.total} history={history.points} /></StaggerItem>
                 </div>
               </div>
-              <WealthJourney netWorth={breakdown.total} />
+              <StaggerItem><WealthJourney netWorth={breakdown.total} /></StaggerItem>
             </>
           )}
-        </div>
+        </Stagger>
       </main>
     </div>
   );

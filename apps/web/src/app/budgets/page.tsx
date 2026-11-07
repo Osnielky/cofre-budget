@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useBudgetScenario, API } from '@/hooks/useBudgetScenario';
 import { dailySeries, isIncomeBudget, monthsBack, shiftMonth, TREND_MONTHS } from '@/lib/budgets/assemble';
 import { categoryTotals, foldOther, inCashFlow, txInMonth } from '@/lib/dashboard/derive';
@@ -254,7 +255,8 @@ export default function BudgetsPage() {
           </div>
         </header>
 
-        <div className="flex-1 px-4 sm:px-6 py-5 flex flex-col gap-4 sm:gap-5">
+        {/* Rises in: summary cards, then each SectionCard in its turn (SectionCard carries the item variants). */}
+        <Stagger className="flex-1 px-4 sm:px-6 py-5 flex flex-col gap-4 sm:gap-5">
           {s.loadError && (
             <div role="alert" className="px-4 py-3 rounded-xl text-xs flex items-center gap-2"
               style={{ background: 'color-mix(in srgb, var(--color-rose) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--color-rose) 40%, transparent)' }}>
@@ -272,7 +274,7 @@ export default function BudgetsPage() {
           ) : (
             <>
               {/* A — Summary */}
-              <BudgetSummaryCards plan={plan} categoryCount={budgetCount} />
+              <StaggerItem><BudgetSummaryCards plan={plan} categoryCount={budgetCount} /></StaggerItem>
 
               {/* B — Visualizations */}
               <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)] gap-4 sm:gap-5">
@@ -313,7 +315,7 @@ export default function BudgetsPage() {
 
             </>
           )}
-        </div>
+        </Stagger>
 
         <BudgetScenarioToolbar plan={plan} saving={s.saving} onSave={s.save} onDiscard={() => dispatch({ type: 'resetAll' })} />
       </main>

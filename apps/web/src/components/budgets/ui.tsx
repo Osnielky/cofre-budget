@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { motion } from 'motion/react';
+import { riseVariants } from '@/components/motion/stagger';
+import { StretchTabs } from '@/components/ui/StretchTabs';
 
 /* ── Stroke icons (24×24) ── */
 const PATHS = {
@@ -64,7 +67,8 @@ export function IconBadge({ name, color, size = 'md' }: { name: IconName; color:
 }
 
 export function SectionCard({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
-  return <section id={id} className={`rounded-2xl p-4 sm:p-5 min-w-0 ${className}`} style={glass}>{children}</section>;
+  /* A motion section so a card inside a <Stagger> rises in its turn (variants propagate). */
+  return <motion.section variants={riseVariants} id={id} className={`rounded-2xl p-4 sm:p-5 min-w-0 ${className}`} style={glass}>{children}</motion.section>;
 }
 
 export function SectionTitle({ icon, color, title, subtitle, right }: {
@@ -88,25 +92,10 @@ export function SectionTitle({ icon, color, title, subtitle, right }: {
 export function Segmented<T extends string>({ value, options, onChange, ariaLabel, size = 'sm' }: {
   value: T; options: readonly { value: T; label: string; count?: number }[]; onChange: (v: T) => void; ariaLabel: string; size?: 'sm' | 'xs';
 }) {
+  /* On the shared stretching pill; `value` here is the item id. */
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className="flex flex-wrap gap-1 p-1 rounded-xl"
-      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-      {options.map((o) => {
-        const on = o.value === value;
-        return (
-          <button key={o.value} type="button" role="radio" aria-checked={on} onClick={() => onChange(o.value)}
-            className={`${size === 'xs' ? 'px-2 py-1 text-[10.5px]' : 'px-2.5 py-1 text-[11px]'} rounded-lg font-semibold transition-colors flex items-center gap-1 cursor-pointer`}
-            style={on
-              ? { background: 'var(--color-primary)', color: '#fff' }
-              : { color: 'var(--color-text-muted)' }}>
-            {o.label}
-            {o.count != null && (
-              <span className="tabular-nums text-[10px] px-1 rounded" style={{ background: on ? 'rgba(255,255,255,0.18)' : 'var(--color-border)' }}>{o.count}</span>
-            )}
-          </button>
-        );
-      })}
-    </div>
+    <StretchTabs role="radiogroup" ariaLabel={ariaLabel} value={value} onChange={onChange} size={size === 'xs' ? 'xs' : 'sm'}
+      items={options.map((o) => ({ id: o.value, label: o.label, count: o.count ?? null }))} />
   );
 }
 

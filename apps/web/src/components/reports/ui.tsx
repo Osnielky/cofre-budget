@@ -4,6 +4,9 @@
    the glass card, a sparkline and an empty state. Theme variables only. */
 
 import type { ReactNode } from 'react';
+import { motion } from 'motion/react';
+import { riseVariants } from '@/components/motion/stagger';
+import { StretchTabs } from '@/components/ui/StretchTabs';
 
 export const money = (n: number, cents = true) =>
   `${n < 0 ? '−' : ''}$${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: cents ? 2 : 0 })}`;
@@ -29,8 +32,9 @@ export function Delta({ value, inverse = false, points = false, className = '' }
 export function Card({ title, subtitle, right, children, className = '', pad = true }: {
   title?: ReactNode; subtitle?: ReactNode; right?: ReactNode; children: ReactNode; className?: string; pad?: boolean;
 }) {
+  /* A motion section so a Card inside a <Stagger> rises in its turn (variants propagate). */
   return (
-    <section className={`rounded-2xl flex flex-col gap-3 min-w-0 ${pad ? 'p-4 sm:p-5' : ''} ${className}`}
+    <motion.section variants={riseVariants} className={`rounded-2xl flex flex-col gap-3 min-w-0 ${pad ? 'p-4 sm:p-5' : ''} ${className}`}
       style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
       {(title || right) && (
         <div className={`flex items-start justify-between gap-3 flex-wrap ${pad ? '' : 'px-4 sm:px-5 pt-4 sm:pt-5'}`}>
@@ -42,7 +46,7 @@ export function Card({ title, subtitle, right, children, className = '', pad = t
         </div>
       )}
       {children}
-    </section>
+    </motion.section>
   );
 }
 
@@ -63,24 +67,9 @@ export function Empty({ text }: { text: string }) {
   return <p className="py-10 text-center text-sm" style={{ color: 'var(--color-text-muted)' }}>{text}</p>;
 }
 
-export function Segmented<T extends string>({ value, options, onChange, size = 'sm' }: {
-  value: T; options: { id: T; label: string }[]; onChange: (v: T) => void; size?: 'sm' | 'md';
+/** The Reports tab strips (main tabs, period presets, sort and group toggles) on the shared stretching pill. */
+export function Segmented<T extends string>({ value, options, onChange, size = 'sm', ariaLabel }: {
+  value: T; options: { id: T; label: string }[]; onChange: (v: T) => void; size?: 'sm' | 'md'; ariaLabel?: string;
 }) {
-  return (
-    <div className="flex gap-1 p-1 rounded-xl max-w-full overflow-x-auto [scrollbar-width:none]"
-      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-      {options.map((o) => {
-        const on = o.id === value;
-        return (
-          <button key={o.id} type="button" onClick={() => onChange(o.id)} aria-pressed={on}
-            className={`${size === 'md' ? 'px-3.5 py-2 text-[13px]' : 'px-3 py-1.5 text-xs'} rounded-lg font-semibold whitespace-nowrap shrink-0 transition-colors cursor-pointer`}
-            style={on
-              ? { background: 'color-mix(in srgb, var(--color-primary) 20%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 40%, transparent)' }
-              : { color: 'var(--color-text-secondary)', border: '1px solid transparent' }}>
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
+  return <StretchTabs items={options} value={value} onChange={onChange} size={size} role="group" ariaLabel={ariaLabel} />;
 }

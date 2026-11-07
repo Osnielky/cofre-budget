@@ -1,5 +1,8 @@
 'use client';
 
+import { motion } from 'motion/react';
+import { riseVariants } from '@/components/motion/stagger';
+
 const glass: React.CSSProperties = {
   background: 'var(--color-surface)',
   backdropFilter: 'var(--glass-blur)',
@@ -18,19 +21,24 @@ interface PanelProps {
 }
 
 export default function Panel({ title, subtitle, legend, colSpan = 1, loading, children }: PanelProps) {
+  /* The motion wrapper (rises in its turn inside the dashboard's <Stagger>) is a
+     separate element from the glass card: the animation leaves an inline
+     `transform` behind, which would override .card-lift's hover transform. */
   return (
-    <div className={`card-lift flex flex-col gap-3 p-4 sm:p-6 rounded-2xl min-w-0 ${colSpan === 2 ? 'md:col-span-2' : ''}`} style={glass}>
-      <div className="flex items-start justify-between flex-wrap gap-2">
-        <div>
-          <p className="card-title">{title}</p>
-          {subtitle && <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{subtitle}</p>}
+    <motion.div variants={riseVariants} className={`min-w-0 flex flex-col [&>*]:flex-1 ${colSpan === 2 ? 'md:col-span-2' : ''}`}>
+      <div className="card-lift flex flex-col gap-3 p-4 sm:p-6 rounded-2xl min-w-0" style={glass}>
+        <div className="flex items-start justify-between flex-wrap gap-2">
+          <div>
+            <p className="card-title">{title}</p>
+            {subtitle && <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{subtitle}</p>}
+          </div>
+          {legend}
         </div>
-        {legend}
+        {loading
+          ? <div className="flex-1 min-h-32 flex items-center justify-center text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</div>
+          : children}
       </div>
-      {loading
-        ? <div className="flex-1 min-h-32 flex items-center justify-center text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</div>
-        : children}
-    </div>
+    </motion.div>
   );
 }
 

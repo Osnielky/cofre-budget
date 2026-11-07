@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ComposedChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
 import { useThemeColors } from '@/components/ThemeProvider';
 import Panel, { Legend, PanelEmpty } from '../Panel';
+import { StretchTabs } from '@/components/ui/StretchTabs';
 import { makeChartTheme, fmt } from '../chartTheme';
 import type { TrendPoint } from '@/lib/dashboard/derive';
 
@@ -85,17 +86,8 @@ export default function CashFlowTrendPanel({ data, loading }: { data: TrendPoint
       legend={
         /* Phones: pills left, legend right on one line under the title; from sm both sit right. */
         <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto justify-between sm:justify-end">
-          <div className="flex items-center gap-0.5 p-0.5 rounded-lg" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-            {RANGES.map((r) => (
-              <button key={r.id} onClick={() => setRange(r.id)}
-                className="px-2.5 py-1 rounded-md text-[10.5px] font-semibold transition-all cursor-pointer"
-                style={range === r.id
-                  ? { background: 'color-mix(in srgb, var(--color-primary) 20%, transparent)', color: 'var(--color-primary)' }
-                  : { color: 'var(--color-text-muted)' }}>
-                {r.id}
-              </button>
-            ))}
-          </div>
+          <StretchTabs role="group" ariaLabel="Chart range" size="xs" value={range} onChange={setRange}
+            items={RANGES.map((r) => ({ id: r.id, label: r.id }))} />
           <Legend items={[
             { label: 'Income', color: tc.green, line: true },
             { label: 'Expenses', color: tc.orange, line: true },
