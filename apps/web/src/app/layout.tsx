@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Great_Vibes } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import ThemeProvider from '@/components/ThemeProvider';
 import UserProvider from '@/components/UserProvider';
@@ -8,8 +8,9 @@ import PageViewBeacon from '@/components/PageViewBeacon';
 import WebVitals from '@/components/WebVitals';
 import { SITE_URL, SITE_NAME, HOME_DESCRIPTION } from '@/lib/seo';
 
+// Only Inter here. The auth pages' script face (Great Vibes) loads in app/(auth)/layout.tsx,
+// so app pages never download it.
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
-const script = Great_Vibes({ subsets: ['latin'], weight: '400', variable: '--font-script' });
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -26,7 +27,7 @@ export const viewport: Viewport = { themeColor: '#0B1326' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${script.variable}`} data-theme="cobalt" suppressHydrationWarning>
+    <html lang="en" className={inter.variable} data-theme="cobalt" suppressHydrationWarning>
       <body className="text-text-primary antialiased" suppressHydrationWarning>
         <WebVitals />
         <ThemeProvider>

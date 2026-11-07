@@ -6,7 +6,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import Logo from './Logo';
 import Avatar from './Avatar';
 import { useUser } from './UserProvider';
-import ReportProblemModal from './support/ReportProblemModal';
+import dynamic from 'next/dynamic';
+
+/* Loaded on first click only: the modal pulls in html-to-image, which no other page needs. */
+const ReportProblemModal = dynamic(() => import('./support/ReportProblemModal'), { ssr: false });
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 

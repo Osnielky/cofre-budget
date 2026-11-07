@@ -25,12 +25,15 @@ import PaceChart from '@/components/reports/PaceChart';
 import CategoryList from '@/components/reports/CategoryList';
 import CategoryStackChart from '@/components/reports/CategoryStackChart';
 import WeekdayChart from '@/components/reports/WeekdayChart';
-import MerchantsTable from '@/components/reports/MerchantsTable';
 import MerchantsMini from '@/components/reports/MerchantsMini';
 import MovesPanel from '@/components/reports/MovesPanel';
 import LargestList from '@/components/reports/LargestList';
-import CashFlowTab from '@/components/reports/CashFlowTab';
-import NetWorthTab from '@/components/reports/NetWorthTab';
+import dynamic from 'next/dynamic';
+
+/* Whole-tab bodies the Overview never shows: their own chunks, fetched on first open. */
+const MerchantsTable = dynamic(() => import('@/components/reports/MerchantsTable'));
+const CashFlowTab = dynamic(() => import('@/components/reports/CashFlowTab'));
+const NetWorthTab = dynamic(() => import('@/components/reports/NetWorthTab'));
 
 const TABS: { id: ReportTab; label: string }[] = [
   { id: 'overview', label: 'Overview' }, { id: 'spending', label: 'Spending' }, { id: 'income', label: 'Income' },

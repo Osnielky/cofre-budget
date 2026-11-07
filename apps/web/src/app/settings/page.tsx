@@ -3,26 +3,31 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment, FormEvent, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
-import { usePlaidLink } from 'react-plaid-link';
+import dynamic from 'next/dynamic';
+import PlaidLauncher from '@/components/PlaidLauncher';
 import Sidebar from '@/components/Sidebar';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useStretchIndicator } from '@/components/ui/useStretchIndicator';
-import CsvImportModal from '@/components/CsvImportModal';
-import CategoryManager from '@/components/CategoryManager';
-import RulesManager from '@/components/RulesManager';
-import RecurringManager from '@/components/RecurringManager';
-import ProjectCategoryManager from '@/components/ProjectCategoryManager';
-import AccountSettings from '@/components/AccountSettings';
 import BankSelect, { BANKS } from '@/components/BankSelect';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
-import DataResetModal from '@/components/DataResetModal';
-import PlaidMergeReviewModal, { PreviewExchangeResult } from '@/components/PlaidMergeReviewModal';
-import IntegrationsTab from '@/components/IntegrationsTab';
-import BillingTab from '@/components/BillingTab';
-import AppearanceTab from '@/components/AppearanceTab';
+import type { PreviewExchangeResult } from '@/components/PlaidMergeReviewModal';
 import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
 import { connectBankError, InstitutionLimitError } from '@/lib/connect-bank-error';
-import MyTicketsList from '@/components/support/MyTicketsList';
+
+/* One tab shows at a time, so each tab body and modal is its own chunk and only
+   downloads when opened. The Bank Accounts tab (the default) stays inline. */
+const CategoryManager = dynamic(() => import('@/components/CategoryManager'));
+const RulesManager = dynamic(() => import('@/components/RulesManager'));
+const RecurringManager = dynamic(() => import('@/components/RecurringManager'));
+const ProjectCategoryManager = dynamic(() => import('@/components/ProjectCategoryManager'));
+const AccountSettings = dynamic(() => import('@/components/AccountSettings'));
+const IntegrationsTab = dynamic(() => import('@/components/IntegrationsTab'));
+const BillingTab = dynamic(() => import('@/components/BillingTab'));
+const AppearanceTab = dynamic(() => import('@/components/AppearanceTab'));
+const MyTicketsList = dynamic(() => import('@/components/support/MyTicketsList'));
+const CsvImportModal = dynamic(() => import('@/components/CsvImportModal'), { ssr: false });
+const DataResetModal = dynamic(() => import('@/components/DataResetModal'), { ssr: false });
+const PlaidMergeReviewModal = dynamic(() => import('@/components/PlaidMergeReviewModal'), { ssr: false });
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -478,17 +483,12 @@ function SettingsPageInner() {
     }
   }, [linkMode, reconnectItemId]);
 
-  const { open: openLink, ready: linkReady } = usePlaidLink({
-    token: linkToken ?? '', onSuccess: onPlaidSuccess,
-    onExit: () => {
-      setLinkToken(null); setConnecting(false); setReconnectItemId(null);
-      sessionStorage.removeItem('plaidLinkToken');
-      sessionStorage.removeItem('plaidLinkMode');
-      sessionStorage.removeItem('plaidReconnectItemId');
-    },
-  });
-
-  useEffect(() => { if (linkToken && linkReady) openLink(); }, [linkToken, linkReady, openLink]);
+  const onPlaidExit = useCallback(() => {
+    setLinkToken(null); setConnecting(false); setReconnectItemId(null);
+    sessionStorage.removeItem('plaidLinkToken');
+    sessionStorage.removeItem('plaidLinkMode');
+    sessionStorage.removeItem('plaidReconnectItemId');
+  }, []);
 
   async function handleGmailDisconnect() {
     if (!confirm('Disconnect Gmail? Cached receipts will remain.')) return;
@@ -664,6 +664,8 @@ function SettingsPageInner() {
   return (
     <div className="flex h-dvh overflow-hidden">
       <Sidebar />
+      {/* Plaid's script is only fetched once a link is about to open. */}
+      {linkToken && <PlaidLauncher token={linkToken} onSuccess={onPlaidSuccess} onExit={onPlaidExit} />}
 
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
         {/* Page header */}

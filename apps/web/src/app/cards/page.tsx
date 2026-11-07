@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { usePlaidLink } from 'react-plaid-link';
+import PlaidLauncher from '@/components/PlaidLauncher';
 import Sidebar from '@/components/Sidebar';
 import TotalUtilization from './components/TotalUtilization';
 import StatTiles from './components/StatTiles';
@@ -97,8 +97,6 @@ export default function CardsPage() {
     load();
   }, [consentItemId, load]);
 
-  const { open, ready } = usePlaidLink({ token: linkToken ?? '', onSuccess, onExit: clearHandoff });
-  useEffect(() => { if (linkToken && ready) open(); }, [linkToken, ready, open]);
 
   const today = localToday();
   const deck = useMemo(() => buildDeck(cards, debit), [cards, debit]);
@@ -170,6 +168,7 @@ export default function CardsPage() {
           <CardProfileForm />
         </div>
 
+        {linkToken && <PlaidLauncher token={linkToken} onSuccess={onSuccess} onExit={clearHandoff} />}
         <CardDetailDrawer card={editing} onClose={() => setEditing(null)}
           onSaved={(updated) => setCards((prev) => prev.map((c) => (c.accountId === updated.accountId ? updated : c)))} />
       </main>
