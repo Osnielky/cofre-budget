@@ -83,6 +83,7 @@ export class RecurringService {
   }
 
   async create(userId: string, dto: CreateRuleDto): Promise<RecurringRule> {
+    this.materialised.delete(userId);
     const rule = this.repo.create({
       userId,
       amount: dto.amount,
@@ -115,6 +116,7 @@ export class RecurringService {
   }
 
   async remove(id: string, userId: string, deleteFuture = false): Promise<void> {
+    this.materialised.delete(userId);
     const rule = await this.repo.findOneBy({ id });
     if (!rule) throw new NotFoundException();
     if (rule.userId !== userId) throw new ForbiddenException();
@@ -138,6 +140,7 @@ export class RecurringService {
   }
 
   async stop(id: string, userId: string): Promise<RecurringRule> {
+    this.materialised.delete(userId);
     const rule = await this.own(id, userId);
     rule.active = false;
     return this.repo.save(rule);
@@ -145,6 +148,7 @@ export class RecurringService {
 
   /** Un-pause. Any occurrences that fell due while paused are written on resume. */
   async resume(id: string, userId: string): Promise<RecurringRule> {
+    this.materialised.delete(userId);
     const rule = await this.own(id, userId);
     rule.active = true;
     const saved = await this.repo.save(rule);
@@ -177,20 +181,34 @@ export class RecurringService {
    * advance only for occurrences actually written, so a second call in the same
    * second is a no-op.
    */
-  async materialiseDue(userId: string): Promise<number> {
+  async materialiseDue(userId: string, now: Date = new Date()): Promise<number> {
+    // Once per user per day on this instance: occurrences are dated, so a rule
+    // that was brought up to date this morning has nothing new until tomorrow.
+    // Every page that lists transactions calls this, several times in parallel,
+    // and each rule costs a locked read-modify-write; without the memo that ran
+    // on every call. Creating, stopping, resuming or removing a rule clears it.
+    const today = iso(now);
+    if (this.materialised.get(userId) === today) return 0;
+
     // Ids only: each rule is re-read under its own lock a moment from now, so
-    // anything loaded here would be stale by the time we acted on it.
+    // anything loaded here would be stale by the time we acted on it. Rules
+    // already run today are left out in SQL.
     const candidates = await this.repo
       .createQueryBuilder('rule')
       .select('rule.id', 'id')
       .where('rule.userId = :userId', { userId })
       .andWhere('rule.active = true')
+      .andWhere('(rule.lastRunDate IS NULL OR rule.lastRunDate < :today)', { today })
       .getRawMany<{ id: string }>();
 
     let written = 0;
     for (const { id } of candidates) written += await this.materialiseRule(id);
+    this.materialised.set(userId, today);
     return written;
   }
+
+  /** userId → the ISO day it was last brought up to date on this instance. */
+  private readonly materialised = new Map<string, string>();
 
   /**
    * Materialise one rule's due occurrences, holding a row lock for the duration.
