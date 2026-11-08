@@ -11,7 +11,7 @@ export default function BudgetActualPanel({ budgets, monthLabel, picker, loading
 }) {
   const tc = useThemeColors();
   return (
-    <Panel title="Budget vs Actual" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading}>
+    <Panel title="Budget vs Actual" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading} skeleton="chart">
       {budgets.length === 0 ? <PanelEmpty message="No budgets set. Create budgets to track spending against targets." /> : (
         <ul className="flex flex-col gap-2.5">
           {budgets.map((b) => {

@@ -56,7 +56,7 @@ export default function CategoryDonutPanel({ title, subtitle, slices: rawSlices,
   );
 
   return (
-    <Panel title={title} subtitle={subtitle} loading={loading} colSpan={colSpan}
+    <Panel title={title} subtitle={subtitle} loading={loading} skeleton="donut" colSpan={colSpan}
       legend={(
         <div className="flex items-center gap-1.5 flex-wrap justify-end">
           {periodOptions && periodOptions.length > 0 && onPeriodChange && (

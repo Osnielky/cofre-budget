@@ -89,7 +89,7 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
   ] : [];
 
   return (
-    <Panel colSpan={2} loading={loading}
+    <Panel colSpan={2} loading={loading} skeleton="chart"
       title={<><span style={{ color: tc.green }}>Income</span> vs <span style={{ color: tc.rose }}>Expenses</span></>}
       subtitle={`${new Date().getFullYear()} · year to date`}
       legend={

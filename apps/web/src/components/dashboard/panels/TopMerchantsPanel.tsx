@@ -9,7 +9,7 @@ export default function TopMerchantsPanel({ merchants, loading }: { merchants: M
   const tc = useThemeColors();
   const max = merchants[0]?.total || 1;
   return (
-    <Panel title="Top Merchants" subtitle="This month" loading={loading}>
+    <Panel title="Top Merchants" subtitle="This month" loading={loading} skeleton="list">
       {merchants.length === 0 ? <PanelEmpty message="No purchases recorded this month." /> : (
         <ul className="flex flex-col gap-2.5">
           {merchants.map((m) => (

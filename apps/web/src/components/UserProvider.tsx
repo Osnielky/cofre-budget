@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { clearApiCache } from '@/lib/api/cache';
+import { readCachedUser, writeCachedUser } from '@/lib/user/cache';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
@@ -37,6 +38,10 @@ export function useUser() {
   return useContext(UserContext);
 }
 
+function storage(): Storage | undefined {
+  return typeof window !== 'undefined' ? window.localStorage : undefined;
+}
+
 export default function UserProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   // Signed-in users never render `/` (middleware redirects them to /dashboard),
@@ -48,7 +53,7 @@ export default function UserProvider({ children }: { children: React.ReactNode }
     setLoading(true);
     fetch(`${API}/auth/me`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
-      .then(u => { setUser(u); setLoading(false); })
+      .then(u => { setUser(u); writeCachedUser(storage(), u); setLoading(false); })
       .catch(() => setLoading(false));
   }
 
@@ -57,12 +62,23 @@ export default function UserProvider({ children }: { children: React.ReactNode }
       setLoading(false);
       return;
     }
+    /* Paint the last known name, avatar and plan at once (lib/user/cache keeps
+       only display fields), then confirm with the server. `loading` stays true
+       until /auth/me answers, so nothing that gates on it trusts the cache. */
+    const cached = readCachedUser(storage());
+    if (cached) setUser((current) => current ?? cached);
     fetchUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function clearUser() {
+    setUser(null);
+    writeCachedUser(storage(), null);
+    void clearApiCache();
+  }
+
   return (
-    <UserContext.Provider value={{ user, loading, clearUser: () => { setUser(null); void clearApiCache(); }, refetch: fetchUser }}>
+    <UserContext.Provider value={{ user, loading, clearUser, refetch: fetchUser }}>
       {children}
     </UserContext.Provider>
   );

@@ -91,7 +91,7 @@ export default function StatCardsRow({ cards, loading }: { cards: StatCardDef[];
               </span>
             </div>
             <p className={`${hero ? 'text-[26px]' : 'text-[17px]'} sm:text-[22px] leading-7 font-bold tabular-nums truncate`}>
-              {loading ? <span className="opacity-30">—</span> : c.value}
+              {loading ? <span className="skel inline-block h-5 sm:h-6 w-24 max-w-full rounded-md align-middle" /> : c.value}
             </p>
             <p className="flex items-center gap-1.5 text-[11px] min-w-0">
               {!loading && c.delta != null && Math.abs(c.delta) >= 0.5 && (
@@ -99,7 +99,9 @@ export default function StatCardsRow({ cards, loading }: { cards: StatCardDef[];
                   {c.delta > 0 ? '↑' : '↓'} {Math.abs(c.delta).toFixed(1)}%
                 </span>
               )}
-              <span className="truncate" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>
+              {loading
+                ? <span className="skel inline-block h-3 w-20 rounded" />
+                : <span className="truncate" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>}
             </p>
             <div className={hero ? '' : 'hidden sm:block'}>
               <Sparkline values={loading ? [] : c.spark} color={c.accent} />

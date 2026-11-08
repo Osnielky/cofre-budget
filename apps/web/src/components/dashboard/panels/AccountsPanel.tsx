@@ -38,7 +38,7 @@ export default function AccountsPanel({ accounts, netWorth, loading }: {
   const totalAssets  = netWorth + totalDebt;
 
   return (
-    <Panel title="Accounts" loading={loading}
+    <Panel title="Accounts" loading={loading} skeleton="list"
       legend={
         <div className="text-right">
           <p className="text-xs font-black tabular-nums" style={{ color: 'var(--color-primary)' }}>${fmt(netWorth)}</p>

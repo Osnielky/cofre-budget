@@ -13,7 +13,7 @@ export default function ProjectsPanel({ projects, loading }: { projects: Project
   const totalNetGain   = projects.filter((p) => p.netGain != null).reduce((s, p) => s + Number(p.netGain), 0);
 
   return (
-    <Panel colSpan={2} title="Projects" loading={loading}
+    <Panel colSpan={2} title="Projects" loading={loading} skeleton="list"
       subtitle={
         <>
           {activeProjects.length} active · ${fmt(totalInvested)} invested · Net P&L{' '}

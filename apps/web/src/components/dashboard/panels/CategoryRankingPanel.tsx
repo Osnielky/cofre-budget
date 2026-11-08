@@ -10,7 +10,7 @@ export default function CategoryRankingPanel({ slices, monthLabel, picker, loadi
 }) {
   const max = slices[0]?.value || 1;
   return (
-    <Panel title="Category Spending Ranking" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading}>
+    <Panel title="Category Spending Ranking" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading} skeleton="list">
       {slices.length === 0 ? <PanelEmpty message="No spending in this month yet." /> : (
         <ul className="flex flex-col gap-2.5">
           {slices.map((s) => (

@@ -12,7 +12,7 @@ export default function RecentTransactionsPanel({ transactions, loading }: { tra
   const recent = [...transactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8);
 
   return (
-    <Panel title="Recent Transactions" loading={loading}
+    <Panel title="Recent Transactions" loading={loading} skeleton="list"
       legend={<Link href="/transactions" className="text-xs font-semibold hover:opacity-80 transition-opacity" style={{ color: 'var(--color-primary)' }}>View all →</Link>}>
       {recent.length === 0 ? (
         <PanelEmpty message="No transactions this month yet." />

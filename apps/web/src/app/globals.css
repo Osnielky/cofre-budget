@@ -769,3 +769,11 @@ body::before {
   border-radius: 1px;
   animation: chat-caret 0.9s steps(1) infinite;
 }
+
+/* ── Skeletons (components/dashboard/PanelSkeleton, StatCardsRow, the dashboard
+   greeting). One breathing animation; .skel is a filled block, .skel-ink colours
+   SVG strokes / borders through currentColor. Both are theme-relative. ── */
+.skel { background: color-mix(in srgb, var(--color-text-muted) 16%, transparent); animation: skel-breathe 1.6s ease-in-out infinite; }
+.skel-ink { color: color-mix(in srgb, var(--color-text-muted) 26%, transparent); animation: skel-breathe 1.6s ease-in-out infinite; }
+@keyframes skel-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .skel, .skel-ink { animation: none; } }

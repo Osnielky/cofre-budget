@@ -21,7 +21,7 @@ export default function NetWorthGoalPanel() {
   const pct = data ? Math.min(100, Math.max(0, (data.current / data.target) * 100)) : 0;
 
   return (
-    <Panel title="Progress to $1M" subtitle="Net worth" loading={loading}>
+    <Panel title="Progress to $1M" subtitle="Net worth" loading={loading} skeleton="tiles">
       {!data ? (
         <PanelEmpty message="Couldn't load your net worth goal." />
       ) : (

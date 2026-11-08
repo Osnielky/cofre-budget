@@ -34,14 +34,14 @@ export default function SpendingPacePanel({ pace, monthLabel, picker, loading }:
   const tc = useThemeColors();
   if (!loading && !pace.hasBudgets) {
     return (
-      <Panel title="Spending Pace" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading}>
+      <Panel title="Spending Pace" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading} skeleton="line">
         <PanelEmpty message="Set budgets to see whether your spending pace will stay under them." />
       </Panel>
     );
   }
   const over = pace.overBy > 0;
   return (
-    <Panel title="Spending Pace" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading}>
+    <Panel title="Spending Pace" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading} skeleton="line">
       <div className="flex items-center justify-around">
         <Ring pct={pace.monthPct} color={tc.sky} label="of the month" sub="elapsed" />
         <Ring pct={pace.budgetPct} color={pace.budgetPct > pace.monthPct ? tc.amber : tc.violet} label="of the budget" sub="spent" />

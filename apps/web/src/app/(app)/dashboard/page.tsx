@@ -192,11 +192,9 @@ export default function DashboardPage() {
   const NUM_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
   const budgetsOver = spendingBudgets.filter(b => Number(b.amount) > 0 && Number(b.spent) / Number(b.amount) >= 0.8).length;
   const monthName   = monthLabel(month).split(' ')[0];
-  const healthLine  = loading ? 'Loading your financial snapshot…'
-    : net >= 0 ? 'Your portfolio of accounts is in excellent shape.'
+  const healthLine  = net >= 0 ? 'Your portfolio of accounts is in excellent shape.'
     : 'Spending is running ahead of income this month.';
-  const attentionLine = loading ? ''
-    : spendingBudgets.length === 0 ? 'Set up budgets to keep your spending on track.'
+  const attentionLine = spendingBudgets.length === 0 ? 'Set up budgets to keep your spending on track.'
     : budgetsOver === 0 ? `All budgets are on track for ${monthName}.`
     : `${NUM_WORDS[budgetsOver] ?? budgetsOver} budget${budgetsOver === 1 ? '' : 's'} need${budgetsOver === 1 ? 's' : ''} attention before the end of ${monthName}.`;
 
@@ -217,9 +215,11 @@ export default function DashboardPage() {
                 {greeting()}{user?.name ? <>, <span style={{ color: 'var(--color-primary)' }}>{user.name.split(' ')[0]}</span></> : ''}
               </h1>
               <div className="hidden sm:block rounded-full sm:mt-[18px] sm:mb-3.5" style={{ width: 56, height: 3, background: 'var(--color-primary)' }} />
-              <p className="mt-1.5 sm:mt-0 text-[13px] sm:text-[17px]" style={{ fontWeight: 300, color: 'var(--color-text-secondary)', maxWidth: 520, lineHeight: 1.5 }}>
-                <span className="hidden sm:inline">{healthLine} </span>{attentionLine}
-              </p>
+              {loading
+                ? <p className="mt-2.5 sm:mt-0 flex flex-col gap-2.5" aria-busy="true"><span className="skel block h-3.5 sm:h-4 w-72 max-w-full rounded" /><span className="skel hidden sm:block h-4 w-52 rounded" /></p>
+                : <p className="mt-1.5 sm:mt-0 text-[13px] sm:text-[17px]" style={{ fontWeight: 300, color: 'var(--color-text-secondary)', maxWidth: 520, lineHeight: 1.5 }}>
+                    <span className="hidden sm:inline">{healthLine} </span>{attentionLine}
+                  </p>}
             </div>
             <div className="flex items-center gap-2 sm:gap-3.5 pb-0 sm:pb-2 flex-wrap">
               {loading && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-green)' }} />}

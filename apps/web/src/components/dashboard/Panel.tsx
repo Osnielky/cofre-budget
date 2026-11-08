@@ -2,6 +2,7 @@
 
 import { motion } from 'motion/react';
 import { riseVariants } from '@/components/motion/stagger';
+import PanelSkeleton, { type SkeletonKind } from './PanelSkeleton';
 
 const glass: React.CSSProperties = {
   background: 'var(--color-surface)',
@@ -17,16 +18,18 @@ interface PanelProps {
   legend?: React.ReactNode;
   colSpan?: 1 | 2;
   loading?: boolean;
+  /** Shape of the ghost shown while `loading` — pick the one that looks like the real content. */
+  skeleton?: SkeletonKind;
   children: React.ReactNode;
 }
 
-export default function Panel({ title, subtitle, legend, colSpan = 1, loading, children }: PanelProps) {
+export default function Panel({ title, subtitle, legend, colSpan = 1, loading, skeleton = 'chart', children }: PanelProps) {
   /* The motion wrapper (rises in its turn inside the dashboard's <Stagger>) is a
      separate element from the glass card: the animation leaves an inline
      `transform` behind, which would override .card-lift's hover transform. */
   return (
     <motion.div variants={riseVariants} className={`min-w-0 flex flex-col [&>*]:flex-1 ${colSpan === 2 ? 'md:col-span-2' : ''}`}>
-      <div className="card-lift flex flex-col gap-3 p-4 sm:p-6 rounded-2xl min-w-0" style={glass}>
+      <div className="card-lift flex flex-col gap-3 p-4 sm:p-6 rounded-2xl min-w-0" style={glass} aria-busy={loading || undefined}>
         <div className="flex items-start justify-between flex-wrap gap-2">
           <div>
             <p className="card-title">{title}</p>
@@ -34,9 +37,7 @@ export default function Panel({ title, subtitle, legend, colSpan = 1, loading, c
           </div>
           {legend}
         </div>
-        {loading
-          ? <div className="flex-1 min-h-32 flex items-center justify-center text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</div>
-          : children}
+        {loading ? <PanelSkeleton kind={skeleton} /> : children}
       </div>
     </motion.div>
   );

@@ -17,7 +17,7 @@ export default function SpendingCalendarPanel({ cells, monthLabel, picker, loadi
   const [hover, setHover] = useState<CalendarCell | null>(null);
   const empty = !loading && cells.every((c) => c.total === 0);
   return (
-    <Panel title="Daily Spending" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading}>
+    <Panel title="Daily Spending" subtitle={picker ? undefined : monthLabel} legend={picker} loading={loading} skeleton="chart">
       {empty ? <PanelEmpty message="No spending recorded this month." /> : (
         <div className="flex flex-col gap-2">
           <div className="grid grid-cols-7 gap-1 text-center">

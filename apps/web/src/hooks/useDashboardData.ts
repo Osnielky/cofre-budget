@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo } from 'react';
 import type { Transaction, BankAccount, Budget, Project, Debt } from '@/lib/dashboard/types';
 import { useApi } from './useApi';
 import { monthRange, monthWithin, sliceMonth } from '@/lib/dashboard/monthSlice';
+import { budgetsKey, currentMonth, transactionsKey, yearRange } from '@/lib/dashboard/keys';
 
 const NO_TX: Transaction[] = [];
 const NO_ACCOUNTS: BankAccount[] = [];
@@ -11,24 +12,21 @@ const NO_BUDGETS: Budget[] = [];
 const NO_PROJECTS: Project[] = [];
 const NO_DEBTS: Debt[] = [];
 
-function currentMonth() { return new Date().toISOString().slice(0, 7); }
-
 /* Everything the dashboard reads, each list on its own cache key (hooks/useApi)
    so a month change refetches only the budgets for that month, and the Goals
    and Ask Cofre pages, which call this too, share the same responses. The
    month's rows come out of the year-to-date list whenever the month is in it;
    only a month outside the current year costs its own request. */
 export function useDashboardData() {
-  const [month, setMonth] = useState(currentMonth);
-  const yearFrom = `${new Date().getFullYear()}-01-01`;
-  const yearTo = new Date().toISOString().slice(0, 10);
+  const [month, setMonth] = useState(() => currentMonth());
+  const { from: yearFrom, to: yearTo } = yearRange();
   const inYear = monthWithin(month, yearFrom, yearTo);
   const { from, to } = monthRange(month);
 
-  const year = useApi<Transaction[]>(`/transactions?from=${yearFrom}&to=${yearTo}&limit=5000`, NO_TX);
-  const monthOnly = useApi<Transaction[]>(inYear ? null : `/transactions?from=${from}&to=${to}&limit=5000`, NO_TX);
+  const year = useApi<Transaction[]>(transactionsKey(yearFrom, yearTo), NO_TX);
+  const monthOnly = useApi<Transaction[]>(inYear ? null : transactionsKey(from, to), NO_TX);
   const accounts = useApi<BankAccount[]>('/bank-accounts', NO_ACCOUNTS);
-  const budgets = useApi<Budget[]>(`/budgets?month=${month}`, NO_BUDGETS);
+  const budgets = useApi<Budget[]>(budgetsKey(month), NO_BUDGETS);
   const projects = useApi<Project[]>('/projects', NO_PROJECTS);
   const debts = useApi<Debt[]>('/debts', NO_DEBTS);
 

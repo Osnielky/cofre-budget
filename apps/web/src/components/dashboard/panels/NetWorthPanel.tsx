@@ -9,7 +9,7 @@ export default function NetWorthPanel({ data, loading }: { data: NetWorthBreakdo
   const tc = useThemeColors();
   const gross = data.assets + data.liabilities;
   return (
-    <Panel title="Net Worth" subtitle="Current" loading={loading}>
+    <Panel title="Net Worth" subtitle="Current" loading={loading} skeleton="tiles">
       <div className="flex items-baseline gap-2">
         <p className="text-2xl font-bold tabular-nums">{data.total < 0 ? '-' : ''}${fmt(Math.abs(data.total))}</p>
         {data.deltaPct != null && (

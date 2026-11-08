@@ -205,7 +205,7 @@ export default function CategoryTrendPanel({ kind, groups, selectedId, onSelect,
   ];
 
   return (
-    <Panel colSpan={2} title={title} subtitle={subtitle} legend={picker || undefined} loading={loading}>
+    <Panel colSpan={2} title={title} subtitle={subtitle} legend={picker || undefined} loading={loading} skeleton="chart">
       {groups.length === 0 ? <PanelEmpty message={income ? 'No income this year yet.' : 'No spending this year yet.'} /> : (
         <div className="@container flex flex-col gap-3 flex-1">
           <div className="grid grid-cols-2 @md:grid-cols-4 gap-1.5 sm:gap-2">

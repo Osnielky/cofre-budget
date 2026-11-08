@@ -82,7 +82,7 @@ export default function CashFlowTrendPanel({ data, loading }: { data: TrendPoint
   const savingsRate = totIncome > 0 ? +((visible.reduce((s, p) => s + p.net, 0) / totIncome) * 100).toFixed(1) : null;
 
   return (
-    <Panel colSpan={2} title="Cash-Flow Trend" subtitle={range === 'YTD' ? 'Year to date' : `Last ${visible.length} months`} loading={loading}
+    <Panel colSpan={2} title="Cash-Flow Trend" subtitle={range === 'YTD' ? 'Year to date' : `Last ${visible.length} months`} loading={loading} skeleton="line"
       legend={
         /* Phones: pills left, legend right on one line under the title; from sm both sit right. */
         <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto justify-between sm:justify-end">
