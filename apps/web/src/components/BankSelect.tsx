@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import BankLogo from './BankLogo';
 
 export const BANKS: readonly { name: string; domain: string; color: string; abbr: string }[] = [
   { name: 'Chase',                domain: 'chase.com',              color: '#117ACA', abbr: 'CH' },
@@ -25,7 +26,7 @@ export const BANKS: readonly { name: string; domain: string; color: string; abbr
   { name: 'Webull',               domain: 'webull.com',             color: '#00B4D8', abbr: 'WB' },
 ] as const;
 
-type Bank = (typeof BANKS)[number];
+export type Bank = (typeof BANKS)[number];
 
 const glass: React.CSSProperties = {
   background: 'var(--popover-bg)',
@@ -50,7 +51,6 @@ export default function BankSelect({ value, onChange, inputStyle, compact = fals
 
   const [open, setOpen]           = useState(false);
   const [customMode, setCustomMode] = useState(isCustom);
-  const [imgErrors, setImgErrors]   = useState<Record<string, boolean>>({});
   const [dropPos, setDropPos]       = useState<DropPos | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -141,7 +141,7 @@ export default function BankSelect({ value, onChange, inputStyle, compact = fals
       >
         {selected ? (
           <>
-            <BankLogo bank={selected} size={compact ? 18 : 22} imgErrors={imgErrors} onError={(d) => setImgErrors((p) => ({ ...p, [d]: true }))} />
+            <BankLogo bank={selected} size={compact ? 18 : 22} radius={5} />
             <span className="flex-1 truncate">{selected.name}</span>
           </>
         ) : (
@@ -172,7 +172,7 @@ export default function BankSelect({ value, onChange, inputStyle, compact = fals
               <button key={bank.name} type="button" onClick={() => pickBank(bank)}
                 className={`w-full flex items-center gap-3 px-3 ${compact ? 'py-2' : 'py-2.5'} text-left transition-colors hover:bg-[var(--color-elevated)]`}
                 style={active ? { background: `${bank.color}20` } : {}}>
-                <BankLogo bank={bank} size={compact ? 20 : 26} imgErrors={imgErrors} onError={(d) => setImgErrors((p) => ({ ...p, [d]: true }))} />
+                <BankLogo bank={bank} size={compact ? 20 : 26} radius={6} />
                 <span className={`flex-1 ${sz} font-medium`} style={{ color: active ? bank.color : 'var(--color-text-primary)' }}>
                   {bank.name}
                 </span>
@@ -192,49 +192,6 @@ export default function BankSelect({ value, onChange, inputStyle, compact = fals
         document.body
       )}
     </>
-  );
-}
-
-const LOGO_SOURCES = (domain: string) => [
-  `https://logo.clearbit.com/${domain}`,
-  `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
-];
-
-function BankLogo({ bank, size, imgErrors, onError }: {
-  bank: Bank; size: number;
-  imgErrors: Record<string, boolean>;
-  onError: (domain: string) => void;
-}) {
-  const [srcIdx, setSrcIdx] = useState(0);
-  const failed = imgErrors[bank.domain];
-  const sources = LOGO_SOURCES(bank.domain);
-
-  if (failed) {
-    return (
-      <span className="rounded-lg shrink-0 flex items-center justify-center"
-        style={{ width: size, height: size, background: bank.color }}>
-        <span style={{ fontSize: size * 0.38, fontWeight: 700, color: 'white', lineHeight: 1 }}>
-          {bank.abbr}
-        </span>
-      </span>
-    );
-  }
-
-  const isClearbit = srcIdx === 0;
-  return (
-    <span className="rounded-lg overflow-hidden shrink-0 flex items-center justify-center"
-      style={{ width: size, height: size, background: isClearbit ? 'white' : 'transparent', padding: isClearbit ? 0 : 1 }}>
-      <img
-        src={sources[srcIdx]}
-        alt={bank.name}
-        width={size} height={size}
-        style={{ objectFit: 'contain', display: 'block' }}
-        onError={() => {
-          if (srcIdx < sources.length - 1) setSrcIdx((i) => i + 1);
-          else onError(bank.domain);
-        }}
-      />
-    </span>
   );
 }
 

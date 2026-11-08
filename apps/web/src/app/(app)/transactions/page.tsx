@@ -17,6 +17,7 @@ import ImportReconcileModal from '@/components/ImportReconcileModal';
 import { summarizeImports } from '@/lib/import/multiFile';
 import type { FileImportOutcome, ImportSummary } from '@/lib/import/multiFile';
 import BankSelect, { BANKS } from '@/components/BankSelect';
+import BankLogo from '@/components/BankLogo';
 import CategoryFormModal from '@/components/CategoryFormModal';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import LinkIcon from '@/components/LinkIcon';
@@ -1230,16 +1231,7 @@ export default function TransactionsPage() {
                                           {isCash ? (
                                             <span style={{ fontSize: 16 }}>💵</span>
                                           ) : bankMeta ? (
-                                            <img
-                                              src={`https://logo.clearbit.com/${bankMeta.domain}`}
-                                              alt={a.bankName}
-                                              width={22} height={22}
-                                              style={{ objectFit: 'contain' }}
-                                              onError={(e) => {
-                                                e.currentTarget.src = `https://www.google.com/s2/favicons?domain=${bankMeta.domain}&sz=64`;
-                                                e.currentTarget.style.background = 'transparent';
-                                              }}
-                                            />
+                                            <BankLogo bank={bankMeta} size={22} radius={5} />
                                           ) : (
                                             <AccountTypeIcon type={a.accountType} size={16} />
                                           )}
@@ -1598,16 +1590,7 @@ export default function TransactionsPage() {
                             {isCash ? (
                               <span style={{ fontSize: 20 }}>💵</span>
                             ) : bankMeta ? (
-                              <img
-                                src={`https://logo.clearbit.com/${bankMeta.domain}`}
-                                alt={acc?.bankName}
-                                width={28} height={28}
-                                style={{ objectFit: 'contain' }}
-                                onError={(e) => {
-                                  e.currentTarget.src = `https://www.google.com/s2/favicons?domain=${bankMeta.domain}&sz=64`;
-                                  e.currentTarget.style.background = 'transparent';
-                                }}
-                              />
+                              <BankLogo bank={bankMeta} size={28} radius={6} />
                             ) : (
                               <AccountTypeIcon type={acc?.accountType ?? ''} size={20} />
                             )}

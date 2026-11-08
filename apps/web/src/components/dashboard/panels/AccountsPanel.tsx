@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { BANKS } from '@/components/BankSelect';
+import SharedBankLogo from '@/components/BankLogo';
 import { isLiability } from '@/lib/accountTypes';
 import Panel, { PanelEmpty } from '../Panel';
 import { fmt } from '../chartTheme';
@@ -11,20 +11,9 @@ import type { BankAccount } from '@/lib/dashboard/types';
 function fmtK(n: number) { return n >= 10000 ? `$${(n/1000).toFixed(1)}k` : `$${fmt(n)}`; }
 
 function BankLogo({ bankName, size = 28 }: { bankName: string; size?: number }) {
-  const [err, setErr] = useState(false);
   const bank = BANKS.find(b => b.name === bankName);
   if (!bank) return <span style={{ fontSize: size * 0.6 }}>🏦</span>;
-  if (err) return (
-    <div className="rounded-lg flex items-center justify-center text-white font-black"
-      style={{ width: size, height: size, background: bank.color, fontSize: size * 0.35 }}>
-      {bank.abbr}
-    </div>
-  );
-  return (
-    <img src={`https://logo.clearbit.com/${bank.domain}`} width={size} height={size}
-      style={{ objectFit: 'contain', borderRadius: 6, background: 'white', padding: 2 }}
-      onError={() => setErr(true)} />
-  );
+  return <SharedBankLogo bank={bank} size={size} radius={6} />;
 }
 
 export default function AccountsPanel({ accounts, netWorth, loading }: {

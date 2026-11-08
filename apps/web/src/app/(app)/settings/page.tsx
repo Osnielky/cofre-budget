@@ -8,6 +8,7 @@ import PlaidLauncher from '@/components/PlaidLauncher';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useStretchIndicator } from '@/components/ui/useStretchIndicator';
 import BankSelect, { BANKS } from '@/components/BankSelect';
+import BankLogo from '@/components/BankLogo';
 import AccountTypeIcon from '@/components/AccountTypeIcon';
 import type { PreviewExchangeResult } from '@/components/PlaidMergeReviewModal';
 import { ACCOUNT_TYPES, ACCOUNT_GROUPS, isLiability } from '@/lib/accountTypes';
@@ -1478,16 +1479,7 @@ function AccountVisual({ account, color, compact = false }: { account: BankAccou
       {isCash ? (
         <span className={compact ? 'text-base' : 'text-xl'}>💵</span>
       ) : bankMeta ? (
-        // eslint-disable-next-line @next/next/no-img-element -- third-party logo lookup by domain
-        <img src={`https://logo.clearbit.com/${bankMeta.domain}`}
-          alt={account.bankName} width={compact ? 22 : 28} height={compact ? 22 : 28}
-          style={{ objectFit: 'contain', borderRadius: 4, background: 'white', padding: 2 }}
-          onError={(e) => {
-            const img = e.currentTarget;
-            img.src = `https://www.google.com/s2/favicons?domain=${bankMeta.domain}&sz=64`;
-            img.style.background = 'transparent';
-            img.style.padding = '0';
-          }} />
+        <BankLogo bank={bankMeta} size={compact ? 22 : 28} radius={5} />
       ) : (
         <AccountTypeIcon type={account.accountType} size={compact ? 18 : 22} />
       )}
