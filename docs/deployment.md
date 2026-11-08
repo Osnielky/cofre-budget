@@ -181,28 +181,32 @@ Logs and alert queries: `docs/observability.md`.
 
 ## Performance baseline
 
-Measured on 2026-11-07 against budgetcofre.com with the demo account (warm
-instances, curl and a headless browser), before the speed work on `dev`
-(indexes, slim transaction rows, once-a-day recurring materialiser, cached user
-lookup, boot sweeps off the cold-start path, SWR client cache, lazy chunks,
-one authenticated layout). Re-run the same measurement after that deploy and
-fill in the second column; the commands are in
-`docs/superpowers/plans/2026-11-07-app-speed.md` (Task 12).
+Measured against budgetcofre.com with the demo account (warm instances, curl
+from a home connection to us-central1, and headless Chromium at 1440×900).
+"Before" is 2026-11-07 ahead of the speed work on `dev` (indexes, slim
+transaction rows, once-a-day recurring materialiser, cached user lookup, boot
+sweeps off the cold-start path, SWR client cache, lazy chunks, one authenticated
+layout); "After" is the same day once `42ada39` was live. The browser method is written up under Task 12 of
+`docs/superpowers/plans/2026-11-07-app-speed.md`; the curl bursts fire the dashboard's eight calls at once with the session cookie.
 
 | Measurement | Before | After |
 |---|---|---|
-| `/api/auth/me` alone (453 bytes) | 250 ms | |
-| Any API call while the dashboard fires its 7–10 | 600–1,100 ms | |
-| Dashboard: data requests start / all data in | 0.73 s / ~1.9 s | |
-| Dashboard requests / transfer per load | 109 / 2.8 MB | |
-| `/api/transactions`, 12 months (`limit=20000`) | 841 KB raw, 48 KB gzip, 1.2 s | |
+| `/api/auth/me` alone, through the web proxy | 250 ms | 270–330 ms (unchanged: that is the network floor of two hops from here) |
+| `/api/auth/me` alone, straight at the API | — | 180–430 ms |
+| Dashboard burst of 8 calls, through the web proxy | 600–1,100 ms each | 300–1,100 ms each |
+| Dashboard burst of 8 calls, straight at the API | — | 190–350 ms each; the 958 KB list 570 ms |
+| Dashboard cold load: first API request / all data in | 0.73 s / ~1.9 s | 0.85 s / 1.8 s (reload with a warm browser cache: 0.28 s / 1.3 s) |
+| Dashboard requests / wire transfer per cold load | 109 / 2.8 MB | 103 / 1.4 MB (44 scripts 1.19 MB, 51 fetches 95 KB, fonts 66 KB) |
+| `/api/transactions`, 12 months (`limit=20000`) | 841 KB raw, 48 KB gzip, 1.2 s | 958 KB raw / 65 KB gzip for 778 rows (1,228 B per row, was ~1,680), 0.6 s gzip |
 | `ask-cofre-logo.png` on every app page | 1.58 MB | 45 KB |
-| Dashboard → Transactions → Dashboard | every list refetched | cached ≤ 10 s, then background refresh |
+| Dashboard → Transactions → Dashboard | every list refetched | 1 API call, 0 KB (cached ≤ 10 s, then background refresh) |
 | Landing page first paint | 3.4 s | not addressed (4 MB hero video, three 330 KB JPEGs, own font) |
 
-Where the time went: two Cloud Run hops per call, a user row read per call,
-the recurring materialiser on every list call, `db-f1-micro` with no index on
-`transactions (userId, date)`, and no client cache. Still open after this
-round: `--min-instances=1` on cofre-web or a direct browser → API path (both
-cost money or a cookie-domain change), the next Cloud SQL tier, and the landing
-page assets.
+What the after column says: the API itself is no longer where the time goes —
+straight at cofre-api every call in a burst lands in 190–350 ms, which is the
+round trip from here. The same burst through cofre-web spreads to 0.3–1.1 s, so
+the remaining per-call cost is the Next.js proxy hop (one 512 MiB instance
+forwarding eight concurrent requests, one of them a 958 KB body). Still open
+after this round: `--min-instances=1` on cofre-web or a direct browser → API
+path (both cost money or a cookie-domain change), the next Cloud SQL tier, the
+1.2 MB of dashboard JavaScript over 44 chunks, and the landing page assets.
