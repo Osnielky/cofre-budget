@@ -8,9 +8,10 @@ import { BillingController } from './billing.controller';
 import { BillingWebhookController } from './billing-webhook.controller';
 import { BillingSweepController } from './billing-sweep.controller';
 import { MailModule } from '../mail/mail.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Subscription]), MailModule],
+  imports: [TypeOrmModule.forFeature([User, Subscription]), MailModule, UsersModule],
   providers: [BillingService, StripeWebhookVerifierService],
   controllers: [BillingController, BillingWebhookController, BillingSweepController],
   exports: [BillingService],

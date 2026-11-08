@@ -1,9 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Stripe from 'stripe';
 import { User } from '../users/user.entity';
+import { UsersService } from '../users/users.service';
 import { Subscription } from './subscription.entity';
 import { mapStripeSubscription, PriceIdMap, type MappedSubscription } from './billing.mapping';
 import { addInterval, extendedPeriodEnd, isPaidExtension, PAID_EXTENSION_METADATA_KEY } from './late-payment';
@@ -34,6 +35,10 @@ export class BillingService {
     @InjectRepository(Subscription) private subs: Repository<Subscription>,
     private config: ConfigService,
     private mail: MailService,
+    // Optional so the unit tests can build the service without it. Every plan change
+    // evicts the user from the JWT lookup cache, so a downgrade takes effect on the
+    // next request instead of up to USER_CACHE_TTL_MS later.
+    @Optional() private readonly usersCache?: UsersService,
   ) {
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY');
     const webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET');
@@ -141,6 +146,7 @@ export class BillingService {
       ['userId'],
     );
     await this.users.update(user.id, { plan });
+    this.usersCache?.invalidate(user.id);
     await this.sendBillingEmail(user, previous, mapped, sub);
     return mapped;
   }
@@ -319,6 +325,7 @@ export class BillingService {
       const user = await this.users.findOneBy({ id: sub.userId });
       if (!user || user.plan === 'free') continue;
       await this.users.update(user.id, { plan: 'free' });
+      this.usersCache?.invalidate(user.id);
       downgraded++;
       this.logger.log(`Past-due downgrade: user ${user.id} (${sub.tier}) → free after ${PAST_DUE_GRACE_HOURS} h`);
       try {

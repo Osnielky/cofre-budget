@@ -5,6 +5,7 @@ import { ConflictException } from '@nestjs/common';
 import { User } from '../users/user.entity';
 import { Subscription } from './subscription.entity';
 import { BillingService } from './billing.service';
+import { UsersService } from '../users/users.service';
 import type { MailService } from '../mail/mail.service';
 import type { BillingEmailContent } from './billing-emails';
 
@@ -85,6 +86,16 @@ describe('BillingService.syncFromStripeSubscription', () => {
     const sub = await ds.getRepository(Subscription).findOneByOrFail({ userId });
     expect(sub.status).toBe('trialing');
     expect(sub.stripeSubscriptionId).toBe('sub_1');
+  });
+
+  it('a plan change evicts the user from the JWT lookup cache', async () => {
+    const users = new UsersService(ds.getRepository(User));
+    const cached = new BillingService(ds.getRepository(User), ds.getRepository(Subscription), fakeConfig(), asMail(mail), users);
+    expect((await users.findByIdCached(userId))?.plan).toBe('free');
+
+    await cached.syncFromStripeSubscription('cus_123', fakeSub() as any);
+    // Still inside the TTL: without the eviction this would read the stale 'free'.
+    expect((await users.findByIdCached(userId))?.plan).toBe('pro');
   });
 
   it('updates the existing row and User.plan on a later sync (e.g. trial → active)', async () => {

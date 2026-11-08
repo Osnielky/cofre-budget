@@ -23,10 +23,11 @@ export class UsersService {
 
   /* The JWT strategy's lookup. Every authenticated request used to cost one
      user query, and a page fires 7–10 at once, so a hit is kept for a short
-     while. Writes through this service invalidate at once; the few writers
-     elsewhere (billing plan changes, Plaid, the demo reset, the net-worth goal)
-     are read at most USER_CACHE_TTL_MS stale, which the UI tolerates. The map
-     is per instance and bounded. */
+     while. Writes through this service invalidate at once, and so do the
+     writers of security-relevant columns elsewhere (billing plan changes, the
+     demo wipe / owner reset). The remaining writers (Plaid user id, net-worth
+     goal) read their own rows, never the cached one. The map is per instance
+     and bounded: another instance serves its copy for at most USER_CACHE_TTL_MS. */
   private readonly cache = new Map<string, { user: User; expires: number }>();
 
   async findByIdCached(id: string, now: number = Date.now()): Promise<User | null> {

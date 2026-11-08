@@ -1,9 +1,10 @@
 import { BOOT_SWEEP_DELAY_MS } from '../common/boot-sweep';
-import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap, Optional } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager, LessThan } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../users/user.entity';
+import { UsersService } from '../users/users.service';
 import { BankAccount } from '../bank-accounts/bank-account.entity';
 import { PlaidItem } from '../plaid/plaid-item.entity';
 import { Transaction } from '../transactions/transaction.entity';
@@ -41,7 +42,12 @@ const todayIso = (d: Date) => d.toISOString().slice(0, 10);
 export class DemoService implements OnApplicationBootstrap {
   private readonly logger = new Logger(DemoService.name);
 
-  constructor(@InjectDataSource() private readonly ds: DataSource) {}
+  // The cache is optional so tests can build the service from a DataSource alone;
+  // a wiped visitor or a reset owner must not keep authenticating from a stale entry.
+  constructor(
+    @InjectDataSource() private readonly ds: DataSource,
+    @Optional() private readonly usersCache?: UsersService,
+  ) {}
 
   /** Rockefeller must exist before the first login, so that part still runs before
       the port opens. The sandbox sweep (up to 50 multi-table wipes) is deferred: on
@@ -117,6 +123,7 @@ export class DemoService implements OnApplicationBootstrap {
     // change-password is blocked for this account, but the hash is restored anyway so a
     // reset always leaves the login exactly as announced.
     await this.ds.getRepository(User).update(owner.id, { password: await bcrypt.hash(DEMO_OWNER_PASSWORD, 10), name: DEMO_OWNER_NAME, plan: 'pro' });
+    this.usersCache?.invalidate(owner.id);
     return this.ds.getRepository(User).findOneByOrFail({ id: owner.id });
   }
 
@@ -166,6 +173,7 @@ export class DemoService implements OnApplicationBootstrap {
       const user = await em.getRepository(User).findOneBy({ id: userId });
       if (user?.isDemo) await em.getRepository(User).delete({ id: userId });
     });
+    this.usersCache?.invalidate(userId);
   }
 
   /* ── Populate ── */

@@ -19,6 +19,7 @@ import { NetWorthSnapshot } from '../net-worth-goal/net-worth-snapshot.entity';
 import { CreditCardDetail } from '../cards/credit-card-detail.entity';
 import { CardProfile } from '../cards/card-profile.entity';
 import { DemoService, DEMO_OWNER_EMAIL, DEMO_OWNER_PASSWORD } from './demo.service';
+import { UsersService } from '../users/users.service';
 
 /* jsonb columns (AI messages, receipts) are not supported by sqlite, so this
    suite covers every other table; populate() skips the conversation when the
@@ -109,6 +110,16 @@ describe('DemoService visitors', { timeout: SEED_TIMEOUT }, () => {
     const b = await service.startVisitor(NOW);
     await service.wipe(a.id);
     expect((await rowsOwnedBy(b.id)).transactions).toBeGreaterThan(900);
+  });
+
+  it('wipe evicts the visitor from the JWT lookup cache so the cookie stops working at once', async () => {
+    const users = new UsersService(ds.getRepository(User));
+    const cached = new DemoService(ds, users);
+    const user = await cached.startVisitor(NOW);
+    expect((await users.findByIdCached(user.id))?.id).toBe(user.id);
+
+    await cached.wipe(user.id);
+    expect(await users.findByIdCached(user.id)).toBeNull();
   });
 
   it('sweepStaleVisitors deletes sandboxes older than 24h and keeps fresh ones', async () => {
