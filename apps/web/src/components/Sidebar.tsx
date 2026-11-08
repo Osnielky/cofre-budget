@@ -29,7 +29,7 @@ const NAV = [
 export default function Sidebar() {
   const pathname   = usePathname();
   const router     = useRouter();
-  const { user } = useUser();
+  const { user, clearUser } = useUser();
   const [loggingOut, setLoggingOut] = useState(false);
   const [open, setOpen] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -52,7 +52,9 @@ export default function Sidebar() {
     } catch {
       // Network error or API down — log out client-side anyway.
     } finally {
-      // Whatever happened to the request, the next account must not see this one's cached lists.
+      // Whatever happened to the request, the next account must not see this one's cached lists
+      // or its cached name, email and plan (lib/user/cache).
+      clearUser();
       await clearApiCache();
       router.push('/login');
       setLoggingOut(false);
