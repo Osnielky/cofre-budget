@@ -144,8 +144,8 @@ export default function PlaidMergeReviewModal({
               Cancel
             </button>
             <button onClick={handleConfirm} disabled={submitting || summary.incomplete > 0}
-              className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-40 transition-all"
-              style={{ background: 'var(--color-card-green)' }}>
+              className="btn-gold px-5 py-2 text-sm font-semibold text-white rounded-xl disabled:opacity-40 transition-all"
+>
               {submitting ? 'Connecting…' : summary.button}
             </button>
           </div>

@@ -236,8 +236,8 @@ export default function IntegrationsTab({ status, loading, onDisconnect, onManag
                   </button>
                 ) : (
                   <a href={`${API}/gmail/connect`}
-                    className="text-xs px-4 py-2 rounded-xl font-semibold no-underline transition-all hover:brightness-110"
-                    style={{ background: 'var(--color-violet)', color: '#fff', boxShadow: '0 0 16px color-mix(in srgb, var(--color-violet) 40%, transparent)' }}>
+                    className="btn-gold text-xs px-4 py-2 rounded-xl font-semibold no-underline transition-all"
+>
                     Connect Gmail
                   </a>
                 )}

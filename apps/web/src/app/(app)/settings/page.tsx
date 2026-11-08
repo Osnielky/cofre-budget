@@ -731,8 +731,8 @@ function SettingsPageInner() {
                 </p>
                 <div className="flex gap-2 shrink-0">
                   <button onClick={openPlaidLink} disabled={connecting}
-                    className="px-4 py-2 text-sm font-semibold text-white rounded-xl transition-all hover:brightness-110 disabled:opacity-60 flex items-center gap-2"
-                    style={{ background: 'var(--color-card-green)' }}>
+                    className="btn-gold px-4 py-2 text-sm font-semibold text-white rounded-xl transition-all disabled:opacity-60 flex items-center gap-2"
+>
                     <LinkIcon />
                     {connecting ? 'Connecting…' : 'Connect Bank'}
                   </button>

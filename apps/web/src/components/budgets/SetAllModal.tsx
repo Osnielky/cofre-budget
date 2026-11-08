@@ -150,8 +150,8 @@ export default function SetAllModal({ month, categories, current, onClose, onSav
                   className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-[var(--color-surface)] transition-colors disabled:opacity-50"
                   style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
                 <button type="button" onClick={saveAllBudgets} disabled={setAllSaving}
-                  className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 transition-all disabled:opacity-50"
-                  style={{ background: 'var(--color-card-violet)' }}>
+                  className="btn-gold px-5 py-2 text-sm font-semibold text-white rounded-xl transition-all disabled:opacity-50"
+>
                   {setAllSaving ? 'Saving…' : 'Save all'}
                 </button>
               </div>

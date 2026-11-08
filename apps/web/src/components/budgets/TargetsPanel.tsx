@@ -30,8 +30,8 @@ export default function TargetsPanel({
           </span>
         </div>
         <button type="button" onClick={onAdd}
-          className="px-2.5 py-1.5 text-[11px] font-semibold rounded-lg hover:brightness-110 transition-all text-white flex items-center gap-1"
-          style={{ background: 'var(--color-green)' }}>
+          className="btn-gold px-2.5 py-1.5 text-[11px] font-semibold rounded-lg transition-all text-white flex items-center gap-1"
+>
           <span className="text-sm leading-none">+</span> Add
         </button>
       </div>

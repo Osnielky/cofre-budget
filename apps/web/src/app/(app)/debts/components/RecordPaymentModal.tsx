@@ -91,8 +91,8 @@ export default function RecordPaymentModal({ openDebts, onClose, onRecorded }: P
             className="px-4 py-2 text-sm font-medium rounded-xl"
             style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
           <button type="submit" disabled={saving || openDebts.length === 0}
-            className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50"
-            style={{ background: 'var(--color-green)' }}>{saving ? 'Saving…' : 'Record payment'}</button>
+            className="btn-gold px-5 py-2 text-sm font-semibold text-white rounded-xl disabled:opacity-50"
+>{saving ? 'Saving…' : 'Record payment'}</button>
         </div>
       </form>
     </div>,

@@ -85,8 +85,8 @@ export default function AddLoanModal({ onClose, onCreated }: Props) {
             className="px-4 py-2 text-sm font-medium rounded-xl"
             style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Cancel</button>
           <button type="submit" disabled={saving}
-            className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-50"
-            style={{ background: 'var(--color-card-violet)' }}>{saving ? 'Saving…' : 'Save record'}</button>
+            className="btn-gold px-5 py-2 text-sm font-semibold text-white rounded-xl disabled:opacity-50"
+>{saving ? 'Saving…' : 'Save record'}</button>
         </div>
       </form>
     </div>,

@@ -99,7 +99,7 @@ export default function ProjectsOverview({ projects, loading, showClosed, onTogg
           <span className="text-5xl opacity-25">📦</span>
           <p className="font-semibold text-sm">No projects yet</p>
           <p className="text-xs max-w-xs" style={{ color: 'var(--color-text-muted)' }}>Track a car flip, a rental, a side business or a trading account — cost basis, income and the result.</p>
-          <button onClick={onCreate} className="mt-1 px-4 py-2 text-xs font-semibold text-white rounded-xl hover:brightness-110" style={{ background: 'var(--color-card-violet)' }}>
+          <button onClick={onCreate} className="btn-gold mt-1 px-4 py-2 text-xs font-semibold text-white rounded-xl">
             Create first project
           </button>
         </StaggerItem>

@@ -138,8 +138,8 @@ export default function ProjectCategoryForm({ projectType, colors, saving, onSub
           Cancel
         </button>
         <button type="submit" disabled={!canSubmit}
-          className="px-3.5 py-2 text-xs font-semibold rounded-lg cursor-pointer hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{ background: 'var(--color-card-violet)', color: 'white' }}>
+          className="btn-gold px-3.5 py-2 text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+>
           {saving ? 'Adding…' : 'Add category'}
         </button>
       </div>

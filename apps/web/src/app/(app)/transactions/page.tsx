@@ -1159,8 +1159,8 @@ export default function TransactionsPage() {
               <span className="hidden sm:block"><Avatar name={user?.name} email={user?.email} src={user?.avatarUrl} size={32} rounded={12} /></span>
               {/* New manual transaction */}
               <button onClick={() => { setManualTxError(''); setShowManualTx(true); }}
-                className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
-                style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-green) 28%, transparent)', color: 'var(--color-green)' }}>
+                className="btn-gold flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all"
+>
                 <PlusIcon /> New
               </button>
               {/* Import CSV (icon-only on phones) */}
@@ -1370,8 +1370,8 @@ export default function TransactionsPage() {
                         )}
 
                         <button type="submit" disabled={addingAcc}
-                          className="w-full py-2.5 text-xs font-bold rounded-xl transition-all hover:brightness-110 disabled:opacity-50"
-                          style={{ background: 'var(--color-card-violet)', color: 'white' }}>
+                          className="btn-gold w-full py-2.5 text-xs font-bold rounded-xl transition-all disabled:opacity-50"
+>
                           {addingAcc ? 'Creating…' : 'Create & Import'}
                         </button>
                         </div>

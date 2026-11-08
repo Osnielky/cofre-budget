@@ -37,8 +37,8 @@ export function BudgetScenarioToolbar({ plan, saving, onSave, onDiscard }: {
             Discard changes
           </button>
           <button type="button" onClick={onSave} disabled={saving}
-            className="flex-1 sm:flex-none px-5 py-2 rounded-xl text-xs font-bold text-white hover:brightness-110 disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5"
-            style={{ background: 'var(--color-violet)' }}>
+            className="btn-gold flex-1 sm:flex-none px-5 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-60 cursor-pointer flex items-center justify-center gap-1.5"
+>
             {saving ? 'Saving…' : <><Icon name="check" size={13} strokeWidth={2.4} /> Save changes</>}
           </button>
         </div>

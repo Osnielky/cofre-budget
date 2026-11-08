@@ -151,8 +151,7 @@ export default function RulesManager() {
                         Cancel
                       </button>
                       <button onClick={() => saveEdit(rule)} disabled={saving || !editValue.trim()}
-                        className="px-3 py-1.5 text-xs font-semibold rounded-lg transition-all hover:brightness-110 disabled:opacity-40"
-                        style={{ background: 'var(--color-card-violet)', color: '#fff' }}>
+                        className="btn-gold px-3 py-1.5 text-xs font-semibold rounded-lg transition-all disabled:opacity-40">
                         {saving ? 'Saving…' : 'Save'}
                       </button>
                     </div>

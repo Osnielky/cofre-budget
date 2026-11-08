@@ -206,8 +206,8 @@ export default function BudgetsPage() {
 
   const addBudgetBtn = (
     <button type="button" onClick={() => setFormReq({ kind: 'expense', editing: null })}
-      className="px-4 py-2 text-xs font-bold text-white rounded-xl hover:brightness-110 transition-all flex items-center gap-1.5 cursor-pointer"
-      style={{ background: 'var(--color-violet)' }}>
+      className="btn-gold px-4 py-2 text-xs font-bold text-white rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+>
       <Icon name="plus" size={13} strokeWidth={2.4} /> Add budget
     </button>
   );

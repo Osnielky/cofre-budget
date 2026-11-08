@@ -216,7 +216,7 @@ export default function ActiveLoansCard({ debts, loading, reload }: Props) {
                         <input value={pay.note} onChange={(e) => setPay((p) => ({ ...p, note: e.target.value }))}
                           placeholder="e.g. Zelle, cash" className="px-3 py-2 text-sm rounded-xl outline-none w-full" style={inputStyle} />
                       </div>
-                      <button type="submit" className="px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110" style={{ background: 'var(--color-green)' }}>
+                      <button type="submit" className="btn-gold px-4 py-2 text-sm font-semibold text-white rounded-xl">
                         {d.direction === 'owed' ? 'Record payment' : 'Record repayment'}
                       </button>
                       <label className="flex items-center gap-1.5 text-[11px]" style={{ color: d.borrowerEmail ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>

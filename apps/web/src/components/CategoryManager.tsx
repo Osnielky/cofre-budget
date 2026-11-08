@@ -100,8 +100,8 @@ export default function CategoryManager() {
           Organize your transactions with custom categories.
         </p>
         <button onClick={startCreate}
-          className="px-4 py-2 text-sm font-semibold text-white rounded-xl transition-all hover:brightness-110"
-          style={{ background: 'var(--color-card-violet)' }}>
+          className="btn-gold px-4 py-2 text-sm font-semibold text-white rounded-xl transition-all"
+>
           + Add Category
         </button>
       </div>

@@ -554,8 +554,8 @@ export default function ProjectsPage() {
             </p>
           </div>
           <button onClick={openCreate}
-            className="flex items-center gap-2 px-3.5 sm:px-4 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 shrink-0 whitespace-nowrap"
-            style={{ background: 'var(--color-card-violet)' }}>
+            className="btn-gold flex items-center gap-2 px-3.5 sm:px-4 py-2 text-sm font-semibold text-white rounded-xl shrink-0 whitespace-nowrap"
+>
             <PlusIcon /> <span className="hidden sm:inline">New Project</span><span className="sm:hidden">New</span>
           </button>
         </div>
@@ -1755,8 +1755,8 @@ export default function ProjectsPage() {
 
                   <div className="shrink-0 pt-1">
                     <button onClick={() => { setShowLinkPicker(null); setPendingLinkTx(null); }}
-                      className="w-full py-2.5 text-sm font-semibold rounded-xl hover:brightness-110"
-                      style={{ background: 'var(--color-card-violet)', color: 'white' }}>
+                      className="btn-gold w-full py-2.5 text-sm font-semibold rounded-xl"
+>
                       Done
                     </button>
                   </div>
@@ -1873,8 +1873,8 @@ export default function ProjectsPage() {
                       Back
                     </button>
                     <button onClick={() => confirmLink(showLinkPicker!)} disabled={linking}
-                      className="px-5 py-2 text-sm font-semibold text-white rounded-xl hover:brightness-110 disabled:opacity-60"
-                      style={{ background: 'var(--color-card-violet)' }}>
+                      className="btn-gold px-5 py-2 text-sm font-semibold text-white rounded-xl disabled:opacity-60"
+>
                       {linking ? 'Linking…' : 'Link Transaction'}
                     </button>
                   </div>

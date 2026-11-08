@@ -68,8 +68,8 @@ export const BudgetQuickAdjust = memo(function BudgetQuickAdjust({ rows, draft, 
           : <>Changes {affected} budget{affected === 1 ? '' : 's'} by <strong className="tabular-nums" style={{ color: diff > 0 ? 'var(--color-rose)' : 'var(--color-green)' }}>{formatMoney(diff, { sign: true })}</strong>; applied on top of your current edits.</>}
       </p>
       <button type="button" disabled={diff === 0} onClick={() => dispatch({ type: 'adjust', pct, keys })}
-        className="w-full py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:brightness-110 disabled:opacity-40 cursor-pointer disabled:cursor-default"
-        style={{ background: 'var(--color-violet)' }}>
+        className="btn-gold w-full py-2.5 rounded-xl text-xs font-bold text-white transition-all disabled:opacity-40 cursor-pointer disabled:cursor-default"
+>
         Apply to draft
       </button>
       <div className="flex gap-1.5">
