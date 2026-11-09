@@ -1,6 +1,7 @@
 'use client';
 
 import PageHeader, { HeaderAction } from '@/components/PageHeader';
+import PeriodPicker from '@/components/PeriodPicker';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import ChatMarkdown from '@/components/ChatMarkdown';
@@ -35,10 +36,6 @@ const SUGGESTED_PROMPTS = [
 ];
 
 function currentMonth() { return new Date().toISOString().slice(0, 7); }
-function monthLabel(m: string) {
-  const [y, mo] = m.split('-');
-  return new Date(Number(y), Number(mo) - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
-}
 
 function UserAvatar({ name }: { name?: string | null }) {
   const initial = (name ?? 'U').trim().charAt(0).toUpperCase();
@@ -107,6 +104,8 @@ export default function AskCofrePage() {
         <div className="flex-1 flex flex-col min-w-0 px-4 sm:px-6 md:px-8 py-3 sm:py-6 gap-3 sm:gap-4">
           {/* Header */}
           <PageHeader title="Ask Cofre" subtitle="Reads your whole account. Asks before it changes anything." phoneSubtitle={false}
+            period={<PeriodPicker mode="month" size="sm" max={null} ariaLabel="Month to ask about"
+              value={{ kind: 'month', month }} onChange={(p) => p.kind === 'month' && setMonth(p.month)} />}
             icon={<>
               <span className="relative shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element -- fixed-color brand asset, not a themed vector icon */}
@@ -263,17 +262,9 @@ export default function AskCofrePage() {
               style={{ color: 'var(--color-text-muted)' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4"/></svg>
             </button>
-            {/* The month picker sits in the input row from sm; on phones it moves to the
-                footer line below so the text field keeps its width. */}
-            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month to ask about"
-              className="hidden sm:block text-xs bg-transparent outline-none px-2 py-1 rounded-full shrink-0"
-              style={{ border: '1px solid var(--color-border)' }} title={monthLabel(month)} />
             <SendButton sending={sending} disabled={sending || !input.trim() || outOfMessages} />
           </form>
           <div className="flex flex-wrap items-center justify-between gap-x-3 sm:gap-x-4 gap-y-1 text-fine px-1">
-            <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month to ask about"
-              className="sm:hidden text-fine bg-transparent outline-none px-2 py-1 rounded-full shrink-0"
-              style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }} title={monthLabel(month)} />
             {usage && usage.limit > 0 ? (
               <span className="font-semibold text-right sm:text-left" role="status"
                 style={{ color: outOfMessages ? 'var(--color-rose)' : usage.remaining <= 5 ? 'var(--color-amber)' : 'var(--color-text-secondary)' }}>

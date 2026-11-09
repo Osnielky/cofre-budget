@@ -1,6 +1,8 @@
 'use client';
 
 import PageHeader, { HeaderAction } from '@/components/PageHeader';
+import PeriodPicker from '@/components/PeriodPicker';
+import { periodFromRangeState, rangeStateFromPeriod } from '@/lib/period';
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
@@ -64,6 +66,7 @@ function Reports() {
 
   const custom = useMemo(() => ({ from: state.from, to: state.to }), [state.from, state.to]);
   const range = useMemo(() => resolveRange(state.preset, now, custom), [state.preset, custom, now]);
+  const period = useMemo(() => periodFromRangeState(state, now), [state, now]);
   const data = useReportsData(range);
   const { projects, accounts, history, loading, error } = data;
 
@@ -156,6 +159,7 @@ function Reports() {
           {/* Header */}
           <StaggerItem>
             <PageHeader title="Reports" subtitle="Where the money went, and how that is changing." phoneSubtitle={false}
+              period={<PeriodPicker mode="range" value={period} onChange={(p) => update({ ...rangeStateFromPeriod(p, now), open: null })} />}
               actions={<>
                 <div className="relative">
                   <HeaderAction onClick={() => setExportOpen((v) => !v)} aria-haspopup="menu" aria-expanded={exportOpen} label="Export CSV" shortLabel="Export"
@@ -179,10 +183,7 @@ function Reports() {
           </StaggerItem>
 
           <StaggerItem>
-            <RangeBar range={range} preset={state.preset} custom={custom} accounts={accounts} account={picked}
-              onPreset={(preset) => update({ preset, open: null })}
-              onCustom={(c) => update({ preset: 'custom', from: c.from, to: c.to, open: null })}
-              onAccount={(account) => update({ account, open: null })} />
+            <RangeBar range={range} accounts={accounts} account={picked} onAccount={(account) => update({ account, open: null })} />
           </StaggerItem>
 
           <StaggerItem><QuestionChips state={state} onPick={(q) => update(applyQuestion(state, q))} /></StaggerItem>

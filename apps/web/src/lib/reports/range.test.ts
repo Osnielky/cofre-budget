@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveRange, monthKeysBetween, dayCount } from './range';
+import { resolveRange, monthKeysBetween, dayCount, wholeMonthSpan } from './range';
 
 const now = new Date(2026, 9, 27); // Oct 27, 2026
 
@@ -44,5 +44,23 @@ describe('helpers', () => {
   it('dayCount is inclusive', () => {
     expect(dayCount('2026-10-01', '2026-10-01')).toBe(1);
     expect(dayCount('2026-02-27', '2026-03-02')).toBe(4);
+  });
+});
+
+describe('whole-month custom ranges', () => {
+  it('one whole month compares to the month before it', () => {
+    const r = resolveRange('custom', now, { from: '2026-09-01', to: '2026-09-30' });
+    expect([r.prevFrom, r.prevTo]).toEqual(['2026-08-01', '2026-08-31']);
+    expect(r.label).toBe('Sep 2026'); expect(r.prevLabel).toBe('Aug 2026');
+  });
+  it('three whole months compare to the three before them, across a year end', () => {
+    const r = resolveRange('custom', now, { from: '2026-01-01', to: '2026-03-31' });
+    expect([r.prevFrom, r.prevTo]).toEqual(['2025-10-01', '2025-12-31']);
+    expect(wholeMonthSpan('2026-01-01', '2026-03-31')).toBe(3);
+  });
+  it('a range that is not whole months keeps the day-for-day comparison', () => {
+    expect(wholeMonthSpan('2026-09-02', '2026-09-30')).toBe(0);
+    expect(wholeMonthSpan('2026-09-01', '2026-09-29')).toBe(0);
+    expect(resolveRange('custom', now, { from: '2026-09-02', to: '2026-09-30' }).prevTo).toBe('2026-09-01');
   });
 });

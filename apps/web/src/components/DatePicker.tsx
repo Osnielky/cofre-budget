@@ -56,7 +56,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Pick a date
     if (!open) return;
     const onDown = (e: PointerEvent) => {
       const t = e.target as HTMLElement;
-      if (panelRef.current?.contains(t) || t.closest('[data-date-trigger]')) return;
+      if (panelRef.current?.contains(t) || t.closest('[data-date-trigger]') || t.closest('[data-period-panel]')) return;
       setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } };
@@ -128,7 +128,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Pick a date
       </button>
 
       {open && pos && createPortal(
-        <div ref={panelRef} className="rounded-2xl cat-picker"
+        <div ref={panelRef} data-date-panel className="rounded-2xl cat-picker"
           style={{
             position: 'fixed', top: pos.top, left: pos.left, width: pos.width, zIndex: 10000,
             background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)',

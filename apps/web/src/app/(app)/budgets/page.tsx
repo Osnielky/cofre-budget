@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useBudgetScenario, API } from '@/hooks/useBudgetScenario';
-import { dailySeries, isIncomeBudget, monthsBack, shiftMonth, TREND_MONTHS } from '@/lib/budgets/assemble';
+import { dailySeries, isIncomeBudget, monthsBack, TREND_MONTHS } from '@/lib/budgets/assemble';
 import { categoryTotals, foldOther, inCashFlow, txInMonth } from '@/lib/dashboard/derive';
 import { dayOfMonth, daysInMonth, elapsedPct, roundUp50, unbudgetedSpending } from '@/lib/budgets/derive';
 import type { BudgetWithSpent } from '@/lib/budgets/types';
@@ -25,11 +25,8 @@ import PlanHistory from '@/components/budgets/PlanHistory';
 import BudgetRowDetail from '@/components/budgets/BudgetRowDetail';
 import { Icon } from '@/components/budgets/ui';
 import PageHeader, { HeaderAction } from '@/components/PageHeader';
+import PeriodPicker from '@/components/PeriodPicker';
 
-function monthLabel(m: string) {
-  const [y, mo] = m.split('-').map(Number);
-  return new Date(y, mo - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
-}
 function lastDayLabel(m: string) {
   const [y, mo] = m.split('-').map(Number);
   return new Date(y, mo - 1, daysInMonth(m)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -221,19 +218,7 @@ export default function BudgetsPage() {
           subtitle="Adjust your budgets and see the impact instantly across your entire plan."
           phoneSubtitle={false}
           period={<>
-            <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-              <button type="button" onClick={() => changeMonth(shiftMonth(month, -1))} aria-label="Previous month"
-                className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-surface)] cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>
-                <Icon name="chevL" size={14} strokeWidth={2.2} />
-              </button>
-              <span className="text-sm font-semibold px-2 min-w-36 text-center flex items-center justify-center gap-1.5">
-                <Icon name="calendar" size={13} /> {monthLabel(month)}
-              </span>
-              <button type="button" onClick={() => changeMonth(shiftMonth(month, 1))} disabled={s.isCurrentMonth} aria-label="Next month"
-                className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-surface)] disabled:opacity-30 cursor-pointer disabled:cursor-default" style={{ color: 'var(--color-text-muted)' }}>
-                <Icon name="chevR" size={14} strokeWidth={2.2} />
-              </button>
-            </div>
+            <PeriodPicker mode="month" value={{ kind: 'month', month }} onChange={(p) => p.kind === 'month' && changeMonth(p.month)} />
             <span className="text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
               Day {dayOfMonth(month, s.now)} of {daysInMonth(month)}
             </span>

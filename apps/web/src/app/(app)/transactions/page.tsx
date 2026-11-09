@@ -7,6 +7,8 @@ import RecurringPanel, { emptyRecurring, occurrenceDates, type RecurringState } 
 import DatePicker from '@/components/DatePicker';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import PageHeader from '@/components/PageHeader';
+import PeriodPicker from '@/components/PeriodPicker';
+import { normalizePeriod, resolvePeriod, thisMonth, type Period } from '@/lib/period';
 import { useApi } from '@/hooks/useApi';
 
 const EMPTY_LIST: never[] = [];
@@ -116,7 +118,6 @@ interface Transaction {
 interface DebtLite { id: string; borrowerName: string; remaining: number; status: 'open' | 'paid'; direction: 'lent' | 'owed' }
 
 type Filter    = 'all' | 'uncategorized' | 'expense' | 'income' | 'recurring' | 'trades';
-type RangeMode = 'month' | 'custom';
 
 /* Non-bank group accents. Hex (not CSS vars) because the group header appends
    alpha suffixes to the colour, exactly as it does with a bank account's colour. */
@@ -146,26 +147,6 @@ const glass: React.CSSProperties = {
 };
 
 /* ── date helpers ──────────────────────────────────────────────── */
-function currentMonth() { return new Date().toISOString().slice(0, 7); }
-function prevMonth(m: string) {
-  const [y, mo] = m.split('-').map(Number);
-  const d = new Date(y, mo - 2);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-function nextMonth(m: string) {
-  const [y, mo] = m.split('-').map(Number);
-  const d = new Date(y, mo);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-function monthLabel(m: string) {
-  const [y, mo] = m.split('-');
-  return new Date(Number(y), Number(mo) - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
-}
-function monthFrom(m: string) { return `${m}-01`; }
-function monthTo(m: string) {
-  const [y, mo] = m.split('-').map(Number);
-  return new Date(y, mo, 0).toISOString().slice(0, 10);
-}
 function formatDate(d: string) {
   return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
@@ -179,10 +160,10 @@ const TYPE_META: Record<string, string> = { savings: '🏦', investment: '📈',
 /* ═══════════════════════════════════════════════════════════════ */
 export default function TransactionsPage() {
   const { user } = useUser();
-  const [month, setMonth]           = useState(currentMonth);
-  const [rangeMode, setRangeMode]   = useState<RangeMode>('month');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo]     = useState('');
+  /* The viewed period — a month (the whole month, so future-dated rows still show), a
+     relative preset or a custom range — is one value, picked in the header's PeriodPicker. */
+  const [period, setPeriod]         = useState<Period>(() => thisMonth());
+  const range = useMemo(() => resolvePeriod(period, new Date()), [period]);
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [prevTransactions, setPrevTransactions] = useState<Transaction[]>([]);
@@ -197,7 +178,7 @@ export default function TransactionsPage() {
     const p = new URLSearchParams(window.location.search);
     const from = p.get('from'), to = p.get('to');
     if (from && to && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to) && from <= to) {
-      setRangeMode('custom'); setCustomFrom(from); setCustomTo(to);
+      setPeriod(normalizePeriod({ kind: 'custom', from, to }));
     }
     const account = p.get('account'); if (account) setAccountFilter(account);
     const category = p.get('category'); if (category) setCategoryFilter(category);
@@ -324,8 +305,8 @@ export default function TransactionsPage() {
 
   const ACC_COLORS = ['#9B6DFF', '#4FBF7F', '#F07A3E', '#F5C842', '#4BA8D8', '#E879A0'];
 
-  const from = rangeMode === 'month' ? monthFrom(month) : customFrom;
-  const to   = rangeMode === 'month' ? monthTo(month)   : customTo;
+  const from = range.from;
+  const to   = range.to;
 
   /* A bulk import (e.g. six months of brokerage history) often lands entirely
      outside the currently-viewed month — switch to a custom range covering it
@@ -334,11 +315,7 @@ export default function TransactionsPage() {
   function jumpToImportedRange(summary: ImportSummary) {
     if (!summary.dateRange) return;
     const alreadyVisible = summary.dateRange.from >= from && summary.dateRange.to <= to;
-    if (!alreadyVisible) {
-      setRangeMode('custom');
-      setCustomFrom(summary.dateRange.from);
-      setCustomTo(summary.dateRange.to);
-    }
+    if (!alreadyVisible) setPeriod(normalizePeriod({ kind: 'custom', from: summary.dateRange.from, to: summary.dateRange.to }));
     // One account → focus it; a batch spread over several → show them all.
     setAccountFilter(summary.accounts.length === 1 ? summary.accounts[0].id : 'all');
   }
@@ -355,23 +332,9 @@ export default function TransactionsPage() {
     importToastTimer.current = setTimeout(() => setImportToast(null), 6000);
   }
 
-  /* Previous window (for stat deltas + insight card): previous month, or the
-     same-length span immediately before a custom range. */
-  const prevRange = useMemo(() => {
-    if (rangeMode === 'month') {
-      const pm = prevMonth(month);
-      return { from: monthFrom(pm), to: monthTo(pm), label: monthLabel(pm) };
-    }
-    if (customFrom && customTo) {
-      const f = new Date(`${customFrom}T00:00:00Z`);
-      const t = new Date(`${customTo}T00:00:00Z`);
-      const days = Math.max(1, Math.round((t.getTime() - f.getTime()) / 86400000) + 1);
-      const pf = new Date(f); pf.setUTCDate(pf.getUTCDate() - days);
-      const pt = new Date(f); pt.setUTCDate(pt.getUTCDate() - 1);
-      return { from: pf.toISOString().slice(0, 10), to: pt.toISOString().slice(0, 10), label: 'prior period' };
-    }
-    return null;
-  }, [rangeMode, month, customFrom, customTo]);
+  /* Previous window (for stat deltas + insight card): the month before, the same number
+     of whole months, or the same-length span immediately before a custom range. */
+  const prevRange = useMemo(() => ({ from: range.prevFrom, to: range.prevTo, label: range.prevLabel }), [range]);
 
   const loadTransactions = useCallback(async () => {
     setLoading(true);
@@ -978,7 +941,7 @@ export default function TransactionsPage() {
     () => buildRecurringMap([...ledger, ...prevLedger].filter((t) => Number(t.amount) < 0)),
     [ledger, prevLedger]
   );
-  const statMonth = rangeMode === 'month' ? month : (from ? from.slice(0, 7) : currentMonth());
+  const statMonth = period.kind === 'month' ? period.month : from.slice(0, 7);
   const prevStatMonth = prevRange ? prevRange.from.slice(0, 7) : '';
   const recurringTotalIn = (mo: string) =>
     [...recurringMap.values()]
@@ -1022,7 +985,7 @@ export default function TransactionsPage() {
     setCollapsedDates((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
   }
 
-  const insightsMonth = rangeMode === 'month' ? month : (from ? from.slice(0, 7) : currentMonth());
+  const insightsMonth = period.kind === 'month' ? period.month : from.slice(0, 7);
 
   function handleSubscriptionChange(next: SubscriptionStore) {
     setSubscriptions(next);
@@ -1080,39 +1043,7 @@ export default function TransactionsPage() {
             and the avatar that used to sit here are gone: the sidebar shows the account and
             there is no notification surface yet. ── */}
         <PageHeader sticky="md" title="Transactions" subtitle="Track, review and organize your money" phoneSubtitle={false}
-          period={<>
-                {rangeMode === 'month' ? (
-                  <div className="flex items-center justify-between sm:justify-start gap-1 p-1 rounded-xl flex-1 sm:flex-initial"
-                    style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                    <button onClick={() => setMonth(prevMonth(month))} aria-label="Previous month"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] text-lg leading-none"
-                      style={{ color: 'var(--color-text-secondary)' }}>‹</button>
-                    <span className="px-3 text-sm font-semibold min-w-36 text-center">{monthLabel(month)}</span>
-                    <button onClick={() => setMonth(nextMonth(month))} aria-label="Next month"
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)] text-lg leading-none"
-                      style={{ color: 'var(--color-text-secondary)' }}>›</button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 flex-1 sm:flex-initial min-w-0">
-                    <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} aria-label="From date"
-                      className="px-2 sm:px-3 py-1.5 text-sm rounded-xl outline-none min-w-0 flex-1 sm:flex-initial"
-                      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
-                    <span style={{ color: 'var(--color-text-muted)' }}>→</span>
-                    <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} aria-label="To date"
-                      className="px-2 sm:px-3 py-1.5 text-sm rounded-xl outline-none min-w-0 flex-1 sm:flex-initial"
-                      style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
-                  </div>
-                )}
-                <button onClick={() => setRangeMode((m) => m === 'month' ? 'custom' : 'month')}
-                  aria-label={rangeMode === 'month' ? 'Pick a custom date range' : 'Back to month view'}
-                  title={rangeMode === 'month' ? 'Custom range' : 'Month view'}
-                  className="text-xs px-2.5 sm:px-3 py-2 sm:py-1.5 rounded-lg transition-colors hover:bg-[var(--color-elevated)] shrink-0"
-                  style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
-                  {rangeMode === 'month'
-                    ? <>📅<span className="hidden sm:inline"> Custom range</span></>
-                    : <>←<span className="hidden sm:inline"> Month view</span></>}
-                </button>
-          </>}
+          period={<PeriodPicker mode="range" max={null} value={period} onChange={setPeriod} />}
           actions={<>
               {/* New manual transaction */}
               <button onClick={() => { setManualTxError(''); setShowManualTx(true); }}

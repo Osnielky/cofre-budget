@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import PageHeader, { HeaderAction } from '@/components/PageHeader';
+import PeriodPicker from '@/components/PeriodPicker';
 import { useUser } from '@/components/UserProvider';
 import { useThemeColors } from '@/components/ThemeProvider';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -37,7 +38,6 @@ import ProjectsPanel from '@/components/dashboard/panels/ProjectsPanel';
 import AccountsPanel from '@/components/dashboard/panels/AccountsPanel';
 import RecentTransactionsPanel from '@/components/dashboard/panels/RecentTransactionsPanel';
 
-function currentMonth() { return new Date().toISOString().slice(0, 7); }
 function monthLabel(m: string) {
   const [y, mo] = m.split('-');
   return new Date(Number(y), Number(mo) - 1).toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -49,11 +49,6 @@ function monthShort(m: string) {
 function prevMonth(m: string) {
   const [y, mo] = m.split('-').map(Number);
   const d = new Date(y, mo - 2);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-}
-function nextMonth(m: string) {
-  const [y, mo] = m.split('-').map(Number);
-  const d = new Date(y, mo);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 function fmt(n: number) { return n.toLocaleString('en-US', { minimumFractionDigits: 2 }); }
@@ -156,8 +151,6 @@ export default function DashboardPage() {
   const receivables  = openDebts.filter(dbt => dbt.direction === 'lent').reduce((s,dbt) => s + Number(dbt.remaining || 0), 0);
   const payables     = openDebts.filter(dbt => dbt.direction === 'owed').reduce((s,dbt) => s + Number(dbt.remaining || 0), 0);
   const netWorth     = totalBalance + receivables - payables;
-  const isCurrentMonth = month === currentMonth();
-  const isEarliestMonth = month <= `${new Date().getFullYear()}-01`;
 
   /* Prev month comparison from yearTx */
   const prevM    = prevMonth(month);
@@ -214,13 +207,8 @@ export default function DashboardPage() {
               subtitle={loading
                 ? <span className="flex flex-col gap-2 pt-1" aria-busy="true"><span className="skel block h-3.5 w-72 max-w-full rounded" /><span className="skel hidden sm:block h-3.5 w-52 rounded" /></span>
                 : <><span className="hidden sm:inline">{healthLine} </span>{attentionLine}</>}
-              period={<>
-              <div className="flex items-center gap-0.5 rounded-full px-1.5 py-1" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                <button onClick={() => !isEarliestMonth && setMonth(prevMonth)} disabled={isEarliestMonth} aria-label="Previous month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: 'var(--color-text-secondary)' }}>‹</button>
-                <span className="text-fine sm:text-[12.5px] font-semibold uppercase px-1 min-w-24 sm:min-w-28 text-center tracking-[0.08em] sm:tracking-[0.12em]">{monthLabel(month)}</span>
-                <button onClick={() => setMonth(nextMonth)} disabled={isCurrentMonth} aria-label="Next month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-default" style={{ color: 'var(--color-text-secondary)' }}>›</button>
-              </div>
-              </>}
+              period={<PeriodPicker mode="month" value={{ kind: 'month', month }} onChange={(p) => p.kind === 'month' && setMonth(p.month)}
+                min={`${new Date().getFullYear()}-01`} />}
               actions={<>
                 {loading && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-green)' }} />}
                 <HeaderAction href="/reports" label="View reports" shortLabel={null} title="View reports"

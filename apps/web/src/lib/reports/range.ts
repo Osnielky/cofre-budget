@@ -49,6 +49,13 @@ export function dayCount(from: string, to: string): number {
   return Math.round((parseYmd(to).getTime() - parseYmd(from).getTime()) / 86_400_000) + 1;
 }
 
+/** How many whole calendar months `from`..`to` covers (the 1st to a month's last day), else 0. */
+export function wholeMonthSpan(from: string, to: string): number {
+  const a = parseYmd(from), b = parseYmd(to);
+  if (to < from || a.getDate() !== 1 || b.getDate() !== monthEnd(b.getFullYear(), b.getMonth()).getDate()) return 0;
+  return monthKeysBetween(from, to).length;
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 export const monthLabel = (key: string) => { const [y, m] = key.split('-').map(Number); return `${MONTHS[m - 1]} ${y}`; };
 export const shortMonth = (key: string) => MONTHS[Number(key.split('-')[1]) - 1];
@@ -74,9 +81,18 @@ export function resolveRange(preset: RangePreset, now: Date, custom?: { from: st
 
   if (preset === 'custom' && custom && custom.from && custom.to && custom.from <= custom.to) {
     from = custom.from; to = custom.to;
-    const n = dayCount(from, to);
-    prevTo = ymd(addDays(parseYmd(from), -1));
-    prevFrom = ymd(addDays(parseYmd(prevTo), -(n - 1)));
+    const whole = wholeMonthSpan(from, to);
+    if (whole) {
+      // Whole calendar months compare to the same number of whole months before them
+      // (September to August), not to the 30 days that happen to precede them.
+      const a = parseYmd(from);
+      prevFrom = ymd(monthStart(a.getFullYear(), a.getMonth() - whole));
+      prevTo = ymd(monthEnd(a.getFullYear(), a.getMonth() - 1));
+    } else {
+      const n = dayCount(from, to);
+      prevTo = ymd(addDays(parseYmd(from), -1));
+      prevFrom = ymd(addDays(parseYmd(prevTo), -(n - 1)));
+    }
   } else {
     const monthsBack = preset === '3m' ? 3 : preset === '6m' ? 6 : preset === '12m' ? 12 : preset === 'ytd' ? m0 + 1 : 1;
     if (preset === 'last-month') {
