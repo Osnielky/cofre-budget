@@ -6,11 +6,11 @@ import dynamic from 'next/dynamic';
 import RecurringPanel, { emptyRecurring, occurrenceDates, type RecurringState } from '@/components/RecurringPanel';
 import DatePicker from '@/components/DatePicker';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
+import PageHeader from '@/components/PageHeader';
 import { useApi } from '@/hooks/useApi';
 
 const EMPTY_LIST: never[] = [];
 import { StretchTabs, type StretchTabItem } from '@/components/ui/StretchTabs';
-import Avatar from '@/components/Avatar';
 import { useUser } from '@/components/UserProvider';
 import CsvImportModal from '@/components/CsvImportModal';
 import ImportReconcileModal from '@/components/ImportReconcileModal';
@@ -250,8 +250,6 @@ export default function TransactionsPage() {
   const [rowMenuPos, setRowMenuPos]   = useState<{ top: number; left: number } | null>(null);
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
   const rowMenuRef = useRef<HTMLDivElement>(null);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
   const [transferMatches, setTransferMatches]         = useState<TransferMatch[]>([]);
   const [transferMatchesLoading, setTransferMatchesLoading] = useState(false);
   const [linkingProj, setLinkingProj]                 = useState(false);
@@ -494,16 +492,6 @@ export default function TransactionsPage() {
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [rowMenuTxId]);
-
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (notifOpen && notifRef.current && !notifRef.current.contains(e.target as Node)) {
-        setNotifOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [notifOpen]);
 
   /* ── category assign ──
      Returns true if the assignment request succeeded, false otherwise, so
@@ -1088,19 +1076,11 @@ export default function TransactionsPage() {
       <main className="flex-1 overflow-y-auto min-w-0 pt-14 md:pt-0">
 
         {/* ── Sticky header (desktop only — too tall to pin on narrow viewports) ── */}
-        <div className="md:sticky md:top-0 z-20 px-4 sm:px-6 pt-4 sm:pt-5 pb-4 flex flex-col gap-3 sm:gap-4"
-          style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
-
-          {/* Title + actions */}
-          {/* Phones: title and the action icons share the first row, the month selector takes
-              the whole second row. From sm: title + selector left, actions right. */}
-          <div className="flex items-center gap-x-3 sm:gap-x-6 gap-y-3 flex-wrap">
-              <div className="order-1 min-w-0">
-                <h1 className="text-xl sm:text-2xl font-bold tracking-tight">Transactions</h1>
-                <p className="text-sm mt-0.5 hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>Track, review and organize your money</p>
-              </div>
-              {/* ── Date range selector ── */}
-              <div className="order-3 sm:order-2 w-full sm:w-auto sm:mr-auto flex items-center gap-2 sm:gap-3 flex-wrap">
+        {/* ── Sticky header (desktop only — too tall to pin on narrow viewports). The bell
+            and the avatar that used to sit here are gone: the sidebar shows the account and
+            there is no notification surface yet. ── */}
+        <PageHeader sticky="md" title="Transactions" subtitle="Track, review and organize your money" phoneSubtitle={false}
+          period={<>
                 {rangeMode === 'month' ? (
                   <div className="flex items-center justify-between sm:justify-start gap-1 p-1 rounded-xl flex-1 sm:flex-initial"
                     style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
@@ -1132,31 +1112,8 @@ export default function TransactionsPage() {
                     ? <>📅<span className="hidden sm:inline"> Custom range</span></>
                     : <>←<span className="hidden sm:inline"> Month view</span></>}
                 </button>
-
-              </div>
-            <div className="order-2 sm:order-3 flex items-center gap-2 ml-auto sm:ml-0">
-              {/* Notifications (hidden on phones — nothing to show there yet) */}
-              <div className="relative hidden sm:block" ref={notifRef}>
-                <button onClick={() => setNotifOpen((v) => !v)}
-                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors hover:bg-[var(--color-elevated)]"
-                  style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
-                  title="Notifications">
-                  <BellIcon />
-                </button>
-                {notifOpen && (
-                  <div className="absolute right-0 top-full mt-2 z-30 rounded-2xl overflow-hidden"
-                    style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', width: '260px' }}>
-                    <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                      <p className="text-sm font-semibold">Notifications</p>
-                    </div>
-                    <div className="px-4 py-6 text-center">
-                      <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No notifications yet</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-              {/* Avatar (the phone drawer already shows the account) */}
-              <span className="hidden sm:block"><Avatar name={user?.name} email={user?.email} src={user?.avatarUrl} size={32} rounded={12} /></span>
+          </>}
+          actions={<>
               {/* New manual transaction */}
               <button onClick={() => { setManualTxError(''); setShowManualTx(true); }}
                 className="btn-gold flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all"
@@ -1170,8 +1127,7 @@ export default function TransactionsPage() {
                   className="flex items-center gap-2 px-2.5 sm:px-3 py-2 text-sm font-semibold rounded-xl transition-all hover:brightness-110"
                   style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 28%, transparent)', color: 'var(--color-primary)' }}>
                   <UploadIcon />
-                  <span className="hidden lg:inline">Import Transactions (CSV)</span>
-                  <span className="hidden sm:inline lg:hidden">Import CSV</span>
+                  <span className="hidden sm:inline">Import CSV</span>
                 </button>
                 {showImportPicker && (
                   <div className="absolute right-0 top-full mt-2 z-30 rounded-2xl overflow-hidden"
@@ -1392,9 +1348,7 @@ export default function TransactionsPage() {
                   <span className="hidden sm:inline">{syncing ? 'Syncing…' : 'Sync Plaid'}</span>
                 </button>
               )}
-            </div>
-          </div>
-
+          </>}>
           {/* ── Stat strip ── */}
           <StatStrip
             transactions={cashFlowRows(ledger)}
@@ -1497,7 +1451,7 @@ export default function TransactionsPage() {
               )}
             </div>
           </div>
-        </div>
+        </PageHeader>
 
         {/* ── Transaction list. Rises in once on mount; a filter change just re-renders
             the groups (no key here: remounting hundreds of rows on every tab was slow). ── */}
@@ -3299,9 +3253,6 @@ function PencilIcon() {
 }
 function KebabIcon() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>;
-}
-function BellIcon() {
-  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
 }
 function SlidersIcon() {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>;

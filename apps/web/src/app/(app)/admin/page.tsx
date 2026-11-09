@@ -1,5 +1,6 @@
 'use client';
 
+import PageHeader, { HeaderAction } from '@/components/PageHeader';
 import { useState } from 'react';
 import { useAdminStats, resetDemoOwner } from '@/hooks/useAdmin';
 import DemoResetPanel from './components/DemoResetPanel';
@@ -32,19 +33,8 @@ export default function AdminPage() {
                 <p className="text-sm" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>
               )}
               {data && (
-              <div className="flex items-end justify-between gap-3 flex-wrap">
-                <div>
-                  <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(26px, 3vw, 38px)' }}>Admin</h1>
-                  <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-                    {`Updated ${new Date(data.generatedAt).toLocaleTimeString()}`}
-                  </p>
-                </div>
-                <button type="button" onClick={refresh} disabled={loading}
-                  className="px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer disabled:opacity-40"
-                  style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                  {loading ? 'Refreshing…' : 'Refresh'}
-                </button>
-              </div>
+              <PageHeader title="Admin" subtitle={`Updated ${new Date(data.generatedAt).toLocaleTimeString()}`}
+                actions={<HeaderAction onClick={refresh} disabled={loading} label={loading ? 'Refreshing…' : 'Refresh'} />} />
               )}
 
               {error && (

@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import PageHeader, { HeaderAction } from '@/components/PageHeader';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useNetWorthGoal } from '@/hooks/useNetWorthGoal';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -26,19 +26,10 @@ export default function GoalsPage() {
       <main className="flex-1 min-w-0 overflow-y-auto pt-14 md:pt-0">
         {/* No width cap: on wide screens the chart row grows a third column (milestones). */}
         <Stagger className="px-4 sm:px-6 md:px-8 2xl:px-10 py-5 sm:py-6 flex flex-col gap-5">
-          <StaggerItem className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(26px, 3vw, 38px)' }}>Your road to $1,000,000</h1>
-              <p className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>See how far you&rsquo;ve come. Keep building what&rsquo;s next.</p>
-            </div>
-            <Link href="/settings?tab=banks"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
-              style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" />
-              </svg>
-              Update assets
-            </Link>
+          <StaggerItem>
+            <PageHeader title="Your road to $1,000,000" subtitle={<>See how far you&rsquo;ve come. Keep building what&rsquo;s next.</>}
+              actions={<HeaderAction href="/settings?tab=banks" label="Update assets"
+                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg>} />} />
           </StaggerItem>
 
           {goalLoading || dataLoading ? (

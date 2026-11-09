@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
+import PageHeader, { HeaderAction } from '@/components/PageHeader';
 import { useUser } from '@/components/UserProvider';
 import { useThemeColors } from '@/components/ThemeProvider';
 import { useDashboardData } from '@/hooks/useDashboardData';
@@ -198,8 +198,6 @@ export default function DashboardPage() {
     : budgetsOver === 0 ? `All budgets are on track for ${monthName}.`
     : `${NUM_WORDS[budgetsOver] ?? budgetsOver} budget${budgetsOver === 1 ? '' : 's'} need${budgetsOver === 1 ? 's' : ''} attention before the end of ${monthName}.`;
 
-  /* Pill CTAs: roomy on desktop, compact on phones so the three controls share a row. */
-  const pill = 'items-center justify-center rounded-full text-fine sm:text-[12.5px] font-semibold uppercase no-underline transition-all px-4 py-2.5 sm:px-[26px] sm:py-3.5 tracking-[0.12em] sm:tracking-[0.18em] whitespace-nowrap';
 
   return (
     <div className="contents">
@@ -207,46 +205,30 @@ export default function DashboardPage() {
         {/* The page rises in: greeting, stat row, then each Panel in its turn (Panel carries the item variants). */}
         <Stagger className="px-4 sm:px-6 md:px-8 py-4 sm:py-6 flex flex-col gap-3 sm:gap-4">
 
-          {/* ── Topbar. Phones: smaller greeting, one status sentence, no rule, icon buttons;
-                 the full pills and the two-sentence line return from sm. ── */}
-          <StaggerItem className="flex items-end justify-between gap-3 sm:gap-6 flex-wrap">
-            <div className="min-w-0">
-              <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(26px, 3.6vw, 48px)', lineHeight: 1.08 }}>
-                {greeting()}{user?.name ? <>, <span style={{ color: 'var(--color-primary)' }}>{user.name.split(' ')[0]}</span></> : ''}
-              </h1>
-              <div className="hidden sm:block rounded-full sm:mt-[18px] sm:mb-3.5" style={{ width: 56, height: 3, background: 'var(--color-primary)' }} />
-              {loading
-                ? <p className="mt-2.5 sm:mt-0 flex flex-col gap-2.5" aria-busy="true"><span className="skel block h-3.5 sm:h-4 w-72 max-w-full rounded" /><span className="skel hidden sm:block h-4 w-52 rounded" /></p>
-                : <p className="mt-1.5 sm:mt-0 text-[13px] sm:text-[17px]" style={{ fontWeight: 300, color: 'var(--color-text-secondary)', maxWidth: 520, lineHeight: 1.5 }}>
-                    <span className="hidden sm:inline">{healthLine} </span>{attentionLine}
-                  </p>}
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3.5 pb-0 sm:pb-2 flex-wrap">
-              {loading && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-green)' }} />}
+          {/* ── Header: greeting, one status sentence (two from sm), the month stepper and the
+                 two shortcuts. Phones keep icon-only shortcuts on the title row and the stepper
+                 on its own row — PageHeader lays that out. ── */}
+          <StaggerItem>
+            <PageHeader
+              title={<>{greeting()}{user?.name ? <>, <span style={{ color: 'var(--color-primary)' }}>{user.name.split(' ')[0]}</span></> : ''}</>}
+              subtitle={loading
+                ? <span className="flex flex-col gap-2 pt-1" aria-busy="true"><span className="skel block h-3.5 w-72 max-w-full rounded" /><span className="skel hidden sm:block h-3.5 w-52 rounded" /></span>
+                : <><span className="hidden sm:inline">{healthLine} </span>{attentionLine}</>}
+              period={<>
               <div className="flex items-center gap-0.5 rounded-full px-1.5 py-1" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                 <button onClick={() => !isEarliestMonth && setMonth(prevMonth)} disabled={isEarliestMonth} aria-label="Previous month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: 'var(--color-text-secondary)' }}>‹</button>
                 <span className="text-fine sm:text-[12.5px] font-semibold uppercase px-1 min-w-24 sm:min-w-28 text-center tracking-[0.08em] sm:tracking-[0.12em]">{monthLabel(month)}</span>
                 <button onClick={() => setMonth(nextMonth)} disabled={isCurrentMonth} aria-label="Next month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-default" style={{ color: 'var(--color-text-secondary)' }}>›</button>
               </div>
-              <Link href="/reports"
-                className={`hidden sm:inline-flex ${pill} hover:brightness-125`}
-                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)' }}>
-                View Reports
-              </Link>
-              <Link href="/transactions" className={`hidden sm:inline-flex btn-gold ${pill}`}>
-                Add Transaction
-              </Link>
-              {/* Phone-only icon buttons: same destinations, one row with the month picker. */}
-              <Link href="/reports" aria-label="View reports" title="View reports"
-                className="sm:hidden w-10 h-10 rounded-full flex items-center justify-center"
-                style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg>
-              </Link>
-              <Link href="/transactions" aria-label="Add transaction" title="Add transaction"
-                className="sm:hidden btn-gold w-10 h-10 rounded-full flex items-center justify-center">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
-              </Link>
-            </div>
+              </>}
+              actions={<>
+                {loading && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-green)' }} />}
+                <HeaderAction href="/reports" label="View reports" shortLabel={null} title="View reports"
+                  icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2" /></svg>} />
+                <HeaderAction href="/transactions" primary label="Add transaction" shortLabel={null} title="Add transaction"
+                  icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>} />
+              </>}
+            />
           </StaggerItem>
 
           {/* ── Error banner ── */}

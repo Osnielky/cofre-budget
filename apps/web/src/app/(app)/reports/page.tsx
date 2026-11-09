@@ -1,7 +1,7 @@
 'use client';
 
+import PageHeader, { HeaderAction } from '@/components/PageHeader';
 import { Suspense, useCallback, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
 import { useThemeColors } from '@/components/ThemeProvider';
@@ -147,7 +147,6 @@ function Reports() {
 
   const pickedAccount = picked ? accounts.find((a) => a.id === picked) : null;
   const askHref = `/ask-cofre?q=${encodeURIComponent(`Where did my money go between ${range.from} and ${range.to}${pickedAccount ? ` in my ${pickedAccount.bankName} ${pickedAccount.accountName} account` : ''}, and what should I change?`)}`;
-  const btn = 'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer';
   const setTab = (tab: ReportTab) => update({ tab, open: null });
 
   return (
@@ -155,18 +154,14 @@ function Reports() {
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
         <Stagger className="px-4 sm:px-6 py-4 sm:py-6 flex flex-col gap-4 sm:gap-5 max-w-[1920px]">
           {/* Header */}
-          <StaggerItem className="flex items-start justify-between gap-3 flex-wrap">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Reports</h1>
-              <p className="text-sm mt-0.5 hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>Where the money went, and how that is changing.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <button type="button" onClick={() => setExportOpen((v) => !v)} aria-haspopup="menu" aria-expanded={exportOpen}
-                  className={btn} style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
+          <StaggerItem>
+            <PageHeader title="Reports" subtitle="Where the money went, and how that is changing." phoneSubtitle={false}
+              actions={<>
+                <div className="relative">
+                  <HeaderAction onClick={() => setExportOpen((v) => !v)} aria-haspopup="menu" aria-expanded={exportOpen} label="Export CSV" shortLabel="Export"
+                    icon={
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12M6 9l6 6 6-6M4 21h16" /></svg>
-                  Export CSV
-                </button>
+                    } />
                 {exportOpen && (
                   <div role="menu" className="absolute right-0 top-full mt-2 z-30 rounded-xl overflow-hidden py-1 w-60"
                     style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
@@ -179,10 +174,8 @@ function Reports() {
                   </div>
                 )}
               </div>
-              <Link href={askHref} className={`${btn} btn-gold`}>
-                <span aria-hidden="true">✦</span><span className="hidden sm:inline">Ask Cofre about this</span><span className="sm:hidden">Ask</span>
-              </Link>
-            </div>
+                <HeaderAction href={askHref} primary label="Ask Cofre about this" shortLabel="Ask" icon={<span aria-hidden="true">✦</span>} />
+              </>} />
           </StaggerItem>
 
           <StaggerItem>

@@ -1,5 +1,6 @@
 'use client';
 
+import PageHeader, { HeaderAction } from '@/components/PageHeader';
 import { useState, useEffect, useRef } from 'react';
 import { closureKind, closureActionLabel, isClosed, statusLabel } from '@/lib/projects/closure';
 import { createPortal } from 'react-dom';
@@ -545,20 +546,9 @@ export default function ProjectsPage() {
       <main className="flex-1 flex flex-col overflow-hidden pt-14 md:pt-0">
 
         {/* Header */}
-        <div className="shrink-0 px-4 sm:px-6 pt-4 sm:pt-5 pb-4 flex items-center justify-between gap-3 z-20"
-          style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight">Projects &amp; Assets</h1>
-            <p className="text-xs mt-0.5 hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>
-              Track cost basis and P&amp;L — cars, property, businesses, trading accounts.
-            </p>
-          </div>
-          <button onClick={openCreate}
-            className="btn-gold flex items-center gap-2 px-3.5 sm:px-4 py-2 text-sm font-semibold text-white rounded-xl shrink-0 whitespace-nowrap"
->
-            <PlusIcon /> <span className="hidden sm:inline">New Project</span><span className="sm:hidden">New</span>
-          </button>
-        </div>
+        <PageHeader sticky="md" className="shrink-0"
+          title="Projects & Assets" subtitle="Track cost basis and P&L — cars, property, businesses, trading accounts." phoneSubtitle={false}
+          actions={<HeaderAction onClick={openCreate} primary label="New project" shortLabel="New" icon={<PlusIcon />} />} />
 
         {/* ── One view at a time: the overview (portfolio strip + a card per project)
             until a project is picked, then its detail takes the whole width with a

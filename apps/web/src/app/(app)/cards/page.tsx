@@ -1,5 +1,6 @@
 'use client';
 
+import PageHeader from '@/components/PageHeader';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PlaidLauncher from '@/components/PlaidLauncher';
 import TotalUtilization from './components/TotalUtilization';
@@ -119,12 +120,7 @@ export default function CardsPage() {
     <div className="contents">
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
         <div className="p-4 sm:p-6 flex flex-col gap-5">
-          <div>
-            <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(24px, 3vw, 34px)' }}>Cards</h1>
-            <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-              {loading ? 'Loading your cards…' : `${deckSubtitle(deck)} · one place`}
-            </p>
-          </div>
+          <PageHeader title="Cards" subtitle={loading ? 'Loading your cards…' : `${deckSubtitle(deck)} · one place`} />
 
           {error && <p className="text-sm" style={{ color: 'var(--color-rose)' }} role="alert">{error}</p>}
 

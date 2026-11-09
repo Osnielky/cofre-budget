@@ -24,6 +24,7 @@ import TargetsPanel from '@/components/budgets/TargetsPanel';
 import PlanHistory from '@/components/budgets/PlanHistory';
 import BudgetRowDetail from '@/components/budgets/BudgetRowDetail';
 import { Icon } from '@/components/budgets/ui';
+import PageHeader, { HeaderAction } from '@/components/PageHeader';
 
 function monthLabel(m: string) {
   const [y, mo] = m.split('-').map(Number);
@@ -34,8 +35,6 @@ function lastDayLabel(m: string) {
   return new Date(y, mo - 1, daysInMonth(m)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-const headerBtn = 'px-3 py-2 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 hover:bg-[var(--color-surface)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
-const headerBtnStyle = { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' };
 
 export default function BudgetsPage() {
   const s = useBudgetScenario();
@@ -217,15 +216,11 @@ export default function BudgetsPage() {
       <main className="flex-1 min-w-0 overflow-y-auto pt-14 md:pt-0 flex flex-col">
 
         {/* ── Header ── */}
-        <header className="relative md:sticky md:top-0 z-20 px-4 sm:px-6 pt-5 pb-4 flex items-center justify-between gap-3 flex-wrap"
-          style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
-          <div className="min-w-0">
-            <h1 className="text-xl font-bold tracking-tight">Budgets</h1>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
-              Adjust your budgets and see the impact instantly across your entire plan.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
+        <PageHeader sticky="md"
+          title="Budgets"
+          subtitle="Adjust your budgets and see the impact instantly across your entire plan."
+          phoneSubtitle={false}
+          period={<>
             <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               <button type="button" onClick={() => changeMonth(shiftMonth(month, -1))} aria-label="Previous month"
                 className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-[var(--color-surface)] cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>
@@ -239,19 +234,18 @@ export default function BudgetsPage() {
                 <Icon name="chevR" size={14} strokeWidth={2.2} />
               </button>
             </div>
-            <button type="button" onClick={() => setImportOpen(true)} disabled={s.dirty} className={headerBtn} style={headerBtnStyle}
-              title={s.dirty ? 'Save or discard your draft changes before importing a plan' : 'Copy another month’s plan into this month'}>
-              <Icon name="layers" size={13} /> Import plan
-            </button>
-            <button type="button" onClick={() => setSetAllOpen(true)} className={headerBtn} style={headerBtnStyle}>
-              <Icon name="list" size={13} /> Set all
-            </button>
-            {addBudgetBtn}
             <span className="text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
               Day {dayOfMonth(month, s.now)} of {daysInMonth(month)}
             </span>
-          </div>
-        </header>
+          </>}
+          actions={<>
+            <HeaderAction onClick={() => setImportOpen(true)} disabled={s.dirty} label="Import plan" shortLabel={null}
+              icon={<Icon name="layers" size={14} />}
+              title={s.dirty ? 'Save or discard your draft changes before importing a plan' : 'Copy another month’s plan into this month'} />
+            <HeaderAction onClick={() => setSetAllOpen(true)} label="Set all" shortLabel={null} icon={<Icon name="list" size={14} />} />
+            {addBudgetBtn}
+          </>}
+        />
 
         {/* Rises in: summary cards, then each SectionCard in its turn (SectionCard carries the item variants). */}
         <Stagger className="flex-1 px-4 sm:px-6 py-5 flex flex-col gap-4 sm:gap-5">

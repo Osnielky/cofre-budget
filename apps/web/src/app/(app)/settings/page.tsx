@@ -1,5 +1,6 @@
 'use client';
 
+import PageHeader from '@/components/PageHeader';
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment, FormEvent, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
@@ -671,9 +672,7 @@ function SettingsPageInner() {
         {/* top-0, not top-14: <main> already pads for the phone top bar, and a
             scroll container's padding is excluded from the sticky box, so a 56px
             offset here would double up and hide the first rows of every tab. */}
-        <div className="sticky top-0 z-10 px-4 sm:px-6 pt-4 sm:pt-5"
-          style={{ background: 'var(--header-bg)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', borderBottom: '1px solid var(--color-border)' }}>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight mb-2 sm:mb-3">Settings</h1>
+        <PageHeader sticky="always" title="Settings" className="pb-0!">
 
           {/* Tab strip: underline tabs, one row that scrolls sideways when it must
               (phones, the icon rail) and spreads out when it can. The destructive
@@ -717,7 +716,7 @@ function SettingsPageInner() {
               </div>
             </div>
           </nav>
-        </div>
+        </PageHeader>
 
         {/* Keyed by the tab so each section rises in when picked. */}
         <Stagger key={activeTab} className="p-4 sm:p-6"><StaggerItem>

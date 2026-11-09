@@ -1,5 +1,6 @@
 'use client';
 
+import PageHeader, { HeaderAction } from '@/components/PageHeader';
 import { useState, useEffect, useCallback } from 'react';
 import StatsRow from './components/StatsRow';
 import ActiveLoansCard from './components/ActiveLoansCard';
@@ -42,23 +43,12 @@ export default function DebtsPage() {
     <div className="contents">
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
         <div className="p-4 sm:p-6 flex flex-col gap-5">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <h1 className="font-bold tracking-tight" style={{ fontSize: 'clamp(24px, 3vw, 34px)' }}>Loans &amp; Debts</h1>
-              <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>Track money you lent and money you owe</p>
-            </div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <button onClick={() => setShowRecordPayment(true)}
-                className="px-4 py-2.5 text-sm font-semibold rounded-xl flex items-center gap-2 transition-all hover:bg-[var(--color-elevated)]"
-                style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
-                Record Payment
-              </button>
-              <button onClick={() => setShowAddLoan(true)}
-                className="btn-gold px-4 py-2.5 text-sm font-semibold rounded-xl flex items-center gap-1.5 transition-all">
-                <span className="text-base leading-none">+</span> Add Loan
-              </button>
-            </div>
-          </div>
+          <PageHeader title="Loans & Debts" subtitle="Track money you lent and money you owe"
+            actions={<>
+              <HeaderAction onClick={() => setShowRecordPayment(true)} label="Record payment" shortLabel="Record" />
+              <HeaderAction onClick={() => setShowAddLoan(true)} primary label="Add loan" shortLabel="Add"
+                icon={<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>} />
+            </>} />
 
           {!loading && debts.length > 0 && (
             <StatsRow
