@@ -1,6 +1,7 @@
 'use client';
 
 import PageHeader from '@/components/PageHeader';
+import StatTile from '@/components/StatTile';
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment, FormEvent, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
@@ -785,7 +786,7 @@ function SettingsPageInner() {
 
               {/* Summary strip — only once there is something to sum. */}
               {!loading && accounts.length > 0 && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
                   {[
                     { label: 'Assets', value: money(totals.assets), color: 'var(--color-green)', sub: 'cash, checking, savings, investments' },
                     { label: 'Owed', value: money(totals.owed), color: 'var(--color-rose)', sub: 'cards, loans, mortgages' },
@@ -793,18 +794,12 @@ function SettingsPageInner() {
                     {
                       label: 'Connections',
                       value: `${bankGroups.length} bank${bankGroups.length === 1 ? '' : 's'}`,
-                      color: totals.broken ? 'var(--color-rose)' : 'var(--color-text-primary)',
+                      color: totals.broken ? 'var(--color-rose)' : undefined,
                       sub: totals.broken
                         ? `${totals.broken} account${totals.broken === 1 ? '' : 's'} need${totals.broken === 1 ? 's' : ''} reconnect`
                         : `${totals.synced} synced · ${accounts.length - totals.synced} manual`,
                     },
-                  ].map((t) => (
-                    <div key={t.label} className="px-4 py-3 rounded-2xl min-w-0" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
-                      <p className="text-fine font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-text-muted)' }}>{t.label}</p>
-                      <p className="mt-1 text-lg sm:text-xl font-black tabular-nums truncate" style={{ color: t.color }}>{t.value}</p>
-                      <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{t.sub}</p>
-                    </div>
-                  ))}
+                  ].map((t) => <StatTile key={t.label} size="sm" label={t.label} value={t.value} valueTone={t.color} sub={t.sub} />)}
                 </div>
               )}
 

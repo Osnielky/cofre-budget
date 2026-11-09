@@ -1,9 +1,10 @@
 'use client';
 
 import { memo } from 'react';
+import StatTile from '@/components/StatTile';
 import type { Plan } from '@/lib/budgets/calculations';
 import { formatMoney } from '@/lib/budgets/money';
-import { glass, Icon, useFlash, type IconName } from './ui';
+import { Icon, useFlash, type IconName } from './ui';
 
 function pctOf(part: number, whole: number): number | null {
   return whole > 0 ? Math.round((part * 1000) / whole) / 10 : null;
@@ -19,40 +20,19 @@ interface CardProps {
   empty?: boolean;
 }
 
+/* One of the four plan figures on the shared StatTile: the value flashes when a draft
+   edit changes it, the delta chip is the change from the saved plan, the bar is the
+   share the sub line describes. */
 function SummaryCard({ label, icon, accent, value, valueTone, sub, right, bar, delta = 0, deltaGoodWhenUp = true, empty = false }: CardProps) {
   const flash = useFlash(value);
-  const good = deltaGoodWhenUp ? delta > 0 : delta < 0;
   return (
-    <div className="rounded-2xl p-4 flex gap-3.5 min-w-0 overflow-hidden"
-      style={{ ...glass, background: `linear-gradient(140deg, color-mix(in srgb, ${accent} 10%, transparent), var(--color-surface) 62%)` }}>
-      <span className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-        style={{ background: `color-mix(in srgb, ${accent} 20%, transparent)`, color: accent, border: `1px solid color-mix(in srgb, ${accent} 35%, transparent)` }}>
-        <Icon name={icon} size={20} />
-      </span>
-      <div className="flex-1 min-w-0 flex flex-col gap-1">
-        <p className="text-fine font-semibold truncate" style={{ color: accent }}>{label}</p>
-        <div className="flex items-baseline gap-2 flex-wrap">
-          <p className={`text-[22px] sm:text-2xl font-extrabold leading-none tabular-nums ${flash}`} style={valueTone && !empty ? { color: valueTone } : empty ? { color: 'var(--color-text-muted)' } : undefined}
-            aria-live="polite">
-            {empty ? '—' : formatMoney(value)}
-          </p>
-          {delta !== 0 && !empty && (
-            <span className="text-fine font-bold tabular-nums px-1.5 py-0.5 rounded-md"
-              style={{ color: good ? 'var(--color-green)' : 'var(--color-rose)', background: `color-mix(in srgb, ${good ? 'var(--color-green)' : 'var(--color-rose)'} 14%, transparent)` }}
-              title="Change from saved plan">
-              {formatMoney(delta, { sign: true })}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center justify-between gap-2 text-fine min-w-0">
-          <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{sub}</span>
-          {right && <span className="shrink-0 tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{right}</span>}
-        </div>
-        <div className="h-1.5 rounded-full overflow-hidden mt-1" style={{ background: 'color-mix(in srgb, var(--color-text-muted) 18%, transparent)' }}>
-          {bar && <div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${Math.min(100, Math.max(0, bar.pct))}%`, background: bar.color }} />}
-        </div>
-      </div>
-    </div>
+    <StatTile label={label} accent={accent} icon={<Icon name={icon} size={18} />}
+      value={empty ? '—' : formatMoney(value)}
+      valueTone={empty ? 'var(--color-text-muted)' : valueTone} valueClassName={flash} live
+      delta={empty ? null : { value: delta, unit: 'money', inverse: !deltaGoodWhenUp, format: (n) => formatMoney(n, { sign: true }) }}
+      deltaTitle="Change from saved plan"
+      sub={sub} right={right}
+      trend={{ kind: 'bar', pct: bar?.pct ?? 0, color: bar?.color }} />
   );
 }
 
@@ -67,7 +47,7 @@ function BudgetSummaryCards({ plan, categoryCount }: { plan: Plan; categoryCount
   const ofIncome = (p: number | null) => (p == null ? null : `${p}% of income`);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
+    <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-4">
       <SummaryCard label="Income (Expected)" icon="income" accent="var(--color-green)" value={income}
         sub={income > 0
           ? <>{Math.min(100, receivedPct ?? 0)}% received · {formatMoney(Math.max(0, income - plan.incomeTargetReceivedCents))} pending</>

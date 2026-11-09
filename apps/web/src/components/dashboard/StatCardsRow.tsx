@@ -1,6 +1,6 @@
 'use client';
 
-import { useThemeColors } from '@/components/ThemeProvider';
+import StatTile from '@/components/StatTile';
 
 /* ── Icons (stroke paths, 24×24 viewBox) ── */
 function StatIcon({ d }: { d: string }) {
@@ -16,30 +16,6 @@ const ICON_TRENDUP = 'M22 7l-8.5 8.5-5-5L2 17 M16 7h6v6';
 const ICON_TRENDDN = 'M22 17l-8.5-8.5-5 5L2 7 M16 17h6v-6';
 const ICON_SAVINGS = 'M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z M2 9v1c0 1.1.9 2 2 2h1';
 const ICON_BUDGET  = 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2 M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2Z M9 13l2 2 4-4';
-
-/* ── Mini sparkline: accent line + soft gradient fill ── */
-function Sparkline({ values, color }: { values: number[]; color: string }) {
-  if (values.length < 2) return <div className="h-8" />;
-  const min = Math.min(...values), max = Math.max(...values);
-  const range = max - min || 1;
-  const W = 100, H = 28;
-  const pts = values.map((v, i) =>
-    `${((i / (values.length - 1)) * W).toFixed(2)},${(H - 3 - ((v - min) / range) * (H - 8)).toFixed(2)}`);
-  const gid = `spark-${color.replace(/[^a-zA-Z0-9]/g, '')}`;
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-8" preserveAspectRatio="none" aria-hidden="true">
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.28" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon points={`0,${H} ${pts.join(' ')} ${W},${H}`} fill={`url(#${gid})`} />
-      <polyline points={pts.join(' ')} fill="none" stroke={color} strokeWidth="1.6"
-        strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-    </svg>
-  );
-}
 
 export interface StatCardDef {
   label: string;
@@ -58,57 +34,20 @@ const ICONS: Record<StatCardDef['icon'], string> = {
   savings: ICON_SAVINGS, budget: ICON_BUDGET,
 };
 
-/* Phones (below sm): the first card is a full-width hero that keeps its sparkline; the
-   other four are compact 2×2 tiles (accent dot, label, value, delta) so all five fit in
-   about one third of the screen. From sm up every card has the full chip + sparkline. */
+/* The dashboard's five figures on the shared StatTile. Phones (below sm): the first
+   card is a full-width hero that keeps its icon and sparkline; the other four are
+   compact 2×2 tiles (accent dot, label, value, delta). From sm up every card has the
+   chip and the sparkline. */
 export default function StatCardsRow({ cards, loading }: { cards: StatCardDef[]; loading: boolean }) {
-  const tc = useThemeColors();
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2.5 sm:gap-5">
-      {cards.map((c, i) => {
-        const hero = i === 0;
-        const good = c.delta == null ? true : (c.inverseDelta ? c.delta < 0 : c.delta > 0);
-        const deltaTone = good ? tc.green : tc.rose;
-        return (
-          <div key={c.label}
-            className={`card-lift ${hero ? 'col-span-2 sm:col-span-1 p-4' : 'p-3'} sm:p-5 flex flex-col gap-1.5 sm:gap-2.5 rounded-2xl min-w-0 cursor-default select-none overflow-hidden`}
-            style={{
-              background: `linear-gradient(140deg, color-mix(in srgb, ${c.accent} 9%, transparent), var(--color-surface) 60%)`,
-              backdropFilter: 'var(--glass-blur)',
-              WebkitBackdropFilter: 'var(--glass-blur)',
-              border: 'var(--glass-border)',
-              boxShadow: 'var(--glass-shadow)',
-            }}>
-            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-              <span className={`${hero ? 'flex' : 'hidden sm:flex'} w-8 h-8 sm:w-9 sm:h-9 rounded-xl items-center justify-center shrink-0`}
-                style={{ background: `color-mix(in srgb, ${c.accent} 18%, transparent)`, color: c.accent }}>
-                <StatIcon d={ICONS[c.icon]} />
-              </span>
-              {!hero && <span aria-hidden="true" className="sm:hidden w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.accent }} />}
-              <span className="text-xs font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>
-                <span className="sm:hidden">{c.short ?? c.label}</span>
-                <span className="hidden sm:inline">{c.label}</span>
-              </span>
-            </div>
-            <p className={`${hero ? 'text-[26px]' : 'text-[17px]'} sm:text-[22px] leading-7 font-bold tabular-nums truncate`}>
-              {loading ? <span className="skel inline-block h-5 sm:h-6 w-24 max-w-full rounded-md align-middle" /> : c.value}
-            </p>
-            <p className="flex items-center gap-1.5 text-fine min-w-0">
-              {!loading && c.delta != null && Math.abs(c.delta) >= 0.5 && (
-                <span className="font-bold shrink-0" style={{ color: deltaTone }}>
-                  {c.delta > 0 ? '↑' : '↓'} {Math.abs(c.delta).toFixed(1)}%
-                </span>
-              )}
-              {loading
-                ? <span className="skel inline-block h-3 w-20 rounded" />
-                : <span className="truncate" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>}
-            </p>
-            <div className={hero ? '' : 'hidden sm:block'}>
-              <Sparkline values={loading ? [] : c.spark} color={c.accent} />
-            </div>
-          </div>
-        );
-      })}
+      {cards.map((c, i) => (
+        <StatTile key={c.label} lift hero={i === 0} className={i === 0 ? 'col-span-2 sm:col-span-1' : ''}
+          label={c.label} shortLabel={c.short} value={c.value} accent={c.accent}
+          icon={<StatIcon d={ICONS[c.icon]} />}
+          delta={{ value: c.delta, inverse: c.inverseDelta }} sub={c.sub}
+          trend={{ kind: 'spark', values: c.spark }} loading={loading} />
+      ))}
     </div>
   );
 }

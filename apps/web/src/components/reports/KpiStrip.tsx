@@ -1,8 +1,9 @@
 'use client';
 
+import StatTile from '@/components/StatTile';
 import { useThemeColors } from '@/components/ThemeProvider';
 import type { Summary, MonthPoint } from '@/lib/reports/compute';
-import { money, Delta, Spark } from './ui';
+import { money } from './ui';
 
 /** A smaller fact tile shown beside the four headline figures on wide screens. */
 export interface KpiExtra { label: string; value: string; sub: string }
@@ -18,35 +19,21 @@ export default function KpiStrip({ summary, months, prevLabel, loading, extras =
   ];
   return (
     <div className="flex flex-col gap-2.5 sm:gap-4 2xl:flex-row">
-    <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-4 2xl:flex-[3] min-w-0">
-      {tiles.map((t) => (
-        <div key={t.label} className="rounded-2xl p-3.5 sm:p-4 flex flex-col gap-1 min-w-0"
-          style={{ background: `linear-gradient(140deg, color-mix(in srgb, ${t.color} 9%, transparent), var(--color-surface) 60%)`, backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
-          <p className="text-xs font-medium flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-            <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />{t.label}
-          </p>
-          <p className="text-[20px] sm:text-[24px] font-bold tabular-nums leading-7 truncate">{loading ? <span className="opacity-30">—</span> : t.value}</p>
-          <p className="text-fine flex items-center gap-1.5 min-w-0" style={{ color: 'var(--color-text-muted)' }}>
-            {!loading && <Delta value={t.delta} inverse={t.inverse} points={t.points} />}
-            <span className="truncate">{loading ? '' : `vs ${t.prev} · ${prevLabel}`}</span>
-          </p>
-          {!loading && months.length > 1 && <div className="mt-1"><Spark values={t.spark} color={t.color} /></div>}
-        </div>
-      ))}
-    </div>
-    {/* Extra facts: a row of three under the headline tiles, a column beside them on wide screens */}
-    {extras.length > 0 && !loading && (
-      <div className="grid grid-cols-3 gap-2.5 sm:gap-4 2xl:flex-[1.3] min-w-0">
-        {extras.map((e) => (
-          <div key={e.label} className="rounded-2xl p-3 sm:p-3.5 flex flex-col gap-0.5 min-w-0"
-            style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
-            <p className="text-fine font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>{e.label}</p>
-            <p className="text-[16px] sm:text-[18px] font-bold tabular-nums leading-6 truncate">{e.value}</p>
-            <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{e.sub}</p>
-          </div>
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-4 2xl:flex-[3] min-w-0">
+        {tiles.map((t) => (
+          <StatTile key={t.label} label={t.label} value={t.value} accent={t.color}
+            delta={{ value: t.delta, inverse: t.inverse, unit: t.points ? 'pts' : 'percent', placeholders: true }}
+            sub={`vs ${t.prev} · ${prevLabel}`}
+            trend={months.length > 1 ? { kind: 'spark', values: t.spark } : null}
+            loading={loading} />
         ))}
       </div>
-    )}
+      {/* Extra facts: a row of three under the headline tiles, a column beside them on wide screens */}
+      {extras.length > 0 && !loading && (
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-4 2xl:flex-[1.3] min-w-0">
+          {extras.map((e) => <StatTile key={e.label} size="sm" label={e.label} value={e.value} sub={e.sub} />)}
+        </div>
+      )}
     </div>
   );
 }

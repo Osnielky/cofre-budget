@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { isClosed } from '@/lib/projects/closure';
 import { headlineFigures, money, portfolioTotals, relativeDay, sparklinePoints, type OverviewProject, type TradingHeadline } from '@/lib/projects/overview';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
+import StatTile from '@/components/StatTile';
 
 /* The Projects landing: a strip of totals across every project and one card per
    project with the three figures its type cares about, a six-month sparkline and
@@ -79,17 +80,11 @@ export default function ProjectsOverview({ projects, loading, showClosed, onTogg
       {/* Portfolio strip */}
       <StaggerItem className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
         {[
-          { label: 'Projects', value: `${totals.active} active`, sub: totals.closed ? `${totals.closed} closed` : 'none closed', clr: 'var(--color-text-primary)' },
+          { label: 'Projects', value: `${totals.active} active`, sub: totals.closed ? `${totals.closed} closed` : 'none closed', clr: undefined },
           { label: 'Cost basis', value: money(totals.costBasis), sub: 'across every project', clr: 'var(--color-card-violet)' },
           { label: 'Income', value: money(totals.income), sub: 'sales, payouts, revenue', clr: 'var(--color-green)' },
-          { label: 'Net', value: money(totals.net, true), sub: 'income minus every cost', clr: totals.net > 0 ? 'var(--color-green)' : totals.net < 0 ? 'var(--color-rose)' : 'var(--color-text-primary)' },
-        ].map((k) => (
-          <div key={k.label} className="px-3 sm:px-4 py-3" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
-            <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{k.label}</p>
-            <p className="font-bold text-lg sm:text-xl mt-0.5 truncate tabular-nums" style={{ color: k.clr }}>{k.value}</p>
-            <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{k.sub}</p>
-          </div>
-        ))}
+          { label: 'Net', value: money(totals.net, true), sub: 'income minus every cost', clr: totals.net > 0 ? 'var(--color-green)' : totals.net < 0 ? 'var(--color-rose)' : undefined },
+        ].map((k) => <StatTile key={k.label} size="sm" label={k.label} value={k.value} valueTone={k.clr} sub={k.sub} />)}
       </StaggerItem>
 
       {loading && <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Loading…</p>}

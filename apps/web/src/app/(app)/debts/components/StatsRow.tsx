@@ -1,5 +1,6 @@
 'use client';
 
+import StatTile from '@/components/StatTile';
 import { useThemeColors } from '@/components/ThemeProvider';
 import { fmt } from '../format';
 
@@ -25,30 +26,23 @@ interface Props {
   dueThisMonth: number; dueThisMonthCount: number;
 }
 
+/* The four debt figures on the shared StatTile; the net position's value takes the
+   green / rose tone of its sign. */
 export default function StatsRow({ netPosition, owedToYou, owedToYouCount, youOwe, youOweCount, dueThisMonth, dueThisMonthCount }: Props) {
   const tc = useThemeColors();
   const netColor = netPosition >= 0 ? tc.green : tc.rose;
-  const cards = [
-    { label: 'Net Position', value: money(netPosition), sub: 'Receivables minus debts', accent: netColor, icon: ICON_WALLET, rotate: 0 },
+  const cards: { label: string; value: string; sub: string; accent: string; valueTone?: string; icon: string; rotate: number }[] = [
+    { label: 'Net Position', value: money(netPosition), sub: 'Receivables minus debts', accent: netColor, valueTone: netColor, icon: ICON_WALLET, rotate: 0 },
     { label: 'Owed to You', value: `$${fmt(owedToYou)}`, sub: `${owedToYouCount} active loan${owedToYouCount === 1 ? '' : 's'}`, accent: tc.green, icon: ICON_ARROW, rotate: 0 },
     { label: 'You Owe', value: `$${fmt(youOwe)}`, sub: `${youOweCount} active loan${youOweCount === 1 ? '' : 's'}`, accent: tc.violet, icon: ICON_ARROW, rotate: 180 },
     { label: 'Due This Month', value: `$${fmt(dueThisMonth)}`, sub: `${dueThisMonthCount} payment${dueThisMonthCount === 1 ? '' : 's'}`, accent: tc.sky, icon: ICON_CALENDAR, rotate: 0 },
   ];
   return (
-    <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 xl:grid-cols-4 gap-2.5 sm:gap-4">
       {cards.map((c) => (
-        <div key={c.label} className="p-4 rounded-2xl flex flex-col gap-2.5"
-          style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: '1px solid var(--color-border)' }}>
-          <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-              style={{ background: `color-mix(in srgb, ${c.accent} 18%, transparent)`, color: c.accent }}>
-              <Icon d={c.icon} rotate={c.rotate} />
-            </span>
-            <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>{c.label}</span>
-          </div>
-          <span className="text-xl font-extrabold leading-none tabular-nums">{c.value}</span>
-          <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>
-        </div>
+        <StatTile key={c.label} label={c.label} value={c.value} sub={c.sub} accent={c.accent}
+          valueTone={c.valueTone}
+          icon={<Icon d={c.icon} rotate={c.rotate} />} />
       ))}
     </div>
   );

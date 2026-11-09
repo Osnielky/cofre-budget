@@ -1,9 +1,12 @@
 'use client';
 
-/* Four summary cards for the transactions page: net cash flow, income,
+import StatTile from '@/components/StatTile';
+import { describeDelta } from '@/lib/ui/statTile';
+
+/* Four summary tiles for the transactions page: net cash flow, income,
    expenses, recurring — each with a delta vs the previous window and a
-   lightweight two-point trend line (previous value -> current value,
-   drawn from data already loaded; no extra fetch). Pure presentation. */
+   two-point trend line (previous value → current value, drawn from data
+   already loaded; no extra fetch). Pure presentation on the shared StatTile. */
 
 interface Category { id: string; name: string; icon: string; color: string; type: string }
 interface TxLite {
@@ -40,35 +43,6 @@ const isTransfer = (t: TxLite) => t.categoryRef?.type === 'transfer' || t.catego
 const income   = (l: TxLite[]) => l.filter((t) => !isTransfer(t) && Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);
 const expenses = (l: TxLite[]) => l.filter((t) => !isTransfer(t) && Number(t.amount) < 0).reduce((s, t) => s + Math.abs(Number(t.amount)), 0);
 
-/* A gentle 2-point-derived curve (prev -> current) with a shaded area
-   underneath — honest about there being only two real data points, but
-   reads as a trend line rather than a bare diagonal. */
-function Sparkline({ prev, current, color }: { prev: number; current: number; color: string }) {
-  const w = 72, h = 28, pad = 3;
-  const lo = Math.min(prev, current, 0);
-  const hi = Math.max(prev, current, 1);
-  const span = hi - lo || 1;
-  const y = (v: number) => h - pad - ((v - lo) / span) * (h - pad * 2);
-  const x0 = pad, x1 = w / 2, x2 = w - pad;
-  const y0 = y(prev), y1 = y((prev + current) / 2), y2 = y(current);
-  const path = `M ${x0} ${y0} Q ${x1 * 0.6} ${y0} ${x1} ${y1} T ${x2} ${y2}`;
-  const areaPath = `${path} L ${x2} ${h} L ${x0} ${h} Z`;
-  const gradId = `spark-${color.replace(/[^a-zA-Z0-9]/g, '')}`;
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0" aria-hidden="true">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={areaPath} fill={`url(#${gradId})`} />
-      <path d={path} fill="none" stroke={color} strokeWidth="1.75" strokeLinecap="round" />
-      <circle cx={x2} cy={y2} r="2.25" fill={color} />
-    </svg>
-  );
-}
-
 export default function StatStrip({ transactions, prev, recurringNow, recurringPrev, prevLabel, loading }: Props) {
   const hasPrev = prev.length > 0;
   const pct = (cur: number, old: number) => (hasPrev && old !== 0 ? +(((cur - old) / Math.abs(old)) * 100).toFixed(1) : null);
@@ -92,50 +66,19 @@ export default function StatStrip({ transactions, prev, recurringNow, recurringP
       prevValue: recurringPrev, curValue: recurringNow, delta: pct(recurringNow, recurringPrev), goodWhenUp: false },
   ];
 
+  // The "vs <period>" note only makes sense next to a chip; a flat or unknown change shows none.
+  const vs = <><span className="hidden sm:inline">vs {prevLabel}</span><span className="sm:hidden">vs prev.</span></>;
+
   return (
-    /* Phones: a 2×2 grid of compact tiles (accent dot, label, value, delta — no icon chip or
-       sparkline) instead of four full-width cards; from sm the cards auto-fit at ≥220px. */
-    <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:[grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
-      {cards.map((c) => {
-        const up = (c.delta ?? 0) > 0;
-        const deltaColor = c.delta == null || c.delta === 0
-          ? 'var(--color-text-muted)'
-          : (up === c.goodWhenUp ? 'var(--color-green)' : 'var(--color-rose)');
-        return (
-          <div key={c.label} className="flex items-center justify-between gap-3 rounded-xl sm:rounded-2xl py-2.5 px-3 sm:py-4 sm:px-4 min-w-0"
-            style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${c.color} 5%, var(--color-surface))` }}>
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center shrink-0"
-                style={{
-                  color: c.color,
-                  background: `color-mix(in srgb, ${c.color} 14%, transparent)`,
-                  border: `1px solid color-mix(in srgb, ${c.color} 32%, transparent)`,
-                }}>
-                <MiniIcon d={c.icon} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs flex items-center gap-1.5 truncate" style={{ color: 'var(--color-text-secondary)' }}>
-                  <span aria-hidden="true" className="sm:hidden w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.color }} />
-                  {c.label}
-                </p>
-                <p className="text-[15px] sm:text-lg font-bold tabular-nums truncate">{loading ? '—' : c.value}</p>
-                {!loading && c.delta != null && (
-                  <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
-                    <span className="font-bold" style={{ color: deltaColor }}>
-                      {c.delta === 0 ? '—' : `${up ? '↑' : '↓'} ${Math.abs(c.delta)}%`}
-                    </span>{' '}
-                    <span className="hidden sm:inline">vs {prevLabel}</span>
-                    <span className="sm:hidden">vs prev.</span>
-                  </p>
-                )}
-              </div>
-            </div>
-            {!loading && hasPrev && (
-              <span className="hidden sm:block"><Sparkline prev={c.prevValue} current={c.curValue} color={c.color} /></span>
-            )}
-          </div>
-        );
-      })}
+    /* Phones: a 2×2 grid of compact tiles; from sm the tiles auto-fit at ≥200px (four across beside the insights column at xl). */
+    <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:[grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+      {cards.map((c) => (
+        <StatTile key={c.label} label={c.label} value={c.value} accent={c.color}
+          icon={<MiniIcon d={c.icon} />}
+          delta={{ value: c.delta, inverse: !c.goodWhenUp }} sub={describeDelta({ value: c.delta }) ? vs : undefined}
+          trend={hasPrev ? { kind: 'spark', values: [c.prevValue, c.curValue] } : null}
+          loading={loading} />
+      ))}
     </div>
   );
 }
