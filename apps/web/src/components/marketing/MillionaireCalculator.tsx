@@ -69,7 +69,7 @@ export default function MillionaireCalculator() {
                 {result.milestones.map((m) => (
                   <li key={m.level} className="flex items-center justify-between gap-3 py-2.5 text-sm" style={{ borderColor: 'var(--color-border)' }}>
                     <span className="flex items-center gap-3 min-w-0">
-                      <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+                      <span className="w-7 h-7 rounded-full flex items-center justify-center text-fine font-bold shrink-0"
                         style={{ background: m.reached ? 'var(--color-green)' : 'var(--color-elevated)', color: m.reached ? '#06240F' : 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
                         {m.level}
                       </span>

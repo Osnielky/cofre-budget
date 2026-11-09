@@ -13,9 +13,9 @@ export function fmtAxis(v: number) {
 
 export function makeChartTheme(tc: ThemeColors) {
   return {
-    xAxis: { tick: { fill: tc.textMuted, fontSize: 10 }, axisLine: false, tickLine: false } as const,
+    xAxis: { tick: { fill: tc.textMuted }, axisLine: false, tickLine: false } as const,
     yAxis: {
-      tick: { fill: tc.textMuted, fontSize: 10 }, axisLine: false, tickLine: false,
+      tick: { fill: tc.textMuted }, axisLine: false, tickLine: false,
       width: 44, tickFormatter: fmtAxis,
     } as const,
     grid: { vertical: false, stroke: tc.border } as const,

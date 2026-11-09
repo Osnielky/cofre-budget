@@ -79,12 +79,12 @@ export default function AccountSettings() {
             </p>
             <p className="text-sm truncate" style={{ color: 'var(--color-text-muted)' }}>{user?.email}</p>
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
+              <span className="text-fine font-bold px-2 py-0.5 rounded-md uppercase tracking-wide"
                 style={{ background: 'color-mix(in srgb, var(--color-primary) 16%, transparent)', color: 'var(--color-primary)' }}>
                 {planLabel} plan
               </span>
               {isGoogle && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1"
+                <span className="text-fine font-semibold px-2 py-0.5 rounded-md flex items-center gap-1"
                   style={{ background: 'var(--color-elevated)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
                   <GoogleMark /> Connected with Google
                 </span>
@@ -106,22 +106,22 @@ export default function AccountSettings() {
         <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>Profile details</p>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Display name</label>
+          <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Display name</label>
           <input value={name} onChange={(e) => { setName(e.target.value); setNameMsg(null); }}
             placeholder="Your name" maxLength={80}
             className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Email</label>
+          <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Email</label>
           <input value={user?.email ?? ''} disabled readOnly
             className="px-3 py-2.5 text-sm outline-none rounded-xl cursor-not-allowed"
             style={{ ...inputStyle, opacity: 0.6 }} />
-          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Your email can't be changed here.</p>
+          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Your email can't be changed here.</p>
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Member since</label>
+          <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Member since</label>
           <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{fmtDate(user?.createdAt)}</p>
         </div>
 
@@ -165,7 +165,7 @@ export default function AccountSettings() {
               </p>
             </div>
           </div>
-          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide shrink-0"
+          <span className="text-fine font-bold px-2.5 py-1 rounded-full uppercase tracking-wide shrink-0"
             style={{
               background: isPaid ? 'color-mix(in srgb, var(--color-green) 14%, transparent)' : 'var(--color-surface)',
               color: isPaid ? 'var(--color-green)' : 'var(--color-text-muted)',
@@ -247,17 +247,17 @@ function PasswordModal({ onClose }: { onClose: () => void }) {
         {/* Body */}
         <div className="flex flex-col gap-4 px-6 py-5">
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Current password</label>
+            <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Current password</label>
             <input type="password" value={current} onChange={(e) => { setCurrent(e.target.value); setMsg(null); }}
               autoComplete="current-password" autoFocus className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>New password</label>
+            <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>New password</label>
             <input type="password" value={next} onChange={(e) => { setNext(e.target.value); setMsg(null); }}
               autoComplete="new-password" className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Confirm new password</label>
+            <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Confirm new password</label>
             <input type="password" value={confirm} onChange={(e) => { setConfirm(e.target.value); setMsg(null); }}
               autoComplete="new-password" className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
           </div>

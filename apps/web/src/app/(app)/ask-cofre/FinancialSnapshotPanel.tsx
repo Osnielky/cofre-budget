@@ -52,7 +52,7 @@ export default function FinancialSnapshotPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+      <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
         Financial Snapshot
       </p>
 
@@ -60,7 +60,7 @@ export default function FinancialSnapshotPanel() {
         <div className="flex items-center justify-between mb-1">
           <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Net Worth</p>
           {nw.deltaPct !== null && (
-            <span className="text-[11px] font-semibold" style={{ color: trendColor }}>
+            <span className="text-fine font-semibold" style={{ color: trendColor }}>
               {nw.deltaPct >= 0 ? '+' : ''}{nw.deltaPct}%
             </span>
           )}
@@ -103,7 +103,7 @@ export default function FinancialSnapshotPanel() {
           <div className="min-w-0">
             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>Road to $1M</p>
             <p className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{roadToMillionPct.toFixed(1)}%</p>
-            <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>${fmt(nw.total)} of $1,000,000</p>
+            <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>${fmt(nw.total)} of $1,000,000</p>
           </div>
         </div>
       </SnapshotCard>
@@ -112,7 +112,7 @@ export default function FinancialSnapshotPanel() {
         <SnapshotCard>
           <div className="flex items-center gap-2 mb-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-card-amber)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l2.5 6.5L21 11l-6.5 2.5L12 20l-2.5-6.5L3 11l6.5-2.5L12 2Z"/></svg>
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>AI Insight</p>
+            <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>AI Insight</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="w-9 h-9 rounded-full flex items-center justify-center text-base shrink-0"

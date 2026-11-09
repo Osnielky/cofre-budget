@@ -205,7 +205,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
               <p className="text-xs font-semibold" style={{ color: 'var(--color-text-muted)' }}>Importing into</p>
               <p className="text-sm font-bold truncate" style={{ color: account.color }}>{accLabel}</p>
             </div>
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md capitalize shrink-0"
+            <span className="text-fine font-bold px-2 py-0.5 rounded-md capitalize shrink-0"
               style={{ background: `${account.color}20`, color: account.color }}>
               {account.accountType}
             </span>
@@ -265,7 +265,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
                 </div>
               ))}
               {merged.repeated > 0 && (
-                <p className="px-3 py-2 text-[11px]" style={{ borderTop: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
+                <p className="px-3 py-2 text-fine" style={{ borderTop: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
                   {merged.repeated} transaction{merged.repeated !== 1 ? 's' : ''} appeared in more than one file and {merged.repeated !== 1 ? 'were' : 'was'} counted once.
                 </p>
               )}
@@ -298,7 +298,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
                 ].map((s) => (
                   <div key={s.label} className="flex flex-col items-center py-2.5 rounded-xl"
                     style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-                    <p className="text-[9px] uppercase tracking-widest font-bold" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
+                    <p className="text-fine uppercase tracking-widest font-bold" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
                     <p className="font-black text-base mt-0.5 tabular-nums" style={{ color: s.color }}>{s.value}</p>
                   </div>
                 ))}
@@ -327,9 +327,9 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
                   <table className="w-full text-xs">
                     <thead className="sticky top-0">
                       <tr style={{ background: 'var(--color-elevated)', borderBottom: '1px solid var(--color-border)' }}>
-                        <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Date</th>
-                        <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Description</th>
-                        <th className="text-right px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Amount</th>
+                        <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-fine" style={{ color: 'var(--color-text-muted)' }}>Date</th>
+                        <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-fine" style={{ color: 'var(--color-text-muted)' }}>Description</th>
+                        <th className="text-right px-3 py-2 font-semibold uppercase tracking-wider text-fine" style={{ color: 'var(--color-text-muted)' }}>Amount</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -384,7 +384,7 @@ export default function CsvImportModal({ account, onClose, onImported }: Props) 
         {/* Import progress */}
         {importing && progress && (
           <div className="px-5 pt-3">
-            <div className="flex items-center justify-between mb-1.5 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+            <div className="flex items-center justify-between mb-1.5 text-fine" style={{ color: 'var(--color-text-muted)' }}>
               <span>Importing transactions…</span>
               <span className="tabular-nums">{progress.done.toLocaleString()} / {progress.total.toLocaleString()}</span>
             </div>

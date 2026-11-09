@@ -127,7 +127,7 @@ function StatCard({ label, value, sub, icon }: { label: string; value: string; s
       <div className="min-w-0">
         <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
         <p className="text-xl font-extrabold tabular-nums leading-tight mt-0.5">{value}</p>
-        <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{sub}</p>
+        <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{sub}</p>
       </div>
     </div>
   );
@@ -241,7 +241,7 @@ export default function RecurringManager() {
             Manage transactions recorded on a repeating schedule.
           </p>
         </div>
-        <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
           {fmtDate(todayIso())}
         </p>
       </div>
@@ -271,7 +271,7 @@ export default function RecurringManager() {
                 const on = tab === s;
                 return (
                   <button key={s} type="button" onClick={() => { setTab(s); setSelectedId(null); }}
-                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold capitalize transition-all flex items-center gap-1.5"
+                    className="px-2.5 py-1.5 rounded-lg text-fine font-semibold capitalize transition-all flex items-center gap-1.5"
                     style={on
                       ? { background: `color-mix(in srgb, ${STATUS_COLOR[s]} 18%, transparent)`, border: `1px solid color-mix(in srgb, ${STATUS_COLOR[s]} 45%, transparent)`, color: STATUS_COLOR[s] }
                       : { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
@@ -325,14 +325,14 @@ export default function RecurringManager() {
                       </span>
                       <div className="flex-1 min-w-32">
                         <p className="text-sm font-bold truncate">{r.name}</p>
-                        <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                        <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                           {[r.category?.name, r.bankAccount?.accountName].filter(Boolean).join(' · ') || 'No category'}
                         </p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-base font-bold tabular-nums"
                           style={{ color: amt >= 0 ? 'var(--color-green)' : 'var(--color-text-primary)' }}>{money(amt)}</p>
-                        <span className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold capitalize"
+                        <span className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-full text-fine font-bold capitalize"
                           style={{ background: `color-mix(in srgb, ${STATUS_COLOR[st]} 16%, transparent)`, color: STATUS_COLOR[st] }}>
                           <span className="w-1.5 h-1.5 rounded-full" style={{ background: STATUS_COLOR[st] }} />{st}
                         </span>
@@ -341,17 +341,17 @@ export default function RecurringManager() {
 
                     <div className="flex gap-6 flex-wrap mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Repeats</p>
+                        <p className="text-fine font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Repeats</p>
                         <p className="text-xs mt-0.5">{cadence(r)}</p>
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Next date</p>
+                        <p className="text-fine font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Next date</p>
                         <p className="text-xs mt-0.5">{next ? fmtDate(next) : '—'}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between gap-2 flex-wrap mt-3">
-                      <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                      <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                         Started {fmtDate(r.startDate)} · {r.endDate ? `ends ${fmtDate(r.endDate)}`
                           : r.occurrenceCount ? `${r.runCount} of ${r.occurrenceCount} recorded` : 'no end date'}
                       </p>
@@ -359,7 +359,7 @@ export default function RecurringManager() {
                         {st !== 'ended' && (
                           <button type="button" disabled={busyId === r.id}
                             onClick={(e) => { e.stopPropagation(); act(r, st === 'active' ? 'stop' : 'resume'); }}
-                            className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:brightness-125 disabled:opacity-40"
+                            className="px-2.5 py-1.5 rounded-lg text-fine font-semibold transition-all hover:brightness-125 disabled:opacity-40"
                             style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
                             {busyId === r.id ? '…' : st === 'active' ? 'Pause' : 'Resume'}
                           </button>
@@ -382,7 +382,7 @@ export default function RecurringManager() {
           {selected && (
             <div className="mt-1 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
               <p className="text-sm font-bold">Recording history</p>
-              <p className="text-[11px] mb-2" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine mb-2" style={{ color: 'var(--color-text-muted)' }}>
                 Transactions already added for {selected.name}.
               </p>
               {history.length === 0 ? (
@@ -395,17 +395,17 @@ export default function RecurringManager() {
                       <div key={h.id} className="flex items-center gap-3 px-3 py-2 rounded-xl"
                         style={{ background: 'var(--color-elevated)' }}>
                         <span className="w-10 shrink-0 text-center">
-                          <span className="block text-[9px] font-bold" style={{ color: 'var(--color-text-muted)' }}>{MONTH_ABBR[d.getMonth()]}</span>
+                          <span className="block text-fine font-bold" style={{ color: 'var(--color-text-muted)' }}>{MONTH_ABBR[d.getMonth()]}</span>
                           <span className="block text-sm font-bold tabular-nums leading-none">{String(d.getDate()).padStart(2, '0')}</span>
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold truncate">{h.name}</p>
-                          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                             {[h.bankAccount?.accountName, fmtDate(h.date)].filter(Boolean).join(' · ')}
                           </p>
                         </div>
                         <p className="text-xs font-bold tabular-nums shrink-0">{money(Number(h.amount))}</p>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0"
+                        <span className="px-2 py-0.5 rounded-full text-fine font-bold shrink-0"
                           style={{ background: 'color-mix(in srgb, var(--color-green) 16%, transparent)', color: 'var(--color-green)' }}>
                           Recorded
                         </span>
@@ -414,7 +414,7 @@ export default function RecurringManager() {
                   })}
                 </div>
               )}
-              <p className="text-[11px] mt-2" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine mt-2" style={{ color: 'var(--color-text-muted)' }}>
                 Pausing a schedule keeps previously recorded transactions.
               </p>
             </div>
@@ -437,7 +437,7 @@ export default function RecurringManager() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm font-bold truncate">{selected.name}</p>
-                  <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                  <span className="inline-block mt-0.5 px-2 py-0.5 rounded-full text-fine font-bold"
                     style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', color: 'var(--color-primary)' }}>
                     Auto-record
                   </span>
@@ -450,11 +450,11 @@ export default function RecurringManager() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="p-2.5 rounded-xl" style={{ background: 'var(--color-elevated)' }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Starts</p>
+                  <p className="text-fine font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Starts</p>
                   <p className="text-xs font-semibold mt-0.5">{fmtDate(selected.startDate)}</p>
                 </div>
                 <div className="p-2.5 rounded-xl" style={{ background: 'var(--color-elevated)' }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Ends</p>
+                  <p className="text-fine font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Ends</p>
                   <p className="text-xs font-semibold mt-0.5">
                     {selected.endDate ? fmtDate(selected.endDate)
                       : selected.occurrenceCount ? `After ${selected.occurrenceCount}` : 'No end date'}
@@ -465,7 +465,7 @@ export default function RecurringManager() {
               <div>
                 <p className="text-xs font-bold mb-1.5">Upcoming occurrences</p>
                 {next.length === 0 ? (
-                  <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                  <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                     {statusOf(selected) === 'active' ? 'Nothing further scheduled.' : 'Paused — nothing will be recorded.'}
                   </p>
                 ) : (
@@ -476,12 +476,12 @@ export default function RecurringManager() {
                         <div key={d} className="flex items-center gap-3 px-2.5 py-2 rounded-xl"
                           style={{ background: 'var(--color-elevated)' }}>
                           <span className="w-9 shrink-0 text-center">
-                            <span className="block text-[9px] font-bold" style={{ color: 'var(--color-text-muted)' }}>{MONTH_ABBR[dt.getMonth()]}</span>
+                            <span className="block text-fine font-bold" style={{ color: 'var(--color-text-muted)' }}>{MONTH_ABBR[dt.getMonth()]}</span>
                             <span className="block text-sm font-bold tabular-nums leading-none">{String(dt.getDate()).padStart(2, '0')}</span>
                           </span>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-semibold">{weekday(d)}</p>
-                            <p className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{money(amt)}</p>
+                            <p className="text-fine tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{money(amt)}</p>
                           </div>
                         </div>
                       );
@@ -490,7 +490,7 @@ export default function RecurringManager() {
                 )}
               </div>
 
-              <p className="text-[11px] px-3 py-2 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)', color: 'var(--color-text-secondary)' }}>
+              <p className="text-fine px-3 py-2 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)', color: 'var(--color-text-secondary)' }}>
                 Adds a transaction on each date once it arrives. This does not move any money.
               </p>
             </div>
@@ -517,7 +517,7 @@ export default function RecurringManager() {
                 className="mt-0.5 w-4 h-4 shrink-0" style={{ accentColor: 'var(--color-rose)' }} />
               <span>
                 <span className="block text-xs font-semibold">Also delete future-dated occurrences</span>
-                <span className="block text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                <span className="block text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                   Leave this off to keep them as ordinary transactions you can edit.
                 </span>
               </span>

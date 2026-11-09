@@ -19,9 +19,9 @@ export default function OverviewStrip({ o, winRate, closed, profitFactor }: { o:
     <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3" data-testid="trading-overview-strip">
       {tiles.map((k) => (
         <div key={k.label} className="p-3 min-w-0" style={panel}>
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{k.label}</p>
+          <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{k.label}</p>
           <p className="font-bold text-base mt-1 truncate" style={{ color: k.clr }}>{k.value}</p>
-          <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>{k.sub}</p>
+          <p className="text-fine mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>{k.sub}</p>
         </div>
       ))}
     </div>

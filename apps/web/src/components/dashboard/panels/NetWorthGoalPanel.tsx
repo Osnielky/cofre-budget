@@ -35,11 +35,11 @@ export default function NetWorthGoalPanel() {
           </div>
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <div>
-              <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Complete</p>
+              <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Complete</p>
               <p className="font-bold">{pct.toFixed(1)}%</p>
             </div>
             <div>
-              <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Target date</p>
+              <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Target date</p>
               {data.targetDate ? (
                 <p className="font-bold">{fmtMonthYear(data.targetDate)}</p>
               ) : (
@@ -47,7 +47,7 @@ export default function NetWorthGoalPanel() {
               )}
             </div>
             <div>
-              <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>On track</p>
+              <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>On track</p>
               <p className="font-bold" style={{
                 color: data.onTrackPct == null ? 'var(--color-text-muted)' : data.onTrackPct >= 100 ? tc.green : tc.amber,
               }}>

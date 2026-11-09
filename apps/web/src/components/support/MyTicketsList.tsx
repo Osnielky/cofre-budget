@@ -10,7 +10,7 @@ const when = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month:
 export function StatusPill({ status }: { status: MyTicket['status'] }) {
   const tone = statusTone(status);
   return (
-    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wide"
+    <span className="text-fine font-bold px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wide"
       style={{ background: `color-mix(in srgb, ${tone} 16%, transparent)`, color: tone, border: `1px solid color-mix(in srgb, ${tone} 30%, transparent)` }}>
       {STATUS_LABELS[status]}
     </span>
@@ -70,7 +70,7 @@ export default function MyTicketsList() {
               </div>
               {t.reply && (
                 <div className="rounded-xl px-3.5 py-2.5 text-sm" style={{ background: 'color-mix(in srgb, var(--color-green) 8%, transparent)', borderLeft: '3px solid var(--color-green)' }}>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-green)' }}>Reply from Cofre</p>
+                  <p className="text-fine font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--color-green)' }}>Reply from Cofre</p>
                   <p className="whitespace-pre-wrap" style={{ color: 'var(--color-text-primary)' }}>{t.reply}</p>
                 </div>
               )}

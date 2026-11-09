@@ -41,7 +41,7 @@ export default function UsersTable({ refreshKey }: { refreshKey: number }) {
             <div className="hidden lg:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                  <tr className="text-left text-fine uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                     {['User', 'Plan', 'Sign-up', 'Joined', 'Last seen', 'Banks', 'Transactions'].map((h) => (
                       <th key={h} scope="col" className="py-2 pr-4 font-semibold">{h}</th>
                     ))}

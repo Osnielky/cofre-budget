@@ -32,12 +32,12 @@ export default function RecentTransactionsPanel({ transactions, loading }: { tra
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold truncate">{tx.name}</p>
                   <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                    <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{formatDate(tx.date)}</span>
+                    <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{formatDate(tx.date)}</span>
                     {tx.bankAccount && (
-                      <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>· {tx.bankAccount.accountName}</span>
+                      <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>· {tx.bankAccount.accountName}</span>
                     )}
                     {cat && (
-                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                      <span className="text-fine font-semibold px-1.5 py-0.5 rounded-md"
                         style={{ background: `${cat.color}18`, color: cat.color }}>{cat.name}</span>
                     )}
                   </div>

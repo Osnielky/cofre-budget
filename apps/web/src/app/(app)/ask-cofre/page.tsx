@@ -116,7 +116,7 @@ export default function AskCofrePage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="font-bold" style={{ fontSize: 22 }}>Ask Cofre</h1>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                  <span className="text-fine font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
                     style={{ background: 'var(--color-card-violet)', color: 'white' }}>
                     {user?.plan === 'elite' ? 'Elite' : 'Pro'}
                   </span>
@@ -162,13 +162,13 @@ export default function AskCofrePage() {
                 <div className="flex items-center justify-end gap-2 px-2 pt-1 mt-1" style={{ borderTop: '1px solid var(--color-border)' }}>
                   {confirmClear ? (
                     <>
-                      <span className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>Delete all {conversations.length} conversation{conversations.length === 1 ? '' : 's'}?</span>
+                      <span className="text-fine" style={{ color: 'var(--color-text-secondary)' }}>Delete all {conversations.length} conversation{conversations.length === 1 ? '' : 's'}?</span>
                       <button onClick={async () => { await clearConversations(); setConfirmClear(false); setShowHistory(false); }}
-                        className="text-[11px] font-semibold px-2 py-1 rounded-md cursor-pointer" style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>Delete all</button>
-                      <button onClick={() => setConfirmClear(false)} className="text-[11px] px-2 py-1 rounded-md cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>Cancel</button>
+                        className="text-fine font-semibold px-2 py-1 rounded-md cursor-pointer" style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>Delete all</button>
+                      <button onClick={() => setConfirmClear(false)} className="text-fine px-2 py-1 rounded-md cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>Cancel</button>
                     </>
                   ) : (
-                    <button onClick={() => setConfirmClear(true)} className="text-[11px] font-semibold px-2 py-1 rounded-md cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>Clear history</button>
+                    <button onClick={() => setConfirmClear(true)} className="text-fine font-semibold px-2 py-1 rounded-md cursor-pointer" style={{ color: 'var(--color-text-muted)' }}>Clear history</button>
                   )}
                 </div>
               )}
@@ -278,9 +278,9 @@ export default function AskCofrePage() {
               style={{ border: '1px solid var(--color-border)' }} title={monthLabel(month)} />
             <SendButton sending={sending} disabled={sending || !input.trim() || outOfMessages} />
           </form>
-          <div className="flex flex-wrap items-center justify-between gap-x-3 sm:gap-x-4 gap-y-1 text-[10.5px] px-1">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 sm:gap-x-4 gap-y-1 text-fine px-1">
             <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month to ask about"
-              className="sm:hidden text-[11px] bg-transparent outline-none px-2 py-1 rounded-full shrink-0"
+              className="sm:hidden text-fine bg-transparent outline-none px-2 py-1 rounded-full shrink-0"
               style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }} title={monthLabel(month)} />
             {usage && usage.limit > 0 ? (
               <span className="font-semibold text-right sm:text-left" role="status"

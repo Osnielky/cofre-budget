@@ -129,8 +129,8 @@ export default function Sidebar() {
             <span className="brand-name" style={{ color: 'var(--color-text-primary)' }}>
               Cofre
             </span>
-            <span className="text-[9.5px] uppercase leading-none"
-              style={{ color: 'var(--color-text-muted)', letterSpacing: '0.32em' }}>
+            <span className="text-fine uppercase leading-none whitespace-nowrap"
+              style={{ color: 'var(--color-text-muted)', letterSpacing: '0.18em' }}>
               Wealth &amp; Budget
             </span>
           </div>
@@ -139,7 +139,7 @@ export default function Sidebar() {
 
       {/* ── Nav ── */}
       <nav className="flex flex-col gap-1.5 px-4 md:px-2.5 lg:px-4 flex-1 pt-2">
-        <p className="md:hidden lg:block text-[10.5px] font-semibold uppercase pl-3 mb-1.5 mt-1"
+        <p className="md:hidden lg:block text-fine font-semibold uppercase pl-3 mb-1.5 mt-1"
           style={{ color: 'var(--color-text-muted)', letterSpacing: '0.28em' }}>Overview</p>
         {NAV.map(({ label, href, icon: Icon }) => {
           const active = pathname === href;
@@ -171,7 +171,7 @@ export default function Sidebar() {
 
       {/* ── Settings ── */}
       <div className="px-4 md:px-2.5 lg:px-4 pb-2 flex flex-col gap-1.5">
-        <p className="md:hidden lg:block text-[10.5px] font-semibold uppercase pl-3 mb-1.5"
+        <p className="md:hidden lg:block text-fine font-semibold uppercase pl-3 mb-1.5"
           style={{ color: 'var(--color-text-muted)', letterSpacing: '0.28em' }}>Account</p>
         {user?.isAdmin && (() => {
           const active = pathname === '/admin';
@@ -243,7 +243,7 @@ export default function Sidebar() {
               {displayName}
             </p>
             {user && (
-              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md shrink-0"
+              <span className="text-fine font-bold px-1.5 py-0.5 rounded-md shrink-0"
                 style={user.plan !== 'free'
                   ? { background: 'color-mix(in srgb, var(--color-primary) 16%, transparent)', color: 'var(--color-primary)' }
                   : { background: 'color-mix(in srgb, var(--color-text-muted) 16%, transparent)', color: 'var(--color-text-muted)' }}>
@@ -252,29 +252,29 @@ export default function Sidebar() {
             )}
           </div>
           {user?.email && !user.isDemo && (
-            <p className="text-[10px] truncate leading-tight" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-fine truncate leading-tight" style={{ color: 'var(--color-text-muted)' }}>
               {user.email}
             </p>
           )}
           {user?.isDemo && (
-            <p className="text-[10px] truncate leading-tight" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-fine truncate leading-tight" style={{ color: 'var(--color-text-muted)' }}>
               Demo sandbox
             </p>
           )}
           {user && !user.isDemo && user.plan === 'free' && (
-            <Link href="/settings?tab=billing" className="text-[10px] font-semibold leading-tight hover:underline"
+            <Link href="/settings?tab=billing" className="text-fine font-semibold leading-tight hover:underline"
               style={{ color: 'var(--color-primary)' }}>
               Upgrade to Pro
             </Link>
           )}
           {user && !user.isDemo && user.plan === 'pro' && (
-            <Link href="/settings?tab=billing" className="text-[10px] font-semibold leading-tight hover:underline"
+            <Link href="/settings?tab=billing" className="text-fine font-semibold leading-tight hover:underline"
               style={{ color: 'var(--color-primary)' }}>
               Upgrade to Elite
             </Link>
           )}
           {user?.isDemo && (
-            <Link href="/signup" className="text-[10px] font-semibold leading-tight hover:underline"
+            <Link href="/signup" className="text-fine font-semibold leading-tight hover:underline"
               style={{ color: 'var(--color-primary)' }}>
               Create your own account
             </Link>
@@ -283,7 +283,7 @@ export default function Sidebar() {
         <button onClick={handleLogout} disabled={loggingOut} title={user?.isDemo ? 'Leave demo' : 'Sign out'} aria-label={user?.isDemo ? 'Leave demo' : 'Sign out'}
           className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-red-500/20 shrink-0 disabled:opacity-40"
           style={{ color: 'var(--color-text-muted)' }}>
-          {loggingOut ? <span className="text-[10px]">…</span> : <SignOutIcon />}
+          {loggingOut ? <span className="text-fine">…</span> : <SignOutIcon />}
         </button>
       </div>
 

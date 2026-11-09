@@ -110,7 +110,7 @@ export default function ActionsPanel({
         <p className="flex items-center gap-2 text-base font-bold">
           Needs attention
           {actionable > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold"
+            <span className="px-2 py-0.5 rounded-full text-fine font-bold"
               style={{ background: 'color-mix(in srgb, var(--color-rose) 18%, transparent)', color: 'var(--color-rose)' }}>
               {actionable}
             </span>
@@ -132,11 +132,11 @@ export default function ActionsPanel({
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>{it.text}</p>
-              <p className="text-[11px] mt-0.5" style={{ color: TONE_COLOR[it.tone] }}>{it.sub}</p>
+              <p className="text-fine mt-0.5" style={{ color: TONE_COLOR[it.tone] }}>{it.sub}</p>
             </div>
             {it.action && it.onClick && (
               <button type="button" onClick={it.onClick}
-                className="px-3 py-1.5 rounded-lg text-[11px] font-bold shrink-0 transition-all hover:brightness-125"
+                className="px-3 py-1.5 rounded-lg text-fine font-bold shrink-0 transition-all hover:brightness-125"
                 style={{
                   background: `color-mix(in srgb, ${TONE_COLOR[it.tone]} 16%, transparent)`,
                   border: `1px solid color-mix(in srgb, ${TONE_COLOR[it.tone]} 40%, transparent)`,
@@ -150,11 +150,11 @@ export default function ActionsPanel({
       </div>
 
       <div className="p-4 rounded-xl" style={{ background: 'color-mix(in srgb, var(--color-primary) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 20%, transparent)' }}>
-        <p className="text-[10.5px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)' }}>Daily allowance left</p>
+        <p className="text-fine font-bold uppercase tracking-widest" style={{ color: 'var(--color-primary)' }}>Daily allowance left</p>
         <p className="font-extrabold tabular-nums leading-none mt-1" style={{ fontSize: 32, color: 'var(--color-text-primary)' }}>
           ${fmt(budgetPerDay)}
         </p>
-        <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-fine mt-1" style={{ color: 'var(--color-text-muted)' }}>
           ${fmt(totalRemaining)} unspent across {daysLeft} remaining day{daysLeft === 1 ? '' : 's'}. Stay under this and every budget lands.
         </p>
       </div>

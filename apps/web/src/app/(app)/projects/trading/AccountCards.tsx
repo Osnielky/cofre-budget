@@ -20,7 +20,7 @@ export default function AccountCards({ accounts, unassigned, onOpen, onAdd }: { 
     <div className="flex flex-col gap-3" data-testid="account-cards">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>Accounts</p>
-        <button type="button" onClick={onAdd} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg hover:brightness-110"
+        <button type="button" onClick={onAdd} className="text-fine font-semibold px-2.5 py-1.5 rounded-lg hover:brightness-110"
           style={{ color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>+ Add account</button>
       </div>
       {list.length === 0 && (
@@ -41,7 +41,7 @@ export default function AccountCards({ accounts, unassigned, onOpen, onAdd }: { 
               <div className="flex items-start gap-3 min-w-0">
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{accountTitle(a)}</p>
-                  <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[10px] font-bold">
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap text-fine font-bold">
                     <span className="px-1.5 py-0.5 rounded-md" style={{ background: 'color-mix(in srgb, var(--color-card-sky) 16%, transparent)', color: 'var(--color-card-sky)' }}>
                       {KIND_LABEL[a.meta.kind]}{a.meta.provider === 'plaid' ? ' · Connected' : ''}
                     </span>
@@ -56,12 +56,12 @@ export default function AccountCards({ accounts, unassigned, onOpen, onAdd }: { 
               <div className="grid grid-cols-3 gap-2">
                 {figures.map((f) => (
                   <div key={f.label} className="min-w-0">
-                    <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{f.label}</p>
+                    <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{f.label}</p>
                     <p className="text-sm font-bold truncate tabular-nums" style={{ color: TONE[f.tone] }}>{f.value}</p>
                   </div>
                 ))}
               </div>
-              <div className="flex items-center justify-between text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="flex items-center justify-between text-fine" style={{ color: 'var(--color-text-muted)' }}>
                 <span className="truncate" style={hint ? { color: 'var(--color-amber)' } : undefined}>{hint ?? `${a.trades.closed} closed · ${a.cash ? `${a.cash.rows.length} cash rows` : 'connected'}`}</span>
                 <span className="shrink-0 ml-2">{relativeDay(lastActivity(a))}</span>
               </div>

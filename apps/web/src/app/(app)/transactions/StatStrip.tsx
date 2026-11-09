@@ -114,13 +114,13 @@ export default function StatStrip({ transactions, prev, recurringNow, recurringP
                 <MiniIcon d={c.icon} />
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] sm:text-xs flex items-center gap-1.5 truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                <p className="text-xs flex items-center gap-1.5 truncate" style={{ color: 'var(--color-text-secondary)' }}>
                   <span aria-hidden="true" className="sm:hidden w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.color }} />
                   {c.label}
                 </p>
                 <p className="text-[15px] sm:text-lg font-bold tabular-nums truncate">{loading ? '—' : c.value}</p>
                 {!loading && c.delta != null && (
-                  <p className="text-[10.5px] sm:text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                  <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
                     <span className="font-bold" style={{ color: deltaColor }}>
                       {c.delta === 0 ? '—' : `${up ? '↑' : '↓'} ${Math.abs(c.delta)}%`}
                     </span>{' '}

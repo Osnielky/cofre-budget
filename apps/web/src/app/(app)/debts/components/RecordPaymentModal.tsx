@@ -44,7 +44,7 @@ export default function RecordPaymentModal({ openDebts, onClose, onRecorded }: P
             <p className="font-bold text-sm">Record Payment</p>
             <button type="button" onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-text-muted)' }}>✕</button>
           </div>
-          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Log a repayment against one of your open loans.</p>
+          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Log a repayment against one of your open loans.</p>
         </div>
 
         {openDebts.length === 0 ? (
@@ -52,7 +52,7 @@ export default function RecordPaymentModal({ openDebts, onClose, onRecorded }: P
         ) : (
           <div className="flex flex-col gap-3 px-5 py-4">
             <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Loan</span>
+              <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Loan</span>
               <select required value={selectedId} onChange={(e) => setSelectedId(e.target.value)}
                 className="px-3 py-2.5 text-sm rounded-xl outline-none" style={inputStyle}>
                 {openDebts.map((d) => (
@@ -63,22 +63,22 @@ export default function RecordPaymentModal({ openDebts, onClose, onRecorded }: P
               </select>
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                 {selected?.direction === 'owed' ? 'Amount paid back' : 'Repayment received'}
               </span>
               <input required type="number" step="0.01" min="0.01" placeholder="0.00" value={amount}
                 onChange={(e) => setAmount(e.target.value)} className="px-3 py-2.5 text-sm rounded-xl outline-none" style={inputStyle} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Date</span>
+              <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Date</span>
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="px-3 py-2.5 text-sm rounded-xl outline-none" style={inputStyle} />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Note (optional)</span>
+              <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Note (optional)</span>
               <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Zelle, cash"
                 className="px-3 py-2.5 text-sm rounded-xl outline-none" style={inputStyle} />
             </label>
-            <label className="flex items-center gap-1.5 text-[11px]" style={{ color: selected?.borrowerEmail ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
+            <label className="flex items-center gap-1.5 text-fine" style={{ color: selected?.borrowerEmail ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
               <input type="checkbox" checked={emailReceipt && !!selected?.borrowerEmail} disabled={!selected?.borrowerEmail}
                 onChange={(e) => setEmailReceipt(e.target.checked)} />
               {selected?.direction === 'owed' ? 'Email confirmation' : 'Email receipt'}

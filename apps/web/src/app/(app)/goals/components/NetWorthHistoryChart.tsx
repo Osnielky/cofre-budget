@@ -128,16 +128,16 @@ export default function NetWorthHistoryChart({ points, loading, error }: Props) 
                 <CartesianGrid stroke={c.border} vertical={false} />
                 <XAxis dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} ticks={ticks}
                   tickFormatter={(t: number) => new Date(t).toLocaleDateString('en-US', tickFmt)}
-                  tick={{ fill: c.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  tick={{ fill: c.textMuted }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v: number) => compactMoney(v)} width={60}
                   domain={[(min: number) => Math.min(0, min), 'auto']}
-                  tick={{ fill: c.textMuted, fontSize: 11 }} axisLine={false} tickLine={false} />
+                  tick={{ fill: c.textMuted }} axisLine={false} tickLine={false} />
                 <Tooltip content={<TipContent />} cursor={{ stroke: c.border }} />
                 <Line dataKey="est" stroke={c.green} strokeOpacity={0.6} strokeWidth={2} strokeDasharray="5 5" dot={false} isAnimationActive={false} />
                 <Area dataKey="real" stroke={c.green} strokeWidth={2.5} fill="url(#nw-fill)" dot={false} isAnimationActive={false} />
                 {crossings.map((x) => (
                   <ReferenceDot key={x.level.n} x={toTime(x.date)} y={x.value} r={5} fill={c.amber} stroke={c.textPrimary}
-                    label={{ value: `${x.estimated ? '≈' : ''}${x.level.short}`, position: 'top', fill: c.amber, fontSize: 11, fontWeight: 700, offset: 10 }} />
+                    label={{ value: `${x.estimated ? '≈' : ''}${x.level.short}`, position: 'top', fill: c.amber, className: 'text-fine', fontWeight: 700, offset: 10 }} />
                 ))}
                 {last && <ReferenceDot x={last.t} y={last.value} r={5} fill={c.textPrimary} stroke={c.green} />}
               </ComposedChart>

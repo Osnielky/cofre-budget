@@ -19,7 +19,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
 
         {/* Quote */}
         <div className="hidden lg:flex flex-col max-w-xl pb-10">
-          <span className="text-[11px] uppercase mb-6" style={{ color: 'rgba(160,190,225,0.85)', letterSpacing: '0.34em' }}>
+          <span className="text-fine uppercase mb-6" style={{ color: 'rgba(160,190,225,0.85)', letterSpacing: '0.34em' }}>
             Cofre · Wealth &amp; Budget
           </span>
           <p style={{
@@ -42,7 +42,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
             </span>
           </p>
           <div className="rounded-full mt-6 mb-5" style={{ width: 56, height: 2, background: 'rgba(238,243,250,0.55)' }} />
-          <span className="text-[11px] uppercase" style={{ color: 'rgba(242,241,234,0.5)', letterSpacing: '0.30em' }}>
+          <span className="text-fine uppercase" style={{ color: 'rgba(242,241,234,0.5)', letterSpacing: '0.30em' }}>
             Peter Drucker
           </span>
         </div>
@@ -69,7 +69,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
             <Logo size={38} className="block" />
           </span>
           <h1 className="mt-5 font-bold" style={{ fontSize: 40, lineHeight: 1, color: '#F5F7FB', fontFamily: 'Georgia, serif', letterSpacing: '0.01em' }}>Cofre</h1>
-          <p className="mt-3 text-[10px] uppercase mb-7" style={{ color: 'rgba(242,241,234,0.55)', letterSpacing: '0.34em' }}>
+          <p className="mt-3 text-fine uppercase mb-7" style={{ color: 'rgba(242,241,234,0.55)', letterSpacing: '0.34em' }}>
             Wealth &amp; Budget
           </p>
 
@@ -78,7 +78,7 @@ export default function AuthShell({ children }: { children: React.ReactNode }) {
 
       </div>
 
-      <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-4 text-[11px]"
+      <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-4 text-fine"
         style={{ color: 'rgba(242,241,234,0.45)' }}>
         <Link href="/privacy" className="no-underline hover:underline" style={{ color: 'inherit' }}>Privacy</Link>
         <span>·</span>

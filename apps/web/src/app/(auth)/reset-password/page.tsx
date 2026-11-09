@@ -7,7 +7,7 @@ import AuthShell, { authInputStyle } from '@/components/AuthShell';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-const labelCls = 'text-[10.5px] font-semibold uppercase';
+const labelCls = 'text-fine font-semibold uppercase';
 const labelStyle: React.CSSProperties = { color: 'rgba(221,184,119,0.85)', letterSpacing: '0.22em' };
 
 function ResetInner() {

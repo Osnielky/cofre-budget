@@ -86,7 +86,7 @@ export default function NextStepCard({ netWorth, history, targetDate, onSetTarge
           {targetDate ? 'Change my target date' : 'Set a target date'}
         </button>
       )}
-      <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+      <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
         Pace is the average change in your net worth over the last 90 days. Projections assume it holds.
       </p>
     </section>

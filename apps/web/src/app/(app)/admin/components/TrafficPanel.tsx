@@ -104,7 +104,7 @@ export default function TrafficPanel({ refreshKey }: { refreshKey: number }) {
           <div key={x.label} className="card-lift rounded-2xl p-5 min-w-0" style={glass}>
             <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>{x.label}</p>
             <p className="text-2xl font-bold tabular-nums mt-1 truncate">{x.value.toLocaleString()}</p>
-            <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>{x.sub}</p>
+            <p className="text-fine mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>{x.sub}</p>
           </div>
         ))}
       </div>
@@ -219,7 +219,7 @@ export default function TrafficPanel({ refreshKey }: { refreshKey: number }) {
           <Panel title="Recent prospect visits" subtitle="One row per visitor per day, newest first. Nothing here identifies a person: location is derived from the address at the time of the visit, which is not kept.">
             {t.prospects.recent.length === 0 ? <PanelEmpty message="No prospect visits yet." /> : <RecentVisits visits={t.prospects.recent} />}
           </Panel>
-          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Location data: GeoLite2 by MaxMind, looked up offline inside Cofre&rsquo;s API.</p>
+          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Location data: GeoLite2 by MaxMind, looked up offline inside Cofre&rsquo;s API.</p>
         </>
       )}
     </section>
@@ -231,7 +231,7 @@ const KIND_COLOR: Record<ReferrerKind, string> = {
 };
 function Tag({ children, color }: { children: React.ReactNode; color: string }) {
   return (
-    <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
+    <span className="text-fine font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0"
       style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}>{children}</span>
   );
 }
@@ -285,7 +285,7 @@ function ReferrerRows({ referrers, entries }: { referrers: TrafficSegment['topRe
       <div className="flex items-center justify-between gap-3 py-1.5 text-sm" style={{ borderBottom: '1px solid var(--color-border)' }}>
         <span className="flex items-center gap-2 min-w-0">
           <span style={{ color: 'var(--color-text-secondary)' }}>Direct</span>
-          <span className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>typed, bookmark, untagged link</span>
+          <span className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>typed, bookmark, untagged link</span>
         </span>
         <span className="font-semibold tabular-nums shrink-0">{entries.direct.toLocaleString()}{pct(entries.direct, total)}</span>
       </div>
@@ -299,7 +299,7 @@ function ReferrerRows({ referrers, entries }: { referrers: TrafficSegment['topRe
         </div>
       ))}
       {rows.some((r) => r.kind === 'own' || r.kind === 'crawler') && (
-        <p className="text-[11px] mt-2" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-fine mt-2" style={{ color: 'var(--color-text-muted)' }}>
           "Your own URL" is the Cloud Run service address — you, or a script, not a prospect. Crawlers that pass the user-agent filter still show up here.
         </p>
       )}
@@ -317,20 +317,20 @@ function FunnelRows({ steps }: { steps: ReturnType<typeof funnelSteps> }) {
         <div key={st.key} className="grid items-center gap-x-3 gap-y-1" style={{ gridTemplateColumns: 'minmax(0, 11rem) minmax(0, 1fr) auto' }}>
           <div className="min-w-0 col-span-2 sm:col-span-1">
             <p className="text-sm sm:truncate" style={{ color: 'var(--color-text-secondary)' }}>{st.label}</p>
-            <p className="text-[10px] truncate hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>{st.hint}</p>
+            <p className="text-fine truncate hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>{st.hint}</p>
           </div>
           <div className="h-5 rounded-md overflow-hidden col-span-2 sm:col-span-1 order-last sm:order-none" style={{ background: 'color-mix(in srgb, var(--color-text-primary) 5%, transparent)' }}>
             <div className="h-full rounded-md" style={{ width: `${top > 0 ? Math.max(st.value > 0 ? 1.5 : 0, (st.value / top) * 100) : 0}%`, background: tone[i], opacity: 0.85 }} />
           </div>
           <div className="text-right sm:min-w-[7.5rem]">
             <p className="text-sm font-semibold tabular-nums">{st.value.toLocaleString()}</p>
-            <p className="text-[10px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-fine tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
               {i === 0 ? '100%' : st.ofPrevious == null ? (st.ofTop == null ? '—' : `${st.ofTop}% of landing`) : `${st.ofPrevious}% of previous · ${st.ofTop ?? 0}% of landing`}
             </p>
           </div>
         </div>
       ))}
-      <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+      <p className="text-fine mt-1" style={{ color: 'var(--color-text-muted)' }}>
         The first two steps count visitor-days on the page; signups and trials come from the accounts table, so one person can appear in both halves.
       </p>
     </div>
@@ -365,7 +365,7 @@ function ActivityStrips({ byHour, byWeekday, total, color }: { byHour: number[];
             <div key={h} className="flex-1 rounded-t" title={`${hourLabel(h)}: ${n}`} style={{ height: `${Math.max(n ? 6 : 2, (n / hMax) * 100)}%`, background: color, opacity: n ? 0.85 : 0.2 }} />
           ))}
         </div>
-        <div className="flex justify-between text-[9px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        <div className="flex justify-between text-fine mt-1" style={{ color: 'var(--color-text-muted)' }}>
           {[0, 6, 12, 18].map((h) => <span key={h}>{hourLabel(h)}</span>)}<span>11pm</span>
         </div>
       </div>
@@ -375,7 +375,7 @@ function ActivityStrips({ byHour, byWeekday, total, color }: { byHour: number[];
             <div key={d} className="flex-1 rounded-t" title={`${WEEKDAYS[d]}: ${n}`} style={{ height: `${Math.max(n ? 8 : 3, (n / dMax) * 100)}%`, background: color, opacity: n ? 0.85 : 0.2 }} />
           ))}
         </div>
-        <div className="grid grid-cols-7 text-[9px] text-center mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        <div className="grid grid-cols-7 text-fine text-center mt-1" style={{ color: 'var(--color-text-muted)' }}>
           {WEEKDAYS.map((d) => <span key={d}>{d[0]}</span>)}
         </div>
       </div>
@@ -396,18 +396,18 @@ function RecentVisits({ visits }: { visits: ProspectVisit[] }) {
         <li key={`${v.date}-${i}`} className="py-2.5 flex flex-col md:flex-row md:items-start gap-1 md:gap-4 text-sm" style={{ borderTop: i === 0 ? undefined : '1px solid var(--color-border)' }}>
           <div className="md:w-44 shrink-0">
             <p className="font-semibold tabular-nums" title={`${v.firstSeen} → ${v.lastSeen}`}>{dateShort(v.firstSeen)} · {time(v.firstSeen)}</p>
-            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{relativeTime(v.lastSeen)} · {v.views} page{v.views === 1 ? '' : 's'}{v.minutes > 0 ? ` · ${v.minutes} min` : ''}{v.isDemo ? ' · demo' : ''}</p>
+            <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{relativeTime(v.lastSeen)} · {v.views} page{v.views === 1 ? '' : 's'}{v.minutes > 0 ? ` · ${v.minutes} min` : ''}{v.isDemo ? ' · demo' : ''}</p>
           </div>
           <div className="md:w-56 shrink-0 min-w-0">
             <p className="truncate">{v.country ? `${flag(v.country)} ${v.city ? `${v.city}, ` : ''}${countryName(v.country)}` : 'Location unknown'}</p>
-            <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
               {[v.device ? DEVICE_LABEL[v.device] ?? v.device : null, v.browser, v.os, v.language].filter(Boolean).join(' · ')}
             </p>
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs tabular-nums break-words" style={{ color: 'var(--color-text-secondary)' }}>{v.pages.join(' → ')}</p>
             {(v.referrerHost || v.campaign) && (
-              <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
                 {v.referrerHost ? `from ${v.referrerHost}` : 'direct'}{v.campaign ? ` · campaign ${v.campaign}` : ''}
               </p>
             )}

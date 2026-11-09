@@ -28,7 +28,7 @@ export default function MerchantsTable({ rows, monthsCount, prevLabel }: { rows:
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-[12.5px]">
               <thead>
-                <tr className="text-[10.5px] uppercase tracking-wider text-left" style={{ color: 'var(--color-text-muted)' }}>
+                <tr className="text-fine uppercase tracking-wider text-left" style={{ color: 'var(--color-text-muted)' }}>
                   <th className="py-2 pr-3 font-semibold">Merchant</th>
                   <th className="py-2 px-3 font-semibold text-right">Transactions</th>
                   <th className="py-2 px-3 font-semibold text-right">Average</th>
@@ -42,7 +42,7 @@ export default function MerchantsTable({ rows, monthsCount, prevLabel }: { rows:
                 {visible.map((r) => (
                   <tr key={r.name} style={{ borderTop: '1px solid var(--color-border)' }}>
                     <td className="py-2 pr-3 font-semibold truncate max-w-[16rem]" style={{ color: 'var(--color-text-primary)' }}>
-                      {r.name}{r.isNew && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: `color-mix(in srgb, ${tc.sky} 14%, transparent)`, color: tc.sky }}>New</span>}
+                      {r.name}{r.isNew && <span className="ml-2 text-fine font-bold px-1.5 py-0.5 rounded-md" style={{ background: `color-mix(in srgb, ${tc.sky} 14%, transparent)`, color: tc.sky }}>New</span>}
                     </td>
                     <td className="py-2 px-3 text-right tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>{r.count}</td>
                     <td className="py-2 px-3 text-right tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>{money(r.avg)}</td>
@@ -61,9 +61,9 @@ export default function MerchantsTable({ rows, monthsCount, prevLabel }: { rows:
               <li key={r.name} className="flex items-center gap-3 py-2.5" style={i > 0 ? { borderTop: '1px solid var(--color-border)' } : undefined}>
                 <div className="flex-1 min-w-0">
                   <p className="text-[13px] font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
-                    {r.name}{r.isNew && <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: `color-mix(in srgb, ${tc.sky} 14%, transparent)`, color: tc.sky }}>New</span>}
+                    {r.name}{r.isNew && <span className="ml-2 text-fine font-bold px-1.5 py-0.5 rounded-md" style={{ background: `color-mix(in srgb, ${tc.sky} 14%, transparent)`, color: tc.sky }}>New</span>}
                   </p>
-                  <p className="text-[10.5px]" style={{ color: 'var(--color-text-muted)' }}>{r.count} × avg {money(r.avg)} · <Delta value={r.delta} inverse /></p>
+                  <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{r.count} × avg {money(r.avg)} · <Delta value={r.delta} inverse /></p>
                 </div>
                 {monthsCount > 1 && <div className="w-16 shrink-0"><Spark values={r.series} color={tc.orange} height={20} /></div>}
                 <p className="text-[13px] font-bold tabular-nums shrink-0">{money(r.total)}</p>

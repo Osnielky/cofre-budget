@@ -38,7 +38,7 @@ export default function NetWorthTab({ history, range }: { history: HistoryPoint[
       <div className="grid grid-cols-3 gap-3">
         {[{ l: 'Start', v: money(first.value) }, { l: 'End', v: money(last.value) }, { l: 'Change', v: money(change), d: pct }].map((s) => (
           <div key={s.l} className="rounded-xl px-3 py-2.5" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-            <p className="text-[10.5px]" style={{ color: 'var(--color-text-muted)' }}>{s.l}</p>
+            <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{s.l}</p>
             <p className="text-[15px] sm:text-lg font-bold tabular-nums truncate" style={{ color: s.l === 'Change' ? (change >= 0 ? tc.green : tc.rose) : 'var(--color-text-primary)' }}>{s.v}</p>
             {s.d !== undefined && <Delta value={s.d} />}
           </div>

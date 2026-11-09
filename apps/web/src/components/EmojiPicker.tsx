@@ -97,7 +97,7 @@ export default function EmojiPicker({ value, onPick, anchor, onClose }: Props) {
           </p>
         ) : groups.map((g) => (
           <div key={g.label} className="mb-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest px-1 pb-1.5"
+            <p className="text-fine font-bold uppercase tracking-widest px-1 pb-1.5"
               style={{ color: 'var(--color-text-muted)' }}>{g.label}</p>
             <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(44px, 1fr))' }}>
               {g.emojis.map((em) => (

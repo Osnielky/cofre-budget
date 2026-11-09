@@ -39,7 +39,7 @@ export default function CashFlowTab({ months }: { months: MonthPoint[] }) {
         <div className="overflow-x-auto px-4 sm:px-5 pb-4 sm:pb-5">
           <table className="w-full text-[12.5px] min-w-[480px]">
             <thead>
-              <tr className="text-[10.5px] uppercase tracking-wider text-left" style={{ color: 'var(--color-text-muted)' }}>
+              <tr className="text-fine uppercase tracking-wider text-left" style={{ color: 'var(--color-text-muted)' }}>
                 <th className="py-2 pr-3 font-semibold">Month</th>
                 <th className="py-2 px-3 font-semibold text-right">Income</th>
                 <th className="py-2 px-3 font-semibold text-right">Spending</th>

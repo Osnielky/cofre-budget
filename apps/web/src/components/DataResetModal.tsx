@@ -160,7 +160,7 @@ export default function DataResetModal({ accounts, onClose, onDone }: Props) {
                 {step === 'confirm' && 'Confirm Deletion'}
                 {step === 'done'    && 'Data Deleted'}
               </p>
-              <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                 {step === 'select'  && 'Choose what to permanently remove'}
                 {step === 'confirm' && 'Review and confirm — this cannot be undone'}
                 {step === 'done'    && 'Selected data has been removed'}
@@ -178,7 +178,7 @@ export default function DataResetModal({ accounts, onClose, onDone }: Props) {
 
             {/* Scope checkboxes */}
             <div className="flex flex-col gap-2 p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-wider px-0.5 mb-1"
+              <p className="text-fine font-semibold uppercase tracking-wider px-0.5 mb-1"
                 style={{ color: 'var(--color-text-muted)' }}>Select what to delete</p>
               {SCOPE_ITEMS.map((item) => {
                 const checked = scope.includes(item.id);
@@ -212,7 +212,7 @@ export default function DataResetModal({ accounts, onClose, onDone }: Props) {
                       </div>
                       <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{item.description}</p>
                       {item.warning && (
-                        <p className="text-[11px] mt-0.5" style={{ color: 'color-mix(in srgb, var(--color-amber) 70%, transparent)' }}>{item.warning}</p>
+                        <p className="text-fine mt-0.5" style={{ color: 'color-mix(in srgb, var(--color-amber) 70%, transparent)' }}>{item.warning}</p>
                       )}
                     </div>
                   </label>
@@ -226,13 +226,13 @@ export default function DataResetModal({ accounts, onClose, onDone }: Props) {
                 style={{ background: 'color-mix(in srgb, var(--color-primary) 6%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 18%, transparent)' }}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold" style={{ color: 'var(--color-primary)' }}>Filter transactions</span>
-                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>leave empty = delete all</span>
+                  <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>leave empty = delete all</span>
                 </div>
 
                 {/* Account picker */}
                 {accounts.length > 0 && (
                   <div className="flex flex-col gap-1">
-                    <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Account</span>
+                    <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Account</span>
                     <select value={bankAccountId} onChange={(e) => setBankAccountId(e.target.value)}
                       className="px-3 py-2 text-sm outline-none appearance-none w-full rounded-xl"
                       style={{
@@ -256,7 +256,7 @@ export default function DataResetModal({ accounts, onClose, onDone }: Props) {
                 {/* Date range */}
                 <div className="flex gap-3">
                   <div className="flex flex-col gap-1 flex-1">
-                    <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>From date</span>
+                    <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>From date</span>
                     <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
                       className="px-3 py-2 text-sm outline-none rounded-xl w-full"
                       style={{
@@ -271,7 +271,7 @@ export default function DataResetModal({ accounts, onClose, onDone }: Props) {
                       }} />
                   </div>
                   <div className="flex flex-col gap-1 flex-1">
-                    <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>To date</span>
+                    <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>To date</span>
                     <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
                       className="px-3 py-2 text-sm outline-none rounded-xl w-full"
                       style={{
@@ -341,18 +341,18 @@ export default function DataResetModal({ accounts, onClose, onDone }: Props) {
                       {item.id === 'transactions' && bankAccountId !== 'all' && (() => {
                         const acc = accounts.find((a) => a.id === bankAccountId);
                         return acc ? (
-                          <p className="text-[11px]" style={{ color: 'color-mix(in srgb, var(--color-primary) 85%, transparent)' }}>
+                          <p className="text-fine" style={{ color: 'color-mix(in srgb, var(--color-primary) 85%, transparent)' }}>
                             {acc.bankName} — {acc.accountName}
                           </p>
                         ) : null;
                       })()}
                       {item.id === 'transactions' && (dateFrom || dateTo) && (
-                        <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                        <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                           {dateFrom && dateTo ? `${dateFrom} → ${dateTo}` : dateFrom ? `From ${dateFrom}` : `Until ${dateTo}`}
                         </p>
                       )}
                       {item.warning && (
-                        <p className="text-[11px]" style={{ color: 'color-mix(in srgb, var(--color-amber) 70%, transparent)' }}>{item.warning}</p>
+                        <p className="text-fine" style={{ color: 'color-mix(in srgb, var(--color-amber) 70%, transparent)' }}>{item.warning}</p>
                       )}
                     </div>
                     <span className="text-sm font-bold tabular-nums shrink-0"

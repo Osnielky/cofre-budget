@@ -169,7 +169,7 @@ export default function CategoryManager() {
               <div className="flex items-start gap-3 px-4 py-3 rounded-xl"
                 style={{ background: 'rgba(107,107,138,0.10)', border: '1px solid rgba(107,107,138,0.25)' }}>
                 <span className="text-base shrink-0">ℹ️</span>
-                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-fine leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
                   {TRANSFER_TIP}
                 </p>
               </div>
@@ -344,7 +344,7 @@ function CategoryColumn({ title, color, icon, cats, groupByWantNeed, onEdit, onM
           {groups.map((g, gi) => (
             <div key={g.key}>
               {g.label && (
-                <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
+                <div className="px-3 py-1 text-fine font-bold uppercase tracking-wider flex items-center gap-1.5"
                   style={{ color: g.color, background: `color-mix(in srgb, ${g.color} 6%, transparent)`,
                            borderTop: gi > 0 ? '1px solid var(--color-border)' : 'none' }}>
                   {g.label} <span style={{ opacity: 0.6, fontWeight: 600 }}>· {g.items.length}</span>
@@ -392,15 +392,15 @@ function CategoryRow({ cat, bordered, showWantNeed, onEdit, onMerge, onDelete, d
         <div className="flex items-center gap-2 min-w-0">
           <p className="text-sm font-semibold truncate">{cat.name}</p>
           {isBoth && (
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
+            <span className="text-fine font-bold px-1.5 py-0.5 rounded shrink-0"
               style={{ background: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', color: 'var(--color-primary)' }}>Both</span>
           )}
           {cat.isDefault && (
-            <span className="text-[9px] rounded shrink-0" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>Default</span>
+            <span className="text-fine rounded shrink-0" style={{ color: 'var(--color-text-muted)', opacity: 0.6 }}>Default</span>
           )}
         </div>
         {(cat.description || wantNeedMeta) && (
-          <p className="text-[11px] truncate mt-0.5 flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-fine truncate mt-0.5 flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
             {cat.description}
             {wantNeedMeta && (
               <span className="font-semibold shrink-0" style={{ color: wantNeedMeta.color }}>

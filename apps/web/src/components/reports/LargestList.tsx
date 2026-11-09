@@ -18,7 +18,7 @@ export default function LargestList({ items, total }: { items: Transaction[]; to
               style={{ background: `color-mix(in srgb, ${t.categoryRef?.color ?? 'var(--color-text-muted)'} 16%, transparent)` }}>{t.categoryRef?.icon ?? '·'}</span>
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{nameOf(t)}</p>
-              <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
                 {parseYmd(t.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                 {t.categoryRef ? ` · ${t.categoryRef.name}` : ' · Uncategorized'}
                 {t.bankAccount ? ` · ${t.bankAccount.bankName} ${t.bankAccount.accountName}` : ''}
@@ -26,7 +26,7 @@ export default function LargestList({ items, total }: { items: Transaction[]; to
             </div>
             <div className="text-right shrink-0">
               <p className="tabular-nums font-bold">{money(amt)}</p>
-              {total != null && total > 0 && <p className="text-[10.5px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{Math.round((amt / total) * 100)}% of spending</p>}
+              {total != null && total > 0 && <p className="text-fine tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{Math.round((amt / total) * 100)}% of spending</p>}
             </div>
           </li>
         );

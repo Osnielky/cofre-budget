@@ -13,7 +13,7 @@ export default function NetWorthPanel({ data, loading }: { data: NetWorthBreakdo
       <div className="flex items-baseline gap-2">
         <p className="text-2xl font-bold tabular-nums">{data.total < 0 ? '-' : ''}${fmt(Math.abs(data.total))}</p>
         {data.deltaPct != null && (
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+          <span className="text-fine font-bold px-1.5 py-0.5 rounded-md"
             style={{
               color: data.deltaPct >= 0 ? tc.green : tc.rose,
               background: `color-mix(in srgb, ${data.deltaPct >= 0 ? tc.green : tc.rose} 14%, transparent)`,
@@ -32,7 +32,7 @@ export default function NetWorthPanel({ data, loading }: { data: NetWorthBreakdo
         {[{ label: 'Assets', total: data.assets, items: data.assetItems, color: tc.green },
           { label: 'Liabilities', total: data.liabilities, items: data.liabilityItems, color: tc.rose }].map((col) => (
           <div key={col.label} className="flex flex-col gap-1.5 min-w-0">
-            <p className="text-[10px] font-semibold flex justify-between" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-fine font-semibold flex justify-between" style={{ color: 'var(--color-text-muted)' }}>
               {col.label} <span style={{ color: col.color }}>${fmt(col.total)}</span>
             </p>
             {col.items.slice(0, 4).map((it) => (

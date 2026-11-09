@@ -106,7 +106,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
               <p className="font-bold text-sm truncate" style={{ color: form.name ? form.color : 'var(--color-text-muted)' }}>
                 {form.name || 'Category name'}
               </p>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+              <span className="text-fine font-bold px-1.5 py-0.5 rounded-md"
                 style={{ background: `${typeMeta.color}20`, color: typeMeta.color }}>
                 {typeMeta.label}
               </span>
@@ -123,7 +123,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
 
           {/* Type pill group */}
           <div className="flex flex-col gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</span>
+            <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</span>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
               {Object.entries(TYPE_META).map(([val, meta]) => (
                 <button key={val} type="button"
@@ -138,12 +138,12 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
                 </button>
               ))}
             </div>
-            <p className="text-[11px] px-0.5" style={{ color: 'var(--color-text-muted)' }}>{TYPE_TIPS[form.type]}</p>
+            <p className="text-fine px-0.5" style={{ color: 'var(--color-text-muted)' }}>{TYPE_TIPS[form.type]}</p>
           </div>
 
           {/* Name */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Name</span>
+            <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Name</span>
             <input required autoFocus placeholder="e.g. Groceries" value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               className="px-3 py-2.5 text-sm outline-none rounded-xl" style={inputStyle} />
@@ -152,7 +152,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
           {/* Icon + Color */}
           <div className="flex gap-3">
             <div className="flex flex-col gap-1.5 shrink-0">
-              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Icon</span>
+              <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Icon</span>
               <button ref={emojiTriggerRef} type="button" data-emoji-trigger
                 onClick={(e) => {
                   setEmojiAnchor(e.currentTarget.getBoundingClientRect());
@@ -167,7 +167,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
               </button>
             </div>
             <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</span>
+              <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</span>
               <div className="flex flex-wrap items-center gap-2 px-3 h-10 rounded-xl" style={inputStyle}>
                 {PRESET_COLORS.map((c) => (
                   <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
@@ -180,7 +180,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
 
           {/* Description */}
           <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
               Description <span style={{ opacity: 0.5, fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
             </span>
             <input placeholder="e.g. Restaurants, groceries…" value={form.description}
@@ -204,7 +204,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
 
           {isExpenseType && (
             <div className="flex flex-col gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                 Want or need?
               </span>
               <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
@@ -221,7 +221,7 @@ export default function CategoryFormModal({ editing, defaultType = 'expense', on
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] px-0.5" style={{ color: wantNeedMissing ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
+              <p className="text-fine px-0.5" style={{ color: wantNeedMissing ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
                 {wantNeedMissing
                   ? 'Pick Need or Want so future spending comparisons can use it.'
                   : 'Used to compare essential vs. discretionary spending.'}

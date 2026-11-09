@@ -1194,12 +1194,12 @@ export default function TransactionsPage() {
                           <UploadIcon />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold">Import files — auto-detect accounts</p>
-                            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Drop one or many CSVs; we&apos;ll match each to the right account</p>
+                            <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Drop one or many CSVs; we&apos;ll match each to the right account</p>
                           </div>
                         </button>
                         <div className="px-4 pt-3.5 pb-2 flex items-center gap-2"
                           style={{ borderBottom: '1px solid var(--color-border)' }}>
-                          <span className="text-[10px] font-bold tracking-widest uppercase flex-1"
+                          <span className="text-fine font-bold tracking-widest uppercase flex-1"
                             style={{ color: 'color-mix(in srgb, var(--color-primary) 80%, transparent)' }}>Select account to import into</span>
                         </div>
 
@@ -1247,10 +1247,10 @@ export default function TransactionsPage() {
                                   })()}
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{a.bankName}</p>
-                                    <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.accountName}</p>
+                                    <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{a.accountName}</p>
                                   </div>
                                   {(() => { const tc = accountTypeMeta(a.accountType).accent; return (
-                                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md capitalize shrink-0"
+                                  <span className="text-fine font-semibold px-1.5 py-0.5 rounded-md capitalize shrink-0"
                                     style={{ background: `color-mix(in srgb, ${tc} 16%, transparent)`, color: tc, border: `1px solid color-mix(in srgb, ${tc} 32%, transparent)` }}>
                                     {a.accountType}
                                   </span>
@@ -1314,7 +1314,7 @@ export default function TransactionsPage() {
                                 style={{ background: 'var(--popover-bg)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)', maxHeight: '240px' }}>
                                 {ACCOUNT_GROUPS.map((grp) => (
                                   <div key={grp.group}>
-                                    <p className="px-3 pt-2 pb-0.5 text-[9px] font-bold uppercase tracking-widest"
+                                    <p className="px-3 pt-2 pb-0.5 text-fine font-bold uppercase tracking-widest"
                                       style={{ color: 'var(--color-text-muted)' }}>{grp.label}</p>
                                     {grp.types.map((meta) => {
                                       const val = meta.value;
@@ -1352,7 +1352,7 @@ export default function TransactionsPage() {
 
                         {/* Opening balance */}
                         <div className="flex flex-col gap-1">
-                          <label className="text-[10px] font-semibold"
+                          <label className="text-fine font-semibold"
                             style={{ color: 'var(--color-text-muted)' }}>
                             {newAcc.accountType === 'loan' ? 'Amount currently owed to you' : 'Opening balance'}{' '}
                             <span className="opacity-50">(optional)</span>
@@ -1366,7 +1366,7 @@ export default function TransactionsPage() {
                         </div>
 
                         {addAccError && (
-                          <p className="text-[10px]" style={{ color: 'var(--color-rose)' }}>{addAccError}</p>
+                          <p className="text-fine" style={{ color: 'var(--color-rose)' }}>{addAccError}</p>
                         )}
 
                         <button type="submit" disabled={addingAcc}
@@ -1427,7 +1427,7 @@ export default function TransactionsPage() {
                 <SlidersIcon />
                 Filters
                 {filtersBadge > 0 && (
-                  <span className="min-w-4 h-4 px-1 rounded-full text-[10px] font-bold flex items-center justify-center"
+                  <span className="min-w-4 h-4 px-1 rounded-full text-fine font-bold flex items-center justify-center"
                     style={{ background: 'var(--color-primary)', color: 'white' }}>{filtersBadge}</span>
                 )}
               </button>
@@ -1465,7 +1465,7 @@ export default function TransactionsPage() {
                   },
                 ] as StretchTabItem<Filter>[]} />
               <div className="hidden sm:flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>Group by</span>
+                <span className="text-fine font-semibold" style={{ color: 'var(--color-text-muted)' }}>Group by</span>
                 <StretchTabs role="radiogroup" ariaLabel="Group transactions by" value={groupBy} onChange={setGroupBy}
                   items={GROUP_BY_OPTIONS.map((o) => ({ id: o.value, label: o.label }))} />
               </div>
@@ -1613,7 +1613,7 @@ export default function TransactionsPage() {
                           {g.kind === 'bank' ? acc?.accountName : g.hint}
                         </p>
                         {acc?.accountType && (() => { const tc = accountTypeMeta(acc.accountType).accent; return (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 capitalize"
+                          <span className="text-fine font-semibold px-1.5 py-0.5 rounded-full shrink-0 capitalize"
                             style={{ background: `color-mix(in srgb, ${tc} 18%, transparent)`, color: tc, border: `1px solid color-mix(in srgb, ${tc} 38%, transparent)` }}>
                             {acc.accountType}
                           </span>
@@ -1685,17 +1685,17 @@ export default function TransactionsPage() {
                       <button
                         onClick={() => toggleCollapseDate(dateKey)}
                         className="w-full flex items-center gap-2 px-2 py-1.5 mb-1 rounded-lg transition-colors hover:bg-white/5 text-left">
-                        <span className="text-[10px] font-bold tracking-wider uppercase flex-1"
+                        <span className="text-fine font-bold tracking-wider uppercase flex-1"
                           style={{ color: 'var(--color-text-muted)' }}>
                           {formatDate(date)}
                         </span>
                         {dayUncategorized > 0 && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                          <span className="text-fine font-semibold px-1.5 py-0.5 rounded-md"
                             style={{ background: 'color-mix(in srgb, var(--color-amber) 12%, transparent)', color: 'var(--color-amber)' }}>
                             {dayUncategorized} uncat.
                           </span>
                         )}
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-md"
+                        <span className="text-fine px-1.5 py-0.5 rounded-md"
                           style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
                           {dateMap[date].length}
                         </span>
@@ -1779,39 +1779,39 @@ export default function TransactionsPage() {
                               <div className="flex-1 min-w-0 order-2 sm:order-none">
                                 <p className="text-sm font-medium truncate leading-snug">{tx.name}</p>
                                 {tx.note && (
-                                  <p className="text-[11px] truncate leading-snug" style={{ color: 'var(--color-text-muted)' }}>{tx.note}</p>
+                                  <p className="text-fine truncate leading-snug" style={{ color: 'var(--color-text-muted)' }}>{tx.note}</p>
                                 )}
                                 {/* Badges. The source (PLAID / MANUAL) and the transfer-direction badge are
                                     desktop-only: on phones the category pill already names the transfer and
                                     the source adds little, so the row stays two lines when nothing is flagged. */}
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap empty:hidden">
                                   {tx.parentId ? (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                    <span className="text-fine font-bold px-1.5 py-0.5 rounded-md"
                                       style={{ background: 'color-mix(in srgb, var(--color-primary) 14%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 28%, transparent)', color: 'var(--color-primary)' }}>
                                       ✂ Split
                                     </span>
                                   ) : (
-                                    <span className="hidden sm:inline text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase"
+                                    <span className="hidden sm:inline text-badge font-bold px-1.5 py-0.5 rounded-md uppercase"
                                       style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
                                       {tx.source}
                                     </span>
                                   )}
                                   {/* Bank context, which the group header supplies only in Bank grouping */}
                                   {groupBy !== 'bank' && tx.bankAccount && (
-                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md truncate max-w-48"
+                                    <span className="text-fine font-semibold px-1.5 py-0.5 rounded-md truncate max-w-48"
                                       title={`${tx.bankAccount.bankName} · ${tx.bankAccount.accountName}`}
                                       style={{ background: `color-mix(in srgb, ${tx.bankAccount.color || 'var(--color-primary)'} 14%, transparent)`, color: 'var(--color-text-secondary)' }}>
                                       {tx.bankAccount.bankName} · {tx.bankAccount.accountName}
                                     </span>
                                   )}
                                   {tx.pending && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                    <span className="text-fine font-bold px-1.5 py-0.5 rounded-md"
                                       style={{ background: 'color-mix(in srgb, var(--color-amber) 12%, transparent)', color: 'var(--color-amber)' }}>
                                       Pending
                                     </span>
                                   )}
                                   {tx.categorizedByRuleId && (
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                    <span className="text-fine font-bold px-1.5 py-0.5 rounded-md"
                                       title={tx.categorizedByRule ? `Categorized by rule: ${tx.categorizedByRule.matchValue}` : 'Categorized by a rule'}
                                       style={{ background: 'color-mix(in srgb, var(--color-card-violet) 12%, transparent)', color: 'var(--color-card-violet)' }}>
                                       📌 Rule
@@ -1825,7 +1825,7 @@ export default function TransactionsPage() {
                                       ? proj.categories?.find((cat) => cat.id === tx.projectCategoryId)
                                       : null;
                                     return (
-                                      <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                                      <span className="flex items-center gap-1 text-fine font-bold px-1.5 py-0.5 rounded-md"
                                         style={{ background: `${c}18`, border: `1px solid ${c}35`, color: c }}>
                                         <span>{proj.icon}</span>
                                         <span className="max-w-20 truncate">{proj.name}</span>
@@ -1834,7 +1834,7 @@ export default function TransactionsPage() {
                                     );
                                   })() : null}
                                   {tx.categoryRef?.type === 'transfer' && (
-                                    <span className="hidden sm:flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md"
+                                    <span className="hidden sm:flex items-center gap-1 text-fine font-semibold px-1.5 py-0.5 rounded-md"
                                       style={{ background: 'rgba(107,107,138,0.15)', border: '1px solid rgba(107,107,138,0.30)', color: '#9B9BB8' }}>
                                       <span>
                                         {Number(tx.amount) >= 0
@@ -1888,7 +1888,7 @@ export default function TransactionsPage() {
                                 style={{ background: `${hint.color}14`, border: `1px solid ${hint.color}38`, color: hint.color }}>
                                 <span>{hint.icon}</span>
                                 <span className="max-w-24 truncate">{hint.name}</span>
-                                <span className="text-[9px] opacity-55 font-normal shrink-0">✓ apply</span>
+                                <span className="text-fine opacity-55 font-normal shrink-0">✓ apply</span>
                               </button>
                             );
                           })()}
@@ -1912,7 +1912,7 @@ export default function TransactionsPage() {
                                 <span className="max-w-20 truncate">{proj.name}</span>
                                 <span className="opacity-50">·</span>
                                 <span className="max-w-16 truncate">{ph.catName}</span>
-                                <span className="text-[9px] opacity-55 font-normal shrink-0">✓ apply</span>
+                                <span className="text-fine opacity-55 font-normal shrink-0">✓ apply</span>
                               </button>
                             );
                           })()}
@@ -2029,7 +2029,7 @@ export default function TransactionsPage() {
                                   if (!filteredDebts.length) return null;
                                   return (
                                     <>
-                                      <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
+                                      <p className="px-3 pt-2 pb-0.5 text-fine font-bold tracking-widest uppercase"
                                         style={{ color: 'var(--color-card-violet)' }}>Debt payment</p>
                                       {filteredDebts.map((d) => (
                                         <button key={d.id}
@@ -2048,7 +2048,7 @@ export default function TransactionsPage() {
                                           <span className="w-6 h-6 rounded-lg flex items-center justify-center text-sm shrink-0"
                                             style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)' }}>🤝</span>
                                           <span className="font-medium flex-1 text-left">{d.borrowerName}</span>
-                                          <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                                          <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                                             ${Number(d.remaining).toLocaleString('en-US', { minimumFractionDigits: 2 })} left
                                           </span>
                                         </button>
@@ -2071,7 +2071,7 @@ export default function TransactionsPage() {
                                     </div>
                                     {/* Suggested matching transactions */}
                                     {transferMatchesLoading && (
-                                      <p className="px-3 py-2 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Finding matches…</p>
+                                      <p className="px-3 py-2 text-fine" style={{ color: 'var(--color-text-muted)' }}>Finding matches…</p>
                                     )}
                                     {/* No matches — show credit card accounts as quick suggestions */}
                                     {!transferMatchesLoading && transferMatches.length === 0 && (() => {
@@ -2079,7 +2079,7 @@ export default function TransactionsPage() {
                                       if (!creditAccs.length) return null;
                                       return (
                                         <>
-                                          <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase flex items-center gap-1"
+                                          <p className="px-3 pt-2 pb-0.5 text-fine font-bold tracking-widest uppercase flex items-center gap-1"
                                             style={{ color: 'var(--color-primary)' }}>
                                             <span>💳</span> Credit Cards
                                           </p>
@@ -2104,14 +2104,14 @@ export default function TransactionsPage() {
                                             );
                                           })}
                                           <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-                                          <p className="px-3 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
+                                          <p className="px-3 pb-0.5 text-fine font-bold tracking-widest uppercase"
                                             style={{ color: 'var(--color-text-muted)' }}>All accounts</p>
                                         </>
                                       );
                                     })()}
                                     {!transferMatchesLoading && transferMatches.length > 0 && (
                                       <>
-                                        <p className="px-3 pt-2 pb-0.5 text-[10px] font-bold tracking-widest uppercase flex items-center gap-1"
+                                        <p className="px-3 pt-2 pb-0.5 text-fine font-bold tracking-widest uppercase flex items-center gap-1"
                                           style={{ color: 'var(--color-amber)' }}>
                                           <span>✦</span> Suggested Matches
                                         </p>
@@ -2140,13 +2140,13 @@ export default function TransactionsPage() {
                                                 <p className="font-bold tabular-nums" style={{ color: Number(m.amount) >= 0 ? 'var(--color-green)' : 'var(--color-orange)' }}>
                                                   {Number(m.amount) >= 0 ? '+' : ''}{Number(m.amount).toFixed(2)}
                                                 </p>
-                                                <p className="text-[9px]" style={{ color: 'var(--color-amber)' }}>auto-link both</p>
+                                                <p className="text-fine" style={{ color: 'var(--color-amber)' }}>auto-link both</p>
                                               </div>
                                             </button>
                                           );
                                         })}
                                         <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-                                        <p className="px-3 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
+                                        <p className="px-3 pb-0.5 text-fine font-bold tracking-widest uppercase"
                                           style={{ color: 'var(--color-text-muted)' }}>Or pick account manually</p>
                                       </>
                                     )}
@@ -2215,7 +2215,7 @@ export default function TransactionsPage() {
                                           {c.name}
                                         </span>
                                         {c.type === 'transfer' && (
-                                          <span className="text-[9px] px-1 py-0.5 rounded shrink-0"
+                                          <span className="text-fine px-1 py-0.5 rounded shrink-0"
                                             style={{ background: 'rgba(107,107,138,0.2)', color: '#6B6B8A' }}>→ acct</span>
                                         )}
                                         {tx.categoryId === c.id && <span style={{ color: c.color }}>✓</span>}
@@ -2226,7 +2226,7 @@ export default function TransactionsPage() {
                                     {pickerCatsAlt.length > 0 && (
                                       <>
                                         <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-                                        <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
+                                        <p className="px-3 pt-1 pb-0.5 text-fine font-bold tracking-widest uppercase"
                                           style={{ color: 'var(--color-text-muted)' }}>
                                           {isIncome ? 'Refund / Expense' : 'Income'}
                                         </p>
@@ -2250,7 +2250,7 @@ export default function TransactionsPage() {
                                     {openProjects.length > 0 && (
                                       <>
                                         <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-                                        <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase"
+                                        <p className="px-3 pt-1 pb-0.5 text-fine font-bold tracking-widest uppercase"
                                           style={{ color: 'var(--color-text-muted)' }}>Projects</p>
                                         {openProjects.map((proj) => {
                                           const c = proj.color || '#9B6DFF';
@@ -2266,10 +2266,10 @@ export default function TransactionsPage() {
                                                 style={{ color: linked ? c : 'var(--color-text-primary)' }}>
                                                 {proj.name}
                                               </span>
-                                              {follows && <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded shrink-0" title={`Follows ${follows.bankName} · ${follows.accountName}`}
+                                              {follows && <span className="text-fine font-semibold px-1.5 py-0.5 rounded shrink-0" title={`Follows ${follows.bankName} · ${follows.accountName}`}
                                                 style={{ background: 'color-mix(in srgb, var(--color-text-muted) 14%, transparent)', color: 'var(--color-text-muted)' }}>already tracked</span>}
-                                              {linked && <span className="text-[10px] shrink-0" style={{ color: c }}>✓</span>}
-                                              <span className="text-[10px] shrink-0" style={{ color: 'var(--color-text-muted)' }}>▶</span>
+                                              {linked && <span className="text-fine shrink-0" style={{ color: c }}>✓</span>}
+                                              <span className="text-fine shrink-0" style={{ color: 'var(--color-text-muted)' }}>▶</span>
                                             </button>
                                           );
                                         })}
@@ -2305,7 +2305,7 @@ export default function TransactionsPage() {
                                             <button
                                               onClick={() => unlinkFromProject(tx.id, pickerProjectDrill!)}
                                               disabled={linkingProj}
-                                              className="text-[10px] font-semibold px-1.5 py-0.5 rounded hover:brightness-110 disabled:opacity-50 shrink-0"
+                                              className="text-fine font-semibold px-1.5 py-0.5 rounded hover:brightness-110 disabled:opacity-50 shrink-0"
                                               style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 25%, transparent)' }}>
                                               Unlink
                                             </button>
@@ -2315,10 +2315,10 @@ export default function TransactionsPage() {
                                         {(() => { const f = proj ? followedAccountFor(proj, tx) : null; return f ? (
                                           <div className="px-3 py-3 flex flex-col gap-1.5" data-testid="project-follows-account">
                                             <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>Already in this project</p>
-                                            <p className="text-[11px] leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
+                                            <p className="text-fine leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>
                                               {proj.name} follows <strong>{f.bankName} · {f.accountName}</strong>, so this {tx.transferAccountId && tx.bankAccountId !== f.id ? 'transfer' : 'activity'} already shows in its Performance — deposits, cash-outs and trades. Filing it under a project category would count it twice.
                                             </p>
-                                            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                                            <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                                               {tx.transferAccountId ? 'Pick what the transfer means from the ⇄ link instead: moving money into savings, taking it out, or gains from investing.' : 'Link it as a transfer from the ⇄ icon to tell the budget what it means.'}
                                             </p>
                                           </div>
@@ -2415,7 +2415,7 @@ export default function TransactionsPage() {
                                             {markAsSaleConfirm === proj?.id ? (
                                               <div className="px-3 py-2.5 flex flex-col gap-2">
                                                 <p className="text-xs font-semibold text-white">Mark {proj.name} as sold?</p>
-                                                <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                                                <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                                                   Sale price: +${Math.abs(Number(tx.amount)).toFixed(2)} · {tx.date}
                                                 </p>
                                                 <div className="flex gap-1.5">
@@ -2535,13 +2535,13 @@ export default function TransactionsPage() {
                                       {tx.source === 'recurring' ? 'Delete this occurrence?' : 'Delete this transaction?'}
                                     </p>
                                     {tx.source === 'recurring' && (
-                                      <p className="text-[10px] mb-2" style={{ color: 'var(--color-text-muted)' }}>
+                                      <p className="text-fine mb-2" style={{ color: 'var(--color-text-muted)' }}>
                                         Removes this month only — the schedule keeps running. Stop the
                                         whole series from Settings → Recurring.
                                       </p>
                                     )}
                                     {tx.transferAccountId && (
-                                      <p className="text-[10px] mb-2" style={{ color: 'var(--color-rose)' }}>⚠ linked transfer will be unlinked</p>
+                                      <p className="text-fine mb-2" style={{ color: 'var(--color-rose)' }}>⚠ linked transfer will be unlinked</p>
                                     )}
                                     <div className="flex items-center gap-2">
                                       <button onClick={() => deleteManualTx(tx.id)}
@@ -2646,8 +2646,8 @@ export default function TransactionsPage() {
                                 {/* Transfer direction */}
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-1.5 mb-0.5">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'rgba(155,155,184,0.5)' }}>Transfer</span>
-                                    <span className="text-[10px]" style={{ color: 'rgba(155,155,184,0.4)' }}>
+                                    <span className="text-fine font-bold uppercase tracking-wider" style={{ color: 'rgba(155,155,184,0.5)' }}>Transfer</span>
+                                    <span className="text-fine" style={{ color: 'rgba(155,155,184,0.4)' }}>
                                       {fromAcc?.accountName ?? '?'} → {toAcc?.accountName ?? '?'}
                                     </span>
                                   </div>
@@ -2782,7 +2782,7 @@ export default function TransactionsPage() {
                     {/* Date + Account */}
                     <div className="flex gap-3">
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Transaction date</span>
+                        <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Transaction date</span>
                         <DatePicker value={manualTx.date} ariaLabel="Transaction date"
                           onChange={(date) => {
                             setManualTx((f) => ({ ...f, date }));
@@ -2799,7 +2799,7 @@ export default function TransactionsPage() {
                       <div className="flex flex-col gap-1.5 flex-1 min-w-0" style={{ position: 'relative' }}>
                         {/* Money leaves an account on an expense and arrives on income —
                             one fixed label would be wrong half the time. */}
-                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                        <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                           {isExpense ? 'Paid from' : 'Deposited to'}
                         </span>
                         <button type="button" onClick={() => { setManualAccOpen((o) => !o); }}
@@ -2828,7 +2828,7 @@ export default function TransactionsPage() {
                                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: a.color || '#9B6DFF' }} />
                                 <div className="min-w-0">
                                   <p className="text-xs font-medium truncate">{a.accountName}</p>
-                                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{a.bankName}</p>
+                                  <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{a.bankName}</p>
                                 </div>
                               </button>
                             ))}
@@ -2839,7 +2839,7 @@ export default function TransactionsPage() {
 
                   {/* Note */}
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                    <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                       Note <span style={{ opacity: 0.5, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                     </span>
                     <input
@@ -2867,7 +2867,7 @@ export default function TransactionsPage() {
                   {/* Category — inline picker, always visible */}
                   <div className="flex flex-col gap-2.5 px-5 py-4 min-h-0 md:border-l" style={{ borderColor: 'var(--color-border)' }}>
                     <div className="flex items-center justify-between gap-2 min-w-0">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                      <span className="text-fine font-semibold uppercase tracking-wider shrink-0" style={{ color: 'var(--color-text-muted)' }}>
                         Category <span style={{ opacity: 0.5, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                       </span>
                       {(selDebt || selProjCat || selCat) && (
@@ -2924,7 +2924,7 @@ export default function TransactionsPage() {
                           : 0;
                         const scheduled = Math.max(all.length - recorded, 0);
                         return (
-                          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                             {recorded} recorded transaction{recorded === 1 ? '' : 's'} · {recurring.endMode === 'never' ? 'rest' : scheduled} scheduled
                           </p>
                         );
@@ -3185,7 +3185,7 @@ export default function TransactionsPage() {
               {filterSelects(true)}
             </div>
             <div>
-              <p className="text-[11px] font-semibold mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Group by</p>
+              <p className="text-fine font-semibold mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Group by</p>
               <div role="radiogroup" aria-label="Group transactions by" className="grid grid-cols-[1fr_1.7fr_1fr] gap-1 p-1 rounded-xl"
                 style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                 {GROUP_BY_OPTIONS.map((o) => {

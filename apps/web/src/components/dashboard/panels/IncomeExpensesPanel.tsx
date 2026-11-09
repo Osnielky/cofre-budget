@@ -106,7 +106,7 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
       {empty ? <PanelEmpty message="No cash-flow activity this year yet." /> : (
         <>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>Amount (USD)</p>
+            <p className="text-fine font-medium" style={{ color: 'var(--color-text-muted)' }}>Amount (USD)</p>
             <span className="sm:hidden">
               <Legend items={[
                 { label: 'Income', color: tc.green }, { label: 'Expenses', color: tc.rose },
@@ -165,9 +165,9 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
                 style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${t.color} 4%, transparent)` }}>
                 <span className={`${t.hero ? 'block' : 'hidden'} sm:block`}><Chip color={t.color} d={t.icon} /></span>
                 <div className="min-w-0">
-                  <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-secondary)' }}>{t.label}</p>
+                  <p className="text-fine truncate" style={{ color: 'var(--color-text-secondary)' }}>{t.label}</p>
                   <p className={`${t.hero ? 'text-[19px]' : 'text-[14px]'} sm:text-[14px] font-bold tabular-nums`} style={{ color: t.color }}>{money(t.value)}</p>
-                  <p className="text-[9.5px] truncate" style={{ color: 'var(--color-text-muted)' }}>{perMo(t.value)}</p>
+                  <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{perMo(t.value)}</p>
                 </div>
               </div>
             ))}
@@ -181,8 +181,8 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
             <div className="flex items-center gap-3 min-w-0 flex-1 basis-64">
               <Chip color={tc.violet} d={I_BULB} size={32} />
               <div className="min-w-0">
-                <p className="text-[11px] font-bold">Insight</p>
-                <p className="text-[10.5px]" style={{ color: 'var(--color-text-secondary)' }}>
+                <p className="text-fine font-bold">Insight</p>
+                <p className="text-fine" style={{ color: 'var(--color-text-secondary)' }}>
                   {net >= 0 ? <>You&apos;re currently earning <span className="font-bold" style={{ color: tc.green }}>{money(net)}</span> more than you spend.</>
                     : <>You&apos;re currently spending <span className="font-bold" style={{ color: tc.rose }}>{money(-net)}</span> more than you earn.</>}
                 </p>
@@ -195,7 +195,7 @@ export default function IncomeExpensesPanel({ data, loading }: { data: CashFlowM
                 <span className="hidden sm:block"><Chip color={h.color} d={h.icon} size={32} /></span>
                 <span aria-hidden="true" className="sm:hidden w-1.5 h-1.5 rounded-full shrink-0" style={{ background: h.color }} />
                 <div className="min-w-0 flex-1 flex items-center justify-between gap-3 sm:block">
-                  <p className="text-[10.5px] sm:text-[10px] truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                  <p className="text-fine truncate" style={{ color: 'var(--color-text-secondary)' }}>
                     <span className="sm:hidden">{h.short}</span><span className="hidden sm:inline">{h.label}</span>
                   </p>
                   <p className="text-[12px] font-bold tabular-nums truncate shrink-0 sm:shrink" style={{ color: h.color }}>{h.text}</p>

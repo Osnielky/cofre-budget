@@ -146,7 +146,7 @@ export default function DatePicker({ value, onChange, placeholder = 'Pick a date
 
           <div className="grid grid-cols-7 gap-1 mb-1">
             {DOW.map((d, i) => (
-              <span key={i} className="h-6 flex items-center justify-center text-[10px] font-bold"
+              <span key={i} className="h-6 flex items-center justify-center text-fine font-bold"
                 style={{ color: 'var(--color-text-muted)' }}>{d}</span>
             ))}
           </div>

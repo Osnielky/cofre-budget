@@ -85,9 +85,9 @@ export default function ProjectsOverview({ projects, loading, showClosed, onTogg
           { label: 'Net', value: money(totals.net, true), sub: 'income minus every cost', clr: totals.net > 0 ? 'var(--color-green)' : totals.net < 0 ? 'var(--color-rose)' : 'var(--color-text-primary)' },
         ].map((k) => (
           <div key={k.label} className="px-3 sm:px-4 py-3" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
-            <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{k.label}</p>
+            <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{k.label}</p>
             <p className="font-bold text-lg sm:text-xl mt-0.5 truncate tabular-nums" style={{ color: k.clr }}>{k.value}</p>
-            <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{k.sub}</p>
+            <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{k.sub}</p>
           </div>
         ))}
       </StaggerItem>
@@ -149,12 +149,12 @@ function ProjectCard({ p, onOpen, typeLabel }: { p: OverviewCardProject; onOpen:
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{p.name}</p>
           <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: `${color}20`, color, border: `1px solid ${color}35` }}>{typeLabel(p.type)}</span>
-            <span className="text-[10px] font-semibold" style={{ color: sold ? 'var(--color-green)' : closed ? 'var(--color-text-muted)' : 'var(--color-amber)' }}>
+            <span className="text-fine font-bold px-1.5 py-0.5 rounded-md" style={{ background: `${color}20`, color, border: `1px solid ${color}35` }}>{typeLabel(p.type)}</span>
+            <span className="text-fine font-semibold" style={{ color: sold ? 'var(--color-green)' : closed ? 'var(--color-text-muted)' : 'var(--color-amber)' }}>
               {sold ? '✓ Sold' : closed ? '■ Terminated' : '● Active'}
             </span>
             {p.type === 'trading' && (p.accounts?.length ?? 0) > 0 && (
-              <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>· {p.accounts!.length} account{p.accounts!.length === 1 ? '' : 's'}</span>
+              <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>· {p.accounts!.length} account{p.accounts!.length === 1 ? '' : 's'}</span>
             )}
           </div>
         </div>
@@ -164,13 +164,13 @@ function ProjectCard({ p, onOpen, typeLabel }: { p: OverviewCardProject; onOpen:
       <div className="grid grid-cols-3 gap-2">
         {figures.map((f) => (
           <div key={f.label} className="min-w-0">
-            <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{f.label}</p>
+            <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{f.label}</p>
             <p className="text-sm font-bold truncate tabular-nums" style={{ color: TONE[f.tone] }}>{f.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-between text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+      <div className="flex items-center justify-between text-fine" style={{ color: 'var(--color-text-muted)' }}>
         <span className="truncate">{p.txCount} transaction{p.txCount === 1 ? '' : 's'}{p.description ? ` · ${p.description}` : ''}</span>
         <span className="shrink-0 ml-2">{relativeDay(p.lastActivity)}</span>
       </div>

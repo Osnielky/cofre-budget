@@ -32,7 +32,7 @@ function SpendingDistributionChart({ slices, totalCents }: { slices: CategorySli
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
               <p className="text-base font-extrabold tabular-nums">{formatMoney(totalCents)}</p>
-              <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Total spent</p>
+              <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Total spent</p>
             </div>
           </div>
           <ul className="flex-1 w-full min-w-0 flex flex-col gap-1.5">

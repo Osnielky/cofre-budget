@@ -27,7 +27,7 @@ interface Props {
 function Pill({ children, tone }: { children: React.ReactNode; tone: 'neutral' | 'rose' | 'green' }) {
   const color = tone === 'rose' ? 'var(--color-rose)' : tone === 'green' ? 'var(--color-green)' : 'var(--color-text-secondary)';
   return (
-    <span className="inline-flex items-center text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
+    <span className="inline-flex items-center text-fine font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full"
       style={{ color, border: `1px solid ${tone === 'neutral' ? 'var(--color-border)' : color}` }}>{children}</span>
   );
 }
@@ -46,7 +46,7 @@ function Fact({ label, value, sub, i, reduce }: { label: string; value: React.Re
     <motion.div {...fadeUp(i, reduce)} className="min-w-0">
       <dt className="text-xs" style={MUTED}>{label}</dt>
       <dd className="font-semibold tabular-nums truncate">{value}</dd>
-      {sub && <dd className="text-[11px] truncate" style={MUTED}>{sub}</dd>}
+      {sub && <dd className="text-fine truncate" style={MUTED}>{sub}</dd>}
     </motion.div>
   );
 }

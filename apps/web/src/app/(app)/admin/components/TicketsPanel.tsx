@@ -30,7 +30,7 @@ export default function TicketsPanel({ refreshKey }: { refreshKey: number }) {
 
   const tab = (s: TicketStatus | 'all', label: string, n?: number) => (
     <button key={s} type="button" onClick={() => { setStatus(s); setPage(1); }}
-      className="px-2.5 py-1 rounded-md text-[10.5px] font-semibold transition-all cursor-pointer whitespace-nowrap"
+      className="px-2.5 py-1 rounded-md text-fine font-semibold transition-all cursor-pointer whitespace-nowrap"
       style={status === s
         ? { background: 'color-mix(in srgb, var(--color-primary) 16%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 35%, transparent)', color: 'var(--color-primary)' }
         : { background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
@@ -54,7 +54,7 @@ export default function TicketsPanel({ refreshKey }: { refreshKey: number }) {
           <div className="overflow-x-auto -mx-1 px-1">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                <tr className="text-left text-fine uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                   {['When', 'Who', 'Page', 'Problem', ''].map((h, i) => <th key={i} scope="col" className="py-2 pr-4 font-semibold">{h}</th>)}
                 </tr>
               </thead>

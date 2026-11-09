@@ -127,9 +127,9 @@ export default function FindReceiptModal({ tx, onLinked, onSplitFromItems, onClo
                   <div className="min-w-0">
                     <p className="text-sm font-bold truncate">
                       {c.merchant}
-                      {c.linked && <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded" style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>LINKED</span>}
+                      {c.linked && <span className="ml-2 text-fine font-semibold px-1.5 py-0.5 rounded" style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>LINKED</span>}
                     </p>
-                    <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                    <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
                       {c.orderDate ?? 'no date'} · {c.rawSubject ?? c.orderNumber ?? c.gmailMessageId}
                     </p>
                   </div>
@@ -138,7 +138,7 @@ export default function FindReceiptModal({ tx, onLinked, onSplitFromItems, onClo
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap text-[11px] font-semibold">
+                <div className="flex items-center gap-2 flex-wrap text-fine font-semibold">
                   <button onClick={() => setExpandedId(expanded ? null : c.id)} className="px-2 py-1 rounded-lg cursor-pointer"
                     style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
                     {expanded ? 'Hide items' : `Items (${c.items.length})`}
@@ -170,7 +170,7 @@ export default function FindReceiptModal({ tx, onLinked, onSplitFromItems, onClo
 
                 {expanded && (
                   <div className="flex flex-col gap-1 pt-1" style={{ borderTop: '1px solid var(--color-border)' }}>
-                    {c.items.length === 0 && <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>No line items parsed.</p>}
+                    {c.items.length === 0 && <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>No line items parsed.</p>}
                     {c.items.map((it, i) => (
                       <div key={i} className="flex items-center justify-between gap-3 text-[12px]">
                         <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{it.quantity > 1 ? `${it.quantity}× ` : ''}{it.name}</span>

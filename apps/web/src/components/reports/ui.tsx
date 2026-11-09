@@ -18,12 +18,12 @@ export const compact = (n: number) => {
 
 /** "↑ 12%" in green or rose; `inverse` = a rise is bad (spending). */
 export function Delta({ value, inverse = false, points = false, className = '' }: { value: number | null; inverse?: boolean; points?: boolean; className?: string }) {
-  if (value == null) return <span className={`text-[11px] font-semibold ${className}`} style={{ color: 'var(--color-text-muted)' }}>new</span>;
-  if (Math.abs(value) < 0.5) return <span className={`text-[11px] font-semibold ${className}`} style={{ color: 'var(--color-text-muted)' }}>— flat</span>;
+  if (value == null) return <span className={`text-fine font-semibold ${className}`} style={{ color: 'var(--color-text-muted)' }}>new</span>;
+  if (Math.abs(value) < 0.5) return <span className={`text-fine font-semibold ${className}`} style={{ color: 'var(--color-text-muted)' }}>— flat</span>;
   const up = value > 0;
   const good = inverse ? !up : up;
   return (
-    <span className={`inline-flex items-center gap-0.5 text-[11px] font-bold tabular-nums whitespace-nowrap shrink-0 ${className}`} style={{ color: good ? 'var(--color-green)' : 'var(--color-rose)' }}>
+    <span className={`inline-flex items-center gap-0.5 text-fine font-bold tabular-nums whitespace-nowrap shrink-0 ${className}`} style={{ color: good ? 'var(--color-green)' : 'var(--color-rose)' }}>
       {up ? '↑' : '↓'} {Math.abs(value).toFixed(points ? 1 : 0)}{points ? ' pts' : '%'}
     </span>
   );

@@ -69,14 +69,14 @@ export default function NetWorthMixCard({ breakdown }: Props) {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Net worth</span>
+                  <span className="text-fine uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Net worth</span>
                   <span className="text-base font-extrabold tabular-nums" style={{ color: mix.net < 0 ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>{money(mix.net)}</span>
                 </div>
               </div>
             )}
             <div className="w-full flex-1 min-w-0 grid grid-cols-1 2xl:grid-cols-2 gap-4 2xl:gap-8">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-green)' }}>Adds up · {money(mix.assetTotal)}</p>
+              <p className="text-fine font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--color-green)' }}>Adds up · {money(mix.assetTotal)}</p>
               {assets.length === 0
                 ? <p className="text-sm py-1" style={{ color: 'var(--color-text-muted)' }}>No assets yet.</p>
                 : <ul className="divide-y" style={{ borderColor: 'var(--color-border)' }}>{assets.map((s) => <Row key={s.id} slice={s} sign="+" />)}</ul>}
@@ -84,9 +84,9 @@ export default function NetWorthMixCard({ breakdown }: Props) {
 
           <div className="min-w-0">
             <div className="flex items-baseline justify-between gap-3 mb-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-rose)' }}>Takes away · {money(mix.liabilityTotal)}</p>
+              <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-rose)' }}>Takes away · {money(mix.liabilityTotal)}</p>
               {mix.liabilityShare != null && liabilities.length > 0 && (
-                <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{mix.liabilityShare}% of your assets</span>
+                <span className="text-fine tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{mix.liabilityShare}% of your assets</span>
               )}
             </div>
             {liabilities.length === 0 ? (

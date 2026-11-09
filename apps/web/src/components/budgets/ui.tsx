@@ -80,7 +80,7 @@ export function SectionTitle({ icon, color, title, subtitle, right }: {
         <IconBadge name={icon} color={color} size="sm" />
         <div className="min-w-0">
           <h2 className="text-[15px] font-bold leading-tight">{title}</h2>
-          {subtitle && <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{subtitle}</p>}
+          {subtitle && <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{subtitle}</p>}
         </div>
       </div>
       {right}

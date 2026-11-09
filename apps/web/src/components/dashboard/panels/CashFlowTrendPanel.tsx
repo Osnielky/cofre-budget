@@ -109,17 +109,17 @@ export default function CashFlowTrendPanel({ data, loading }: { data: TrendPoint
                   style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${s.color} 4%, transparent)` }}>
                   <span className={`${s.hero ? 'block' : 'hidden'} sm:block`}><Chip color={s.color} d={s.icon} /></span>
                   <div className="min-w-0">
-                    <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-secondary)' }}>{s.label}</p>
+                    <p className="text-fine truncate" style={{ color: 'var(--color-text-secondary)' }}>{s.label}</p>
                     <p className={`${s.hero ? 'text-[19px]' : 'text-[14px]'} sm:text-[14px] font-bold tabular-nums`} style={{ color: s.color }}>{money(+s.cur.toFixed(2))}</p>
                     {s.delta != null ? (
-                      <p className="text-[9.5px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                      <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
                         vs previous {prev.length} mo{' '}
                         <span className="font-bold" style={{ color: good ? tc.green : tc.rose }}>
                           {s.delta > 0 ? '▲' : '▼'} {Math.abs(s.delta)}%
                         </span>
                       </p>
                     ) : (
-                      <p className="text-[9.5px] truncate" style={{ color: 'var(--color-text-muted)' }}>per month</p>
+                      <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>per month</p>
                     )}
                   </div>
                 </div>
@@ -175,7 +175,7 @@ export default function CashFlowTrendPanel({ data, loading }: { data: TrendPoint
                 <span className="hidden sm:block"><Chip color={h.color} d={h.icon} size={30} /></span>
                 <span aria-hidden="true" className="sm:hidden w-1.5 h-1.5 rounded-full shrink-0" style={{ background: h.color }} />
                 <div className="min-w-0 flex-1 flex items-center justify-between gap-3 sm:block">
-                  <p className="text-[10.5px] sm:text-[10px] truncate" style={{ color: 'var(--color-text-secondary)' }}>
+                  <p className="text-fine truncate" style={{ color: 'var(--color-text-secondary)' }}>
                     <span className="sm:hidden">{h.short}</span><span className="hidden sm:inline">{h.label}</span>
                   </p>
                   <p className="text-[12px] font-bold tabular-nums truncate shrink-0 sm:shrink" style={{ color: h.color }}>{h.text}</p>

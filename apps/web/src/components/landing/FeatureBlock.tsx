@@ -20,7 +20,7 @@ export default function FeatureBlock({ id, eyebrow, title, body, proBadge, rever
         <div className="flex items-center gap-2">
           <span className="landing-eyebrow">{eyebrow}</span>
           {proBadge && (
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{ background: tint('var(--color-primary)', 16), color: 'var(--color-primary)' }}>Pro</span>
+            <span className="text-fine font-semibold px-2 py-0.5 rounded-full" style={{ background: tint('var(--color-primary)', 16), color: 'var(--color-primary)' }}>Pro</span>
           )}
         </div>
         <h2 className="landing-display mt-3 text-[34px] sm:text-[44px]" style={{ color: 'var(--color-text-primary)' }}>{title}</h2>

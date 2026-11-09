@@ -16,11 +16,10 @@ interface LinkRenderProps { sourceX: number; targetX: number; sourceY: number; t
 
 export default function MoneyFlowChart({ flow, height }: { flow: MoneyFlow; height?: number }) {
   const tc = useThemeColors();
-  /* Phones: tighter label gutters and a smaller font so the whole flow fits 343px
+  /* Phones: tighter label gutters so the whole flow fits 343px (labels are `text-fine`)
      without sideways scrolling; wider screens get roomy labels. */
   const narrow = useNarrowScreen();
   const gutter = narrow ? { left: 88, right: 96 } : { left: 120, right: 120 };
-  const font = narrow ? 10 : 11;
   if (flow.links.length === 0) return <Empty text="No income or spending in this period yet." />;
   /* Tall enough for the busier column: every node needs ~44px for its two-line label. */
   const sources = flow.nodes.filter((n) => n.kind === 'income' || n.kind === 'deficit').length;
@@ -46,11 +45,11 @@ export default function MoneyFlowChart({ flow, height }: { flow: MoneyFlow; heig
       <g>
         <rect x={x} y={y} width={width} height={Math.max(hh, 2)} rx={3} fill={payload.color} fillOpacity={0.95} />
         {isHub ? (
-          <text x={tx} y={y - 8} textAnchor={anchor} fontSize={font} fontWeight={700} fill={tc.textPrimary}>{label} · {value}</text>
+          <text x={tx} y={y - 8} textAnchor={anchor} className="text-fine" fontWeight={700} fill={tc.textPrimary}>{label} · {value}</text>
         ) : (
           <>
-            <text x={tx} y={y + hh / 2 - 2} textAnchor={anchor} fontSize={font} fontWeight={600} fill={tc.textPrimary}>{label}</text>
-            <text x={tx} y={y + hh / 2 + 11} textAnchor={anchor} fontSize={font - 1} fill={tc.textMuted}>{value}</text>
+            <text x={tx} y={y + hh / 2 - 2} textAnchor={anchor} className="text-fine" fontWeight={600} fill={tc.textPrimary}>{label}</text>
+            <text x={tx} y={y + hh / 2 + 11} textAnchor={anchor} className="text-fine" fill={tc.textMuted}>{value}</text>
           </>
         )}
       </g>
@@ -81,7 +80,7 @@ export default function MoneyFlowChart({ flow, height }: { flow: MoneyFlow; heig
         </ResponsiveContainer>
       </div>
       {hubIndex >= 0 && (
-        <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-fine mt-1" style={{ color: 'var(--color-text-muted)' }}>
           {flow.income >= flow.spending
             ? <>You kept <span className="font-semibold" style={{ color: tc.green }}>{money(flow.income - flow.spending)}</span> of {money(flow.income)} earned.</>
             : <>Spending exceeded income by <span className="font-semibold" style={{ color: tc.rose }}>{money(flow.spending - flow.income)}</span>, covered from savings or credit.</>}

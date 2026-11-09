@@ -52,7 +52,7 @@ export default function AddLoanModal({ onClose, onCreated }: Props) {
             <p className="font-bold text-sm">Add Loan</p>
             <button type="button" onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-[var(--color-surface)]" style={{ color: 'var(--color-text-muted)' }}>✕</button>
           </div>
-          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
             A personal record between you and someone you trust — you&apos;ll log repayments yourself.
           </p>
         </div>
@@ -72,7 +72,7 @@ export default function AddLoanModal({ onClose, onCreated }: Props) {
           </div>
           {fields.map(([key, label, type, req]) => (
             <label key={key} className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+              <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{label}</span>
               <input required={req} type={type} step={type === 'number' ? '0.01' : undefined} min={type === 'number' ? '0.01' : undefined}
                 value={form[key]} onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                 className="px-3 py-2.5 text-sm rounded-xl outline-none"

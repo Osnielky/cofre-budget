@@ -49,7 +49,7 @@ function TypePill({ type }: { type: string }) {
   const income = type === 'income';
   const color = income ? 'var(--color-green)' : 'var(--color-orange)';
   return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-semibold" style={{ color }}>
+    <span className="inline-flex items-center gap-1 text-fine font-semibold" style={{ color }}>
       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         {income ? <><path d="M7 7l10 10" /><path d="M17 7v10H7" /></> : <><path d="M7 17L17 7" /><path d="M7 7h10v10" /></>}
       </svg>
@@ -209,7 +209,7 @@ export default function ProjectCategoryManager() {
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold truncate" style={{ color: on ? t.accent : 'var(--color-text-primary)' }}>{t.label}</span>
                 {n !== null && (
-                  <span className="block text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                  <span className="block text-fine" style={{ color: 'var(--color-text-muted)' }}>
                     {n} categor{n === 1 ? 'y' : 'ies'}
                   </span>
                 )}
@@ -224,7 +224,7 @@ export default function ProjectCategoryManager() {
         })}
       </div>
 
-      <p className="flex items-start gap-2 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+      <p className="flex items-start gap-2 text-fine" style={{ color: 'var(--color-text-muted)' }}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
           <path d="M12 2 2 7l10 5 10-5z" /><path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
         </svg>
@@ -237,7 +237,7 @@ export default function ProjectCategoryManager() {
           <div className="flex flex-col gap-3 px-4 py-3.5" style={{ borderBottom: '1px solid var(--color-border)' }}>
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-base font-bold">{typeMeta.label} categories</p>
-              <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{cats.length} total</span>
+              <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{cats.length} total</span>
               <input value={query} onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search categories…" aria-label="Search categories"
                 className="ml-auto min-w-36 flex-1 sm:flex-none sm:w-52 px-3 py-2 text-xs outline-none"
@@ -248,7 +248,7 @@ export default function ProjectCategoryManager() {
                 const on = filter === k;
                 return (
                   <button key={k} type="button" onClick={() => setFilter(k)}
-                    className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1.5"
+                    className="px-2.5 py-1.5 rounded-lg text-fine font-semibold transition-all flex items-center gap-1.5"
                     style={on
                       ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 45%, transparent)', color: 'var(--color-primary)' }
                       : { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
@@ -260,7 +260,7 @@ export default function ProjectCategoryManager() {
           </div>
 
           {/* Column headers on wide screens only; the rows read fine without them when stacked */}
-          <div className="hidden sm:flex items-center gap-3 px-4 py-2 text-[9.5px] font-bold uppercase tracking-wider"
+          <div className="hidden sm:flex items-center gap-3 px-4 py-2 text-fine font-bold uppercase tracking-wider"
             style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
             <span className="flex-1">Category</span>
             <span className="w-24">Type</span>
@@ -297,13 +297,13 @@ export default function ProjectCategoryManager() {
                   <span className="flex-1 min-w-32">
                     <span className="block text-sm font-semibold truncate" style={{ color: c.color }}>{c.name}</span>
                     {c.description && (
-                      <span className="block text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{c.description}</span>
+                      <span className="block text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{c.description}</span>
                     )}
                   </span>
                   <span className="w-24 shrink-0"><TypePill type={c.type ?? 'expense'} /></span>
                   <span className="w-24 flex items-center justify-end gap-1 shrink-0">
                     <button type="button" onClick={() => openEdit(c)}
-                      className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:brightness-125"
+                      className="px-2.5 py-1.5 rounded-lg text-fine font-semibold transition-all hover:brightness-125"
                       style={isEditing
                         ? { background: 'color-mix(in srgb, var(--color-primary) 20%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 45%, transparent)', color: 'var(--color-primary)' }
                         : { background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
@@ -324,7 +324,7 @@ export default function ProjectCategoryManager() {
           </div>
 
           {!editing && cats.length > 0 && (
-            <p className="flex items-center gap-2 px-4 py-3 text-[11px]"
+            <p className="flex items-center gap-2 px-4 py-3 text-fine"
               style={{ borderTop: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="shrink-0">
                 <circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" />
@@ -342,26 +342,26 @@ export default function ProjectCategoryManager() {
                 <p className="text-base font-bold flex items-center gap-2">
                   {editing === 'new' ? 'New category' : 'Edit category'}
                   {dirty && (
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: 'var(--color-amber)' }}>
+                    <span className="inline-flex items-center gap-1.5 text-fine font-semibold" style={{ color: 'var(--color-amber)' }}>
                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--color-amber)' }} />
                       Unsaved changes
                     </span>
                   )}
                 </p>
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                   {typeMeta.label}{editing !== 'new' && original ? ` / ${original.name}` : ''}
                 </p>
               </div>
             </div>
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Category name</span>
+              <span className="text-fine font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Category name</span>
               <input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
                 placeholder="e.g. Mechanic" className="px-3 py-2.5 text-sm outline-none" style={inputStyle} autoFocus />
             </label>
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Transaction type</span>
+              <span className="text-fine font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Transaction type</span>
               <select value={draft.type} onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value }))}
                 className="px-3 py-2.5 text-sm outline-none" style={inputStyle}>
                 <option value="expense">Expense</option>
@@ -370,7 +370,7 @@ export default function ProjectCategoryManager() {
             </label>
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+              <span className="text-fine font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
                 Description <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>Optional</span>
               </span>
               <textarea value={draft.description} rows={2}
@@ -381,7 +381,7 @@ export default function ProjectCategoryManager() {
 
             <div className="flex gap-4 flex-wrap">
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Icon</span>
+                <span className="text-fine font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Icon</span>
                 <div className="flex items-center gap-2">
                   <span className="w-11 h-11 rounded-xl flex items-center justify-center text-xl shrink-0"
                     style={{ background: `${draft.color}22`, border: `1px solid ${draft.color}40` }}>{draft.icon}</span>
@@ -394,7 +394,7 @@ export default function ProjectCategoryManager() {
                 </div>
               </div>
               <div className="flex flex-col gap-1.5 min-w-0">
-                <span className="text-[11px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Color</span>
+                <span className="text-fine font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Color</span>
                 <div className="flex gap-1.5 flex-wrap">
                   {PRESET_COLORS.map((col) => (
                     <button key={col} type="button" onClick={() => setDraft((d) => ({ ...d, color: col }))}
@@ -414,26 +414,26 @@ export default function ProjectCategoryManager() {
 
             {/* Live preview */}
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Live preview</p>
+              <p className="text-fine font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--color-text-muted)' }}>Live preview</p>
               <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                 <span className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
                   style={{ background: `${draft.color}22`, border: `1px solid ${draft.color}40` }}>{draft.icon}</span>
                 <span className="flex-1 min-w-0">
                   <span className="block text-sm font-semibold truncate" style={{ color: draft.color }}>{draft.name || 'Category name'}</span>
-                  {draft.description && <span className="block text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{draft.description}</span>}
+                  {draft.description && <span className="block text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{draft.description}</span>}
                 </span>
                 <span className="shrink-0"><TypePill type={draft.type} /></span>
               </div>
             </div>
 
-            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
               Applies to all your {typeMeta.label} projects.
             </p>
 
             <div className="flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: '1px solid var(--color-border)' }}>
               {editing !== 'new' && original && (
                 <button type="button" onClick={() => setConfirmDelete(original)}
-                  className="mr-auto flex items-center gap-1.5 text-[11px] font-semibold transition-colors hover:brightness-125"
+                  className="mr-auto flex items-center gap-1.5 text-fine font-semibold transition-colors hover:brightness-125"
                   style={{ color: 'var(--color-rose)' }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />

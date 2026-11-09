@@ -45,7 +45,7 @@ export default function TotalUtilization({ cards }: { cards: CardView[] }) {
         <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: color }} />
         <div className="absolute top-0 bottom-0 w-0.5" style={{ left: '30%', background: 'var(--color-text-secondary)' }} aria-hidden="true" />
       </div>
-      <div className="flex justify-between text-[11px]" style={MUTED}>
+      <div className="flex justify-between text-fine" style={MUTED}>
         <span>0%</span><span>30% (good)</span><span>100%</span>
       </div>
       <p className="text-xs" style={MUTED}>Keeping it under 30% helps your credit score.</p>

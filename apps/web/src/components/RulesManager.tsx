@@ -112,7 +112,7 @@ export default function RulesManager() {
                 {isEditing ? (
                   <div className="flex flex-col gap-2 py-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider shrink-0"
+                      <span className="text-fine font-bold uppercase tracking-wider shrink-0"
                         style={{ color: 'var(--color-text-muted)' }}>
                         {rule.matchType === 'merchant' ? 'Merchant' : 'Description'}
                       </span>
@@ -165,18 +165,18 @@ export default function RulesManager() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 min-w-0">
                         <p className="text-sm font-semibold truncate">{rule.matchValue}</p>
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wide"
+                        <span className="text-fine font-bold px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wide"
                           style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
                           {rule.matchType === 'merchant' ? 'Merchant' : 'Description'}
                         </span>
                         {rule.matchStrategy === 'prefix' && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wide"
+                          <span className="text-fine font-bold px-1.5 py-0.5 rounded shrink-0 uppercase tracking-wide"
                             style={{ background: 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)', color: 'var(--color-card-violet)' }}>
                             Starts with
                           </span>
                         )}
                       </div>
-                      <p className="text-[11px] truncate mt-0.5" style={{ color: cat?.color ?? 'var(--color-text-muted)' }}>
+                      <p className="text-fine truncate mt-0.5" style={{ color: cat?.color ?? 'var(--color-text-muted)' }}>
                         → {cat?.name ?? 'Unknown category'}
                       </p>
                     </div>

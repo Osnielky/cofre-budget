@@ -16,8 +16,8 @@ export default function MoneyInOutPanel({ months }: { months: MonthFlow[] }) {
   return (
     <div className="p-3 sm:p-4" style={panel} data-testid="money-in-out">
       <div className="flex items-baseline justify-between gap-3 flex-wrap mb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Money in & out by month</p>
-        <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Money in & out by month</p>
+        <div className="flex items-center gap-3 text-fine" style={{ color: 'var(--color-text-muted)' }}>
           <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--color-green)' }} />to you {money(totalOut)}</span>
           <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--color-rose)' }} />from you {money(totalIn)}</span>
         </div>
@@ -29,7 +29,7 @@ export default function MoneyInOutPanel({ months }: { months: MonthFlow[] }) {
               <div className="w-[38%] rounded-t" style={{ height: `${(m.out / max) * 100}%`, background: 'var(--color-green)', opacity: 0.85 }} />
               <div className="w-[38%] rounded-t" style={{ height: `${(m.in / max) * 100}%`, background: 'var(--color-rose)', opacity: 0.85 }} />
             </div>
-            <span className="text-[9px]" style={{ color: m.in || m.out ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>{short(m.month)}</span>
+            <span className="text-fine" style={{ color: m.in || m.out ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>{short(m.month)}</span>
           </div>
         ))}
       </div>

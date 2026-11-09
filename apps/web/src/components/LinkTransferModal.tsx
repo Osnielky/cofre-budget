@@ -76,11 +76,11 @@ function Panel({ side, tx: panelTx, account, currentTxId, onChange }: {
     <div className="flex-1 min-w-0 p-4 rounded-2xl"
       style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
       <div className="flex items-start justify-between gap-2 mb-3">
-        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-fine font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
           {isFrom ? 'From · Sending account' : 'To · Receiving account'}
         </p>
         {panelTx && (
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0"
+          <span className="text-fine font-bold px-2 py-0.5 rounded-full shrink-0"
             style={isCurrent
               ? { background: 'color-mix(in srgb, var(--color-sky) 18%, transparent)', color: 'var(--color-sky)' }
               : { background: 'color-mix(in srgb, var(--color-violet) 22%, transparent)', color: 'var(--color-violet)' }}>
@@ -126,11 +126,11 @@ function Panel({ side, tx: panelTx, account, currentTxId, onChange }: {
           {panelTx && (
             <div className="flex flex-col gap-2.5 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
               <div>
-                <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Posted date</p>
+                <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Posted date</p>
                 <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>{prettyDate(panelTx.date)}</p>
               </div>
               <div className="min-w-0">
-                <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Description</p>
+                <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Description</p>
                 <p className="text-xs font-semibold break-words" style={{ color: 'var(--color-text-primary)' }}>{panelTx.name}</p>
               </div>
             </div>
@@ -165,7 +165,7 @@ function Row({ selected, onClick, icon, title, subtitle, trailing }: {
         style={{ background: 'var(--color-elevated)' }}>{icon}</span>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold truncate" style={{ color: selected ? 'var(--color-violet)' : 'var(--color-text-primary)' }}>{title}</p>
-        <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{subtitle}</p>
+        <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{subtitle}</p>
       </div>
       {trailing}
     </button>
@@ -328,7 +328,7 @@ export default function LinkTransferModal({
 
         <div className="px-5 sm:px-6 pb-5 flex flex-col gap-4">
           {infoOpen && (
-            <p className="text-[11px] leading-snug p-3 rounded-xl"
+            <p className="text-fine leading-snug p-3 rounded-xl"
               style={{ background: 'color-mix(in srgb, var(--color-violet) 10%, transparent)', color: 'var(--color-text-secondary)' }}>
               A transfer is money moving between your own accounts — like paying a credit card from checking.
               Linking both sides keeps your budget accurate by keeping transfers out of your income and spending totals.
@@ -422,7 +422,7 @@ export default function LinkTransferModal({
                 className="w-full px-3 py-2.5 text-sm outline-none rounded-xl"
                 style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
               />
-              <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                 Looking within {SEARCH_WINDOW_DAYS} days either side of {prettyDate(tx.date)}. Transactions already
                 linked to another transfer are not shown.
               </p>
@@ -451,7 +451,7 @@ export default function LinkTransferModal({
 
           {tab === 'cash' && (
             <div className="flex flex-col gap-2">
-              <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                 Cash rarely leaves a second record, so this links the transfer to the account itself
                 rather than pairing it with another transaction.
               </p>
@@ -497,7 +497,7 @@ export default function LinkTransferModal({
                             border: `1px solid ${on ? 'var(--color-violet)' : 'var(--color-border)'}`,
                           }}>
                           <p className="text-xs font-semibold" style={{ color: on ? 'var(--color-violet)' : 'var(--color-text-primary)' }}>{KIND_LABELS[k].title}</p>
-                          <p className="text-[10px] mt-0.5 leading-snug" style={{ color: 'var(--color-text-muted)' }}>{KIND_LABELS[k].hint}</p>
+                          <p className="text-fine mt-0.5 leading-snug" style={{ color: 'var(--color-text-muted)' }}>{KIND_LABELS[k].hint}</p>
                         </button>
                       );
                     })}
@@ -507,7 +507,7 @@ export default function LinkTransferModal({
 
               <div className="rounded-xl p-4 flex flex-col gap-3"
                 style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-fine font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                   This is how it will be recorded
                 </p>
                 {[explanation.from, explanation.to].map((side) => (
@@ -521,7 +521,7 @@ export default function LinkTransferModal({
                         {side.account} <span style={{ color: 'var(--color-text-muted)' }}>→</span>{' '}
                         <span className="px-1.5 py-0.5 rounded-md" style={{ background: 'color-mix(in srgb, var(--color-violet) 16%, transparent)', color: 'var(--color-violet)' }}>{side.category}</span>
                       </p>
-                      <p className="text-[11px] mt-0.5 leading-snug" style={{ color: 'var(--color-text-secondary)' }}>{side.text}</p>
+                      <p className="text-fine mt-0.5 leading-snug" style={{ color: 'var(--color-text-secondary)' }}>{side.text}</p>
                     </div>
                   </div>
                 ))}

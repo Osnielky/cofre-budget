@@ -39,18 +39,18 @@ export default function SavingsTrendWidget({ data }: { data: SavingsTrendWidgetD
         </div>
         <div className="flex sm:flex-col justify-between gap-3 sm:gap-2 sm:text-right sm:pl-3 sm:flex-1 min-w-0">
           <div className="min-w-0">
-            <p className="text-[10px] uppercase truncate" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-fine uppercase truncate" style={{ color: 'var(--color-text-muted)' }}>
               Projected {currentMonthKey ? monthEndLabel(currentMonthKey) : ''}
             </p>
             <p className="font-bold text-sm tabular-nums">${fmt(data.projected)}</p>
           </div>
           <div className="min-w-0 text-right sm:text-right">
-            <p className="text-[10px] uppercase truncate" style={{ color: 'var(--color-text-muted)' }}>6-month avg</p>
+            <p className="text-fine uppercase truncate" style={{ color: 'var(--color-text-muted)' }}>6-month avg</p>
             <p className="font-bold text-sm tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>${fmt(data.sixMonthAvg)}</p>
           </div>
         </div>
       </div>
-      <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+      <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
         {data.transactionCount} transactions · {data.accountCount} accounts · 6 months history
       </p>
     </div>

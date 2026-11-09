@@ -79,7 +79,7 @@ export function BudgetAmountInput({ rowKey, name, cents, step, dispatch }: Amoun
         <Icon name="plus" size={12} strokeWidth={2.4} />
       </button>
       {error && (
-        <p id={errId} role="alert" className="absolute left-0 top-full mt-1 z-10 text-[10.5px] font-semibold px-2 py-1 rounded-md whitespace-nowrap"
+        <p id={errId} role="alert" className="absolute left-0 top-full mt-1 z-10 text-fine font-semibold px-2 py-1 rounded-md whitespace-nowrap"
           style={{ background: 'var(--popover-bg, var(--color-elevated))', color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 40%, transparent)' }}>
           {error}
         </p>
@@ -105,7 +105,7 @@ export function BudgetSlider({ rowKey, name, cents, originalCents, spentCents, m
   return (
     <div className="relative w-full">
       {dragging && (
-        <span className="absolute -top-6 -translate-x-1/2 px-1.5 py-0.5 rounded-md text-[10.5px] font-bold tabular-nums pointer-events-none whitespace-nowrap z-10"
+        <span className="absolute -top-6 -translate-x-1/2 px-1.5 py-0.5 rounded-md text-fine font-bold tabular-nums pointer-events-none whitespace-nowrap z-10"
           style={{ left: `${pct}%`, background: 'var(--color-text-primary)', color: 'var(--color-base)' }}>
           {formatMoney(cents)}
         </span>
@@ -131,7 +131,7 @@ export function BudgetSlider({ rowKey, name, cents, originalCents, spentCents, m
         onPointerCancel={() => setDragging(false)}
         onBlur={() => setDragging(false)} />
       {beyond && (
-        <span className="absolute right-0 -bottom-3 text-[9.5px] font-semibold" style={{ color: 'var(--color-violet)' }}>
+        <span className="absolute right-0 -bottom-3 text-fine font-semibold" style={{ color: 'var(--color-violet)' }}>
           above slider range
         </span>
       )}
@@ -145,7 +145,7 @@ export function BudgetUsageIndicator({ usagePct, status }: { usagePct: number | 
   const color = statusColor(status);
   if (usagePct == null) {
     return status === 'unbudgeted'
-      ? <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full" style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}>Unbudgeted</span>
+      ? <span className="text-fine font-bold px-2 py-0.5 rounded-full" style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)` }}>Unbudgeted</span>
       : <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>—</span>;
   }
   return (
@@ -154,7 +154,7 @@ export function BudgetUsageIndicator({ usagePct, status }: { usagePct: number | 
         role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(usagePct)} aria-label="Budget used">
         <div className="h-full rounded-full transition-[width] duration-200" style={{ width: `${Math.min(100, usagePct)}%`, background: color }} />
       </div>
-      <span className="text-[11.5px] font-bold tabular-nums shrink-0 w-11 text-right" style={{ color }}>
+      <span className="text-fine font-bold tabular-nums shrink-0 w-11 text-right" style={{ color }}>
         {usagePct >= 1000 ? '999+' : Math.round(usagePct)}%
       </span>
     </div>
@@ -165,7 +165,7 @@ export function BudgetUsageIndicator({ usagePct, status }: { usagePct: number | 
 
 export function TrendSparkline({ values, labels }: { values: Cents[]; labels: string[] }) {
   if (values.length < 2 || values.every((v) => v === 0)) {
-    return <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>No history</span>;
+    return <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>No history</span>;
   }
   const W = 64, H = 22;
   const max = Math.max(...values), min = Math.min(...values);

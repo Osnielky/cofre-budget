@@ -183,7 +183,7 @@ export default function BudgetFormModal({ request, month, categories, projects, 
                     {/* Project picker — income targets only, shown FIRST */}
                     {formKind === 'income' && (
                       <div className="flex flex-col gap-1.5">
-                        <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                        <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                           Project <span style={{ color: 'var(--color-text-muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span>
                         </span>
                         <div style={{ position: 'relative' }}>
@@ -248,7 +248,7 @@ export default function BudgetFormModal({ request, month, categories, projects, 
                       const activeCatId = isProjectCatMode ? form.projectCategoryId : form.categoryId;
                       return (
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Category</span>
+                      <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Category</span>
                       <div style={{ position: 'relative' }}>
                         <button type="button" disabled={!!editingId} onClick={() => setCatDropOpen(o => !o)}
                           className="w-full px-3 py-2.5 text-sm flex items-center gap-2.5 rounded-xl outline-none text-left disabled:opacity-60"
@@ -294,7 +294,7 @@ export default function BudgetFormModal({ request, month, categories, projects, 
 
                     {/* Amount */}
                     <div className="flex flex-col gap-3">
-                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                      <span className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                         {isIncome ? 'Expected Income' : 'Monthly Limit'}
                       </span>
                       <div className="flex rounded-xl overflow-hidden" style={{ border: `1px solid ${amt > 0 ? accentHex + '55' : 'var(--color-border)'}` }}>
@@ -336,7 +336,7 @@ export default function BudgetFormModal({ request, month, categories, projects, 
                             ['--slider-accent' as string]: accentHex,
                             ['--slider-pct' as string]: `${sMax > 0 ? (Math.min(amt, sMax) / sMax) * 100 : 0}%`,
                           }} />
-                        <div className="flex justify-between text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                        <div className="flex justify-between text-fine" style={{ color: 'var(--color-text-muted)' }}>
                           <span>$0</span><span>${(sMax / 2).toLocaleString()}</span><span>${sMax.toLocaleString()}</span>
                         </div>
                       </div>
@@ -355,7 +355,7 @@ export default function BudgetFormModal({ request, month, categories, projects, 
                                 color: on ? accentHex : 'var(--color-text-muted)',
                               }}>
                               ${q.toLocaleString()}
-                              {isRec && <span className="block text-[10px] font-medium opacity-80">Recommended</span>}
+                              {isRec && <span className="block text-fine font-medium opacity-80">Recommended</span>}
                             </button>
                           );
                         })}
@@ -367,15 +367,15 @@ export default function BudgetFormModal({ request, month, categories, projects, 
                       <div className="flex flex-wrap gap-2 rounded-xl px-3 py-3"
                         style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Daily allowance</p>
+                          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Daily allowance</p>
                           <p className="text-sm font-bold tabular-nums">${fmt(perDay)}</p>
                         </div>
                         <div className="flex-1 min-w-0" style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: 12 }}>
-                          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Weekly allowance</p>
+                          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Weekly allowance</p>
                           <p className="text-sm font-bold tabular-nums">${fmt(perDay * 7)}</p>
                         </div>
                         <div className="flex-1 min-w-0" style={{ borderLeft: '1px solid var(--color-border)', paddingLeft: 12 }}>
-                          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>vs. last month</p>
+                          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>vs. last month</p>
                           <p className="text-sm font-bold tabular-nums"
                             style={{ color: vsLast === null ? 'var(--color-text-muted)' : vsLast >= 0 ? 'var(--color-amber)' : 'var(--color-green)' }}>
                             {vsLast === null ? '—' : `${vsLast >= 0 ? '+' : '−'}$${fmt(vsLast)}`}
@@ -390,7 +390,7 @@ export default function BudgetFormModal({ request, month, categories, projects, 
                       <span className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: `${accentHex}18` }}>🔔</span>
                       <div className="flex-1 basis-40 min-w-0">
                         <p className="text-sm font-semibold leading-tight">Notify me when I reach {form.notifyThreshold}%</p>
-                        <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Get a heads up before you hit your limit.</p>
+                        <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Get a heads up before you hit your limit.</p>
                       </div>
                       <div className="flex items-center gap-2 ml-auto shrink-0">
                         <select value={form.notifyThreshold} disabled={!form.notifyEnabled}
@@ -418,7 +418,7 @@ export default function BudgetFormModal({ request, month, categories, projects, 
                         <span className="w-9 h-9 rounded-xl flex items-center justify-center text-base shrink-0" style={{ background: 'var(--color-surface)' }}>⚙️</span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold leading-tight">More options</p>
-                          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Rollover unused funds, set as recurring, and more</p>
+                          <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Rollover unused funds, set as recurring, and more</p>
                         </div>
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="shrink-0"
                           style={{ opacity: 0.5, transform: moreOpen ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }}>
@@ -434,7 +434,7 @@ export default function BudgetFormModal({ request, month, categories, projects, 
                             <label key={opt.key} className="flex items-center gap-3 px-3 py-2.5 cursor-pointer">
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium leading-tight">{opt.label}</p>
-                                <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{opt.hint}</p>
+                                <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{opt.hint}</p>
                               </div>
                               <button type="button" role="switch" aria-checked={form[opt.key]} aria-label={opt.label}
                                 onClick={() => setForm(f => ({ ...f, [opt.key]: !f[opt.key] }))}

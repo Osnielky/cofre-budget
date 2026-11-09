@@ -47,7 +47,7 @@ export default function StatsRow({ netPosition, owedToYou, owedToYouCount, youOw
             <span className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>{c.label}</span>
           </div>
           <span className="text-xl font-extrabold leading-none tabular-nums">{c.value}</span>
-          <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>
+          <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{c.sub}</span>
         </div>
       ))}
     </div>

@@ -108,10 +108,10 @@ export default function CategoryBudgetEditor(props: Props) {
             className="flex-1 min-w-0 bg-transparent outline-none text-xs" style={{ color: 'var(--color-text-primary)' }} />
         </label>
         <Segmented ariaLabel="Filter categories" value={filter} options={filters} onChange={setFilter} size="xs" />
-        <label className="flex items-center gap-1.5 text-[11px] ml-auto" style={{ color: 'var(--color-text-muted)' }}>
+        <label className="flex items-center gap-1.5 text-fine ml-auto" style={{ color: 'var(--color-text-muted)' }}>
           Sort
           <select value={sort} onChange={(e) => setSort(e.target.value as RowSort)} aria-label="Sort categories"
-            className="px-2 py-1.5 rounded-lg text-[11px] font-semibold outline-none cursor-pointer"
+            className="px-2 py-1.5 rounded-lg text-fine font-semibold outline-none cursor-pointer"
             style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
             {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
@@ -120,7 +120,7 @@ export default function CategoryBudgetEditor(props: Props) {
 
       {stale && visible.length > 0 && (
         <button type="button" onClick={() => setSnapshotTick((t) => t + 1)}
-          className="self-start flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-lg cursor-pointer"
+          className="self-start flex items-center gap-1.5 text-fine font-semibold px-2.5 py-1 rounded-lg cursor-pointer"
           style={{ color: 'var(--color-primary)', background: 'color-mix(in srgb, var(--color-primary) 10%, transparent)' }}>
           <Icon name="reset" size={12} /> Statuses changed — re-apply filter &amp; sort
         </button>
@@ -135,7 +135,7 @@ export default function CategoryBudgetEditor(props: Props) {
       ) : (
         <div className="budget-list flex flex-col">
           {/* Column headers (table layout only) */}
-          <div className="budget-grid budget-grid-head text-[10px] font-bold uppercase tracking-wider"
+          <div className="budget-grid budget-grid-head text-fine font-bold uppercase tracking-wider"
             style={{ color: 'var(--color-text-muted)', borderBottom: '1px solid var(--color-border)' }}>
             <div className="a-cat flex items-center gap-2.5">
               <input type="checkbox" checked={allSelected} aria-label="Select all visible categories"

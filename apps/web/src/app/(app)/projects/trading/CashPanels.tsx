@@ -20,9 +20,9 @@ export function CashTiles({ cash, platformPnl, hasTrades }: { cash: CashSummary;
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" data-testid="cash-tiles">
       {tiles.map((k) => (
         <div key={k.label} className="p-3 min-w-0" style={panel}>
-          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{k.label}</p>
+          <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{k.label}</p>
           <p className="font-bold text-base mt-1 truncate" style={{ color: k.clr }}>{k.value}</p>
-          <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>{k.sub}</p>
+          <p className="text-fine mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>{k.sub}</p>
         </div>
       ))}
     </div>
@@ -43,8 +43,8 @@ export function CashRows({ projectId, cash, onChanged }: { projectId: string; ca
   return (
     <div className="p-3 sm:p-4 min-w-0" style={panel} data-testid="cash-rows">
       <div className="flex items-baseline justify-between gap-3 mb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Money in & out</p>
-        <p className="text-[10px] hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>What you paid and what you received for this account</p>
+        <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Money in & out</p>
+        <p className="text-fine hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>What you paid and what you received for this account</p>
       </div>
       {error && <p className="text-xs mb-2" style={{ color: 'var(--color-rose)' }}>{error}</p>}
       {cash.rows.length === 0 ? (
@@ -55,14 +55,14 @@ export function CashRows({ projectId, cash, onChanged }: { projectId: string; ca
             const out = r.amount > 0;
             return (
               <li key={r.id} className="flex items-center gap-3 py-2 text-xs group">
-                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-bold shrink-0"
+                <span className="w-6 h-6 rounded-lg flex items-center justify-center text-fine font-bold shrink-0"
                   style={{ background: `color-mix(in srgb, ${out ? 'var(--color-green)' : 'var(--color-rose)'} 16%, transparent)`, color: out ? 'var(--color-green)' : 'var(--color-rose)' }}>{out ? '↓' : '↑'}</span>
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{r.name}</p>
-                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{dateLabel(r.date)}{r.category ? ` · ${r.category.icon} ${r.category.name}` : ''}</p>
+                  <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{dateLabel(r.date)}{r.category ? ` · ${r.category.icon} ${r.category.name}` : ''}</p>
                 </div>
                 <span className="font-bold tabular-nums shrink-0" style={{ color: out ? 'var(--color-green)' : 'var(--color-rose)' }}>{out ? '+' : '-'}{money(Math.abs(r.amount))}</span>
-                <button type="button" onClick={() => unassign(r.id)} className="text-[10px] font-semibold sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100" style={{ color: 'var(--color-text-muted)' }}>Unassign</button>
+                <button type="button" onClick={() => unassign(r.id)} className="text-fine font-semibold sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100" style={{ color: 'var(--color-text-muted)' }}>Unassign</button>
               </li>
             );
           })}

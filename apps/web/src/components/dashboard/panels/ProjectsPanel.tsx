@@ -39,23 +39,23 @@ export default function ProjectsPanel({ projects, loading }: { projects: Project
                   <span className="text-xl">{p.icon}</span>
                   <div className="min-w-0">
                     <p className="text-xs font-bold truncate">{p.name}</p>
-                    <p className="text-[10px] capitalize" style={{ color: 'var(--color-text-muted)' }}>{p.type}</p>
+                    <p className="text-fine capitalize" style={{ color: 'var(--color-text-muted)' }}>{p.type}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-center">
                   <div className="rounded-lg py-1.5" style={{ background: 'var(--color-elevated)' }}>
-                    <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Invested</p>
+                    <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Invested</p>
                     <p className="text-xs font-bold mt-0.5" style={{ color: c }}>${fmt(Number(p.costBasis))}</p>
                   </div>
                   <div className="rounded-lg py-1.5" style={{ background: 'var(--color-elevated)' }}>
-                    <p className="text-[9px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>P&L</p>
+                    <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>P&L</p>
                     <p className="text-xs font-bold mt-0.5" style={{ color: gain != null ? (gain >= 0 ? 'var(--color-green)' : 'var(--color-rose)') : 'var(--color-text-muted)' }}>
                       {gain != null ? `${gain >= 0 ? '+' : '−'}$${Math.abs(gain).toFixed(0)}` : '—'}
                     </p>
                   </div>
                 </div>
                 {roi != null && (
-                  <div className="flex items-center justify-between text-[10px]">
+                  <div className="flex items-center justify-between text-fine">
                     <span style={{ color: 'var(--color-text-muted)' }}>ROI</span>
                     <span className="font-bold" style={{ color: roi >= 0 ? 'var(--color-green)' : 'var(--color-rose)' }}>
                       {roi >= 0 ? '+' : ''}{roi.toFixed(1)}%

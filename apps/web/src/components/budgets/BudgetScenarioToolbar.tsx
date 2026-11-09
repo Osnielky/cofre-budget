@@ -22,11 +22,11 @@ export function BudgetScenarioToolbar({ plan, saving, onSave, onDiscard }: {
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--color-violet)' }} />
           <span className="text-xs font-bold">Draft scenario</span>
-          <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+          <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
             {plan.modifiedCount} categor{plan.modifiedCount === 1 ? 'y' : 'ies'} changed
           </span>
         </div>
-        <div className="flex items-center gap-4 text-[11px]">
+        <div className="flex items-center gap-4 text-fine">
           <span style={{ color: 'var(--color-text-muted)' }}>Budget <strong className="tabular-nums" style={{ color: diff > 0 ? 'var(--color-rose)' : diff < 0 ? 'var(--color-green)' : 'var(--color-text-primary)' }}>{formatMoney(diff, { sign: true })}</strong></span>
           <span style={{ color: 'var(--color-text-muted)' }}>Savings <strong className="tabular-nums" style={{ color: impact > 0 ? 'var(--color-green)' : impact < 0 ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>{formatMoney(impact, { sign: true })}</strong></span>
         </div>

@@ -85,7 +85,7 @@ export default function PlanChangeModal({ target, overview, onClose, onDone }: {
 
         <div className="px-5 sm:px-6 py-4 flex items-start justify-between gap-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-primary)' }}>Plan change</p>
+            <p className="text-fine font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-primary)' }}>Plan change</p>
             <h2 id="plan-change-title" className="text-lg font-bold leading-tight" style={{ color: 'var(--color-text-primary)' }}>
               {done ? (done.kind === 'upgrade' ? `You're on ${planLabel(target)}` : 'Switch scheduled') : copy?.title ?? `Switch to ${planLabel(target)}`}
             </h2>
@@ -153,7 +153,7 @@ export default function PlanChangeModal({ target, overview, onClose, onDone }: {
                 <span className="shrink-0 mt-px"><Icon name="card" size={14} /></span>{copy.payment.text}
               </p>
 
-              <p className="text-[11px] leading-snug" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine leading-snug" style={{ color: 'var(--color-text-muted)' }}>
                 {copy.policy} By confirming you agree to our <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: 'var(--color-text-secondary)' }}>Terms</a>.
                 We&rsquo;ll email you a confirmation.
               </p>
@@ -187,7 +187,7 @@ export default function PlanChangeModal({ target, overview, onClose, onDone }: {
 function PlanTile({ label, plan, currency, muted }: { label: string; plan: PlanChangePreview['from']; currency: string; muted?: boolean }) {
   return (
     <div className="rounded-xl p-3" style={{ background: 'var(--color-surface)', border: `1px solid ${muted ? 'var(--color-border)' : 'var(--color-primary)'}`, opacity: muted ? 0.8 : 1 }}>
-      <p className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
+      <p className="text-fine font-bold uppercase tracking-wide" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
       <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--color-text-primary)' }}>{planLabel(plan)}</p>
       <p className="text-xs tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>{fmtMoney(plan.amount, currency)} / {plan.interval}</p>
     </div>

@@ -45,7 +45,7 @@ function LinePill({ viewBox, text, color, below }: { viewBox?: { x: number; y: n
   return (
     <g>
       <rect x={x} y={y} width={w} height={18} rx={9} fill={`color-mix(in srgb, ${color} 22%, var(--color-elevated))`} stroke={color} strokeOpacity={0.5} />
-      <text x={x + w / 2} y={y + 12.5} textAnchor="middle" fontSize={10.5} fontWeight={700} fill={color}>{text}</text>
+      <text x={x + w / 2} y={y + 12.5} textAnchor="middle" fontSize={11} fontWeight={700} fill={color}>{text}</text>
     </g>
   );
 }
@@ -141,7 +141,7 @@ export default function CategoryTrendPanel({ kind, groups, selectedId, onSelect,
       <Chip color={accent} size={34}><span className="text-base leading-none">{selected?.icon ?? '📊'}</span></Chip>
       <span>{income ? 'Income Trend' : 'Expense Trend'}</span>
       {project && (
-        <span className="text-[10.5px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+        <span className="text-fine font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
           style={{ color: project.color, background: `color-mix(in srgb, ${project.color} 14%, transparent)`, border: `1px solid color-mix(in srgb, ${project.color} 40%, transparent)` }}>
           Project
         </span>
@@ -170,7 +170,7 @@ export default function CategoryTrendPanel({ kind, groups, selectedId, onSelect,
             <line x1={x + 9} y1={y - 19} x2={x + 6} y2={y - 15} />
           </g>
         )}
-        <text x={x} y={y} textAnchor="middle" fontSize={11} fontWeight={700} fill={color}>{whole(m.value)}</text>
+        <text x={x} y={y} textAnchor="middle" className="text-fine" fontWeight={700} fill={color}>{whole(m.value)}</text>
       </g>
     );
   };
@@ -214,9 +214,9 @@ export default function CategoryTrendPanel({ kind, groups, selectedId, onSelect,
                 style={{ border: `1px solid color-mix(in srgb, ${s.color} 28%, transparent)`, background: `color-mix(in srgb, ${s.color} 6%, transparent)` }}>
                 <span className="hidden @3xl:inline-flex"><Chip color={s.color} d={s.icon} size={32} /></span>
                 <div className="min-w-0">
-                  <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-secondary)' }}>{s.label}</p>
+                  <p className="text-fine truncate" style={{ color: 'var(--color-text-secondary)' }}>{s.label}</p>
                   <p className="text-[14px] font-bold tabular-nums truncate" style={{ color: 'var(--color-text-primary)' }}>{s.value}</p>
-                  <p className="text-[10px] font-semibold truncate" style={{ color: s.subColor ?? 'var(--color-text-muted)' }}>{s.sub}</p>
+                  <p className="text-fine font-semibold truncate" style={{ color: s.subColor ?? 'var(--color-text-muted)' }}>{s.sub}</p>
                 </div>
               </div>
             ))}
@@ -254,7 +254,7 @@ export default function CategoryTrendPanel({ kind, groups, selectedId, onSelect,
             </ResponsiveContainer>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1 sm:gap-y-1.5 text-[10.5px] sm:text-[11px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
+          <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1 sm:gap-y-1.5 text-fine font-semibold" style={{ color: 'var(--color-text-secondary)' }}>
             {legend.map((l) => (
               <span key={l.key} className="inline-flex items-center gap-1.5">{l.swatch}{l.text}</span>
             ))}

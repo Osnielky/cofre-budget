@@ -801,9 +801,9 @@ function SettingsPageInner() {
                     },
                   ].map((t) => (
                     <div key={t.label} className="px-4 py-3 rounded-2xl min-w-0" style={{ ...glass, borderRadius: 'var(--radius-card)' }}>
-                      <p className="text-[10.5px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-text-muted)' }}>{t.label}</p>
+                      <p className="text-fine font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-text-muted)' }}>{t.label}</p>
                       <p className="mt-1 text-lg sm:text-xl font-black tabular-nums truncate" style={{ color: t.color }}>{t.value}</p>
-                      <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>{t.sub}</p>
+                      <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{t.sub}</p>
                     </div>
                   ))}
                 </div>
@@ -856,7 +856,7 @@ function SettingsPageInner() {
                       {/* Row 1: Account Type + Currency */}
                       <div className="flex gap-3">
                         <div className="flex flex-col gap-1.5 flex-1 min-w-0" ref={typeDropdownRef} style={{ position: 'relative' }}>
-                          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</label>
+                          <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</label>
                           <button type="button" onClick={() => setTypeOpen((o) => !o)}
                             className="px-3 py-2.5 text-sm outline-none w-full flex items-center justify-between gap-2 rounded-xl"
                             style={inputStyle}>
@@ -878,7 +878,7 @@ function SettingsPageInner() {
                             }}>
                               {ACCOUNT_GROUPS.map((grp) => (
                                 <div key={grp.group}>
-                                  <p className="px-3 pt-2.5 pb-1 text-[10px] font-bold uppercase tracking-widest"
+                                  <p className="px-3 pt-2.5 pb-1 text-fine font-bold uppercase tracking-widest"
                                     style={{ color: 'var(--color-text-muted)' }}>{grp.label}</p>
                                   {grp.types.map((meta) => {
                                     const val = meta.value;
@@ -899,7 +899,7 @@ function SettingsPageInner() {
                           )}
                         </div>
                         <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 90 }}>
-                          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Currency</label>
+                          <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Currency</label>
                           <select value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}
                             className="px-3 py-2.5 text-sm outline-none appearance-none w-full rounded-xl" style={inputStyle}>
                             {['USD', 'EUR', 'GBP', 'BRL', 'CUP', 'MXN', 'CAD'].map((c) => (
@@ -912,7 +912,7 @@ function SettingsPageInner() {
                       {/* Bank — hidden for cash */}
                       {form.accountType !== 'cash' && (
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                        <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                           {form.accountType === 'loan' ? 'Institution or Person' : 'Bank'}
                         </label>
                         {form.accountType === 'loan' ? (
@@ -931,7 +931,7 @@ function SettingsPageInner() {
                       {/* Account Name + Last 4 */}
                       <div className="flex gap-3">
                         <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-                          <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                          <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                             {form.accountType === 'loan' ? 'Description' : 'Account Name'}
                           </label>
                           <input required
@@ -942,14 +942,14 @@ function SettingsPageInner() {
                         </div>
                         {form.accountType !== 'cash' && (
                         <div className="flex flex-col gap-1.5 shrink-0" style={{ width: 84 }}>
-                          <label className="text-[11px] font-semibold uppercase tracking-wider flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                          <label className="text-fine font-semibold uppercase tracking-wider flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                             Last 4
                             <span className="relative group" style={{ lineHeight: 0 }}>
                               <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style={{ cursor: 'pointer', color: 'var(--color-text-muted)', opacity: 0.6 }}>
                                 <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
                                 <path d="M8 7v5M8 5.5v.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                               </svg>
-                              <span className="absolute bottom-full right-0 mb-2 w-48 text-[11px] leading-relaxed font-normal normal-case tracking-normal rounded-lg px-3 py-2.5 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
+                              <span className="absolute bottom-full right-0 mb-2 w-48 text-fine leading-relaxed font-normal normal-case tracking-normal rounded-lg px-3 py-2.5 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50"
                                 style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)', color: 'var(--color-text-secondary)', boxShadow: 'var(--glass-shadow)', whiteSpace: 'normal' }}>
                                 Last 4 digits of your card or account number. Used to detect if a CSV file belongs to this account on import.
                                 <span className="absolute top-full right-2 -mt-px" style={{ width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--color-border)' }} />
@@ -965,7 +965,7 @@ function SettingsPageInner() {
 
                       {/* Balance */}
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                        <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                           {form.accountType === 'loan' ? 'Amount Owed' : isLiability(form.accountType) ? 'Current Debt' : 'Balance'}
                         </label>
                         <div className="flex rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
@@ -986,7 +986,7 @@ function SettingsPageInner() {
                         if (bankCards.length > 0) {
                           return (
                             <div className="flex flex-col gap-2">
-                              <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                              <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                                 Card Design
                               </label>
                               <div className="grid grid-cols-5 gap-2.5 p-3 rounded-xl" style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
@@ -1013,7 +1013,7 @@ function SettingsPageInner() {
                                         <div className="absolute" style={{ top: 7, left: 8, width: 20, height: 14, borderRadius: 3, background: 'linear-gradient(135deg,#D4AF37 0%,#F5E06B 50%,#D4AF37 100%)' }} />
                                         {/* Brand mark */}
                                         {design.brand === 'VISA' && (
-                                          <span className="absolute font-black italic" style={{ bottom: 4, right: 5, fontSize: 8, color: 'var(--color-text-primary)', letterSpacing: 0.5 }}>VISA</span>
+                                          <span aria-hidden="true" className="absolute font-black italic" style={{ bottom: 4, right: 5, fontSize: 8, color: 'var(--color-text-primary)', letterSpacing: 0.5 }}>VISA</span>
                                         )}
                                         {design.brand === 'MC' && (
                                           <div className="absolute flex" style={{ bottom: 4, right: 5 }}>
@@ -1022,13 +1022,13 @@ function SettingsPageInner() {
                                           </div>
                                         )}
                                         {design.brand === 'AMEX' && (
-                                          <span className="absolute font-black" style={{ bottom: 4, right: 5, fontSize: 7, color: 'var(--color-text-primary)' }}>AMEX</span>
+                                          <span aria-hidden="true" className="absolute font-black" style={{ bottom: 4, right: 5, fontSize: 7, color: 'var(--color-text-primary)' }}>AMEX</span>
                                         )}
                                         {/* Shimmer */}
                                         <div className="absolute inset-0" style={{ background: 'linear-gradient(135deg,rgba(255,255,255,0.25) 0%,transparent 50%)', pointerEvents: 'none' }} />
                                       </div>
                                       {/* Card name */}
-                                      <p className="text-center leading-tight" style={{ fontSize: 9, width: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: sel ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                                      <p className="text-center leading-tight text-fine" style={{ width: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: sel ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                                         {design.name}
                                       </p>
                                     </button>
@@ -1040,7 +1040,7 @@ function SettingsPageInner() {
                         }
                         return (
                           <div className="flex flex-col gap-1.5">
-                            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</label>
+                            <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</label>
                             <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ ...inputStyle }}>
                               {PRESET_COLORS.map((c) => (
                                 <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
@@ -1104,14 +1104,14 @@ function SettingsPageInner() {
                           <AccountVisual account={first} color={color} compact />
                           <div className="flex-1 min-w-0">
                             <p className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{bankName}</p>
-                            <p className="text-[10.5px] font-semibold flex items-center gap-1.5" style={{ color: statusColor }}>
+                            <p className="text-fine font-semibold flex items-center gap-1.5" style={{ color: statusColor }}>
                               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'currentColor' }} />
                               {list.length} account{list.length === 1 ? '' : 's'} · {broken ? 'Needs reconnect' : connected.length ? 'Synced' : 'Manual'}
                             </p>
                           </div>
                           {broken ? (
                             <button onClick={() => openReconnect(broken)} disabled={connecting}
-                              className="px-2.5 h-8 rounded-lg text-[11px] font-semibold disabled:opacity-40"
+                              className="px-2.5 h-8 rounded-lg text-fine font-semibold disabled:opacity-40"
                               style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>
                               Reconnect
                             </button>
@@ -1151,13 +1151,13 @@ function SettingsPageInner() {
                                 <span className="w-1 h-8 rounded-full shrink-0" style={{ background: meta.accent }} />
                                 <div className="flex-1 min-w-0">
                                   <p className="font-semibold text-[13px] truncate" style={{ color: 'var(--color-text-primary)' }}>{account.accountName}</p>
-                                  <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                                  <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
                                     {meta.label}{account.last4 ? ` ···${account.last4}` : ''}{account.currency !== 'USD' ? ` · ${account.currency}` : ''}
                                     {isConnected && account.plaidStatus === 'error' && <span style={{ color: 'var(--color-rose)' }}> · Needs reconnect</span>}
                                     {!isConnected && !isCash && connected.length > 0 && ' · Manual'}
                                   </p>
                                   {unsetCash && (
-                                    <p className="text-[10.5px] font-semibold mt-0.5" style={{ color: 'var(--color-amber)' }}>Set how much cash you have → tap, then Edit</p>
+                                    <p className="text-fine font-semibold mt-0.5" style={{ color: 'var(--color-amber)' }}>Set how much cash you have → tap, then Edit</p>
                                   )}
                                   <InvestmentsHint account={account} connecting={connecting} onEnable={() => openInvestments(account)} compact />
                                 </div>
@@ -1165,7 +1165,7 @@ function SettingsPageInner() {
                                   <p className="font-black text-sm tabular-nums" style={{ color: owed ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>
                                     {owed ? '−' : ''}{account.currency === 'USD' ? '$' : `${account.currency} `}{Math.abs(balance).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                   </p>
-                                  {owed && <p className="text-[10px] font-semibold" style={{ color: 'color-mix(in srgb, var(--color-rose) 60%, transparent)' }}>owed</p>}
+                                  {owed && <p className="text-fine font-semibold" style={{ color: 'color-mix(in srgb, var(--color-rose) 60%, transparent)' }}>owed</p>}
                                 </div>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
                                   className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} style={{ color: 'var(--color-text-muted)' }}>
@@ -1220,20 +1220,20 @@ function SettingsPageInner() {
                           <AccountVisual account={first} color={color} compact />
                           <div className="flex-1 min-w-0">
                             <p className="font-bold text-sm truncate" style={{ color: 'var(--color-text-primary)' }}>{bankName}</p>
-                            <p className="text-[11px] font-semibold flex items-center gap-1.5" style={{ color: status.color }}>
+                            <p className="text-fine font-semibold flex items-center gap-1.5" style={{ color: status.color }}>
                               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'currentColor' }} />
                               {list.length} account{list.length === 1 ? '' : 's'} · {status.label}
                             </p>
                           </div>
                           {allUsd && list.length > 1 && (
                             <div className="text-right shrink-0 pr-1">
-                              <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-text-muted)' }}>Net</p>
+                              <p className="text-fine font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--color-text-muted)' }}>Net</p>
                               <p className="font-black text-sm tabular-nums" style={{ color: groupNet < 0 ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>{money(groupNet)}</p>
                             </div>
                           )}
                           {broken ? (
                             <button onClick={() => openReconnect(broken)} disabled={connecting}
-                              className="px-3 h-8 rounded-lg text-[11px] font-semibold disabled:opacity-40 transition-colors hover:brightness-110"
+                              className="px-3 h-8 rounded-lg text-fine font-semibold disabled:opacity-40 transition-colors hover:brightness-110"
                               style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)', background: 'color-mix(in srgb, var(--color-rose) 10%, transparent)' }}>
                               Reconnect
                             </button>
@@ -1273,7 +1273,7 @@ function SettingsPageInner() {
                                 <span className="w-1 h-9 rounded-full shrink-0" style={{ background: meta.accent }} />
                                 <div className="flex-1 min-w-0">
                                   <p className="font-semibold text-[13px] truncate" style={{ color: 'var(--color-text-primary)' }}>{account.accountName}</p>
-                                  <p className="text-[11px] truncate flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+                                  <p className="text-fine truncate flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
                                     <span className="font-bold" style={{ color: meta.accent }}>{meta.label}</span>
                                     {account.last4 && <span className="tabular-nums">···{account.last4}</span>}
                                     {account.currency !== 'USD' && <span>· {account.currency}</span>}
@@ -1282,7 +1282,7 @@ function SettingsPageInner() {
                                   </p>
                                   {unsetCash && (
                                     <button type="button" onClick={() => openEdit(account)}
-                                      className="mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full cursor-pointer"
+                                      className="mt-1 text-fine font-semibold px-2 py-0.5 rounded-full cursor-pointer"
                                       style={{ background: 'color-mix(in srgb, var(--color-amber) 14%, transparent)', color: 'var(--color-amber)', border: '1px solid color-mix(in srgb, var(--color-amber) 35%, transparent)' }}>
                                       Set how much cash you have →
                                     </button>
@@ -1293,7 +1293,7 @@ function SettingsPageInner() {
                                   <p className="font-black text-[15px] tabular-nums" style={{ color: owed ? 'var(--color-rose)' : 'var(--color-text-primary)' }}>
                                     {owed ? '−' : ''}{money(Math.abs(balance), account.currency)}
                                   </p>
-                                  {owed && <p className="text-[10px] font-semibold leading-none" style={{ color: 'color-mix(in srgb, var(--color-rose) 60%, transparent)' }}>owed</p>}
+                                  {owed && <p className="text-fine font-semibold leading-none" style={{ color: 'color-mix(in srgb, var(--color-rose) 60%, transparent)' }}>owed</p>}
                                 </div>
                                 <div className="flex items-center gap-0.5 shrink-0 opacity-55 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                                   <button onClick={() => openEdit(account)} className={`${iconBtn} hover:bg-[var(--color-elevated)]`}
@@ -1306,7 +1306,7 @@ function SettingsPageInner() {
                                   </button>
                                   {isConnected && (account.plaidStatus === 'error' ? (
                                     <button onClick={() => openReconnect(account)} disabled={connecting}
-                                      className="px-2 h-7 rounded-lg text-[11px] font-semibold disabled:opacity-40" style={{ color: 'var(--color-rose)' }} title="Reconnect bank">
+                                      className="px-2 h-7 rounded-lg text-fine font-semibold disabled:opacity-40" style={{ color: 'var(--color-rose)' }} title="Reconnect bank">
                                       Reconnect
                                     </button>
                                   ) : (
@@ -1484,7 +1484,7 @@ function AccountVisual({ account, color, compact = false }: { account: BankAccou
         <AccountTypeIcon type={account.accountType} size={compact ? 18 : 22} />
       )}
       {!compact && account.last4 && (
-        <span className="text-[8px] font-bold tracking-widest leading-none mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
+        <span className="text-badge font-bold tracking-widest leading-none mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>
           ···{account.last4}
         </span>
       )}
@@ -1529,7 +1529,7 @@ function SyncIcon({ spinning }: { spinning: boolean }) {
 function InvestmentsHint({ account, connecting, onEnable, compact = false }: { account: BankAccount; connecting: boolean; onEnable: () => void; compact?: boolean }) {
   if (account.accountType !== 'investment' || account.provider !== 'plaid') return null;
   const status = account.investmentsStatus ?? null;
-  const size = compact ? 'text-[10.5px]' : 'text-[11px]';
+  const size = compact ? 'text-fine' : 'text-fine';
   if (status === 'not_consented') {
     return (
       <button type="button" onClick={(e) => { e.stopPropagation(); onEnable(); }} disabled={connecting}

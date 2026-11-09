@@ -33,7 +33,7 @@ export default function AdminStatTiles({ s }: { s: AdminStats }) {
         <div key={t.label} className="card-lift rounded-2xl p-5 min-w-0" style={glass}>
           <p className="text-xs truncate" style={{ color: 'var(--color-text-secondary)' }}>{t.label}</p>
           <p className="text-2xl font-bold tabular-nums mt-1 truncate">{t.value}</p>
-          <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>{t.sub}</p>
+          <p className="text-fine mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>{t.sub}</p>
         </div>
       ))}
     </div>

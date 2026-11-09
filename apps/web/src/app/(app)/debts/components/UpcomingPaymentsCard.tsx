@@ -13,7 +13,7 @@ function DatePill({ iso }: { iso: string }) {
   return (
     <div className="w-11 h-11 rounded-xl flex flex-col items-center justify-center shrink-0"
       style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-      <span className="text-[9px] font-bold uppercase leading-none" style={{ color: 'var(--color-text-muted)' }}>{month}</span>
+      <span className="text-fine font-bold uppercase leading-none" style={{ color: 'var(--color-text-muted)' }}>{month}</span>
       <span className="text-sm font-extrabold leading-tight">{d}</span>
     </div>
   );

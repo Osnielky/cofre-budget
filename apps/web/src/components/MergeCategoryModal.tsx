@@ -105,7 +105,7 @@ export default function MergeCategoryModal({ source, categories, onClose, onMerg
             <div className="flex flex-wrap gap-1.5 mt-0.5">
               {[target.name, source.name].filter((n, i, a) => a.indexOf(n) === i).map((n) => (
                 <button key={n} type="button" onClick={() => setName(n)}
-                  className="text-[11px] font-semibold px-2.5 py-1 rounded-full transition-colors"
+                  className="text-fine font-semibold px-2.5 py-1 rounded-full transition-colors"
                   style={name.trim() === n
                     ? { background: 'color-mix(in srgb, var(--color-primary) 18%, transparent)', color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 35%, transparent)' }
                     : { color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
@@ -113,7 +113,7 @@ export default function MergeCategoryModal({ source, categories, onClose, onMerg
                 </button>
               ))}
             </div>
-            <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-fine mt-1" style={{ color: 'var(--color-text-muted)' }}>
               Keeps {target.icon} and the colour of “{target.name}”. Budgets for the same month are added together; rules and recurring payments follow the merged category.
             </p>
           </div>

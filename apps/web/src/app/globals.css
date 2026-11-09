@@ -6,7 +6,23 @@
   --radius-input: 0.75rem;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --breakpoint-desk: 90rem; /* 1440px — budgets editor + side tools panel */
+  /* Small text. `text-fine` is the floor for anything a person must read:
+     11px on desktop, 12px on phones (overridden below `sm`). `text-badge` is
+     10px for decorative labels only — a value that is also shown in readable
+     text next to it, or hidden on phones (the PLAID / MANUAL source badge).
+     Arbitrary `text-[Npx]` below 11px is refused by lib/ui/text-floor.test.ts. */
+  --text-fine:  11px;
+  --text-badge: 10px;
 }
+/* Below `sm` (640px) the readable floor is 12px — a phone is held further from the eye. */
+@media (max-width: 39.9375rem) {
+  :root { --text-fine: 12px; }
+}
+
+/* Chart axis ticks read the same token (a CSS rule beats recharts' presentation attribute). */
+.recharts-cartesian-axis-tick-value,
+.recharts-polar-angle-axis-tick-value,
+.recharts-polar-radius-axis-tick-value { font-size: var(--text-fine); }
 
 /* ─────────────────────────────────────────────
    ROOT VARIABLES — Default theme: Cobalt

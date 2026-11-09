@@ -29,7 +29,7 @@ export default function AppearanceTab() {
   return (
     <section className="mx-auto w-full max-w-5xl flex flex-col gap-6 sm:gap-8 sm:py-4">
       <header className="text-center flex flex-col items-center gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--color-primary)' }}>
+        <span className="text-fine font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--color-primary)' }}>
           Appearance
         </span>
         <h2 className="text-xl sm:text-2xl font-bold leading-tight" style={{ color: 'var(--color-text-primary)' }}>
@@ -94,7 +94,7 @@ function ThemeCard({ theme: t, selected, onSelect, onKeyDown, buttonRef }: {
       <div className="flex-1 min-w-0 flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <p className="text-sm font-bold leading-tight truncate" style={{ color: 'var(--color-text-primary)' }}>{t.name}</p>
-          <span className="text-[10px] font-semibold px-1.5 py-px rounded-full shrink-0"
+          <span className="text-fine font-semibold px-1.5 py-px rounded-full shrink-0"
             style={{ background: 'color-mix(in srgb, var(--color-text-muted) 14%, transparent)', color: 'var(--color-text-muted)' }}>
             {t.dark ? 'Dark' : 'Light'}
           </span>

@@ -39,7 +39,7 @@ export default function CompareTable({ competitors }: { competitors: Competitor[
           </tbody>
         </table>
       </div>
-      <p className="px-3 pt-3 pb-1 text-[11px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+      <p className="px-3 pt-3 pb-1 text-fine leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
         Competitor prices are their public US prices, checked {pricesCheckedLabel()}:{' '}
         {competitors.map((c, i) => (
           <span key={c.slug}>

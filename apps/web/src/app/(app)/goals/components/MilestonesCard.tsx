@@ -36,7 +36,7 @@ export default function MilestonesCard({ netWorth, history }: Props) {
           const color = done ? 'var(--color-green)' : isNext ? 'var(--color-primary)' : 'var(--color-text-muted)';
           return (
             <li key={l.n} className="flex items-center gap-3 py-2 text-sm" style={{ borderBottom: l.n < LEVELS.length ? '1px solid var(--color-border)' : undefined }}>
-              <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0"
+              <span className="w-7 h-7 rounded-full flex items-center justify-center text-fine font-bold shrink-0"
                 style={{ border: `2px solid ${color}`, color, background: done ? 'color-mix(in srgb, var(--color-green) 16%, transparent)' : 'transparent' }}>
                 {done ? '✓' : l.n}
               </span>

@@ -24,13 +24,13 @@ export default function TargetsPanel({
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="text-base font-bold">Income targets</span>
-          <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold tabular-nums"
+          <span className="px-1.5 py-0.5 rounded-md text-fine font-bold tabular-nums"
             style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
             {targets.length}
           </span>
         </div>
         <button type="button" onClick={onAdd}
-          className="btn-gold px-2.5 py-1.5 text-[11px] font-semibold rounded-lg transition-all text-white flex items-center gap-1"
+          className="btn-gold px-2.5 py-1.5 text-fine font-semibold rounded-lg transition-all text-white flex items-center gap-1"
 >
           <span className="text-sm leading-none">+</span> Add
         </button>
@@ -41,7 +41,7 @@ export default function TargetsPanel({
           style={{ background: 'var(--color-elevated)', border: '1px dashed var(--color-border)' }}>
           <span className="text-xl">💵</span>
           <p className="text-xs font-semibold">No income targets yet</p>
-          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Forecast what each category should bring in.</p>
+          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Forecast what each category should bring in.</p>
         </div>
       ) : (
         <>
@@ -50,11 +50,11 @@ export default function TargetsPanel({
               <span className="tabular-nums font-extrabold leading-none" style={{ fontSize: 26 }}>${fmt(totalEarned)}</span>
               <span className="text-sm font-bold tabular-nums shrink-0" style={{ color: 'var(--color-green)' }}>{earnPct}%</span>
             </div>
-            <p className="text-[11px] -mt-0.5" style={{ color: 'var(--color-text-muted)' }}>of ${fmt(totalTarget)}</p>
+            <p className="text-fine -mt-0.5" style={{ color: 'var(--color-text-muted)' }}>of ${fmt(totalTarget)}</p>
             <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
               <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(earnPct, 100)}%`, background: 'var(--color-green)' }} />
             </div>
-            <p className="text-[10.5px]" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
               ${fmt(Math.max(totalTarget - totalEarned, 0))} remaining · expected before {lastDayLabel}
             </p>
           </div>
@@ -75,21 +75,21 @@ export default function TargetsPanel({
                       <span className="w-6 h-6 rounded-md flex items-center justify-center text-xs shrink-0" style={{ background: `${tColor}20` }}>{displayCat?.icon ?? '💼'}</span>
                       <span className="text-[12.5px] font-semibold truncate">{displayCat?.name ?? 'Unknown'}</span>
                       {reached && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                        <span className="text-fine font-bold px-1.5 py-0.5 rounded-full shrink-0"
                           style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>GOAL MET</span>
                       )}
                       {t.project && !reached && (
-                        <span className="text-[10px] truncate flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                        <span className="text-fine truncate flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                           {t.project.icon} {t.project.name}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-0.5 shrink-0">
                       <button type="button" onClick={() => onEdit(t)}
-                        className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-[var(--color-surface)] transition-colors text-[10px]"
+                        className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-[var(--color-surface)] transition-colors text-fine"
                         style={{ color: 'var(--color-text-muted)' }}>✏️</button>
                       <button type="button" onClick={() => onDelete(t.id)} disabled={deletingId === t.id}
-                        className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-red-500/20 transition-colors text-[10px] disabled:opacity-40"
+                        className="w-6 h-6 rounded-md flex items-center justify-center hover:bg-red-500/20 transition-colors text-fine disabled:opacity-40"
                         style={{ color: 'var(--color-text-muted)' }}>{deletingId === t.id ? '…' : '🗑️'}</button>
                     </div>
                   </div>
@@ -97,8 +97,8 @@ export default function TargetsPanel({
                     <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(pct, 100)}%`, background: reached ? 'var(--color-green)' : tColor }} />
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10.5px]" style={{ color: 'var(--color-text-muted)' }}>${fmt(earned)} of ${fmt(goal)} · {pct}%</span>
-                    {t.project && !reached ? null : <span className="text-[10.5px]" style={{ color: 'var(--color-text-muted)' }}>{reached ? `+$${fmt(earned - goal)}` : `$${fmt(goal - earned)} to go`}</span>}
+                    <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>${fmt(earned)} of ${fmt(goal)} · {pct}%</span>
+                    {t.project && !reached ? null : <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{reached ? `+$${fmt(earned - goal)}` : `$${fmt(goal - earned)} to go`}</span>}
                   </div>
                 </div>
               );

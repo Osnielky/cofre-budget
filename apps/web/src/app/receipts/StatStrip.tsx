@@ -50,7 +50,7 @@ export default function StatStrip({ receipts, loading }: Props) {
             <MiniIcon d={tile.icon} />
           </span>
           <div className="min-w-0">
-            <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-secondary)' }}>{tile.label}</p>
+            <p className="text-fine truncate" style={{ color: 'var(--color-text-secondary)' }}>{tile.label}</p>
             <p className="text-[14px] font-bold tabular-nums truncate">{loading ? '—' : tile.value}</p>
           </div>
         </div>

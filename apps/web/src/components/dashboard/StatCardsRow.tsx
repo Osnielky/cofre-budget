@@ -85,7 +85,7 @@ export default function StatCardsRow({ cards, loading }: { cards: StatCardDef[];
                 <StatIcon d={ICONS[c.icon]} />
               </span>
               {!hero && <span aria-hidden="true" className="sm:hidden w-1.5 h-1.5 rounded-full shrink-0" style={{ background: c.accent }} />}
-              <span className="text-[11px] sm:text-xs font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>
+              <span className="text-xs font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>
                 <span className="sm:hidden">{c.short ?? c.label}</span>
                 <span className="hidden sm:inline">{c.label}</span>
               </span>
@@ -93,7 +93,7 @@ export default function StatCardsRow({ cards, loading }: { cards: StatCardDef[];
             <p className={`${hero ? 'text-[26px]' : 'text-[17px]'} sm:text-[22px] leading-7 font-bold tabular-nums truncate`}>
               {loading ? <span className="skel inline-block h-5 sm:h-6 w-24 max-w-full rounded-md align-middle" /> : c.value}
             </p>
-            <p className="flex items-center gap-1.5 text-[11px] min-w-0">
+            <p className="flex items-center gap-1.5 text-fine min-w-0">
               {!loading && c.delta != null && Math.abs(c.delta) >= 0.5 && (
                 <span className="font-bold shrink-0" style={{ color: deltaTone }}>
                   {c.delta > 0 ? '↑' : '↓'} {Math.abs(c.delta).toFixed(1)}%

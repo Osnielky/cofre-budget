@@ -14,7 +14,7 @@ function LevelRing({ pct, level }: { pct: number; level: number }) {
       <circle cx="44" cy="44" r={r} fill="none" stroke="color-mix(in srgb, var(--color-text-muted) 30%, transparent)" strokeWidth="6" />
       <circle cx="44" cy="44" r={r} fill="none" stroke="var(--color-green)" strokeWidth="6" strokeLinecap="round"
         strokeDasharray={`${dash} ${c - dash}`} transform="rotate(-90 44 44)" />
-      <text x="44" y="40" textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--color-text-muted)" letterSpacing="0.08em">LEVEL</text>
+      <text x="44" y="40" textAnchor="middle" className="text-fine" fontWeight="700" fill="var(--color-text-muted)" letterSpacing="0.08em">LEVEL</text>
       <text x="44" y="60" textAnchor="middle" fontSize="22" fontWeight="800" fill="var(--color-text-primary)">{level}</text>
     </svg>
   );
@@ -32,7 +32,7 @@ export default function GoalsHero({ netWorth, monthNet }: Props) {
     <section className="goals-hero-art rounded-3xl overflow-hidden" style={{ border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
       <div className="p-5 sm:p-7 lg:p-8 grid lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-6 lg:gap-10 items-center">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--color-text-secondary)' }}>Net worth today</p>
+          <p className="text-fine font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--color-text-secondary)' }}>Net worth today</p>
           <p className="font-extrabold tabular-nums leading-none mt-2" style={{ fontSize: 'clamp(38px, 5.5vw, 60px)', letterSpacing: '-0.02em' }}>
             {money(netWorth)}
           </p>

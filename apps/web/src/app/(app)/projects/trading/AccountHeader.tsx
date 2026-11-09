@@ -58,16 +58,16 @@ export default function AccountHeader({ projectId, account, meta, onChanged, onR
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
           <h3 className="text-base font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>{accountTitle({ account })}</h3>
-          <div className="flex items-center gap-1.5 mt-1 flex-wrap text-[10px] font-bold">
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap text-fine font-bold">
             <span className="px-1.5 py-0.5 rounded-md" style={{ background: 'color-mix(in srgb, var(--color-card-sky) 16%, transparent)', color: 'var(--color-card-sky)' }}>{KIND_LABEL[meta.kind]}{connected ? ' · Connected' : ' · Not connected'}</span>
             <select value={meta.kind} disabled={busy} aria-label="Account kind" onChange={(e) => patch({ kind: e.target.value as TradingKind })}
-              className="text-[10px] font-semibold rounded-md px-1 py-0.5 cursor-pointer" style={inputStyle}>
+              className="text-fine font-semibold rounded-md px-1 py-0.5 cursor-pointer" style={inputStyle}>
               {KINDS.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
             </select>
             <label className="flex items-center gap-1">
               <span className="px-1.5 py-0.5 rounded-md" style={{ background: `color-mix(in srgb, ${TONE[statusTone(meta.status)]} 14%, transparent)`, color: TONE[statusTone(meta.status)] }}>{STATUS_LABEL[meta.status]}</span>
               <select value={meta.status} disabled={busy} aria-label="Account status" onChange={(e) => patch({ status: e.target.value as TradingStatus })}
-                className="text-[10px] font-semibold rounded-md px-1 py-0.5 cursor-pointer" style={inputStyle}>
+                className="text-fine font-semibold rounded-md px-1 py-0.5 cursor-pointer" style={inputStyle}>
                 {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
               </select>
             </label>
@@ -77,11 +77,11 @@ export default function AccountHeader({ projectId, account, meta, onChanged, onR
           {meta.notes && !editing && <p className="text-xs mt-1.5" style={{ color: 'var(--color-text-secondary)' }}>{meta.notes}</p>}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {connected && <a href="/settings?tab=banks" className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Sync in Settings</a>}
-          <button type="button" onClick={toggleEdit} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>{editing ? 'Cancel' : 'Edit'}</button>
+          {connected && <a href="/settings?tab=banks" className="text-fine font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>Sync in Settings</a>}
+          <button type="button" onClick={toggleEdit} className="text-fine font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>{editing ? 'Cancel' : 'Edit'}</button>
           {!confirmRemove
-            ? <button type="button" onClick={() => setConfirmRemove(true)} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>Remove from project</button>
-            : <button type="button" disabled={busy} onClick={remove} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>Confirm remove (the account stays in Settings)</button>}
+            ? <button type="button" onClick={() => setConfirmRemove(true)} className="text-fine font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>Remove from project</button>
+            : <button type="button" disabled={busy} onClick={remove} className="text-fine font-semibold px-2.5 py-1.5 rounded-lg" style={{ color: 'var(--color-rose)', border: '1px solid color-mix(in srgb, var(--color-rose) 35%, transparent)' }}>Confirm remove (the account stays in Settings)</button>}
         </div>
       </div>
       {editing && (

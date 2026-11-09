@@ -83,7 +83,7 @@ export function ThinkingBubble() {
         ))}
       </div>
       <AnimatePresence mode="wait" initial={false}>
-        <motion.p key={step} className="text-[11px] pl-1" style={{ color: 'var(--color-text-muted)' }}
+        <motion.p key={step} className="text-fine pl-1" style={{ color: 'var(--color-text-muted)' }}
           initial={reduce ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.22 }}>
           {THINKING_STEPS[step]}
         </motion.p>

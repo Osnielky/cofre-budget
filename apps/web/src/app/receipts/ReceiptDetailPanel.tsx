@@ -112,20 +112,20 @@ export default function ReceiptDetailPanel({
               {parsedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </p>
             <div className="flex items-center gap-2 flex-wrap mt-2">
-              <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium"
+              <span className="inline-flex items-center gap-1 text-fine px-2 py-0.5 rounded-full font-medium"
                 style={{ background: 'var(--color-elevated)', color: 'var(--color-text-secondary)' }}>
                 <SourceIcon source={receipt.source} size={10} />
                 {receipt.source === 'manual' ? 'Manual Upload' : 'From Gmail'}
               </span>
               {receipt.source === 'gmail' && receipt.gmailMessageId && (
                 <a href={`https://mail.google.com/mail/u/0/#inbox/${receipt.gmailMessageId}`} target="_blank" rel="noreferrer"
-                  className="text-[11px] font-medium hover:underline" style={{ color: 'var(--color-sky)' }}>
+                  className="text-fine font-medium hover:underline" style={{ color: 'var(--color-sky)' }}>
                   View email ↗
                 </a>
               )}
               {receipt.imageMimeType && (
                 <a href={imageUrl} target="_blank" rel="noreferrer"
-                  className="text-[11px] font-medium hover:underline" style={{ color: 'var(--color-sky)' }}>
+                  className="text-fine font-medium hover:underline" style={{ color: 'var(--color-sky)' }}>
                   {isPdf ? 'View PDF' : 'View receipt'} ↗
                 </a>
               )}
@@ -158,13 +158,13 @@ export default function ReceiptDetailPanel({
               <p className="text-xs font-medium" style={{ color: 'var(--color-sky)' }}>
                 {receipt.matchedTransaction.name} — {money(receipt.matchedTransaction.amount)}
               </p>
-              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{receipt.matchedTransaction.date}</p>
+              <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{receipt.matchedTransaction.date}</p>
             </div>
           </FieldRow>
         </div>
       )}
 
-      <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>Line Items</p>
+      <p className="text-fine font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>Line Items</p>
 
       {receipt.matchedTransaction || receipt.imported ? (
         <div className="space-y-1.5 mb-4">
@@ -191,7 +191,7 @@ export default function ReceiptDetailPanel({
                 <p className="text-xs font-medium" style={{ color: 'var(--color-card-violet)' }}>
                   All {receipt.items.length} item{receipt.items.length !== 1 ? 's' : ''} look{receipt.items.length === 1 ? 's' : ''} like {suggestion.categoryName}
                 </p>
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                   Based on your last {suggestion.receiptsConsidered} {receipt.merchant} receipt{suggestion.receiptsConsidered !== 1 ? 's' : ''}
                 </p>
               </div>
@@ -205,10 +205,10 @@ export default function ReceiptDetailPanel({
 
           {categoryGroups.length > 1 && (
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="text-fine font-bold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                 {itemCount} item{itemCount !== 1 ? 's' : ''}
               </span>
-              <button onClick={() => setGrouped((g) => !g)} className="text-[11px] font-medium hover:underline" style={{ color: 'var(--color-sky)' }}>
+              <button onClick={() => setGrouped((g) => !g)} className="text-fine font-medium hover:underline" style={{ color: 'var(--color-sky)' }}>
                 {grouped ? 'Show original order' : 'Group by category'}
               </button>
             </div>
@@ -219,8 +219,8 @@ export default function ReceiptDetailPanel({
               categoryGroups.map((group) => (
                 <div key={group.categoryId ?? 'uncategorized'}>
                   <div className="flex items-center justify-between px-1 mb-1">
-                    <span className="text-[11px] font-semibold" style={{ color: group.color }}>{group.icon} {group.categoryName}</span>
-                    <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{money(group.total)}</span>
+                    <span className="text-fine font-semibold" style={{ color: group.color }}>{group.icon} {group.categoryName}</span>
+                    <span className="text-fine tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{money(group.total)}</span>
                   </div>
                   <div className="space-y-2">
                     {group.itemIndices.map((idx) => renderItemRow(receipt.items[idx], idx))}
@@ -258,7 +258,7 @@ export default function ReceiptDetailPanel({
 
           <div className="rounded-xl p-3 mb-4"
             style={{ background: 'color-mix(in srgb, var(--color-card-violet) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--color-card-violet) 15%, transparent)' }}>
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--color-card-violet)' }}>
+            <p className="text-fine font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--color-card-violet)' }}>
               This will create {transactionCount} transaction{transactionCount !== 1 ? 's' : ''}
             </p>
             <div className="space-y-1.5">

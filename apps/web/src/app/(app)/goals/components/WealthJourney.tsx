@@ -55,7 +55,7 @@ export default function WealthJourney({ netWorth }: Props) {
         <div className="absolute left-10 rounded-full" style={{ top: 48 + 27, height: 5, width: `calc((100% - 5rem) * ${pos / 100})`, background: 'linear-gradient(90deg, var(--color-green), var(--color-card-amber))' }} />
         {/* You are here */}
         <div className="absolute flex flex-col items-center" style={{ left: `calc(2.5rem + (100% - 5rem) * ${pos / 100})`, top: 10, transform: 'translateX(-50%)' }}>
-          <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap" style={{ background: 'var(--color-text-primary)', color: 'var(--color-base)' }}>
+          <span className="px-2.5 py-1 rounded-lg text-fine font-bold whitespace-nowrap" style={{ background: 'var(--color-text-primary)', color: 'var(--color-base)' }}>
             You · {compactMoney(netWorth)}
           </span>
           <span style={{ width: 2, height: 14, background: 'var(--color-text-primary)' }} />
@@ -67,7 +67,7 @@ export default function WealthJourney({ netWorth }: Props) {
               <div key={l.n} className="flex flex-col items-center gap-1.5 w-20 lg:w-24">
                 <Node n={l.n} name={l.name} short={l.short} state={s} />
                 <span className="text-sm font-bold tabular-nums" style={{ color: '#F5F7FB', textShadow: '0 1px 3px rgba(5,9,18,0.9)' }}>{l.short}</span>
-                <span className="text-[10.5px] font-medium text-center leading-tight" style={{ color: s === 'done' ? 'var(--color-green)' : 'rgba(235,240,250,0.8)', textShadow: '0 1px 3px rgba(5,9,18,0.9)' }}>{l.name}</span>
+                <span className="text-fine font-medium text-center leading-tight" style={{ color: s === 'done' ? 'var(--color-green)' : 'rgba(235,240,250,0.8)', textShadow: '0 1px 3px rgba(5,9,18,0.9)' }}>{l.name}</span>
               </div>
             );
           })}
@@ -87,11 +87,11 @@ export default function WealthJourney({ netWorth }: Props) {
                   style={{ background: s === 'next' ? 'color-mix(in srgb, var(--color-primary) 22%, rgba(9,15,30,0.7))' : 'rgba(9,15,30,0.55)', border: `1px solid ${s === 'next' ? 'var(--color-primary)' : 'rgba(255,255,255,0.08)'}` }}>
                   <div className="min-w-0">
                     <p className="text-sm font-bold leading-tight truncate">{l.short} · {l.name}</p>
-                    <p className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+                    <p className="text-fine" style={{ color: 'var(--color-text-secondary)' }}>
                       {s === 'done' ? 'Reached' : s === 'next' ? `${compactMoney(p.toGo)} to go` : 'Locked'}
                     </p>
                   </div>
-                  {s === 'next' && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: 'var(--color-text-primary)', color: 'var(--color-base)' }}>You are here</span>}
+                  {s === 'next' && <span className="text-fine font-bold px-2 py-0.5 rounded-full shrink-0" style={{ background: 'var(--color-text-primary)', color: 'var(--color-base)' }}>You are here</span>}
                 </div>
               </li>
             );

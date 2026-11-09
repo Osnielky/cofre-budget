@@ -30,21 +30,21 @@ function SummaryCard({ label, icon, accent, value, valueTone, sub, right, bar, d
         <Icon name={icon} size={20} />
       </span>
       <div className="flex-1 min-w-0 flex flex-col gap-1">
-        <p className="text-[11.5px] font-semibold truncate" style={{ color: accent }}>{label}</p>
+        <p className="text-fine font-semibold truncate" style={{ color: accent }}>{label}</p>
         <div className="flex items-baseline gap-2 flex-wrap">
           <p className={`text-[22px] sm:text-2xl font-extrabold leading-none tabular-nums ${flash}`} style={valueTone && !empty ? { color: valueTone } : empty ? { color: 'var(--color-text-muted)' } : undefined}
             aria-live="polite">
             {empty ? '—' : formatMoney(value)}
           </p>
           {delta !== 0 && !empty && (
-            <span className="text-[10.5px] font-bold tabular-nums px-1.5 py-0.5 rounded-md"
+            <span className="text-fine font-bold tabular-nums px-1.5 py-0.5 rounded-md"
               style={{ color: good ? 'var(--color-green)' : 'var(--color-rose)', background: `color-mix(in srgb, ${good ? 'var(--color-green)' : 'var(--color-rose)'} 14%, transparent)` }}
               title="Change from saved plan">
               {formatMoney(delta, { sign: true })}
             </span>
           )}
         </div>
-        <div className="flex items-center justify-between gap-2 text-[11px] min-w-0">
+        <div className="flex items-center justify-between gap-2 text-fine min-w-0">
           <span className="truncate" style={{ color: 'var(--color-text-secondary)' }}>{sub}</span>
           {right && <span className="shrink-0 tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{right}</span>}
         </div>

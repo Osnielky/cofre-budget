@@ -46,7 +46,7 @@ export default function Panel({ title, subtitle, legend, colSpan = 1, loading, s
 /** Standard legend chip row for chart panels. */
 export function Legend({ items }: { items: { label: string; color: string; line?: boolean }[] }) {
   return (
-    <div className="flex items-center gap-3 text-[10px] font-semibold flex-wrap" style={{ color: 'var(--color-text-secondary)' }}>
+    <div className="flex items-center gap-3 text-fine font-semibold flex-wrap" style={{ color: 'var(--color-text-secondary)' }}>
       {items.map((it) => (
         <span key={it.label} className="flex items-center gap-1.5">
           <span className={it.line ? 'w-4 h-0.5 rounded-full' : 'w-2.5 h-1.5 rounded-sm'} style={{ background: it.color }} />

@@ -37,21 +37,21 @@ export default function AddAccountModal({ projectId, onClose, onCreated, onConne
           <button type="button" onClick={onConnectInstead} className="text-xs font-semibold mt-1.5" style={{ color: 'var(--color-primary)' }}>Connected brokerage instead → pick it in the project form</button>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Firm
+          <label className="flex flex-col gap-1 text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Firm
             <input className={input} style={inputStyle} value={form.firm} onChange={(e) => setForm((f) => ({ ...f, firm: e.target.value }))} placeholder="Topstep" required /></label>
-          <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Account name
+          <label className="flex flex-col gap-1 text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Account name
             <input className={input} style={inputStyle} value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="50K #1" required /></label>
-          <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Kind
+          <label className="flex flex-col gap-1 text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Kind
             <select className={input} style={inputStyle} value={form.kind} onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as 'prop_firm' | 'broker' }))}>
               <option value="prop_firm">Prop firm</option><option value="broker">Broker</option></select></label>
           {form.kind === 'prop_firm' && (
-            <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Status
+            <label className="flex flex-col gap-1 text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Status
               <select className={input} style={inputStyle} value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as 'evaluation' | 'funded' }))}>
                 <option value="evaluation">Evaluation</option><option value="funded">Funded</option></select></label>
           )}
-          <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Account size
+          <label className="flex flex-col gap-1 text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Account size
             <input className={input} style={inputStyle} type="number" min="0" value={form.accountSize} onChange={(e) => setForm((f) => ({ ...f, accountSize: e.target.value }))} placeholder="50000" /></label>
-          <label className="flex flex-col gap-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Started
+          <label className="flex flex-col gap-1 text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Started
             <input className={input} style={inputStyle} type="date" value={form.startedAt} onChange={(e) => setForm((f) => ({ ...f, startedAt: e.target.value }))} /></label>
         </div>
         {error && <p className="text-xs" style={{ color: 'var(--color-rose)' }}>{error}</p>}

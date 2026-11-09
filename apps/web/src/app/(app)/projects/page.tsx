@@ -643,11 +643,11 @@ export default function ProjectsPage() {
                     <div className="flex-1 min-w-0">
                       <h2 className="font-bold text-xl leading-tight" style={{ color: 'var(--color-text-primary)' }}>{sel.name}</h2>
                       <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+                        <span className="text-fine font-bold px-2 py-0.5 rounded-md"
                           style={{ background: `${color}25`, color, border: `1px solid ${color}45` }}>
                           {PROJECT_TYPES.find((t) => t.value === sel.type)?.label ?? sel.type}
                         </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+                        <span className="text-fine font-bold px-2 py-0.5 rounded-md"
                           style={sold
                             ? { background: 'color-mix(in srgb, var(--color-green) 18%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 40%, transparent)' }
                             : closed
@@ -656,12 +656,12 @@ export default function ProjectsPage() {
                           {sold ? '✓ Sold' : closed ? '■ Terminated' : '● Active'}
                         </span>
                         {closed && sel.saleDate && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-md" style={{ color: 'var(--color-text-muted)' }}>
+                          <span className="text-fine px-2 py-0.5 rounded-md" style={{ color: 'var(--color-text-muted)' }}>
                             {sold ? 'Sold' : 'Closed'} {sel.saleDate}
                           </span>
                         )}
                         {sel.type === 'trading' && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+                          <span className="text-fine font-bold px-2 py-0.5 rounded-md"
                             style={{ background: 'color-mix(in srgb, var(--color-violet) 14%, transparent)', color: 'var(--color-violet)', border: '1px solid color-mix(in srgb, var(--color-violet) 35%, transparent)' }}>
                             📈 Trading records only
                           </span>
@@ -804,19 +804,19 @@ export default function ProjectsPage() {
                             <div className="flex items-center justify-between">
                               <div>
                                 <p className="text-xs font-bold" style={{ color: 'var(--color-text-secondary)' }}>{chartTitle}</p>
-                                <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{chartSubtitle}</p>
+                                <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{chartSubtitle}</p>
                               </div>
                               <div className="flex items-center gap-2">
                                 {showRevenue && (
-                                  <span className="text-[10px] flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                                  <span className="text-fine flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                                     <span className="w-5 h-0.5 inline-block rounded" style={{ background: '#4FBF7F' }} /> Income
                                   </span>
                                 )}
-                                <span className="text-[10px] flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
+                                <span className="text-fine flex items-center gap-1" style={{ color: 'var(--color-text-muted)' }}>
                                   <span className="w-5 h-0.5 inline-block rounded" style={{ background: '#F07A3E' }} /> Expenses
                                 </span>
                                 {sold && sel.saleDate && (
-                                  <span className="text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md"
+                                  <span className="text-fine font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md"
                                     style={{ background: 'rgba(79,191,127,0.15)', color: '#4FBF7F', border: '1px solid rgba(79,191,127,0.30)' }}>
                                     <span className="w-1 h-3 rounded-sm inline-block" style={{ background: '#4FBF7F' }} /> Sold
                                   </span>
@@ -842,8 +842,8 @@ export default function ProjectsPage() {
                                   </defs>
                                   <CartesianGrid vertical={false} stroke="rgba(138,147,166,0.18)" />
                                   <XAxis dataKey="date" tickFormatter={(d) => d.slice(5).replace('-', '/')}
-                                    tick={{ fontSize: 9, fill: '#8A93A6' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                                  <YAxis tick={{ fontSize: 9, fill: 'rgba(138,147,166,0.70)' }} axisLine={false} tickLine={false} />
+                                    tick={{ fill: '#8A93A6' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                                  <YAxis tick={{ fill: 'rgba(138,147,166,0.70)' }} axisLine={false} tickLine={false} />
                                   <Tooltip content={<LineTip />} cursor={{ stroke: 'rgba(138,147,166,0.35)', strokeWidth: 1 }} />
                                   <Area type="monotone" dataKey="expenses" stroke="#F07A3E" strokeWidth={2}
                                     fill={`url(#expGrad-${sel.id})`} dot={false} activeDot={{ r: 4, fill: '#F07A3E', strokeWidth: 0 }} />
@@ -853,7 +853,7 @@ export default function ProjectsPage() {
                                   )}
                                   {sold && sel.saleDate && (
                                     <ReferenceLine x={sel.saleDate} stroke="#4FBF7F" strokeWidth={2} strokeDasharray="5 3"
-                                      label={{ value: '$ Sold', position: 'insideTopRight', fill: '#4FBF7F', fontSize: 9, fontWeight: 700 }} />
+                                      label={{ value: '$ Sold', position: 'insideTopRight', fill: '#4FBF7F', className: 'text-fine', fontWeight: 700 }} />
                                   )}
                                 </AreaChart>
                               </ResponsiveContainer>
@@ -873,8 +873,8 @@ export default function ProjectsPage() {
                                     <span className="text-sm shrink-0 w-5 text-center">{cat.icon}</span>
                                     <div className="flex-1 flex flex-col gap-0.5">
                                       <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-semibold truncate" style={{ color: cat.color }}>{cat.name}</span>
-                                        <span className="text-[10px] tabular-nums font-bold" style={{ color: 'var(--color-text-secondary)' }}>${cat.total.toFixed(2)}</span>
+                                        <span className="text-fine font-semibold truncate" style={{ color: cat.color }}>{cat.name}</span>
+                                        <span className="text-fine tabular-nums font-bold" style={{ color: 'var(--color-text-secondary)' }}>${cat.total.toFixed(2)}</span>
                                       </div>
                                       <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'color-mix(in srgb, var(--color-text-primary) 8%, transparent)' }}>
                                         <div className="h-full rounded-full transition-all duration-700"
@@ -932,23 +932,23 @@ export default function ProjectsPage() {
                             <ChevronIcon />
                           </span>
                           <span className="text-xs font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Expense Breakdown</span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md"
+                          <span className="text-fine font-bold px-1.5 py-0.5 rounded-md"
                             style={{ background: `${color}15`, color, border: `1px solid ${color}25` }}>
                             {(sel.categories ?? []).length}
                           </span>
-                          <span className="text-[10px] ml-auto pr-1" style={{ color: 'var(--color-text-muted)' }}>
+                          <span className="text-fine ml-auto pr-1" style={{ color: 'var(--color-text-muted)' }}>
                             {collapsedCats[sel.id] ? 'show' : 'hide'}
                           </span>
                         </button>
                         <div className="flex items-center gap-1 px-2 shrink-0"
                           style={{ borderLeft: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                           <button onClick={() => handleSeedCats(sel.id)} disabled={seedingCat === sel.id}
-                            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1.5 rounded-lg hover:brightness-110 disabled:opacity-50 whitespace-nowrap"
+                            className="flex items-center gap-1 text-fine font-semibold px-2 py-1.5 rounded-lg hover:brightness-110 disabled:opacity-50 whitespace-nowrap"
                             style={{ background: 'rgba(155,109,255,0.15)', color: '#9B6DFF', border: '1px solid rgba(155,109,255,0.28)' }}>
                             {seedingCat === sel.id ? '…' : '✦ Restore'}
                           </button>
                           <button onClick={() => setShowCatForm(showCatForm === sel.id ? null : sel.id)}
-                            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1.5 rounded-lg hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] whitespace-nowrap"
+                            className="flex items-center gap-1 text-fine font-semibold px-2 py-1.5 rounded-lg hover:bg-[color-mix(in_srgb,var(--color-text-primary)_10%,transparent)] whitespace-nowrap"
                             style={{ color: 'var(--color-text-muted)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 9%, transparent)' }}>
                             <PlusIcon /> Add
                           </button>
@@ -983,7 +983,7 @@ export default function ProjectsPage() {
                                 </div>
                                 <button onClick={() => handleDeleteCat(sel.id, cat.id)} disabled={deletingCat === cat.id}
                                   className="opacity-0 group-hover:opacity-100 w-5 h-5 rounded flex items-center justify-center hover:bg-red-500/20 transition-opacity shrink-0">
-                                  {deletingCat === cat.id ? <span className="text-[10px]">…</span> : <span className="text-[10px]" style={{ color: '#FF6B6B' }}>✕</span>}
+                                  {deletingCat === cat.id ? <span className="text-fine">…</span> : <span className="text-fine" style={{ color: '#FF6B6B' }}>✕</span>}
                                 </button>
                               </div>
                             ))}
@@ -1037,7 +1037,7 @@ export default function ProjectsPage() {
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium truncate">{tx.name}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                  <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{tx.date}</span>
+                                  <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{tx.date}</span>
                                   <ProjectCategoryPicker
                                     tx={tx}
                                     categories={sel.categories ?? []}
@@ -1054,7 +1054,7 @@ export default function ProjectsPage() {
                                   <button
                                     onClick={() => removePurchaseTx(sel.id)}
                                     disabled={removingPurchaseTx === sel.id}
-                                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold shrink-0 hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-fine font-semibold shrink-0 hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     style={{
                                       background: !removePurchaseTxError[sel.id] ? 'color-mix(in srgb, var(--color-card-violet) 15%, transparent)' : 'color-mix(in srgb, #F07A3E 15%, transparent)',
                                       color: !removePurchaseTxError[sel.id] ? 'var(--color-card-violet)' : '#F07A3E',
@@ -1064,7 +1064,7 @@ export default function ProjectsPage() {
                                     {removingPurchaseTx === sel.id ? '…' : '🏷 Purchase'}
                                   </button>
                                   {removePurchaseTxError[sel.id] && (
-                                    <p className="text-[9px] text-right" style={{ color: '#F07A3E' }}>
+                                    <p className="text-fine text-right" style={{ color: '#F07A3E' }}>
                                       {removePurchaseTxError[sel.id]}
                                     </p>
                                   )}
@@ -1163,7 +1163,7 @@ export default function ProjectsPage() {
 
                 {/* ── Type selector ── */}
                 <div className="flex flex-col gap-2.5">
-                  <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>Type</span>
+                  <span className="text-fine font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>Type</span>
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5">
                     {MAIN_TYPES.map((t) => {
                       const active = form.type === t.value || (t.value === 'business' && form.type === 'service');
@@ -1199,7 +1199,7 @@ export default function ProjectsPage() {
                           <span className="text-lg">{s.icon}</span>
                           <div className="text-left">
                             <p className="font-semibold leading-tight">{s.label}</p>
-                            <p className="text-[10px] leading-tight opacity-65">{s.hint}</p>
+                            <p className="text-fine leading-tight opacity-65">{s.hint}</p>
                           </div>
                         </button>
                       ))}
@@ -1223,7 +1223,7 @@ export default function ProjectsPage() {
                   )}
                   {form.type === 'trading' && (
                     <div className="flex flex-col gap-2">
-                      <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                      <span className="text-fine font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                         Brokerage accounts <span className="normal-case tracking-normal font-medium">(optional · pick as many as trade for this project)</span>
                       </span>
                       {investmentAccounts.length > 0 && (
@@ -1242,7 +1242,7 @@ export default function ProjectsPage() {
                           })}
                         </div>
                       )}
-                      <p className="text-[10px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+                      <p className="text-fine leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
                         {investmentAccounts.length === 0
                           ? 'Connect a brokerage in Settings → Bank Accounts to follow its trades here.'
                           : 'Each account is analysed on its own and the project adds them up — realized P&L, win rate, open positions. Nothing to categorize.'}
@@ -1258,7 +1258,7 @@ export default function ProjectsPage() {
 
                 {/* ── Name ── */}
                 <div className="flex flex-col gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>Name</span>
+                  <span className="text-fine font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>Name</span>
                   <input required autoFocus
                     placeholder={PROJECT_TYPES.find((t) => t.value === form.type)?.placeholder ?? 'Project name'}
                     value={form.name}
@@ -1271,7 +1271,7 @@ export default function ProjectsPage() {
                 {/* ── Description + Purchase Price ── */}
                 <div className={`grid gap-3 ${form.type === 'service' ? 'grid-cols-1' : 'grid-cols-2'}`}>
                   <div className="flex flex-col gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                    <span className="text-fine font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                       Description <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(optional)</span>
                     </span>
                     <input placeholder="Short note…" value={form.description}
@@ -1282,7 +1282,7 @@ export default function ProjectsPage() {
                   </div>
                   {form.type !== 'service' && (
                     <div className="flex flex-col gap-2">
-                      <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                      <span className="text-fine font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                         {form.type === 'trading' ? 'Initial Deposit'
                           : form.type === 'property' || form.type === 'vehicle' ? 'Purchase Price' : 'Initial Investment'}
                       </span>
@@ -1294,7 +1294,7 @@ export default function ProjectsPage() {
                           className="flex-1 px-4 py-3 text-sm outline-none min-w-0 transition-all duration-150"
                           style={{ background: 'color-mix(in srgb, var(--color-text-primary) 6%, transparent)', color: 'var(--color-text-primary)' }} />
                       </div>
-                      <p className="text-[10px] leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+                      <p className="text-fine leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
                         {form.type === 'trading' ? (
                           <>💡 The amount you funded the account with. Use <strong style={{ color: 'var(--color-text-secondary)' }}>one method only</strong>:{' '}
                           enter it here <em>or</em> link the transfer transaction as the deposit later — not both.</>
@@ -1310,7 +1310,7 @@ export default function ProjectsPage() {
                 {/* ── Date + Color ── */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                    <span className="text-fine font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                       {form.type === 'service' || form.type === 'trading' ? 'Start Date' : 'Purchase Date'}
                     </span>
                     <input type="date" value={form.purchaseDate}
@@ -1320,7 +1320,7 @@ export default function ProjectsPage() {
                       style={{ ...inputStyle, colorScheme: 'dark' }} />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>Color</span>
+                    <span className="text-fine font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>Color</span>
                     <div className="grid grid-cols-7 place-items-center gap-2 px-3 py-3 rounded-xl min-h-[50px]" style={inputStyle}>
                       {PRESET_COLORS.map((c) => (
                         <button key={c} type="button" onClick={() => setForm((f) => ({ ...f, color: c }))}
@@ -1338,7 +1338,7 @@ export default function ProjectsPage() {
 
                 {/* ── Image upload ── */}
                 <div className="flex flex-col gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
+                  <span className="text-fine font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-muted)' }}>
                     Image <span style={{ opacity: 0.45, textTransform: 'none', letterSpacing: 0, fontWeight: 500 }}>(optional)</span>
                   </span>
                   <input
@@ -1360,7 +1360,7 @@ export default function ProjectsPage() {
                       <img src={form.imageUrl} alt="Project" className="w-14 h-14 rounded-xl object-cover shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>Image selected</p>
-                        <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Shown on the project card</p>
+                        <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Shown on the project card</p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button type="button" onClick={() => fileInputRef.current?.click()}
@@ -1455,7 +1455,7 @@ export default function ProjectsPage() {
                   style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }} />
               </div>
 
-              <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                 You can reactivate it later from this page.
               </p>
 
@@ -1557,7 +1557,7 @@ export default function ProjectsPage() {
                         ) : filteredSellTx.length === 0 ? (
                           <div className="py-4 text-center">
                             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No deposits found in checking / savings.</p>
-                            <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Switch to "Cash" if you received cash.</p>
+                            <p className="text-fine mt-1" style={{ color: 'var(--color-text-muted)' }}>Switch to "Cash" if you received cash.</p>
                           </div>
                         ) : filteredSellTx.map((tx) => (
                           <button key={tx.id} type="button"
@@ -1616,7 +1616,7 @@ export default function ProjectsPage() {
                         ) : filteredSellTx.length === 0 ? (
                           <div className="py-4 text-center">
                             <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>No cash transactions found.</p>
-                            <p className="text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>Add one in Transactions first, then return here.</p>
+                            <p className="text-fine mt-1" style={{ color: 'var(--color-text-muted)' }}>Add one in Transactions first, then return here.</p>
                           </div>
                         ) : filteredSellTx.map((tx) => (
                           <button key={tx.id} type="button"
@@ -1806,7 +1806,7 @@ export default function ProjectsPage() {
                           <p className="text-xs font-semibold" style={{ color: 'var(--color-card-violet)' }}>
                             This is the {noun}
                           </p>
-                          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                             Replaces the ${Number(proj.purchasePrice).toFixed(0)} estimate — no double-counting
                           </p>
                         </div>
@@ -1853,7 +1853,7 @@ export default function ProjectsPage() {
                         </div>
                         {refund.length > 0 && (
                           <>
-                            <p className="text-[10px] font-bold tracking-widest uppercase px-1 pt-1"
+                            <p className="text-fine font-bold tracking-widest uppercase px-1 pt-1"
                               style={{ color: 'var(--color-text-muted)' }}>
                               {isIncome ? '↩ Return / Refund' : '↩ Adjustment'}
                             </p>
@@ -1960,7 +1960,7 @@ function ProjectCategoryPicker({
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-md hover:brightness-125 transition-all"
+        className="flex items-center gap-1 text-fine font-semibold px-1.5 py-0.5 rounded-md hover:brightness-125 transition-all"
         style={current
           ? { background: `${current.color}18`, border: `1px solid ${current.color}35`, color: current.color }
           : { background: 'color-mix(in srgb, var(--color-text-primary) 7%, transparent)', border: '1px solid color-mix(in srgb, var(--color-text-primary) 13%, transparent)', color: 'var(--color-text-muted)' }}>
@@ -1996,7 +1996,7 @@ function ProjectCategoryPicker({
                 {primary.map(CatBtn)}
                 {refund.length > 0 && (
                   <>
-                    <div className="px-3 pt-1 pb-0.5 text-[9px] font-bold tracking-widest uppercase"
+                    <div className="px-3 pt-1 pb-0.5 text-fine font-bold tracking-widest uppercase"
                       style={{ color: 'var(--color-text-muted)', borderTop: '1px solid color-mix(in srgb, var(--color-text-primary) 8%, transparent)' }}>
                       {isIncome ? '↩ Return / Refund' : '↩ Adjustment'}
                     </div>
@@ -2015,7 +2015,7 @@ function ProjectCategoryPicker({
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="text-right">
-      <p className="text-[10px] font-medium" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
+      <p className="text-fine font-medium" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
       <p className="text-sm font-bold" style={{ color }}>{value}</p>
     </div>
   );

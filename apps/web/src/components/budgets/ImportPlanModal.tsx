@@ -58,7 +58,7 @@ export default function ImportPlanModal({ month, onClose, onImported }: { month:
                 style={{ borderBottom: '1px solid var(--color-border)' }}>
                 <div>
                   <p className="font-bold text-sm">Import budget plan</p>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                  <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                     Pick a month to copy into <span style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>{monthLabel(month)}</span> — replaces existing budgets.
                   </p>
                 </div>
@@ -89,7 +89,7 @@ export default function ImportPlanModal({ month, onClose, onImported }: { month:
                         <p className="text-sm font-semibold" style={{ color: isSelected ? 'var(--color-card-violet)' : 'var(--color-text-primary)' }}>
                           {monthLabel(m.month)}
                         </p>
-                        <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                        <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                           {m.count} budget{m.count !== 1 ? 's' : ''} set
                         </p>
                       </div>

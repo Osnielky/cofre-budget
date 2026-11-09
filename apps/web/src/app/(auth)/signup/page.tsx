@@ -6,7 +6,7 @@ import AuthShell, { authInputStyle } from '@/components/AuthShell';
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-const labelCls = 'text-[10.5px] font-semibold uppercase';
+const labelCls = 'text-fine font-semibold uppercase';
 const labelStyle: React.CSSProperties = { color: 'rgba(221,184,119,0.85)', letterSpacing: '0.22em' };
 
 export default function SignupPage() {
@@ -91,7 +91,7 @@ export default function SignupPage() {
           {loading ? 'Creating account…' : 'Create account'}
         </button>
 
-        <p className="text-[11.5px] text-center leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-fine text-center leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
           By creating an account, you agree to our{' '}
           <Link href="/terms" className="underline" style={{ color: 'inherit' }}>Terms of Service</Link>
           {' '}and{' '}

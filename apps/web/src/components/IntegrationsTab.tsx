@@ -134,7 +134,7 @@ const card: React.CSSProperties = {
 
 function CategoryBadge({ label }: { label: string }) {
   return (
-    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md"
+    <span className="text-fine font-semibold px-2 py-0.5 rounded-md"
       style={{ background: 'color-mix(in srgb, var(--color-primary) 14%, transparent)', color: 'var(--color-primary)' }}>
       {label}
     </span>
@@ -214,7 +214,7 @@ export default function IntegrationsTab({ status, loading, onDisconnect, onManag
                       { label: 'Bills', color: 'var(--color-amber)' },
                       { label: 'Subscriptions', color: 'var(--color-sky)' },
                     ].map((c) => (
-                      <span key={c.label} className="flex items-center gap-1.5 text-[10.5px] font-semibold px-2 py-1 rounded-md"
+                      <span key={c.label} className="flex items-center gap-1.5 text-fine font-semibold px-2 py-1 rounded-md"
                         style={{ background: `color-mix(in srgb, ${c.color} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${c.color} 25%, transparent)`, color: c.color }}>
                         {c.label}
                       </span>
@@ -243,7 +243,7 @@ export default function IntegrationsTab({ status, loading, onDisconnect, onManag
                 )}
               </div>
 
-              <div className="flex items-center gap-5 flex-wrap text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="flex items-center gap-5 flex-wrap text-fine" style={{ color: 'var(--color-text-muted)' }}>
                 <span className="flex items-center gap-1.5"><Icon d={I_LOCK} size={12} /> Read-only access</span>
                 <span className="flex items-center gap-1.5"><Icon d={I_SHIELD} size={12} /> You control your data</span>
                 <span className="flex items-center gap-1.5"><Icon d={I_OFF} size={12} /> Disconnect anytime</span>
@@ -262,7 +262,7 @@ export default function IntegrationsTab({ status, loading, onDisconnect, onManag
                   <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>{integ.description}</p>
                 </div>
               </div>
-              <span className="text-[10.5px] font-semibold px-2.5 py-1 rounded-full w-fit mt-auto"
+              <span className="text-fine font-semibold px-2.5 py-1 rounded-full w-fit mt-auto"
                 style={{ background: 'color-mix(in srgb, var(--color-amber) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--color-amber) 28%, transparent)', color: 'var(--color-amber)' }}>
                 Coming soon
               </span>
@@ -322,7 +322,7 @@ export default function IntegrationsTab({ status, loading, onDisconnect, onManag
                 <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{status.email}</p>
                 <p>{connectedAt ? `Connected ${connectedAt}` : 'Connected'}</p>
               </div>
-              <span className="ml-auto w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-[10px]"
+              <span className="ml-auto w-4 h-4 rounded-full flex items-center justify-center shrink-0 text-fine"
                 style={{ background: 'var(--color-green)', color: '#08111F' }}>✓</span>
             </div>
           ) : (

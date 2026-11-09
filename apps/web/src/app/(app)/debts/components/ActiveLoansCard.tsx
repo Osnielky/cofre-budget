@@ -150,22 +150,22 @@ export default function ActiveLoansCard({ debts, loading, reload }: Props) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-sm">{d.borrowerName}</p>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                        <span className="text-fine font-bold px-2 py-0.5 rounded-full"
                           style={d.direction === 'lent'
                             ? { background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }
                             : { background: 'color-mix(in srgb, var(--color-violet) 15%, transparent)', color: 'var(--color-violet)' }}>
                           {d.direction === 'lent' ? 'OWES YOU' : 'YOU OWE'}
                         </span>
                         {d.status === 'paid' && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                          <span className="text-fine font-bold px-2 py-0.5 rounded-full"
                             style={{ background: 'color-mix(in srgb, var(--color-text-muted) 15%, transparent)', color: 'var(--color-text-muted)' }}>PAID</span>
                         )}
                         {overdue && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                          <span className="text-fine font-bold px-2 py-0.5 rounded-full"
                             style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)' }}>OVERDUE</span>
                         )}
                       </div>
-                      <p className="text-[11px] mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
+                      <p className="text-fine mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>
                         {d.description ? `${d.description} · ` : ''}
                         {d.startDate ? `${d.direction === 'owed' ? 'Borrowed' : 'Lent'} ${fmtDate(d.startDate)}` : ''}
                         {d.startDate && d.dueDate ? ' · ' : ''}
@@ -180,16 +180,16 @@ export default function ActiveLoansCard({ debts, loading, reload }: Props) {
                         <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
                           <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: 'var(--color-green)' }} />
                         </div>
-                        <span className="text-[10px] font-semibold tabular-nums shrink-0" style={{ color: 'var(--color-green)' }}>
+                        <span className="text-fine font-semibold tabular-nums shrink-0" style={{ color: 'var(--color-green)' }}>
                           {d.direction === 'owed' ? 'paid back' : 'repaid'} ${fmt(d.paid)} · {Math.round(pct)}%
                         </span>
                       </div>
                     </div>
 
                     <div className="text-right shrink-0">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Remaining</p>
+                      <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Remaining</p>
                       <p className="text-lg font-extrabold tabular-nums" style={{ color: d.remaining > 0 ? 'var(--color-orange)' : 'var(--color-green)' }}>${fmt(d.remaining)}</p>
-                      <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>of ${fmt(d.principal)}</p>
+                      <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>of ${fmt(d.principal)}</p>
                     </div>
                     <span className={`shrink-0 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`} style={{ color: 'var(--color-text-muted)' }}>▾</span>
                   </div>
@@ -199,7 +199,7 @@ export default function ActiveLoansCard({ debts, loading, reload }: Props) {
                   <div className="px-4 pb-4 flex flex-col gap-4" style={{ borderTop: '1px solid var(--color-border)' }}>
                     <form onSubmit={recordPayment} className="flex flex-wrap items-end gap-2.5 pt-4">
                       <div className="flex flex-col gap-1">
-                        <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                        <span className="text-fine uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                           {d.direction === 'owed' ? 'Amount paid back' : 'Repayment received'}
                         </span>
                         <input required type="number" step="0.01" min="0.01" placeholder="0.00" value={pay.amount}
@@ -207,19 +207,19 @@ export default function ActiveLoansCard({ debts, loading, reload }: Props) {
                           className="w-28 px-3 py-2 text-sm rounded-xl outline-none" style={inputStyle} />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Date</span>
+                        <span className="text-fine uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Date</span>
                         <input type="date" value={pay.date} onChange={(e) => setPay((p) => ({ ...p, date: e.target.value }))}
                           className="px-3 py-2 text-sm rounded-xl outline-none" style={inputStyle} />
                       </div>
                       <div className="flex flex-col gap-1 flex-1 min-w-32">
-                        <span className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Note (optional)</span>
+                        <span className="text-fine uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Note (optional)</span>
                         <input value={pay.note} onChange={(e) => setPay((p) => ({ ...p, note: e.target.value }))}
                           placeholder="e.g. Zelle, cash" className="px-3 py-2 text-sm rounded-xl outline-none w-full" style={inputStyle} />
                       </div>
                       <button type="submit" className="btn-gold px-4 py-2 text-sm font-semibold text-white rounded-xl">
                         {d.direction === 'owed' ? 'Record payment' : 'Record repayment'}
                       </button>
-                      <label className="flex items-center gap-1.5 text-[11px]" style={{ color: d.borrowerEmail ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
+                      <label className="flex items-center gap-1.5 text-fine" style={{ color: d.borrowerEmail ? 'var(--color-text-secondary)' : 'var(--color-text-muted)' }}>
                         <input type="checkbox" checked={pay.emailReceipt && !!d.borrowerEmail} disabled={!d.borrowerEmail}
                           onChange={(e) => setPay((p) => ({ ...p, emailReceipt: e.target.checked }))} />
                         {d.direction === 'owed' ? 'Email confirmation' : 'Email receipt'}
@@ -229,7 +229,7 @@ export default function ActiveLoansCard({ debts, loading, reload }: Props) {
                         style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>Send statement</button>
                       {confirmDeleteId === d.id ? (
                         <span className="flex items-center gap-1.5">
-                          <span className="text-[11px]" style={{ color: 'var(--color-rose)' }}>
+                          <span className="text-fine" style={{ color: 'var(--color-rose)' }}>
                             Delete this record &amp; its payments?{(() => {
                               const n = detail.payments.filter((p) => p.transactionId).length;
                               return n > 0 ? ` ${n} linked transaction${n > 1 ? 's' : ''} will be kept as income.` : '';
@@ -276,7 +276,7 @@ function monthYear(ym: string) {
 function SummaryChip({ label, value, tone, className = '' }: { label: string; value: string; tone?: string; className?: string }) {
   return (
     <div className={`flex flex-col gap-0.5 px-3 py-2 rounded-xl min-w-0 ${className}`} style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
-      <span className="text-[9.5px] font-bold uppercase tracking-wider truncate" style={{ color: 'var(--color-text-muted)' }}>{label}</span>
+      <span className="text-fine font-bold uppercase tracking-wider truncate" style={{ color: 'var(--color-text-muted)' }}>{label}</span>
       <span className="text-[13px] font-bold tabular-nums truncate" style={{ color: tone ?? 'var(--color-text-primary)' }}>{value}</span>
     </div>
   );
@@ -291,7 +291,7 @@ function RepaymentHistory({ detail, onDelete }: { detail: DebtDetail; onDelete: 
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
+      <p className="text-fine font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
         Repayment history · {rows.length}
       </p>
 
@@ -315,22 +315,22 @@ function RepaymentHistory({ detail, onDelete }: { detail: DebtDetail; onDelete: 
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-md"
+                    <span className="text-fine font-bold tabular-nums px-1.5 py-0.5 rounded-md"
                       style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>#{p.seq}</span>
                     <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>{fmtDate(p.date)}</span>
                     {p.paidOff && (
-                      <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full"
+                      <span className="text-fine font-bold px-1.5 py-0.5 rounded-full"
                         style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>PAID OFF</span>
                     )}
                   </p>
-                  <p className="mt-1 truncate text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                  <p className="mt-1 truncate text-fine" style={{ color: 'var(--color-text-muted)' }}>
                     {p.note ? `${p.note} · ` : ''}{source}
                   </p>
                 </div>
                 <div className="flex items-start gap-2.5 shrink-0">
                   <div className="text-right">
                     <p className="font-bold tabular-nums" style={{ color: amountTone }}>{owed ? '−' : '+'}${fmt(p.amount)}</p>
-                    <p className="text-[10.5px] tabular-nums mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{p.shareOfPrincipal}% of loan</p>
+                    <p className="text-fine tabular-nums mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{p.shareOfPrincipal}% of loan</p>
                   </div>
                   {!p.transactionId && (
                     <button onClick={() => onDelete(p.id)} aria-label="Delete payment" className="hover:opacity-70 pt-0.5" style={{ color: 'var(--color-text-muted)' }}>✕</button>
@@ -342,12 +342,12 @@ function RepaymentHistory({ detail, onDelete }: { detail: DebtDetail; onDelete: 
                 <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-border)' }}>
                   <div className="h-full rounded-full" style={{ width: `${p.pctRepaid}%`, background: 'var(--color-green)' }} />
                 </div>
-                <span className="text-[10.5px] tabular-nums shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+                <span className="text-fine tabular-nums shrink-0" style={{ color: 'var(--color-text-muted)' }}>
                   {p.pctRepaid}% {owed ? 'paid back' : 'repaid'}
                 </span>
               </div>
 
-              <div className="flex items-center justify-between gap-3 flex-wrap text-[10.5px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="flex items-center justify-between gap-3 flex-wrap text-fine tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
                 <span>
                   {owed ? 'Paid back' : 'Repaid'} so far <span className="font-semibold" style={{ color: 'var(--color-text-secondary)' }}>${fmt(p.paidSoFar)}</span>
                   {p.daysSincePrev != null && (

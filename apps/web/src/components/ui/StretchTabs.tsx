@@ -46,7 +46,7 @@ type Props<T extends string> = {
 };
 
 const SIZES = {
-  xs: 'px-2 py-1 text-[10.5px] rounded-md',
+  xs: 'px-2 py-1 text-fine rounded-md',
   sm: 'px-3 py-1.5 text-xs rounded-lg',
   md: 'px-3.5 py-2 text-[13px] rounded-lg',
 } as const;

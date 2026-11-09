@@ -106,7 +106,7 @@ export default function RecurringPanel({ value: r, onChange, amount, accent, isE
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold">Make it recurring</p>
-          <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Set when it repeats and when it stops.</p>
+          <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>Set when it repeats and when it stops.</p>
         </div>
         <button type="button" role="switch" aria-checked={r.enabled} aria-label="Make it recurring"
           onClick={() => set({ enabled: !r.enabled })}
@@ -158,7 +158,7 @@ export default function RecurringPanel({ value: r, onChange, amount, accent, isE
           {/* Starts / Ends */}
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>Starts</p>
+              <p className="text-fine font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>Starts</p>
               <input type="date" value={r.startDate} aria-label="Start date"
                 onChange={(e) => set({
                   startDate: e.target.value,
@@ -168,12 +168,12 @@ export default function RecurringPanel({ value: r, onChange, amount, accent, isE
                 className="w-full h-10 px-3 rounded-xl text-sm outline-none" style={field} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>Ends</p>
+              <p className="text-fine font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>Ends</p>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex rounded-xl p-0.5 shrink-0" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                   {([['never', 'Never'], ['on', 'On date'], ['after', 'After #']] as const).map(([k, label]) => (
                     <button key={k} type="button" onClick={() => set({ endMode: k })}
-                      className="px-2.5 h-9 rounded-lg text-[11px] font-semibold transition-colors"
+                      className="px-2.5 h-9 rounded-lg text-fine font-semibold transition-colors"
                       style={r.endMode === k
                         ? { background: `color-mix(in srgb, ${accent} 20%, transparent)`, color: accent }
                         : { color: 'var(--color-text-muted)' }}>
@@ -191,7 +191,7 @@ export default function RecurringPanel({ value: r, onChange, amount, accent, isE
                     <input type="number" min={1} max={120} value={r.count} aria-label="Number of occurrences"
                       onChange={(e) => set({ count: Math.min(120, Math.max(1, Number(e.target.value) || 1)) })}
                       className="w-16 h-10 px-2 rounded-xl text-sm text-center outline-none tabular-nums" style={field} />
-                    <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>times</span>
+                    <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>times</span>
                   </div>
                 )}
               </div>
@@ -204,7 +204,7 @@ export default function RecurringPanel({ value: r, onChange, amount, accent, isE
               className="mt-0.5 w-4 h-4 shrink-0" style={{ accentColor: accent }} />
             <span className="min-w-0">
               <span className="block text-xs font-semibold">Record the first occurrence as {isExpense ? 'paid' : 'received'}</span>
-              <span className="block text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="block text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                 {dates[0] ? `${fmtFull(dates[0])} · Future occurrences remain scheduled.` : 'Future occurrences remain scheduled.'}
               </span>
             </span>
@@ -225,7 +225,7 @@ export default function RecurringPanel({ value: r, onChange, amount, accent, isE
                     Every {r.interval === 1 ? '' : `${r.interval} `}{r.unit}{r.interval === 1 ? '' : 's'}
                     {monthly ? <> on the {ORDINALS[r.dayOfMonth - 1]}</> : null}
                   </p>
-                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                  <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                     {fmtFull(dates[0])}{endless ? ' onwards' : ` – ${fmtFull(dates[dates.length - 1])}`}
                   </p>
                 </div>
@@ -234,7 +234,7 @@ export default function RecurringPanel({ value: r, onChange, amount, accent, isE
                     {endless ? 'Repeats indefinitely' : `${dates.length} occurrence${dates.length === 1 ? '' : 's'}`}
                   </p>
                   {!endless && amount > 0 && (
-                    <p className="text-[11px] mt-0.5 sm:pl-3" style={{ color: 'var(--color-text-muted)' }}>
+                    <p className="text-fine mt-0.5 sm:pl-3" style={{ color: 'var(--color-text-muted)' }}>
                       Series total <span className="font-bold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>{money(amount * dates.length)}</span>
                     </p>
                   )}
@@ -243,9 +243,9 @@ export default function RecurringPanel({ value: r, onChange, amount, accent, isE
 
               {dates.length > 1 && (
                 <div className="flex items-center gap-2 flex-wrap mt-3 pt-3" style={{ borderTop: '1px solid var(--color-border)' }}>
-                  <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Next scheduled</span>
+                  <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Next scheduled</span>
                   {dates.slice(1, 4).map((d) => (
-                    <span key={d} className="px-2.5 py-1 rounded-lg text-[11px] font-semibold"
+                    <span key={d} className="px-2.5 py-1 rounded-lg text-fine font-semibold"
                       style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                       {fmtDay(d)}
                     </span>

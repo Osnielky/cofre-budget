@@ -40,7 +40,7 @@ function Chip({ icon, label, sub, color, selected, onClick }: {
         style={{ background: `color-mix(in srgb, ${color} 18%, transparent)` }} aria-hidden="true">{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="block text-[13px] font-semibold leading-tight truncate" style={{ color: selected ? color : 'var(--color-text-primary)' }}>{label}</span>
-        {sub && <span className="block text-[11px] truncate mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{sub}</span>}
+        {sub && <span className="block text-fine truncate mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{sub}</span>}
       </span>
       {selected && (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" aria-hidden="true">
@@ -52,7 +52,7 @@ function Chip({ icon, label, sub, color, selected, onClick }: {
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <p className="col-span-full text-[10px] font-bold uppercase tracking-wider pt-2 first:pt-0" style={{ color: 'var(--color-text-muted)' }}>{children}</p>;
+  return <p className="col-span-full text-fine font-bold uppercase tracking-wider pt-2 first:pt-0" style={{ color: 'var(--color-text-muted)' }}>{children}</p>;
 }
 
 /**
@@ -182,7 +182,7 @@ export default function CategoryChooser<P extends ChooserProject>({
                       style={{ background: `color-mix(in srgb, ${color} 18%, transparent)` }} aria-hidden="true">{project.icon}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-bold truncate">{project.name}</span>
-                      <span className="block text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                      <span className="block text-fine" style={{ color: 'var(--color-text-muted)' }}>
                         {chosen ? `Selected: ${pc.find((c) => c.id === value.projectCategoryId)?.name ?? ''}` : `${pc.length} categor${pc.length === 1 ? 'y' : 'ies'}`}
                       </span>
                     </span>

@@ -145,13 +145,13 @@ export default function ReportProblemModal({ onClose, onReported }: Props) {
                 rows={4} maxLength={MAX_DESCRIPTION} autoFocus disabled={busy}
                 placeholder="What you were doing, what you expected, and what happened instead."
                 className="w-full px-3 py-2.5 text-sm rounded-xl outline-none resize-y" style={inputStyle} />
-              <span className="flex justify-between text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="flex justify-between text-fine" style={{ color: 'var(--color-text-muted)' }}>
                 <span role={touched && problem ? 'alert' : undefined} style={touched && problem ? { color: 'var(--color-rose)' } : undefined}>{touched && problem ? problem : ''}</span>
                 <span className="tabular-nums">{description.trim().length}/{MAX_DESCRIPTION}</span>
               </span>
             </label>
 
-            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
               We&rsquo;ll include this page ({pathname}), your screen size and browser. Only you and Cofre&rsquo;s team can see the screenshot.
             </p>
 

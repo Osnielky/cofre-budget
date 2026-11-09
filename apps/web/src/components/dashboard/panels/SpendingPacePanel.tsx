@@ -22,8 +22,8 @@ function Ring({ pct, color, label, sub }: { pct: number; color: string; label: s
           <span className="text-lg font-bold tabular-nums">{pct.toFixed(0)}%</span>
         </div>
       </div>
-      <p className="text-[10px] font-semibold" style={{ color: 'var(--color-text-secondary)' }}>{label}</p>
-      <p className="text-[9px] -mt-1" style={{ color: 'var(--color-text-muted)' }}>{sub}</p>
+      <p className="text-fine font-semibold" style={{ color: 'var(--color-text-secondary)' }}>{label}</p>
+      <p className="text-fine -mt-1" style={{ color: 'var(--color-text-muted)' }}>{sub}</p>
     </div>
   );
 }

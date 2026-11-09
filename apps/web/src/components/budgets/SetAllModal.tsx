@@ -124,7 +124,7 @@ export default function SetAllModal({ month, categories, current, onClose, onSav
                         onClick={() => { if (avg && avg > 0) setRowAmount(row.categoryId, String(Math.round(avg))); }}
                         disabled={!avg || avg <= 0}
                         title={avg && avg > 0 ? 'Use this average' : 'No recent spending'}
-                        className="text-[11px] tabular-nums px-2 py-1 rounded-md transition-colors disabled:cursor-default hover:bg-[var(--color-elevated)]"
+                        className="text-fine tabular-nums px-2 py-1 rounded-md transition-colors disabled:cursor-default hover:bg-[var(--color-elevated)]"
                         style={{ color: 'var(--color-text-muted)' }}>
                         {avg != null && avg > 0 ? `avg $${fmt(avg)}` : '—'}
                       </button>

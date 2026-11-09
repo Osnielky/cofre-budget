@@ -14,7 +14,7 @@ export default function FixedVariablePanel({ split, monthLabel, loading }: {
     <Panel title="Fixed vs Variable" subtitle={monthLabel} loading={loading} skeleton="donut">
       {total === 0 ? <PanelEmpty message="No expenses this month. Mark categories as fixed in Settings → Categories." /> : (
         <div className="flex flex-col gap-3">
-          <div className="flex h-9 rounded-xl overflow-hidden text-[10px] font-bold">
+          <div className="flex h-9 rounded-xl overflow-hidden text-fine font-bold">
             {split.fixedTotal > 0 && (
               <div className="flex flex-col items-center justify-center" style={{ width: `${split.fixedPct}%`, background: `color-mix(in srgb, ${tc.violet} 45%, transparent)`, minWidth: 54 }}>
                 <span>Fixed {split.fixedPct.toFixed(0)}%</span>

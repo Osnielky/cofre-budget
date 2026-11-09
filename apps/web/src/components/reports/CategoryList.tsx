@@ -61,8 +61,8 @@ export default function CategoryList({ rows, cur, months, grouper, dir, prevLabe
                   <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'color-mix(in srgb, var(--color-text-muted) 14%, transparent)' }}>
                     <div className="h-full rounded-full" style={{ width: `${max > 0 ? (r.value / max) * 100 : 0}%`, background: r.color }} />
                   </div>
-                  <span className="text-[10.5px] tabular-nums w-10 text-right shrink-0" style={{ color: 'var(--color-text-muted)' }}>{r.share.toFixed(0)}%</span>
-                  <span className="hidden sm:inline text-[10.5px] tabular-nums w-14 text-right shrink-0" style={{ color: 'var(--color-text-muted)' }}>{r.count} tx</span>
+                  <span className="text-fine tabular-nums w-10 text-right shrink-0" style={{ color: 'var(--color-text-muted)' }}>{r.share.toFixed(0)}%</span>
+                  <span className="hidden sm:inline text-fine tabular-nums w-14 text-right shrink-0" style={{ color: 'var(--color-text-muted)' }}>{r.count} tx</span>
                   <Delta value={r.delta} inverse={dir === 'expense'} className="w-16 justify-end" />
                 </div>
               </div>
@@ -74,7 +74,7 @@ export default function CategoryList({ rows, cur, months, grouper, dir, prevLabe
               <div className="pb-4 pl-11 flex flex-col gap-3">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>By month · vs {prevLabel}: {money(r.prevValue)}</p>
+                    <p className="text-fine font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>By month · vs {prevLabel}: {money(r.prevValue)}</p>
                     {months.length > 1 ? (
                       <div className="h-28">
                         <ResponsiveContainer width="100%" height="100%">
@@ -92,7 +92,7 @@ export default function CategoryList({ rows, cur, months, grouper, dir, prevLabe
                     )}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>Top merchants</p>
+                    <p className="text-fine font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>Top merchants</p>
                     <ul className="flex flex-col gap-1">
                       {merchants.map((m) => (
                         <li key={m.name} className="flex items-center justify-between gap-2 text-[12px]">
@@ -103,7 +103,7 @@ export default function CategoryList({ rows, cur, months, grouper, dir, prevLabe
                     </ul>
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>Latest transactions</p>
+                    <p className="text-fine font-semibold mb-1" style={{ color: 'var(--color-text-muted)' }}>Latest transactions</p>
                     <ul className="flex flex-col gap-1">
                       {recent.map((t) => (
                         <li key={t.id} className="flex items-center justify-between gap-2 text-[12px]">

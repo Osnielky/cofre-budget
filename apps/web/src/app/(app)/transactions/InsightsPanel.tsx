@@ -49,7 +49,7 @@ export function InsightsPanel({
         <div className="flex items-center gap-2">
           <span aria-hidden="true">✨</span>
           <p className="text-sm font-bold tracking-tight">Financial Intelligence</p>
-          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md tracking-wider"
+          <span className="text-fine font-bold px-1.5 py-0.5 rounded-md tracking-wider"
             style={{ background: 'color-mix(in srgb, var(--color-card-violet) 20%, transparent)', color: 'var(--color-card-violet)' }}>
             BETA
           </span>
@@ -182,7 +182,7 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
               <p className="text-xs font-bold" style={{ color: 'var(--color-card-amber)' }}>
                 {unreviewedList.length} unreviewed subscription{unreviewedList.length !== 1 ? 's' : ''}
               </p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                 ${unreviewedTotal.toFixed(2)}/mo you haven&apos;t evaluated yet
               </p>
             </>
@@ -191,7 +191,7 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
               <p className="text-xs font-bold" style={{ color: 'var(--color-green)' }}>
                 All subscriptions reviewed ✓
               </p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                 Nothing new to evaluate this month
               </p>
             </>
@@ -202,7 +202,7 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
       {/* Possible duplicates */}
       {duplicateGroups.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold tracking-widest uppercase mb-2"
+          <p className="text-fine font-bold tracking-widest uppercase mb-2"
             style={{ color: 'var(--color-card-amber)' }}>
             Possible Duplicates
           </p>
@@ -213,21 +213,21 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
                   background: 'color-mix(in srgb, var(--color-card-amber) 8%, transparent)',
                   border: '1px solid color-mix(in srgb, var(--color-card-amber) 20%, transparent)',
                 }}>
-                <p className="text-[10px] font-semibold mb-2"
+                <p className="text-fine font-semibold mb-2"
                   style={{ color: 'var(--color-card-amber)' }}>
                   {cat.icon} {cat.name} — {merchants.length} services
                 </p>
                 {merchants.map((r) => (
                   <div key={r.normalized} className="flex items-center justify-between py-0.5">
-                    <span className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
+                    <span className="text-fine" style={{ color: 'var(--color-text-secondary)' }}>
                       {r.displayName}
                     </span>
-                    <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
+                    <span className="text-fine tabular-nums" style={{ color: 'var(--color-text-muted)' }}>
                       ${r.medianAmount.toFixed(2)}/mo
                     </span>
                   </div>
                 ))}
-                <p className="text-[10px] mt-2 pt-1.5 border-t"
+                <p className="text-fine mt-2 pt-1.5 border-t"
                   style={{ color: 'var(--color-text-muted)', borderColor: 'color-mix(in srgb, var(--color-card-amber) 20%, transparent)' }}>
                   Do you need both? ${merchants.reduce((s, r) => s + r.medianAmount, 0).toFixed(2)}/mo total
                 </p>
@@ -239,7 +239,7 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
 
       {/* Recurring this month */}
       <div>
-        <p className="text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-fine font-bold tracking-widest uppercase mb-2" style={{ color: 'var(--color-text-muted)' }}>
           Recurring this month
         </p>
         {recurringThisMonth.length === 0 ? (
@@ -259,23 +259,23 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
                     className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:brightness-110 transition-all">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold truncate">{r.displayName}</p>
-                      <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                      <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                         {r.frequency === 'weekly' ? 'Weekly' : r.frequency === 'monthly' ? 'Monthly' : 'Irregular'}
                         {' · '}avg ${r.medianAmount.toFixed(2)}
                       </p>
                     </div>
                     {!sub ? (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                      <span className="text-fine font-bold px-1.5 py-0.5 rounded shrink-0"
                         style={{ background: 'color-mix(in srgb, var(--color-card-amber) 15%, transparent)', color: 'var(--color-card-amber)' }}>
                         Review
                       </span>
                     ) : sub.status === 'to-cancel' ? (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                      <span className="text-fine font-bold px-1.5 py-0.5 rounded shrink-0"
                         style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)' }}>
                         To cancel
                       </span>
                     ) : (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                      <span className="text-fine font-bold px-1.5 py-0.5 rounded shrink-0"
                         style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>
                         Tracked
                       </span>
@@ -308,7 +308,7 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
       {/* To Cancel */}
       {toCancelList.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold tracking-widest uppercase mb-2" style={{ color: 'var(--color-rose)' }}>
+          <p className="text-fine font-bold tracking-widest uppercase mb-2" style={{ color: 'var(--color-rose)' }}>
             To Cancel
           </p>
           <div className="flex flex-col gap-1.5">
@@ -321,12 +321,12 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
                     {recurringMap.get(key)?.displayName ?? key}
                   </p>
                   {sub.note && (
-                    <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{sub.note}</p>
+                    <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{sub.note}</p>
                   )}
                 </div>
                 <button
                   onClick={() => onSubscriptionChange({ ...subscriptions, [key]: { ...sub, status: 'cancelled', cancelledAt: new Date().toISOString().slice(0, 10) } })}
-                  className="text-[10px] font-semibold px-2 py-1 rounded-lg shrink-0 hover:brightness-110 transition-all"
+                  className="text-fine font-semibold px-2 py-1 rounded-lg shrink-0 hover:brightness-110 transition-all"
                   style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)', border: '1px solid color-mix(in srgb, var(--color-green) 25%, transparent)' }}>
                   Done
                 </button>
@@ -339,7 +339,7 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
       {/* Still charging after cancellation */}
       {stillCharging.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold tracking-widest uppercase mb-2"
+          <p className="text-fine font-bold tracking-widest uppercase mb-2"
             style={{ color: 'var(--color-rose)' }}>
             Still Charging!
           </p>
@@ -355,7 +355,7 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
                     border: '1px solid color-mix(in srgb, var(--color-rose) 25%, transparent)',
                   }}>
                   <p className="text-xs font-semibold truncate">{r.displayName}</p>
-                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+                  <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
                     {postCharges.length} charge{postCharges.length !== 1 ? 's' : ''} after cancellation · ${postTotal.toFixed(2)} total
                   </p>
                   <button
@@ -363,7 +363,7 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
                       ...subscriptions,
                       [r.normalized]: { ...sub, status: 'to-cancel' },
                     })}
-                    className="mt-2 text-[10px] font-semibold px-2 py-1 rounded-lg transition-all hover:brightness-110"
+                    className="mt-2 text-fine font-semibold px-2 py-1 rounded-lg transition-all hover:brightness-110"
                     style={{
                       background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)',
                       color: 'var(--color-rose)',
@@ -383,12 +383,12 @@ function DigestView({ transactions, recurringMap, subscriptions, onSubscriptionC
         <div className="rounded-xl px-3 py-2.5 flex flex-col gap-1"
           style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
           {totalRecurring > 0 && (
-            <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+            <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
               ↻ <span className="font-bold tabular-nums">${totalRecurring.toFixed(2)}</span>/mo in recurring charges
             </p>
           )}
           {confirmedSavings > 0 && (
-            <p className="text-[11px]" style={{ color: 'var(--color-green)' }}>
+            <p className="text-fine" style={{ color: 'var(--color-green)' }}>
               ✓ <span className="font-bold tabular-nums">${confirmedSavings.toFixed(2)}</span>/mo saved
             </p>
           )}
@@ -470,13 +470,13 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
           style={{ color: isIncome ? 'var(--color-green)' : 'var(--color-rose)' }}>
           {isIncome ? '+' : '-'}${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
         </p>
-        <p className="text-[11px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-fine mt-1" style={{ color: 'var(--color-text-muted)' }}>
           {new Date(tx.date + 'T12:00:00').toLocaleDateString('en-US', {
             weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
           })}
         </p>
         {tx.categoryRef && (
-          <span className="inline-flex items-center gap-1.5 mt-2 px-2 py-1 rounded-lg text-[11px] font-semibold"
+          <span className="inline-flex items-center gap-1.5 mt-2 px-2 py-1 rounded-lg text-fine font-semibold"
             style={{ background: `${tx.categoryRef.color}18`, color: tx.categoryRef.color }}>
             <span>{tx.categoryRef.icon}</span>
             <span>{tx.categoryRef.name}</span>
@@ -486,18 +486,18 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
 
       {/* Details pills */}
       <div className="flex flex-wrap gap-1.5">
-        <span className="text-[10px] px-2 py-1 rounded-lg font-medium"
+        <span className="text-fine px-2 py-1 rounded-lg font-medium"
           style={{ background: 'var(--color-elevated)', color: 'var(--color-text-secondary)' }}>
           {tx.bankAccount?.accountName ?? 'Unknown account'}
         </span>
-        <span className="text-[10px] px-2 py-1 rounded-lg font-medium uppercase"
+        <span className="text-fine px-2 py-1 rounded-lg font-medium uppercase"
           style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)' }}>
           {tx.source}
         </span>
         {editingNote ? (
           <textarea
             autoFocus
-            className="w-full text-[11px] rounded-lg px-2 py-1.5 resize-none outline-none mt-0.5"
+            className="w-full text-fine rounded-lg px-2 py-1.5 resize-none outline-none mt-0.5"
             style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-primary)', color: 'var(--color-text-primary)', minHeight: '60px' }}
             value={noteValue}
             onChange={(e) => setNoteValue(e.target.value)}
@@ -507,7 +507,7 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
           />
         ) : (
           <button onClick={() => setEditingNote(true)}
-            className="text-[10px] px-2 py-1 rounded-lg font-medium transition-colors hover:brightness-125"
+            className="text-fine px-2 py-1 rounded-lg font-medium transition-colors hover:brightness-125"
             style={{ background: 'var(--color-elevated)', color: tx.note ? 'var(--color-text-secondary)' : 'color-mix(in srgb, var(--color-text-muted) 60%, transparent)' }}>
             {tx.note || '+ Add note'}
           </button>
@@ -524,7 +524,7 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
           <p className="text-xs font-bold" style={{ color: 'var(--color-rose)' }}>
             ⚠ Still charging after cancellation
           </p>
-          <p className="text-[10px] mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-fine mt-0.5" style={{ color: 'var(--color-text-muted)' }}>
             {postCancellationCharges.length} charge{postCancellationCharges.length !== 1 ? 's' : ''} detected after {sub!.cancelledAt}
           </p>
         </div>
@@ -537,11 +537,11 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
         <button
           className="w-full flex items-center justify-between px-3 py-3 transition-colors hover:brightness-110"
           onClick={() => setHistoryOpen((o) => !o)}>
-          <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-fine font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>
             History
           </p>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>
+            <span className="text-fine tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>
               {allOccurrences.length} {allOccurrences.length === 1 ? 'transaction' : 'transactions'}
               {thisYearTotal > 0 && ` · $${thisYearTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} in ${thisYear}`}
             </span>
@@ -561,17 +561,17 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
                 const isCurrent = o.id === tx.id;
                 return (
                   <div key={o.id} className="flex items-center justify-between">
-                    <span className="text-[11px] flex items-center gap-1.5"
+                    <span className="text-fine flex items-center gap-1.5"
                       style={{ color: isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                       {new Date(o.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       {isCurrent && (
-                        <span className="text-[9px] font-bold px-1 py-0.5 rounded"
+                        <span className="text-fine font-bold px-1 py-0.5 rounded"
                           style={{ background: 'var(--color-primary)', color: 'white' }}>
                           this
                         </span>
                       )}
                     </span>
-                    <span className="text-[11px] tabular-nums font-semibold"
+                    <span className="text-fine tabular-nums font-semibold"
                       style={{ color: isCurrent ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
                       ${Math.abs(Number(o.amount)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
@@ -580,17 +580,17 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
               })}
             </div>
             {allOccurrences.length > 6 && (
-              <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                 +{allOccurrences.length - 6} more transactions
               </p>
             )}
             {/* Summary footer */}
             <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: 'var(--color-border)' }}>
-              <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+              <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                 {thisYearCount} this year
                 {recInfo ? ` · ${recInfo.frequency === 'weekly' ? 'weekly' : recInfo.frequency === 'monthly' ? 'monthly' : 'irregular'}` : ''}
               </span>
-              <span className="text-[10px] font-semibold tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>
+              <span className="text-fine font-semibold tabular-nums" style={{ color: 'var(--color-text-secondary)' }}>
                 ${allTimeTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })} total
               </span>
             </div>
@@ -601,7 +601,7 @@ function TransactionDetailView({ tx, transactions, recurringMap, subscriptions, 
       {/* Subscription controls */}
       <div className="rounded-xl overflow-hidden"
         style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-        <p className="text-[10px] font-bold tracking-widest uppercase px-3 pt-3 pb-2" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-fine font-bold tracking-widest uppercase px-3 pt-3 pb-2" style={{ color: 'var(--color-text-muted)' }}>
           Subscription
         </p>
         <SubscriptionControls
@@ -649,7 +649,7 @@ function SubscriptionControls({ merchantKey, sub, subscriptions, onSubscriptionC
     return (
       <div className="px-3 pb-3">
         {sub?.status === 'cancelled' && (
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded mb-2 inline-block"
+          <span className="text-fine font-bold px-1.5 py-0.5 rounded mb-2 inline-block"
             style={{ background: 'var(--color-elevated)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>
             Cancelled
           </span>
@@ -667,12 +667,12 @@ function SubscriptionControls({ merchantKey, sub, subscriptions, onSubscriptionC
   if (sub.status === 'active') {
     return (
       <div className="px-3 pb-3 flex flex-col gap-2">
-        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded w-fit"
+        <span className="text-fine font-bold px-1.5 py-0.5 rounded w-fit"
           style={{ background: 'color-mix(in srgb, var(--color-green) 15%, transparent)', color: 'var(--color-green)' }}>
           Tracked
         </span>
         <textarea
-          className="w-full text-[11px] rounded-lg px-2 py-1.5 resize-none outline-none"
+          className="w-full text-fine rounded-lg px-2 py-1.5 resize-none outline-none"
           style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', minHeight: '52px' }}
           placeholder="Cancel instructions (e.g. cancel at netflix.com/account)…"
           value={noteValue}
@@ -692,12 +692,12 @@ function SubscriptionControls({ merchantKey, sub, subscriptions, onSubscriptionC
   /* to-cancel */
   return (
     <div className="px-3 pb-3 flex flex-col gap-2">
-      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded w-fit"
+      <span className="text-fine font-bold px-1.5 py-0.5 rounded w-fit"
         style={{ background: 'color-mix(in srgb, var(--color-rose) 15%, transparent)', color: 'var(--color-rose)' }}>
         Marked to cancel
       </span>
       {sub.note && (
-        <p className="text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>{sub.note}</p>
+        <p className="text-fine" style={{ color: 'var(--color-text-secondary)' }}>{sub.note}</p>
       )}
       <button
         onClick={() => update({ status: 'cancelled' })}
@@ -745,7 +745,7 @@ function SpendingInsight({ transactions, prevTransactions }: { transactions: Tra
         background: 'color-mix(in srgb, var(--color-violet) 8%, transparent)',
         border: '1px solid color-mix(in srgb, var(--color-violet) 22%, transparent)',
       }}>
-      <p className="text-[10px] font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--color-violet)' }}>
+      <p className="text-fine font-bold tracking-widest uppercase mb-1" style={{ color: 'var(--color-violet)' }}>
         Insight
       </p>
       <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
@@ -756,7 +756,7 @@ function SpendingInsight({ transactions, prevTransactions }: { transactions: Tra
         compared to the previous period.
       </p>
       {up && (
-        <a href="/budgets" className="text-[11px] font-semibold inline-block mt-1.5 no-underline" style={{ color: 'var(--color-violet)' }}>
+        <a href="/budgets" className="text-fine font-semibold inline-block mt-1.5 no-underline" style={{ color: 'var(--color-violet)' }}>
           Consider setting a budget →
         </a>
       )}
@@ -803,20 +803,20 @@ function SpendingByCategory({ transactions, projects }: { transactions: Transact
 
   return (
     <div className="rounded-xl px-3 py-3 mb-3" style={{ border: '1px solid var(--color-border)' }}>
-      <p className="text-[10px] font-bold tracking-widest uppercase mb-2.5" style={{ color: 'var(--color-text-muted)' }}>
+      <p className="text-fine font-bold tracking-widest uppercase mb-2.5" style={{ color: 'var(--color-text-muted)' }}>
         Spending by Category
       </p>
       <div className="flex items-center gap-3">
         <div className="relative shrink-0 rounded-full" style={{ width: 72, height: 72, background: `conic-gradient(${stops})` }}>
           <div className="absolute rounded-full flex flex-col items-center justify-center"
             style={{ inset: 9, background: 'var(--color-elevated)' }}>
-            <p className="text-[10.5px] font-bold tabular-nums leading-tight">${total.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
-            <p className="text-[8px]" style={{ color: 'var(--color-text-muted)' }}>Total</p>
+            <p className="text-fine font-bold tabular-nums leading-tight">${total.toLocaleString('en-US', { maximumFractionDigits: 0 })}</p>
+            <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Total</p>
           </div>
         </div>
         <ul className="flex-1 min-w-0 flex flex-col gap-1">
           {top.map((s) => (
-            <li key={s.name} className="flex items-center gap-1.5 text-[10px] min-w-0">
+            <li key={s.name} className="flex items-center gap-1.5 text-fine min-w-0">
               <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
               <span className="truncate flex-1" style={{ color: 'var(--color-text-secondary)' }}>{s.name}</span>
               <span className="font-bold tabular-nums shrink-0">${Math.round(s.total)}</span>

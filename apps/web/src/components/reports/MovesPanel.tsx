@@ -8,7 +8,7 @@ export default function MovesPanel({ moves, prevLabel }: { moves: CategoryMoves;
   if (moves.up.length === 0 && moves.down.length === 0) return <Empty text={`Nothing to compare with ${prevLabel} yet.`} />;
   const Column = ({ title, rows, tone }: { title: string; rows: CategoryMoves['up']; tone: 'up' | 'down' }) => (
     <div className="min-w-0 flex-1">
-      <p className="text-[10px] font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--color-text-muted)' }}>{title}</p>
+      <p className="text-fine font-semibold uppercase tracking-wider mb-1.5" style={{ color: 'var(--color-text-muted)' }}>{title}</p>
       {rows.length === 0 ? <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>None</p> : (
         <ul className="flex flex-col gap-1.5">
           {rows.map((r) => {

@@ -22,11 +22,11 @@ export default function KpiStrip({ summary, months, prevLabel, loading, extras =
       {tiles.map((t) => (
         <div key={t.label} className="rounded-2xl p-3.5 sm:p-4 flex flex-col gap-1 min-w-0"
           style={{ background: `linear-gradient(140deg, color-mix(in srgb, ${t.color} 9%, transparent), var(--color-surface) 60%)`, backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
-          <p className="text-[11px] sm:text-xs font-medium flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+          <p className="text-xs font-medium flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
             <span aria-hidden="true" className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />{t.label}
           </p>
           <p className="text-[20px] sm:text-[24px] font-bold tabular-nums leading-7 truncate">{loading ? <span className="opacity-30">—</span> : t.value}</p>
-          <p className="text-[11px] flex items-center gap-1.5 min-w-0" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-fine flex items-center gap-1.5 min-w-0" style={{ color: 'var(--color-text-muted)' }}>
             {!loading && <Delta value={t.delta} inverse={t.inverse} points={t.points} />}
             <span className="truncate">{loading ? '' : `vs ${t.prev} · ${prevLabel}`}</span>
           </p>
@@ -40,9 +40,9 @@ export default function KpiStrip({ summary, months, prevLabel, loading, extras =
         {extras.map((e) => (
           <div key={e.label} className="rounded-2xl p-3 sm:p-3.5 flex flex-col gap-0.5 min-w-0"
             style={{ background: 'var(--color-surface)', backdropFilter: 'var(--glass-blur)', WebkitBackdropFilter: 'var(--glass-blur)', border: 'var(--glass-border)', boxShadow: 'var(--glass-shadow)' }}>
-            <p className="text-[10.5px] sm:text-[11px] font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>{e.label}</p>
+            <p className="text-fine font-medium truncate" style={{ color: 'var(--color-text-secondary)' }}>{e.label}</p>
             <p className="text-[16px] sm:text-[18px] font-bold tabular-nums leading-6 truncate">{e.value}</p>
-            <p className="text-[10.5px] truncate" style={{ color: 'var(--color-text-muted)' }}>{e.sub}</p>
+            <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{e.sub}</p>
           </div>
         ))}
       </div>

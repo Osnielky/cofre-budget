@@ -22,12 +22,12 @@ export default function SpendingCalendarPanel({ cells, monthLabel, picker, loadi
         <div className="flex flex-col gap-2">
           <div className="grid grid-cols-7 gap-1 text-center">
             {DOW.map((d, i) => (
-              <span key={`dow-${i}`} className="text-[9px] font-semibold" style={{ color: 'var(--color-text-muted)' }}>{d}</span>
+              <span key={`dow-${i}`} className="text-fine font-semibold" style={{ color: 'var(--color-text-muted)' }}>{d}</span>
             ))}
             {cells.map((c, i) => (
               <div key={i}
                 onMouseEnter={() => c.day && setHover(c)} onMouseLeave={() => setHover(null)}
-                className="aspect-square rounded-md flex items-center justify-center text-[9px] font-medium"
+                className="aspect-square rounded-md flex items-center justify-center text-fine font-medium"
                 style={c.day == null ? { opacity: 0 } : {
                   background: c.intensity === 0
                     ? 'color-mix(in srgb, currentColor 4%, transparent)'
@@ -39,7 +39,7 @@ export default function SpendingCalendarPanel({ cells, monthLabel, picker, loadi
               </div>
             ))}
           </div>
-          <p className="text-[10px] text-center h-4" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-fine text-center h-4" style={{ color: 'var(--color-text-muted)' }}>
             {hover && hover.day != null
               ? `${monthLabel.split(' ')[0]} ${hover.day} — $${fmt(hover.total)}`
               : 'Darker = more spent · hover a day'}

@@ -74,13 +74,13 @@ export default function TradingPerformance({ data, view, onEdit, onView }: {
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
         <div>
           <h3 className="text-sm font-bold" style={{ color: 'var(--color-text-primary)' }}>Performance</h3>
-          <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
             {scope}
             {current.from && current.to ? ` · ${dateLabel(current.from)} – ${dateLabel(current.to)}` : ''}
             {' · '}FIFO lots, realized only
           </p>
         </div>
-        <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{t.total} trade{t.total === 1 ? '' : 's'} · {t.closed} closed</span>
+        <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{t.total} trade{t.total === 1 ? '' : 's'} · {t.closed} closed</span>
       </div>
 
       {/* Account switcher: the project total (when there is more than one account), then each account on its own */}
@@ -92,7 +92,7 @@ export default function TradingPerformance({ data, view, onEdit, onView }: {
             label: <>{tab.name}<span className="tabular-nums" style={{ color: view === tab.id ? 'inherit' : pnlColor(tab.pnl), opacity: view === tab.id ? 0.8 : 1 }}>{money(tab.pnl, true)}</span></>,
           }))} />
         {onEdit && (
-          <button type="button" onClick={onEdit} className="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg hover:brightness-110"
+          <button type="button" onClick={onEdit} className="text-fine font-semibold px-2.5 py-1.5 rounded-lg hover:brightness-110"
             style={{ color: 'var(--color-primary)', border: '1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)' }}>
             + Add account
           </button>
@@ -124,14 +124,14 @@ export default function TradingPerformance({ data, view, onEdit, onView }: {
               { label: 'Cashed out', value: money(current.withdrawals), clr: current.withdrawals ? 'var(--color-card-sky)' : 'var(--color-text-secondary)', sub: lastCashOut ? `last ${dateLabel(lastCashOut.date)}` : 'nothing taken out yet' },
             ].map((k) => (
               <div key={k.label} className="p-3" style={panel}>
-                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{k.label}</p>
+                <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{k.label}</p>
                 <p className="font-bold text-base mt-1 truncate" style={{ color: k.clr }}>{k.value}</p>
-                <p className="text-[10px] mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>{k.sub}</p>
+                <p className="text-fine mt-0.5 truncate" style={{ color: 'var(--color-text-muted)' }}>{k.sub}</p>
               </div>
             ))}
           </div>
 
-          <div className="p-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px]" style={{ ...panel, color: 'var(--color-text-secondary)' }}>
+          <div className="p-3 flex flex-wrap gap-x-5 gap-y-1 text-fine" style={{ ...panel, color: 'var(--color-text-secondary)' }}>
             <span>Net result <strong style={{ color: pnlColor(current.netResult) }}>{money(current.netResult, true)}</strong></span>
             {t.avgWin != null && <span>Avg win <strong style={{ color: 'var(--color-green)' }}>{money(t.avgWin)}</strong></span>}
             {t.avgLoss != null && <span>Avg loss <strong style={{ color: 'var(--color-rose)' }}>{money(t.avgLoss)}</strong></span>}
@@ -145,14 +145,14 @@ export default function TradingPerformance({ data, view, onEdit, onView }: {
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             {/* By symbol */}
             <div className="p-3 sm:p-4 min-w-0" style={panel}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>By symbol</p>
+              <p className="text-fine font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>By symbol</p>
               {current.bySymbol.length === 0 ? <Empty>No symbols yet.</Empty> : (
                 <ul className="flex flex-col divide-y" style={{ borderColor: 'var(--color-border)' }}>
                   {current.bySymbol.slice(0, 12).map((s) => (
                     <li key={s.symbol} className="flex items-center gap-3 py-2 text-xs">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{s.symbol}</p>
-                        <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                        <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
                           {s.closedTrades} closed · {s.wins}W{s.openQuantity ? ` · ${qty(s.openQuantity)} open` : ''}
                         </p>
                       </div>
@@ -165,23 +165,23 @@ export default function TradingPerformance({ data, view, onEdit, onView }: {
 
             {/* Open positions */}
             <div className="p-3 sm:p-4 min-w-0" style={panel}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>Open positions · cost basis</p>
+              <p className="text-fine font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>Open positions · cost basis</p>
               {current.openPositions.length === 0 ? <Empty>Nothing open — everything is closed out.</Empty> : (
                 <ul className="flex flex-col divide-y" style={{ borderColor: 'var(--color-border)' }}>
                   {current.openPositions.slice(0, 12).map((p) => (
                     <li key={p.symbol} className="flex items-center gap-3 py-2 text-xs">
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>
-                          {p.symbol}{p.side === 'short' && <span className="ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded" style={{ background: 'color-mix(in srgb, var(--color-amber) 16%, transparent)', color: 'var(--color-amber)' }}>SHORT</span>}
+                          {p.symbol}{p.side === 'short' && <span className="ml-1.5 text-fine font-bold px-1.5 py-0.5 rounded" style={{ background: 'color-mix(in srgb, var(--color-amber) 16%, transparent)', color: 'var(--color-amber)' }}>SHORT</span>}
                         </p>
-                        <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{qty(p.quantity)} @ {money(p.avgCost)} · since {dateLabel(p.since)}{showAccountTag && p.account ? ` · ${p.account}` : ''}</p>
+                        <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{qty(p.quantity)} @ {money(p.avgCost)} · since {dateLabel(p.since)}{showAccountTag && p.account ? ` · ${p.account}` : ''}</p>
                       </div>
                       <span className="font-bold tabular-nums shrink-0" style={{ color: 'var(--color-text-primary)' }}>{money(p.costBasis)}</span>
                     </li>
                   ))}
                 </ul>
               )}
-              <p className="text-[10px] mt-2" style={{ color: 'var(--color-text-muted)' }}>Current value needs live prices — coming with Plaid Holdings.</p>
+              <p className="text-fine mt-2" style={{ color: 'var(--color-text-muted)' }}>Current value needs live prices — coming with Plaid Holdings.</p>
             </div>
           </div>
 
@@ -189,39 +189,39 @@ export default function TradingPerformance({ data, view, onEdit, onView }: {
           {cashFlows.length > 0 && (
             <div className="p-3 sm:p-4 min-w-0" style={panel} data-testid="cash-flows">
               <div className="flex items-baseline justify-between gap-3 mb-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Deposits & cash-outs</p>
-                <p className="text-[10px] hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>Your own money moving — not profit, not a cost</p>
+                <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Deposits & cash-outs</p>
+                <p className="text-fine hidden sm:block" style={{ color: 'var(--color-text-muted)' }}>Your own money moving — not profit, not a cost</p>
               </div>
               <ul className="flex flex-col divide-y" style={{ borderColor: 'var(--color-border)' }}>
                 {cashFlows.slice(0, 10).map((f, i) => {
                   const out = f.kind === 'withdrawal';
                   return (
                     <li key={`${f.date}-${i}`} className="flex items-center gap-3 py-2 text-xs">
-                      <span className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-bold shrink-0"
+                      <span className="w-6 h-6 rounded-lg flex items-center justify-center text-fine font-bold shrink-0"
                         style={{ background: `color-mix(in srgb, ${out ? 'var(--color-card-sky)' : 'var(--color-green)'} 16%, transparent)`, color: out ? 'var(--color-card-sky)' : 'var(--color-green)' }}>
                         {out ? '↑' : '↓'}
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{out ? 'Cashed out' : 'Deposited'}{showAccountTag && f.account ? ` · ${f.account}` : ''}</p>
-                        <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{dateLabel(f.date)}{f.name ? ` · ${f.name}` : ''}</p>
+                        <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{dateLabel(f.date)}{f.name ? ` · ${f.name}` : ''}</p>
                       </div>
                       <span className="font-bold tabular-nums shrink-0" style={{ color: out ? 'var(--color-card-sky)' : 'var(--color-green)' }}>{out ? '-' : '+'}{money(f.amount)}</span>
                     </li>
                   );
                 })}
               </ul>
-              {cashFlows.length > 10 && <p className="text-[10px] mt-2" style={{ color: 'var(--color-text-muted)' }}>Showing the last 10 of {cashFlows.length}.</p>}
+              {cashFlows.length > 10 && <p className="text-fine mt-2" style={{ color: 'var(--color-text-muted)' }}>Showing the last 10 of {cashFlows.length}.</p>}
             </div>
           )}
 
           {/* Recent closed trades */}
           {current.recentClosed.length > 0 && (
             <div className="p-3 sm:p-4 min-w-0" style={panel}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>Recent closed trades</p>
+              <p className="text-fine font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-muted)' }}>Recent closed trades</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-xs" style={{ minWidth: showAccountTag ? 520 : 420 }}>
                   <thead>
-                    <tr className="text-[10px] uppercase tracking-wider text-left" style={{ color: 'var(--color-text-muted)' }}>
+                    <tr className="text-fine uppercase tracking-wider text-left" style={{ color: 'var(--color-text-muted)' }}>
                       <th className="py-1 pr-2 font-semibold">Closed</th><th className="py-1 pr-2 font-semibold">Symbol</th>{showAccountTag && <th className="py-1 pr-2 font-semibold">Account</th>}<th className="py-1 pr-2 font-semibold">Side</th>
                       <th className="py-1 pr-2 font-semibold text-right">Qty</th><th className="py-1 pr-2 font-semibold text-right">Entry → Exit</th><th className="py-1 font-semibold text-right">P&L</th>
                     </tr>
@@ -303,17 +303,17 @@ export function MonthlyPanel({ months }: { months: MonthSummary[] }) {
 
   const figure = (label: string, value: string, sub: string, clr = 'var(--color-text-primary)') => (
     <div key={label} className="min-w-0">
-      <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
+      <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
       <p className="text-sm font-bold tabular-nums truncate" style={{ color: clr }}>{value}</p>
-      <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{sub}</p>
+      <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{sub}</p>
     </div>
   );
 
   return (
     <div className="p-3 sm:p-4" style={panel} data-testid="monthly-panel">
       <div className="flex items-baseline justify-between gap-3 flex-wrap mb-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Realized P&L by month</p>
-        <div className="flex items-center gap-3 text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+        <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Realized P&L by month</p>
+        <div className="flex items-center gap-3 text-fine" style={{ color: 'var(--color-text-muted)' }}>
           <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-2.5 rounded-sm" style={{ background: 'var(--color-green)' }} />month</span>
           <span className="flex items-center gap-1"><span className="inline-block w-4 rounded-full" style={{ height: 2, background: cumColor }} />cumulative</span>
           <span>{n} month{n === 1 ? '' : 's'}</span>
@@ -336,11 +336,11 @@ export function MonthlyPanel({ months }: { months: MonthSummary[] }) {
                     <title>{`${monthLabel(m.month)}: ${money(m.realized, true)} · ${m.closedTrades} closed · cumulative ${money(m.cumulative, true)}`}</title>
                     {h > 0 && <rect x={x} y={y} width={barW} height={h} rx={3} fill={pos ? 'var(--color-green)' : 'var(--color-rose)'} opacity={0.85} />}
                     {showValues && m.active && m.realized !== 0 && (
-                      <text x={cx(i)} y={pos ? y - 4 : y0 + h + 11} textAnchor="middle" fontSize="10" fontWeight="600" fill={pos ? 'var(--color-green)' : 'var(--color-rose)'}>{shortMoney(m.realized)}</text>
+                      <text x={cx(i)} y={pos ? y - 4 : y0 + h + 11} textAnchor="middle" className="text-fine" fontWeight="600" fill={pos ? 'var(--color-green)' : 'var(--color-rose)'}>{shortMoney(m.realized)}</text>
                     )}
-                    <text x={cx(i)} y={P + 14} textAnchor="middle" fontSize="9" fill={m.active ? 'var(--color-text-secondary)' : 'var(--color-text-muted)'}>{monthLabel(m.month)}</text>
+                    <text x={cx(i)} y={P + 14} textAnchor="middle" className="text-fine" fill={m.active ? 'var(--color-text-secondary)' : 'var(--color-text-muted)'}>{monthLabel(m.month)}</text>
                     {m.active && slot >= 34 && (
-                      <text x={cx(i)} y={P + 25} textAnchor="middle" fontSize="9" fill="var(--color-text-muted)">{m.closedTrades ? `${m.closedTrades} closed` : '—'}</text>
+                      <text x={cx(i)} y={P + 25} textAnchor="middle" className="text-fine" fill="var(--color-text-muted)">{m.closedTrades ? `${m.closedTrades} closed` : '—'}</text>
                     )}
                   </g>
                 );
@@ -349,7 +349,7 @@ export function MonthlyPanel({ months }: { months: MonthSummary[] }) {
                 <>
                   <path d={line} fill="none" stroke={cumColor} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" opacity={0.95} />
                   {cum.map((v, i) => <circle key={i} cx={cx(i)} cy={cy(v)} r={i === n - 1 ? 3.5 : 2} fill={cumColor} />)}
-                  {showCumLabel && <text x={cx(n - 1)} y={cy(cum[n - 1]) - 7} textAnchor={n > 2 ? 'end' : 'middle'} fontSize="10" fontWeight="700" fill={cumColor}>{shortMoney(cum[n - 1])}</text>}
+                  {showCumLabel && <text x={cx(n - 1)} y={cy(cum[n - 1]) - 7} textAnchor={n > 2 ? 'end' : 'middle'} className="text-fine" fontWeight="700" fill={cumColor}>{shortMoney(cum[n - 1])}</text>}
                 </>
               )}
             </svg>

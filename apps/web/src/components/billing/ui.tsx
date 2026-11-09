@@ -80,7 +80,7 @@ export function IconChip({ name, color, size = 40 }: { name: IconName; color: st
 
 export function Pill({ children, color }: { children: ReactNode; color: string }) {
   return (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold"
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-fine font-semibold"
       style={{ color, background: `color-mix(in srgb, ${color} 15%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 35%, transparent)` }}>
       {children}
     </span>

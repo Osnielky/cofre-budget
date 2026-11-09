@@ -206,7 +206,7 @@ export function PaymentMethodCard({ overview, sub, notice, actions }: {
         </p>
       )}
       <div className="flex items-center gap-3 rounded-xl p-3" style={{ border: `1px solid ${pm ? 'var(--color-border)' : 'color-mix(in srgb, var(--color-amber) 45%, transparent)'}`, background: 'var(--color-elevated)' }}>
-        <span className="inline-flex items-center justify-center rounded-md px-2 h-8 min-w-12 text-[11px] font-black tracking-wide shrink-0"
+        <span className="inline-flex items-center justify-center rounded-md px-2 h-8 min-w-12 text-fine font-black tracking-wide shrink-0"
           style={{ background: 'var(--color-text-primary)', color: 'var(--color-surface)' }}>
           {d.badge ?? <Icon name={pm?.kind === 'bank' ? 'bank' : 'card'} size={16} />}
         </span>
@@ -240,7 +240,7 @@ export function PaymentMethodCard({ overview, sub, notice, actions }: {
             : { background: 'var(--color-primary)', color: 'var(--btn-primary-text, #fff)' }}>
           <Icon name="card" size={16} /> {opening ? 'Opening Stripe…' : pm ? 'Change payment method' : 'Add payment method'}
         </button>
-        <p className="text-[11px] leading-snug text-center" style={{ color: error ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
+        <p className="text-fine leading-snug text-center" style={{ color: error ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
           {error ?? 'Opens Stripe, our payment partner, in this tab. Save a card or bank account there and you’ll land back here.'}
         </p>
       </div>
@@ -315,7 +315,7 @@ export function TrialCard({ sub, pastDue }: { sub: SubscriptionInfo; pastDue: Pa
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-3xl font-bold tabular-nums" style={{ color: 'var(--color-text-primary)' }}>{big}</span>
-          <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{small}</span>
+          <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{small}</span>
         </div>
       </div>
     );
@@ -325,7 +325,7 @@ export function TrialCard({ sub, pastDue }: { sub: SubscriptionInfo; pastDue: Pa
       <span style={{ color: 'var(--color-green)' }}><Icon name="shield" size={20} /></span>
       <div>
         <p className="text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>Secure billing powered by Stripe</p>
-        <p className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>Your card details are handled by Stripe and never stored by Cofre.</p>
+        <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Your card details are handled by Stripe and never stored by Cofre.</p>
       </div>
     </div>
   );

@@ -199,7 +199,7 @@ export default function DashboardPage() {
     : `${NUM_WORDS[budgetsOver] ?? budgetsOver} budget${budgetsOver === 1 ? '' : 's'} need${budgetsOver === 1 ? 's' : ''} attention before the end of ${monthName}.`;
 
   /* Pill CTAs: roomy on desktop, compact on phones so the three controls share a row. */
-  const pill = 'items-center justify-center rounded-full text-[11.5px] sm:text-[12.5px] font-semibold uppercase no-underline transition-all px-4 py-2.5 sm:px-[26px] sm:py-3.5 tracking-[0.12em] sm:tracking-[0.18em] whitespace-nowrap';
+  const pill = 'items-center justify-center rounded-full text-fine sm:text-[12.5px] font-semibold uppercase no-underline transition-all px-4 py-2.5 sm:px-[26px] sm:py-3.5 tracking-[0.12em] sm:tracking-[0.18em] whitespace-nowrap';
 
   return (
     <div className="contents">
@@ -225,7 +225,7 @@ export default function DashboardPage() {
               {loading && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--color-green)' }} />}
               <div className="flex items-center gap-0.5 rounded-full px-1.5 py-1" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
                 <button onClick={() => !isEarliestMonth && setMonth(prevMonth)} disabled={isEarliestMonth} aria-label="Previous month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-not-allowed" style={{ color: 'var(--color-text-secondary)' }}>‹</button>
-                <span className="text-[11.5px] sm:text-[12.5px] font-semibold uppercase px-1 min-w-24 sm:min-w-28 text-center tracking-[0.08em] sm:tracking-[0.12em]">{monthLabel(month)}</span>
+                <span className="text-fine sm:text-[12.5px] font-semibold uppercase px-1 min-w-24 sm:min-w-28 text-center tracking-[0.08em] sm:tracking-[0.12em]">{monthLabel(month)}</span>
                 <button onClick={() => setMonth(nextMonth)} disabled={isCurrentMonth} aria-label="Next month" className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-colors hover:bg-[rgba(128,128,128,0.15)] disabled:opacity-30 disabled:cursor-default" style={{ color: 'var(--color-text-secondary)' }}>›</button>
               </div>
               <Link href="/reports"

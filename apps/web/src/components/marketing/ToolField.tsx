@@ -41,7 +41,7 @@ export default function ToolField({ label, value, onChange, prefix, suffix, hint
         />
         {suffix && <span className="absolute right-3 text-sm" style={{ color: 'var(--color-text-muted)' }}>{suffix}</span>}
       </span>
-      {hint && <span className="text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{hint}</span>}
+      {hint && <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{hint}</span>}
     </label>
   );
 }

@@ -24,7 +24,7 @@ const fieldStyle: React.CSSProperties = {
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
-    <span className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
+    <span className="block text-fine font-bold uppercase tracking-widest mb-1.5" style={{ color: 'var(--color-text-muted)' }}>
       {children}
     </span>
   );

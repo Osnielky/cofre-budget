@@ -89,7 +89,7 @@ function RowMenu({ row, expanded, handlers }: { row: DerivedRow; expanded: boole
 }
 
 function MobileLabel({ children }: { children: React.ReactNode }) {
-  return <p className="budget-mlabel text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--color-text-muted)' }}>{children}</p>;
+  return <p className="budget-mlabel text-fine font-semibold uppercase tracking-wider mb-0.5" style={{ color: 'var(--color-text-muted)' }}>{children}</p>;
 }
 
 function CategoryBudgetRow({ row, trendLabels, selected, expanded, flash, deleting, ...handlers }: Props) {
@@ -114,7 +114,7 @@ function CategoryBudgetRow({ row, trendLabels, selected, expanded, flash, deleti
         </span>
         <div className="min-w-0">
           <p className="text-[13px] font-semibold truncate" title={row.name}>{row.name}</p>
-          <p className="text-[10.5px] truncate flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-fine truncate flex items-center gap-1.5" style={{ color: 'var(--color-text-muted)' }}>
             {row.modified ? (
               <span style={{ color: 'var(--color-violet)' }} className="font-semibold">Edited · was {formatMoney(row.originalCents)}</span>
             ) : attention ? (

@@ -396,7 +396,7 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
                   className="flex flex-col items-center py-2.5 rounded-xl"
                   style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}
                 >
-                  <p className="text-[9px] uppercase tracking-widest font-bold" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
+                  <p className="text-fine uppercase tracking-widest font-bold" style={{ color: 'var(--color-text-muted)' }}>{s.label}</p>
                   <p className="font-black text-base mt-0.5 tabular-nums" style={{ color: s.color }}>{s.value}</p>
                 </div>
               ))}
@@ -446,7 +446,7 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                    <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                       Bank name <span style={{ color: 'var(--color-card-orange)' }}>*</span>
                     </label>
                     <input
@@ -457,7 +457,7 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
+                    <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>
                       Account name <span style={{ color: 'var(--color-card-orange)' }}>*</span>
                     </label>
                     <input
@@ -471,7 +471,7 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
 
                 <div className="flex flex-wrap gap-3 items-end">
                   <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
-                    <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</label>
+                    <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Type</label>
                     <SelectMenu
                       value={d.accountType}
                       onChange={(v) => update({ accountType: v as NewAccountDraft['accountType'] })}
@@ -485,7 +485,7 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
                     />
                   </div>
                   <div className="flex flex-col gap-1" style={{ width: '90px' }}>
-                    <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Last 4</label>
+                    <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Last 4</label>
                     <input
                       type="text" placeholder="1234" maxLength={4} value={d.last4} disabled={importing}
                       onChange={(e) => update({ last4: e.target.value.replace(/\D/g, '').slice(0, 4) })}
@@ -494,7 +494,7 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
                     />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</label>
+                    <label className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Color</label>
                     <div className="flex items-center gap-2 h-[38px]">
                       {ACC_COLORS.map((c) => (
                         <button
@@ -561,7 +561,7 @@ export default function ImportReconcileModal({ accounts, onClose, onImported, on
         {/* Import progress */}
         {importing && progress && (
           <div className="px-5 pt-3">
-            <div className="flex items-center justify-between mb-1.5 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+            <div className="flex items-center justify-between mb-1.5 text-fine" style={{ color: 'var(--color-text-muted)' }}>
               <span>Importing transactions…</span>
               <span className="tabular-nums">{progress.done.toLocaleString()} / {progress.total.toLocaleString()}</span>
             </div>
@@ -660,7 +660,7 @@ function FileCard({
         <span className="text-base shrink-0">{entry.error ? '⚠️' : '📄'}</span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold truncate" style={{ color: 'var(--color-text-primary)' }}>{entry.name}</p>
-          <p className="text-[11px] truncate" style={{ color: entry.error ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
+          <p className="text-fine truncate" style={{ color: entry.error ? 'var(--color-rose)' : 'var(--color-text-muted)' }}>
             {entry.error ?? <>
               {entry.rows.length.toLocaleString()} transaction{entry.rows.length !== 1 ? 's' : ''} · {detectedLabel(entry.fingerprint)}
               {entry.last4 && <> ••{entry.last4}</>}
@@ -669,7 +669,7 @@ function FileCard({
         </div>
         {!entry.error && (
           <button type="button" onClick={onTogglePreview} disabled={disabled}
-            className="text-[11px] font-semibold px-2 py-1 rounded-lg shrink-0 hover:bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] transition-colors"
+            className="text-fine font-semibold px-2 py-1 rounded-lg shrink-0 hover:bg-[color-mix(in_srgb,var(--color-primary)_10%,transparent)] transition-colors"
             style={{ color: 'var(--color-text-muted)' }}>
             {entry.showPreview ? 'Hide' : 'Preview'}
           </button>
@@ -701,7 +701,7 @@ function FileCard({
                 ]}
               />
             </div>
-            <span className="text-[11px] tabular-nums shrink-0" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="text-fine tabular-nums shrink-0" style={{ color: 'var(--color-text-muted)' }}>
               {creating ? <span style={{ color: 'var(--color-primary)' }}>{entry.rows.length} new</span>
                 : entry.dupChecking ? 'Checking…'
                 : entry.dupCheck ? <>
@@ -712,14 +712,14 @@ function FileCard({
             </span>
           </div>
           {entry.dupCheck && entry.dupCheck.elsewhereCount > 0 && (
-            <p className="text-[11px]" style={{ color: 'var(--color-amber)' }}>
+            <p className="text-fine" style={{ color: 'var(--color-amber)' }}>
               {entry.dupCheck.elsewhereCount} of the skipped rows {entry.dupCheck.elsewhereCount === 1 ? 'lives' : 'live'} in {formatElsewhere(entry.dupCheck.elsewhereAccounts)}, not in this account.
             </p>
           )}
           {ranked && (
-            <div className="flex items-center gap-2 text-[11px]">
+            <div className="flex items-center gap-2 text-fine">
               <span
-                className="px-1.5 py-0.5 rounded-md font-bold text-[10px] uppercase tracking-wide"
+                className="px-1.5 py-0.5 rounded-md font-bold text-fine uppercase tracking-wide"
                 style={{ background: `color-mix(in srgb, ${tierColor} 15%, transparent)`, color: tierColor, border: `1px solid color-mix(in srgb, ${tierColor} 30%, transparent)` }}
               >
                 {TIER_LABELS[tier]}
@@ -737,9 +737,9 @@ function FileCard({
             <table className="w-full text-xs">
               <thead className="sticky top-0">
                 <tr style={{ background: 'var(--color-elevated)', borderBottom: '1px solid var(--color-border)' }}>
-                  <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Date</th>
-                  <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Description</th>
-                  <th className="text-right px-3 py-2 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Amount</th>
+                  <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-fine" style={{ color: 'var(--color-text-muted)' }}>Date</th>
+                  <th className="text-left px-3 py-2 font-semibold uppercase tracking-wider text-fine" style={{ color: 'var(--color-text-muted)' }}>Description</th>
+                  <th className="text-right px-3 py-2 font-semibold uppercase tracking-wider text-fine" style={{ color: 'var(--color-text-muted)' }}>Amount</th>
                 </tr>
               </thead>
               <tbody>
@@ -889,7 +889,7 @@ function SelectMenu({
               >
                 <span className="truncate">{o.label}</span>
                 {o.note && (
-                  <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md"
+                  <span className="shrink-0 text-fine font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md"
                     style={{
                       color: o.noteColor ?? 'var(--color-text-muted)',
                       background: `color-mix(in srgb, ${o.noteColor ?? 'var(--color-text-muted)'} 14%, transparent)`,

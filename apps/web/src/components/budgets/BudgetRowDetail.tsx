@@ -44,16 +44,16 @@ export default function BudgetRowDetail({ budget, txs, avg3mo, raiseTo, onRaise,
           <div className="px-5 py-3 flex items-center gap-6 flex-wrap"
             style={{ background: `linear-gradient(135deg, ${catColor}08 0%, transparent 100%)`, borderBottom: '1px solid var(--color-border)' }}>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>This month</p>
+              <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>This month</p>
               <p className="text-lg font-black" style={{ color: catColor }}>${fmt(thisMonth)}</p>
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>3-month avg</p>
+              <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>3-month avg</p>
               <p className="text-lg font-black" style={{ color: 'var(--color-text-primary)' }}>{avg3mo != null && avg3mo > 0 ? `$${fmt(avg3mo)}` : '—'}</p>
             </div>
             {biggest && (
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Biggest</p>
+                <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>Biggest</p>
                 <p className="text-sm font-bold truncate" style={{ color: 'var(--color-text-primary)' }}>
                   {biggest.name} · ${fmt(Math.abs(Number(biggest.amount)))}
                 </p>
@@ -78,17 +78,17 @@ export default function BudgetRowDetail({ budget, txs, avg3mo, raiseTo, onRaise,
             )}
             <div className="flex items-center gap-2 ml-auto shrink-0">
               <button type="button" onClick={onRaise}
-                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all"
+                className="text-fine font-semibold px-3 py-1.5 rounded-lg hover:brightness-110 transition-all"
                 style={{ background: `${catColor}22`, color: catColor, border: `1px solid ${catColor}44` }}>
                 Raise to ${fmt(raiseTo)}
               </button>
               <Link href="/transactions"
-                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg no-underline transition-colors hover:bg-[var(--color-elevated)]"
+                className="text-fine font-semibold px-3 py-1.5 rounded-lg no-underline transition-colors hover:bg-[var(--color-elevated)]"
                 style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
                 See all {expenses.length}
               </Link>
               <button type="button" onClick={onDelete} disabled={deleting}
-                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                className="text-fine font-semibold px-3 py-1.5 rounded-lg hover:bg-red-500/10 transition-colors disabled:opacity-40"
                 style={{ color: 'var(--color-rose)' }}>
                 {deleting ? '…' : 'Delete'}
               </button>
@@ -105,8 +105,8 @@ export default function BudgetRowDetail({ budget, txs, avg3mo, raiseTo, onRaise,
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold truncate">{tx.name}</p>
                   <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>{fmtDate(tx.date)}</span>
-                    {tx.bankAccount && <span className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>· {tx.bankAccount.accountName}</span>}
+                    <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{fmtDate(tx.date)}</span>
+                    {tx.bankAccount && <span className="text-fine" style={{ color: 'var(--color-text-muted)' }}>· {tx.bankAccount.accountName}</span>}
                   </div>
                 </div>
                 <span className="text-sm font-bold tabular-nums shrink-0" style={{ color: 'var(--color-text-primary)' }}>

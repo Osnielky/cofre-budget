@@ -35,7 +35,7 @@ export default function ExpenseChangePanel({ changes, unchanged, monthLabel, pre
             );
           })}
           {unchanged > 0 && (
-            <li className="text-[10px] pt-1" style={{ color: 'var(--color-text-muted)' }}>
+            <li className="text-fine pt-1" style={{ color: 'var(--color-text-muted)' }}>
               {unchanged} categor{unchanged === 1 ? 'y' : 'ies'} unchanged
             </li>
           )}

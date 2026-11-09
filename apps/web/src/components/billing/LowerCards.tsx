@@ -194,7 +194,7 @@ export function BillingHelpCard({ actions }: { actions: BillingActions }) {
               <span style={{ color: 'var(--color-primary)' }}><Icon name={it.icon} size={18} /></span>
               <span className="min-w-0 text-left">
                 <span className="block text-xs font-semibold" style={{ color: 'var(--color-text-primary)' }}>{it.title}</span>
-                <span className="block text-[11px]" style={{ color: 'var(--color-text-muted)' }}>{it.detail}</span>
+                <span className="block text-fine" style={{ color: 'var(--color-text-muted)' }}>{it.detail}</span>
               </span>
             </>
           );

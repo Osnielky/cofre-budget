@@ -55,7 +55,7 @@ function BudgetVsActualChart({ points, todayDay, hasIncome }: { points: DailyPoi
                 formatter={(v: unknown, name: unknown) => [v == null ? '—' : `$${fmt(Number(v))}`, String(name)]} />
               {todayDay != null && (
                 <ReferenceLine x={points[todayDay - 1]?.label} stroke={tc.textMuted} strokeDasharray="3 3"
-                  label={{ value: 'Today', position: 'insideTopRight', fill: tc.textMuted, fontSize: 10 }} />
+                  label={{ value: 'Today', position: 'insideTopRight', fill: tc.textMuted, className: 'text-fine' }} />
               )}
               <Area type="monotone" dataKey={series.actual} name={series.actualLabel} stroke={tc.orange} strokeWidth={2}
                 fill="url(#bva-actual)" connectNulls={false} dot={false} isAnimationActive={false} />

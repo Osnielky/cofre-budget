@@ -9,7 +9,7 @@ export function Stat({ label, value, sub, tone = 'default' }: { label: string; v
   const color = tone === 'good' ? 'var(--color-green)' : tone === 'warn' ? 'var(--color-amber)' : tone === 'bad' ? 'var(--color-rose)' : 'var(--color-text-primary)';
   return (
     <div className="rounded-2xl p-4" style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)' }}>
-      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
+      <p className="text-fine font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
       <p className="mt-1 text-2xl font-bold tracking-tight" style={{ color }}>{value}</p>
       {sub && <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--color-text-secondary)' }}>{sub}</p>}
     </div>

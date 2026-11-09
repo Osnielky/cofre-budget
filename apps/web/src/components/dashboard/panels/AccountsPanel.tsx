@@ -31,7 +31,7 @@ export default function AccountsPanel({ accounts, netWorth, loading }: {
       legend={
         <div className="text-right">
           <p className="text-xs font-black tabular-nums" style={{ color: 'var(--color-primary)' }}>${fmt(netWorth)}</p>
-          <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>net worth</p>
+          <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>net worth</p>
         </div>
       }>
       {accounts.length === 0 ? (
@@ -45,7 +45,7 @@ export default function AccountsPanel({ accounts, netWorth, loading }: {
                 <div style={{ width: `${totalAssets/(totalAssets+totalDebt)*100}%`, background: 'var(--color-green)' }} />
                 <div style={{ width: `${totalDebt/(totalAssets+totalDebt)*100}%`, background: 'var(--color-rose)' }} />
               </div>
-              <div className="flex justify-between text-[10px] mt-1" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="flex justify-between text-fine mt-1" style={{ color: 'var(--color-text-muted)' }}>
                 <span style={{ color: 'var(--color-green)' }}>Assets ${fmtK(totalAssets)}</span>
                 <span style={{ color: 'var(--color-rose)' }}>Debt ${fmtK(totalDebt)}</span>
               </div>
@@ -62,7 +62,7 @@ export default function AccountsPanel({ accounts, netWorth, loading }: {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-semibold truncate">{acc.accountName}</p>
-                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+                  <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
                     {acc.bankName}{isDebt ? ' · owed' : ''}
                   </p>
                 </div>
@@ -74,7 +74,7 @@ export default function AccountsPanel({ accounts, netWorth, loading }: {
             );
           })}
           {accounts.length > 5 && (
-            <Link href="/settings" className="text-[10px] text-center hover:opacity-80" style={{ color: 'var(--color-text-muted)' }}>
+            <Link href="/settings" className="text-fine text-center hover:opacity-80" style={{ color: 'var(--color-text-muted)' }}>
               +{accounts.length - 5} more accounts
             </Link>
           )}

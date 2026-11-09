@@ -23,7 +23,7 @@ export default function PaceChart({ points, prevLabel }: { points: PacePoint[]; 
             <XAxis dataKey="day" {...th.xAxis} tickFormatter={(d) => `D${d}`} interval="preserveStartEnd" minTickGap={24} />
             <YAxis {...th.yAxis} />
             <Tooltip {...th.tooltip} labelFormatter={(d) => `Day ${d}`} formatter={(v: unknown, name: unknown) => [money(Number(v)), name === 'cur' ? 'This period' : prevLabel]} />
-            <Legend wrapperStyle={{ fontSize: 11 }} formatter={(v) => (v === 'cur' ? 'This period' : prevLabel)} />
+            <Legend wrapperStyle={{ fontSize: 'var(--text-fine)' }} formatter={(v) => (v === 'cur' ? 'This period' : prevLabel)} />
             <Line type="monotone" dataKey="prev" stroke={tc.textMuted} strokeWidth={2} strokeDasharray="6 5" dot={false} connectNulls={false} isAnimationActive={false} />
             <Line type="monotone" dataKey="cur" stroke={tc.primary} strokeWidth={2.5} dot={false} connectNulls={false} isAnimationActive={false} />
           </LineChart>

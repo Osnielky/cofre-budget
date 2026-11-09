@@ -193,7 +193,7 @@ function AccountCard({ account: pa, institutionName, manualAccounts, lastEntryDa
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold truncate">{pa.name}</p>
-          <p className="text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+          <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
             {meta.label}{pa.mask ? ` ···${pa.mask}` : ''}
           </p>
         </div>
@@ -219,7 +219,7 @@ function AccountCard({ account: pa, institutionName, manualAccounts, lastEntryDa
         <div className="flex flex-col gap-2">
           <div className="flex flex-col rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
             {sameBank.length === 0 && (
-              <p className="px-3 py-2 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+              <p className="px-3 py-2 text-fine" style={{ color: 'var(--color-text-muted)' }}>
                 None of your manual accounts is at {institutionName}. Pick one from another bank below if you named it differently.
               </p>
             )}
@@ -229,7 +229,7 @@ function AccountCard({ account: pa, institutionName, manualAccounts, lastEntryDa
             ))}
             {otherBanks.length > 0 && (
               <button type="button" onClick={() => setShowOthers((v) => !v)}
-                className="flex items-center justify-between px-3 py-2 text-[11px] font-medium text-left hover:bg-[var(--color-elevated)] transition-colors"
+                className="flex items-center justify-between px-3 py-2 text-fine font-medium text-left hover:bg-[var(--color-elevated)] transition-colors"
                 style={{ color: 'var(--color-text-secondary)', borderTop: sameBank.length ? '1px solid var(--color-border)' : undefined }}>
                 <span>Other banks ({otherBanks.length})</span>
                 <span aria-hidden="true">{showOthers ? '▴' : '▾'}</span>
@@ -253,7 +253,7 @@ function AccountCard({ account: pa, institutionName, manualAccounts, lastEntryDa
                 )}
               </p>
               {editDate && (
-                <label className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--color-text-muted)' }}>
+                <label className="flex items-center gap-2 text-fine" style={{ color: 'var(--color-text-muted)' }}>
                   <span className="shrink-0">Import from</span>
                   <input type="date" value={d.cutoverDate} onChange={(e) => onChange({ cutoverDate: e.target.value })}
                     className="px-3 py-1.5 text-sm outline-none rounded-lg flex-1 min-w-0"
@@ -298,7 +298,7 @@ function ChoiceTile({ selected, disabled, title, caption, onSelect }: {
         </span>
         {title}
       </span>
-      <span className="text-[11px] pl-[22px]" style={{ color: 'var(--color-text-muted)' }}>{caption}</span>
+      <span className="text-fine pl-[22px]" style={{ color: 'var(--color-text-muted)' }}>{caption}</span>
     </button>
   );
 }
@@ -318,12 +318,12 @@ function CandidateRow({ candidate: a, selected, showBank, tag, onSelect }: {
       <span className="w-1 self-stretch rounded-full shrink-0" style={{ background: meta.accent }} />
       <span className="min-w-0 flex-1">
         <span className="block text-[13px] font-medium truncate">{a.accountName}</span>
-        <span className="block text-[11px] truncate" style={{ color: 'var(--color-text-muted)' }}>
+        <span className="block text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>
           {showBank ? `${a.bankName} · ` : ''}{meta.label}{a.last4 ? ` ···${a.last4}` : ''}
         </span>
       </span>
       {tag && (
-        <span className="hidden sm:inline text-[10px] font-semibold px-1.5 py-0.5 rounded-md shrink-0"
+        <span className="hidden sm:inline text-fine font-semibold px-1.5 py-0.5 rounded-md shrink-0"
           style={{ background: 'color-mix(in srgb, var(--color-green) 16%, transparent)', color: 'var(--color-green)' }}>
           {tag}
         </span>

@@ -549,7 +549,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                             <span className="flex-1 min-w-0 text-left">
                               <span className="font-medium block truncate" style={{ color: on ? pc.color : 'var(--color-text-primary)' }}>{pc.name}</span>
                               {showProject && (
-                                <span className="block truncate text-[10px]" style={{ color: 'var(--color-text-muted)' }}>
+                                <span className="block truncate text-fine" style={{ color: 'var(--color-text-muted)' }}>
                                   {project.icon} {project.name}
                                 </span>
                               )}
@@ -611,7 +611,7 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                                 >
                                   <span aria-hidden="true">‹</span>
                                   <span className="truncate">{drillProject.icon} {drillProject.name}</span>
-                                  <span className="ml-auto text-[10px] font-normal" style={{ color: 'var(--color-text-muted)' }}>All categories</span>
+                                  <span className="ml-auto text-fine font-normal" style={{ color: 'var(--color-text-muted)' }}>All categories</span>
                                 </button>
                                 {projectOptions.filter(({ project }) => project.id === drillProject.id).map((o) => renderProjectCat(o, false))}
                               </>
@@ -629,14 +629,14 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                                   fpc.length > 0 && (
                                     <>
                                       <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-                                      <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Projects</p>
+                                      <p className="px-3 pt-1 pb-0.5 text-fine font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Projects</p>
                                       {fpc.map((o) => renderProjectCat(o))}
                                     </>
                                   )
                                 ) : pickerProjects.length > 0 && (
                                   <>
                                     <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
-                                    <p className="px-3 pt-1 pb-0.5 text-[10px] font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Projects</p>
+                                    <p className="px-3 pt-1 pb-0.5 text-fine font-bold tracking-widest uppercase" style={{ color: 'var(--color-text-muted)' }}>Projects</p>
                                     {pickerProjects.map((p) => {
                                       const holdsSelection = line.projectId === p.id && !!line.projectCategoryId;
                                       const tint = p.color ?? PROJECT_FALLBACK;
@@ -649,8 +649,8 @@ export default function SplitTransactionModal({ tx, categories, onSave, onClose,
                                         >
                                           <span className="w-6 h-6 rounded-lg flex items-center justify-center text-base shrink-0" style={{ background: `${tint}20` }}>{p.icon}</span>
                                           <span className="font-medium flex-1 min-w-0 text-left truncate" style={{ color: 'var(--color-text-primary)' }}>{p.name}</span>
-                                          {holdsSelection && <span className="text-[10px]" style={{ color: tint }}>●</span>}
-                                          <span className="text-[11px] tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{(p.categories ?? []).length}</span>
+                                          {holdsSelection && <span className="text-fine" style={{ color: tint }}>●</span>}
+                                          <span className="text-fine tabular-nums" style={{ color: 'var(--color-text-muted)' }}>{(p.categories ?? []).length}</span>
                                           <span aria-hidden="true" style={{ color: 'var(--color-text-muted)' }}>›</span>
                                         </button>
                                       );

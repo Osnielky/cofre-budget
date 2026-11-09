@@ -47,7 +47,7 @@ export default function CategoryDonutPanel({ title, subtitle, slices: rawSlices,
 
   const toggleBtn = (m: 'amount' | 'percent', label: string) => (
     <button key={m} onClick={() => setMode(m)}
-      className="px-2.5 py-1 rounded-md text-[10.5px] font-semibold transition-all cursor-pointer"
+      className="px-2.5 py-1 rounded-md text-fine font-semibold transition-all cursor-pointer"
       style={mode === m
         ? { background: 'color-mix(in srgb, var(--color-primary) 16%, transparent)', border: '1px solid color-mix(in srgb, var(--color-primary) 35%, transparent)', color: 'var(--color-primary)' }
         : { background: 'transparent', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' }}>
@@ -81,14 +81,14 @@ export default function CategoryDonutPanel({ title, subtitle, slices: rawSlices,
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>Total</p>
+                <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>Total</p>
                 <p className="text-lg font-bold tabular-nums">${fmt(total)}</p>
               </div>
             </div>
 
             {/* Category table */}
             <div className="flex-1 min-w-0 w-full flex flex-col gap-1 justify-evenly self-stretch">
-              <div className="flex items-center gap-2.5 text-[10px] pb-1" style={{ color: 'var(--color-text-muted)' }}>
+              <div className="flex items-center gap-2.5 text-fine pb-1" style={{ color: 'var(--color-text-muted)' }}>
                 <span className="flex-1">Category</span>
                 <span className="w-16 sm:w-20 text-right">{mode === 'amount' ? 'Amount' : 'Percent'}</span>
                 <span className="w-10 sm:w-12 text-right truncate">{mode === 'amount' ? '% of total' : 'Amount'}</span>
@@ -104,7 +104,7 @@ export default function CategoryDonutPanel({ title, subtitle, slices: rawSlices,
                     {mode === 'amount' ? `$${fmt(s.value)}` : `${s.pct}%`}
                   </span>
                   <span className="w-10 sm:w-12 text-right shrink-0">
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded tabular-nums"
+                    <span className="text-fine font-semibold px-1.5 py-0.5 rounded tabular-nums"
                       style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}>
                       {mode === 'amount' ? `${Math.round(s.pct)}%` : `$${fmt(s.value)}`}
                     </span>
@@ -129,12 +129,12 @@ export default function CategoryDonutPanel({ title, subtitle, slices: rawSlices,
                   style={{ background: 'var(--color-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)' }}
                   aria-hidden="true">Σ</span>
                 <div className="min-w-0">
-                  <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>Total</p>
+                  <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>Total</p>
                   <p className="text-xs font-bold truncate">{subtitle}</p>
                 </div>
                 <div className="ml-auto text-right shrink-0">
                   <p className="text-xs font-bold tabular-nums">${fmt(total)}</p>
-                  <p className="text-[9.5px]" style={{ color: 'var(--color-text-muted)' }}>
+                  <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>
                     {slices.length} {slices.length === 1 ? 'category' : 'categories'}
                   </p>
                 </div>
@@ -145,12 +145,12 @@ export default function CategoryDonutPanel({ title, subtitle, slices: rawSlices,
                   style={{ border: 'var(--glass-border)', background: `color-mix(in srgb, ${s.color} 4%, transparent)` }}>
                   <IconChip slice={s} />
                   <div className="min-w-0">
-                    <p className="text-[10px] truncate" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
+                    <p className="text-fine truncate" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
                     <p className="text-xs font-bold truncate">{s.name}</p>
                   </div>
                   <div className="ml-auto text-right shrink-0">
                     <p className="text-xs font-bold tabular-nums" style={{ color: s.color }}>${fmt(s.value)}</p>
-                    <p className="text-[9.5px]" style={{ color: 'var(--color-text-muted)' }}>{s.pct}% of total</p>
+                    <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>{s.pct}% of total</p>
                   </div>
                 </div>
               ))}

@@ -13,7 +13,7 @@ function StatChip({ icon, iconBg, label, value }: { icon: React.ReactNode; iconB
         {icon}
       </span>
       <div className="min-w-0">
-        <p className="text-[10px] uppercase truncate" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
+        <p className="text-fine uppercase truncate" style={{ color: 'var(--color-text-muted)' }}>{label}</p>
         <p className="font-bold text-sm truncate">${fmt(value === undefined ? 0 : Number(value))}</p>
       </div>
     </div>
@@ -72,7 +72,7 @@ export default function SafeToSpendWidget({ data }: { data: SafeToSpendWidgetDat
         </BarChart>
       </ResponsiveContainer>
 
-      <p className="text-[10px]" style={{ color: 'var(--color-text-muted)' }}>For {data.month} · buffer is 5% of projected income, held back for surprises</p>
+      <p className="text-fine" style={{ color: 'var(--color-text-muted)' }}>For {data.month} · buffer is 5% of projected income, held back for surprises</p>
     </div>
   );
 }
