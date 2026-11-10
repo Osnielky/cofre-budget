@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import Logo from './Logo';
@@ -8,23 +8,19 @@ import Avatar from './Avatar';
 import { useUser } from './UserProvider';
 import { clearApiCache } from '@/lib/api/cache';
 import dynamic from 'next/dynamic';
+import { NAV_GROUPS, isNavActive, type NavIcon } from '@/lib/nav';
 
 /* Loaded on first click only: the modal pulls in html-to-image, which no other page needs. */
 const ReportProblemModal = dynamic(() => import('./support/ReportProblemModal'), { ssr: false });
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3333/api';
 
-const NAV = [
-  { label: 'Dashboard',    href: '/dashboard',    icon: DashboardIcon },
-  { label: 'Ask Cofre',    href: '/ask-cofre',    icon: AskCofreIcon },
-  { label: 'Goals',        href: '/goals',        icon: GoalsIcon },
-  { label: 'Transactions', href: '/transactions', icon: TransactionsIcon },
-  { label: 'Reports',      href: '/reports',      icon: ReportsNavIcon },
-  { label: 'Budgets',      href: '/budgets',      icon: BudgetsIcon },
-  { label: 'Projects',     href: '/projects',     icon: ProjectsIcon },
-  { label: 'Debts',        href: '/debts',        icon: DebtsIcon },
-  { label: 'Cards',        href: '/cards',        icon: CardsIcon },
-];
+/* The pages come from lib/nav.ts (Overview · Money · Wealth); this map only draws them. */
+const ICONS: Record<NavIcon, () => ReactNode> = {
+  'dashboard': DashboardIcon, 'ask-cofre': AskCofreIcon,
+  'transactions': TransactionsIcon, 'budgets': BudgetsIcon, 'reports': ReportsNavIcon,
+  'goals': GoalsIcon, 'cards': CardsIcon, 'debts': DebtsIcon, 'projects': ProjectsIcon,
+};
 
 export default function Sidebar() {
   const pathname   = usePathname();
@@ -115,7 +111,7 @@ export default function Sidebar() {
       </button>
 
       {/* ── Brand ── */}
-      <div className="px-6 md:px-0 lg:px-6 pt-7 md:pt-5 lg:pt-7 pb-6 md:pb-4 lg:pb-6 mb-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
+      <div className="px-6 md:px-0 lg:px-6 pt-5 pb-3 mb-1" style={{ borderBottom: '1px solid var(--color-border)' }}>
         <Link href="/dashboard" className="flex items-center md:justify-center lg:justify-start gap-3.5 no-underline" title="Cofre">
           <span className="w-14 h-14 md:w-11 md:h-11 lg:w-14 lg:h-14 rounded-full flex items-center justify-center shrink-0 overflow-hidden"
             style={{
@@ -137,15 +133,23 @@ export default function Sidebar() {
         </Link>
       </div>
 
-      {/* ── Nav ── */}
-      <nav className="flex flex-col gap-1.5 px-4 md:px-2.5 lg:px-4 flex-1 pt-2">
-        <p className="md:hidden lg:block text-fine font-semibold uppercase pl-3 mb-1.5 mt-1"
-          style={{ color: 'var(--color-text-muted)', letterSpacing: '0.28em' }}>Overview</p>
-        {NAV.map(({ label, href, icon: Icon }) => {
-          const active = pathname === href;
-          return (
-            <Link key={href} href={href} title={label}
-              className="flex items-center md:justify-center lg:justify-start gap-3.5 px-3.5 md:px-0 lg:px-3.5 py-3 rounded-xl text-[15px] transition-all group relative"
+      {/* ── Nav: three groups by job. Headings show in the drawer and the full
+          sidebar; the icon rail separates the groups with a hairline instead.
+          Scrolls on its own when a short window cannot hold every row. ── */}
+      <nav className="flex flex-col px-4 md:px-2.5 lg:px-4 flex-1 min-h-0 overflow-y-auto pt-1" aria-label="Pages">
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={group.id} className="flex flex-col gap-1" role="group" aria-labelledby={`nav-group-${group.id}`}>
+            <p id={`nav-group-${group.id}`} className={`md:hidden lg:block text-fine font-semibold uppercase pl-3 mb-1 ${gi === 0 ? 'mt-1' : 'mt-2.5'}`}
+              style={{ color: 'var(--color-text-muted)', letterSpacing: '0.28em' }}>{group.label}</p>
+            {gi > 0 && (
+              <span aria-hidden="true" className="hidden md:block lg:hidden h-px mx-3 my-2" style={{ background: 'var(--color-border)' }} />
+            )}
+            {group.items.map(({ label, href, icon }) => {
+              const Icon = ICONS[icon];
+              const active = isNavActive(pathname, href);
+              return (
+            <Link key={href} href={href} title={label} aria-current={active ? 'page' : undefined}
+              className="flex items-center md:justify-center lg:justify-start gap-3.5 px-3.5 md:px-0 lg:px-3.5 py-2 rounded-xl text-[15px] transition-all group relative"
               style={{
                 color: active ? 'var(--nav-active-fg, var(--color-text-primary))' : 'var(--color-text-secondary)',
                 background: active ? 'var(--nav-active-bg)' : 'transparent',
@@ -165,19 +169,21 @@ export default function Sidebar() {
               </span>
               <span className="md:hidden lg:inline">{label}</span>
             </Link>
-          );
-        })}
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* ── Settings ── */}
-      <div className="px-4 md:px-2.5 lg:px-4 pb-2 flex flex-col gap-1.5">
-        <p className="md:hidden lg:block text-fine font-semibold uppercase pl-3 mb-1.5"
+      <div className="px-4 md:px-2.5 lg:px-4 pb-2 pt-1 flex flex-col gap-1 shrink-0">
+        <p className="md:hidden lg:block text-fine font-semibold uppercase pl-3 mb-1"
           style={{ color: 'var(--color-text-muted)', letterSpacing: '0.28em' }}>Account</p>
         {user?.isAdmin && (() => {
-          const active = pathname === '/admin';
+          const active = isNavActive(pathname, '/admin');
           return (
-            <Link href="/admin" title="Admin"
-              className="flex items-center md:justify-center lg:justify-start gap-3.5 px-3.5 md:px-0 lg:px-3.5 py-3 rounded-xl text-[15px] transition-all relative"
+            <Link href="/admin" title="Admin" aria-current={active ? 'page' : undefined}
+              className="flex items-center md:justify-center lg:justify-start gap-3.5 px-3.5 md:px-0 lg:px-3.5 py-2 rounded-xl text-[15px] transition-all relative"
               style={{
                 color: active ? 'var(--nav-active-fg, var(--color-text-primary))' : 'var(--color-text-secondary)',
                 background: active ? 'var(--nav-active-bg)' : 'transparent',
@@ -198,7 +204,7 @@ export default function Sidebar() {
           );
         })()}
         <button type="button" onClick={() => { setOpen(false); setReporting(true); }} title="Report a problem"
-          className="w-full flex items-center md:justify-center lg:justify-start gap-3.5 px-3.5 md:px-0 lg:px-3.5 py-3 rounded-xl text-[15px] transition-all cursor-pointer"
+          className="w-full flex items-center md:justify-center lg:justify-start gap-3.5 px-3.5 md:px-0 lg:px-3.5 py-2 rounded-xl text-[15px] transition-all cursor-pointer"
           style={{ color: 'var(--color-text-secondary)', border: '1px solid transparent', letterSpacing: '0.03em' }}
           onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-elevated)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
@@ -207,10 +213,10 @@ export default function Sidebar() {
         </button>
         {reporting && <ReportProblemModal onClose={() => setReporting(false)} />}
         {(() => {
-          const active = pathname === '/settings';
+          const active = isNavActive(pathname, '/settings');
           return (
-            <Link href="/settings" title="Settings"
-              className="flex items-center md:justify-center lg:justify-start gap-3.5 px-3.5 md:px-0 lg:px-3.5 py-3 rounded-xl text-[15px] transition-all relative"
+            <Link href="/settings" title="Settings" aria-current={active ? 'page' : undefined}
+              className="flex items-center md:justify-center lg:justify-start gap-3.5 px-3.5 md:px-0 lg:px-3.5 py-2 rounded-xl text-[15px] transition-all relative"
               style={{
                 color: active ? 'var(--nav-active-fg, var(--color-text-primary))' : 'var(--color-text-secondary)',
                 background: active ? 'var(--nav-active-bg)' : 'transparent',
@@ -233,7 +239,7 @@ export default function Sidebar() {
       </div>
 
       {/* ── User block ── */}
-      <div className="mx-3 md:mx-2 lg:mx-3 mb-4 p-3 md:p-2 lg:p-3 rounded-2xl flex md:flex-col lg:flex-row items-center gap-2.5 md:gap-2 lg:gap-2.5"
+      <div className="mx-3 md:mx-2 lg:mx-3 mb-3 p-3 md:p-2 lg:p-3 rounded-2xl flex md:flex-col lg:flex-row items-center gap-2.5 md:gap-2 lg:gap-2.5"
         style={{ background: 'var(--color-elevated)', border: 'var(--glass-border)' }}
         title={user?.email ?? undefined}>
         <Avatar name={user?.name} email={user?.email} src={user?.avatarUrl} size={32} rounded={12} />
