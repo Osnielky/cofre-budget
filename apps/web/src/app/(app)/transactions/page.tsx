@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import RecurringPanel, { emptyRecurring, occurrenceDates, type RecurringState } from '@/components/RecurringPanel';
 import DatePicker from '@/components/DatePicker';
 import { Stagger, StaggerItem } from '@/components/motion/stagger';
-import PageHeader from '@/components/PageHeader';
+import PageHeader, { HeaderAction } from '@/components/PageHeader';
 import PeriodPicker from '@/components/PeriodPicker';
 import { normalizePeriod, resolvePeriod, thisMonth, type Period } from '@/lib/period';
 import { useApi } from '@/hooks/useApi';
@@ -1045,12 +1045,8 @@ export default function TransactionsPage() {
         <PageHeader sticky="md" title="Transactions" subtitle="Track, review and organize your money" phoneSubtitle={false}
           period={<PeriodPicker mode="range" max={null} value={period} onChange={setPeriod} />}
           actions={<>
-              {/* New manual transaction */}
-              <button onClick={() => { setManualTxError(''); setShowManualTx(true); }}
-                className="btn-gold flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-xl transition-all"
->
-                <PlusIcon /> New
-              </button>
+              {/* New manual transaction — the page's primary action (the phone top bar shows it below md) */}
+              <HeaderAction primary onClick={() => { setManualTxError(''); setShowManualTx(true); }} label="New" icon={<PlusIcon />} />
               {/* Import CSV (icon-only on phones) */}
               <div className="relative" ref={importBtnRef}>
                 <button onClick={() => { setShowImportPicker((v) => !v); setShowAddAccForm(false); setAddAccError(''); }}

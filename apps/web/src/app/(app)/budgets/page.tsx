@@ -200,8 +200,10 @@ export default function BudgetsPage() {
     [plan.rows],
   );
 
+  const addBudget = () => setFormReq({ kind: 'expense', editing: null });
+  /* The empty-state button; the header renders the same action as the page's primary HeaderAction. */
   const addBudgetBtn = (
-    <button type="button" onClick={() => setFormReq({ kind: 'expense', editing: null })}
+    <button type="button" onClick={addBudget}
       className="btn-gold px-4 py-2 text-xs font-bold text-white rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
 >
       <Icon name="plus" size={13} strokeWidth={2.4} /> Add budget
@@ -219,7 +221,7 @@ export default function BudgetsPage() {
           phoneSubtitle={false}
           period={<>
             <PeriodPicker mode="month" value={{ kind: 'month', month }} onChange={(p) => p.kind === 'month' && changeMonth(p.month)} />
-            <span className="text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
+            <span className="hidden sm:inline text-xs whitespace-nowrap" style={{ color: 'var(--color-text-muted)' }}>
               Day {dayOfMonth(month, s.now)} of {daysInMonth(month)}
             </span>
           </>}
@@ -228,7 +230,7 @@ export default function BudgetsPage() {
               icon={<Icon name="layers" size={14} />}
               title={s.dirty ? 'Save or discard your draft changes before importing a plan' : 'Copy another month’s plan into this month'} />
             <HeaderAction onClick={() => setSetAllOpen(true)} label="Set all" shortLabel={null} icon={<Icon name="list" size={14} />} />
-            {addBudgetBtn}
+            <HeaderAction primary onClick={addBudget} label="Add budget" shortLabel={null} icon={<Icon name="plus" size={14} strokeWidth={2.4} />} />
           </>}
         />
 

@@ -24,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 /** Browser chrome colour on phones; matches the Cobalt navy base. */
-export const viewport: Viewport = { themeColor: '#0B1326' };
+export const viewport: Viewport = { themeColor: '#0B1326', viewportFit: 'cover' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

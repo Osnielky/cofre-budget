@@ -202,7 +202,7 @@ export default function DashboardPage() {
                  two shortcuts. Phones keep icon-only shortcuts on the title row and the stepper
                  on its own row — PageHeader lays that out. ── */}
           <StaggerItem>
-            <PageHeader
+            <PageHeader phoneTitle
               title={<>{greeting()}{user?.name ? <>, <span style={{ color: 'var(--color-primary)' }}>{user.name.split(' ')[0]}</span></> : ''}</>}
               subtitle={loading
                 ? <span className="flex flex-col gap-2 pt-1" aria-busy="true"><span className="skel block h-3.5 w-72 max-w-full rounded" /><span className="skel hidden sm:block h-3.5 w-52 rounded" /></span>

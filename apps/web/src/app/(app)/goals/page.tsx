@@ -27,7 +27,7 @@ export default function GoalsPage() {
         {/* No width cap: on wide screens the chart row grows a third column (milestones). */}
         <Stagger className="px-4 sm:px-6 md:px-8 2xl:px-10 py-5 sm:py-6 flex flex-col gap-5">
           <StaggerItem>
-            <PageHeader title="Your road to $1,000,000" subtitle={<>See how far you&rsquo;ve come. Keep building what&rsquo;s next.</>}
+            <PageHeader phoneTitle title="Your road to $1,000,000" subtitle={<>See how far you&rsquo;ve come. Keep building what&rsquo;s next.</>}
               actions={<HeaderAction href="/settings?tab=banks" label="Update assets"
                 icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /></svg>} />} />
           </StaggerItem>

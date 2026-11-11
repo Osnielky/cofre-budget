@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NAV_GROUPS, NAV_ITEMS, isNavActive } from './nav';
+import { NAV_GROUPS, NAV_ITEMS, activePhoneTab, isNavActive, pageTitleFor, phoneMoreItems, phoneTabs } from './nav';
 
 describe('NAV_GROUPS', () => {
   it('groups the nine pages by job, in reading order', () => {
@@ -26,5 +26,32 @@ describe('isNavActive', () => {
     expect(isNavActive('/cardsx', '/cards')).toBe(false);
     expect(isNavActive('/transactions', '/dashboard')).toBe(false);
     expect(isNavActive(null, '/dashboard')).toBe(false);
+  });
+});
+
+describe('phone navigation', () => {
+  it('puts the four daily pages in the tab bar and the rest, in sidebar order, under More', () => {
+    expect(phoneTabs().map((t) => t.label)).toEqual(['Dashboard', 'Transactions', 'Budgets', 'Ask Cofre']);
+    expect(phoneMoreItems().map((t) => t.label)).toEqual(['Reports', 'Goals', 'Cards', 'Debts', 'Projects']);
+    expect([...phoneTabs(), ...phoneMoreItems()]).toHaveLength(NAV_ITEMS.length);
+  });
+
+  it('lights the tab of the open page, More for the other pages, nothing off the map', () => {
+    expect(activePhoneTab('/budgets')).toBe('/budgets');
+    expect(activePhoneTab('/ask-cofre')).toBe('/ask-cofre');
+    expect(activePhoneTab('/goals')).toBe('more');
+    expect(activePhoneTab('/settings/plaid-oauth-redirect')).toBe('more');
+    expect(activePhoneTab('/admin')).toBe('more');
+    expect(activePhoneTab('/login')).toBeNull();
+    expect(activePhoneTab(null)).toBeNull();
+  });
+
+  it('titles the top bar with the page name, Settings on its sub-routes, the app name elsewhere', () => {
+    expect(pageTitleFor('/transactions')).toBe('Transactions');
+    expect(pageTitleFor('/ask-cofre')).toBe('Ask Cofre');
+    expect(pageTitleFor('/settings/plaid-oauth-redirect')).toBe('Settings');
+    expect(pageTitleFor('/admin')).toBe('Admin');
+    expect(pageTitleFor('/nowhere')).toBe('Cofre');
+    expect(pageTitleFor(null)).toBe('Cofre');
   });
 });
